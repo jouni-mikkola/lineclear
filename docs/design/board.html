@@ -1,0 +1,1053 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lineclear: the design board for Phase 13</title>
+<style>
+/* The board: the target Phase 13 builds to. Self-contained: no network, no fonts, no images from files. */
+:root {
+  --b: #0b0b0c; --r: #141415; --r2: #1a1a1c; --r3: #202023; --l: #26262a; --l2: #34343a; --l3: #4a4a50;
+  --f: #ece9e4; --f2: #a9a6a1; --f3: #8f8c87; --a: #d97757; --g: #5fa883; --am: #e7b25a; --rd: #e5484d;
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --press: 100ms; --hover: 120ms; --signal: 200ms; --move: 240ms; --view: 280ms; --leave: 200ms; --train: 240ms;
+  --ease: cubic-bezier(.2, .8, .2, 1); --ease-in: cubic-bezier(.4, 0, 1, 1); --ease-train: cubic-bezier(.45, 0, .2, 1);
+}
+html:not(.shepherdr-dark):not(.shepherdr-light) body { background: var(--b); color: var(--f); margin: 0; padding: 32px 24px 64px }
+body { font: 16px/1.5 var(--font); color: var(--fg, var(--f)) }
+.board { max-width: 1320px; margin: 0 auto }
+.board > header h1 { font-size: 32px; line-height: 38px; letter-spacing: -.02em; margin: 0 0 8px }
+.board > header p { margin: 0 0 8px; color: var(--fg2, var(--f2)); max-width: 760px }
+.toc { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 8px; padding: 0; list-style: none }
+.toc a { display: inline-block; padding: 6px 12px; border: 1px solid var(--line, var(--l)); border-radius: 16px; color: inherit; text-decoration: none; font-size: 14px }
+.sec { margin-top: 56px; padding-top: 24px; border-top: 1px solid var(--line, var(--l)) }
+.sec > h2 { font-size: 22px; line-height: 30px; margin: 0 0 4px; letter-spacing: -.01em }
+.sec > .ans { font-size: 16px; margin: 0 0 12px; color: var(--fg2, var(--f2)) }
+.sec > .ans b { color: var(--fg, var(--f)) }
+.notes { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 4px 32px; margin: 0 0 20px; padding: 0 0 0 18px; font-size: 14px; color: var(--fg2, var(--f2)) }
+.notes li { margin: 2px 0 }
+.notes b { color: var(--fg, var(--f)); font-weight: 600 }
+.frames { display: grid; gap: 24px; align-items: start }
+.frames.two { grid-template-columns: minmax(0, 1fr) }
+.cap { font-size: 12px; color: var(--fg3, var(--f3)); margin: 8px 0 0 }
+.phones { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 24px; align-items: start }
+.fit { position: relative; width: 100%; overflow: hidden; border-radius: 12px }
+.fit > * { position: absolute; left: 0; top: 0; transform-origin: 0 0 }
+.fit.ph { border-radius: 36px }
+
+/* The app: the dark graphite theme, on a 4 px grid */
+.app { background: var(--b); color: var(--f); font: 14px/20px var(--font); -webkit-font-smoothing: antialiased; overflow: hidden; text-align: left }
+.app * { box-sizing: border-box }
+.app h1, .app h2, .app h3, .app p { margin: 0 }
+.app .num, .app .t-num { font-variant-numeric: tabular-nums }
+.desk { width: 1440px; height: 900px; display: grid; grid-template-columns: 232px minmax(0, 1fr); border: 1px solid var(--l); border-radius: 12px }
+.phone.tab { width: 768px; height: 1024px; border-radius: 32px }
+.phone.tab .pbody { padding: 0 32px }
+.desk.wide { width: 2560px; height: 1200px }
+.desk.panel { grid-template-columns: 232px minmax(0, 1fr) 400px }
+.desk.wide.panel { grid-template-columns: 232px minmax(0, 1fr) 640px }
+.phone { width: 390px; height: 844px; border: 1px solid #2c2c31; border-radius: 44px; position: relative; display: flex; flex-direction: column }
+.sb { height: 48px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 28px 0 32px; font: 600 16px/1 var(--font) }
+.sb i { width: 64px; height: 12px; border-radius: 3px; background: linear-gradient(90deg, var(--f) 0 38%, transparent 38% 44%, var(--f) 44% 60%, transparent 60% 66%, var(--f) 66%) ; opacity: .9 }
+.pbody { flex: 1; overflow: hidden; padding: 0 16px; position: relative }
+.phead { height: 52px; display: flex; align-items: center; gap: 8px; margin: 0 -4px }
+.phead .sp { flex: 1 }
+.iconbtn { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 12px; color: var(--f2) }
+
+/* Rail */
+.rail { border-right: 1px solid var(--l); padding: 16px 12px; display: flex; flex-direction: column; gap: 2px; background: #0d0d0e; border-radius: 12px 0 0 12px }
+.brand { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 8px; margin-bottom: 12px; font: 600 16px/1 var(--font); letter-spacing: -.01em }
+.nav { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 8px; color: var(--f2); font-size: 14px; text-decoration: none; cursor: pointer; transition: background var(--hover) var(--ease-in), color var(--hover) var(--ease-in) }
+.nav:hover { background: var(--r2); color: var(--f) }
+.nav.sel { background: var(--r3); color: var(--f) }
+.nav .n { margin-left: auto; font-size: 12px; color: var(--f3); font-variant-numeric: tabular-nums }
+.n.am, .badge { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--am); color: #1b1408; font: 600 12px/20px var(--font); text-align: center }
+.rh { font-size: 12px; color: var(--f3); padding: 20px 10px 6px; display: flex; justify-content: space-between }
+.rfoot { margin-top: auto; display: flex; flex-direction: column; gap: 2px }
+.live { display: flex; align-items: center; gap: 8px; padding: 8px 10px 0; font-size: 12px; color: var(--f3) }
+.live i { width: 6px; height: 6px; border-radius: 3px; background: var(--f2) }
+
+/* Main */
+.main { padding: 40px 48px; overflow: hidden; display: flex; flex-direction: column; gap: 32px; min-width: 0 }
+.main.cols { display: grid; grid-template-columns: minmax(0, 1fr) 360px; column-gap: 40px; align-content: start }
+.hero h1 { font: 600 48px/56px var(--font); letter-spacing: -.025em }
+.hero h1.m { font-size: 32px; line-height: 38px; letter-spacing: -.02em }
+.hero p { margin-top: 8px; font-size: 16px; line-height: 24px; color: var(--f2) }
+.crumb { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--f3); margin-bottom: 12px }
+.crumb b { color: var(--f2); font-weight: 500 }
+.sh { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px }
+.sh h2 { font: 600 18px/26px var(--font) }
+.sh span, .sh a { font-size: 12px; color: var(--f3); text-decoration: none }
+.card { background: var(--r); border: 1px solid var(--l); border-radius: 12px }
+.meta { font-size: 12px; line-height: 16px; color: var(--f3); display: flex; align-items: center; gap: 6px; flex-wrap: wrap }
+.meta b { color: var(--f2); font-weight: 500 }
+.chip { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border-radius: 12px; background: var(--r3); color: var(--f2); font-size: 12px; white-space: nowrap }
+.chip.am { background: rgba(231, 178, 90, .13); color: var(--am) }
+.chip.g { background: rgba(95, 168, 131, .13); color: var(--g) }
+.chip.rd { background: rgba(229, 72, 77, .14); color: #ff8c8f }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--l2); background: var(--r2); color: var(--f); font: 600 14px/1 var(--font); cursor: pointer; white-space: nowrap;
+  transition: background var(--hover) var(--ease), border-color var(--hover) var(--ease), transform var(--press) var(--ease), filter var(--press) var(--ease) }
+.btn:hover { background: var(--r3); border-color: var(--l3) }
+.btn:active { transform: scale(.97); filter: brightness(.85) }
+.btn:focus-visible, .nav:focus-visible, .tab:focus-visible { outline: 2px solid var(--a); outline-offset: 2px }
+.btn.pri { background: var(--f); color: var(--b); border-color: var(--f) }
+.btn.pri:hover { background: #fffaf3 }
+.btn.gh { background: transparent; border-color: transparent; color: var(--f2) }
+.btn.gh:hover { background: var(--r2); color: var(--f) }
+.btn.sm { height: 32px; padding: 0 12px; font-size: 14px }
+.phone .btn { height: 48px; border-radius: 12px; font-size: 16px }
+.phone .btn.sm { height: 48px }
+.field { height: 40px; border: 1px solid var(--l2); border-radius: 8px; background: var(--b); display: flex; align-items: center; gap: 8px; padding: 0 12px; color: var(--f3); font-size: 14px }
+.phone .field { height: 48px; border-radius: 12px }
+code, .mono { font-family: var(--mono); font-size: inherit }
+.app code { background: var(--r3); padding: 1px 5px; border-radius: 4px; color: var(--f2) }
+
+/* Ask */
+.ask { padding: 20px 20px 20px 16px; display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 4px 12px; align-items: start; border-color: rgba(231, 178, 90, .28) }
+.ask .meta { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.ask .q { font: 600 18px/26px var(--font); margin-top: 4px }
+.ask .d { color: var(--f2); margin-top: 4px }
+.ask .acts { display: flex; gap: 8px; align-self: center }
+.phone .ask { grid-template-columns: 24px minmax(0, 1fr); padding: 16px 14px }
+.phone .ask .q { font-size: 16px; line-height: 24px }
+.phone .ask .acts { grid-column: 1 / -1; margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr 48px }
+.row { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 16px; border-top: 1px solid var(--l) }
+.row:first-child { border-top: 0 }
+.row .t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.row .t b { font-weight: 500 }
+
+/* The line */
+.tr { display: grid; grid-template-columns: 176px minmax(0, 1fr) 112px; align-items: center; gap: 16px; padding: 12px 16px; border-top: 1px solid var(--l); min-height: 84px; transition: background var(--hover) var(--ease); cursor: pointer }
+.tr:first-of-type { border-top: 0 }
+.tr:hover { background: #111113 }
+.tr h3 { font: 600 16px/22px var(--font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.tr .p { font-size: 12px; line-height: 16px; color: var(--f3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.tr .c { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; font-size: 12px; color: var(--f2) }
+.tr .c span { display: flex; align-items: center; gap: 6px }
+.ptr { padding: 14px 14px 10px; border-top: 1px solid var(--l) }
+.ptr:first-child { border-top: 0 }
+.ptr .top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px }
+.ptr h3 { font: 600 16px/22px var(--font); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+svg.trk { display: block; overflow: visible }
+svg.trk text { font: 12px var(--font); fill: var(--f3) }
+svg.trk text.on { fill: var(--f2); font-weight: 600 }
+.uline { display: flex; align-items: center; gap: 12px; color: var(--f2); font-size: 14px; padding: 12px 16px; text-decoration: none }
+.uline .bar { width: 120px; height: 6px; border-radius: 3px; background: var(--l2); overflow: hidden }
+.uline .bar i { display: block; height: 100%; background: var(--f2) }
+
+/* Tab bar */
+.tabs { flex: none; height: 84px; border-top: 1px solid var(--l); background: rgba(11, 11, 12, .92); display: grid; grid-template-columns: repeat(5, 1fr); padding: 0 4px 22px; border-radius: 0 0 44px 44px }
+.tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: var(--f3); font-size: 12px; position: relative; min-height: 56px }
+.tab.sel { color: var(--f) }
+.tab.sel::before { content: ""; position: absolute; top: 0; width: 24px; height: 2px; border-radius: 1px; background: var(--a) }
+.tab .badge { position: absolute; top: 6px; left: calc(50% + 6px); min-width: 18px; height: 18px; line-height: 18px; font-size: 12px; padding: 0 5px }
+
+/* Roadmap */
+.vt { position: relative }
+.vs { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 0 10px; align-items: start; padding: 10px 0; position: relative; min-height: 56px }
+.vs::before { content: ""; position: absolute; left: 13px; top: 0; bottom: 0; width: 2px; background: var(--l2) }
+.vs.d::before { background: var(--g); width: 3px; left: 12.5px }
+.vs:first-child::before { top: 18px }
+.vs:last-child::before { bottom: auto; height: 18px }
+.vs .st { position: relative; z-index: 1; width: 28px; height: 28px; display: grid; place-items: center }
+.vs .tt { font-size: 14px; line-height: 20px; min-width: 0 }
+.vs .tt b { font-weight: 500 }
+.vs .tt .meta { margin-top: 2px }
+.list .li { display: grid; grid-template-columns: 20px 56px minmax(0, 1fr) 140px 88px; gap: 12px; align-items: center; height: 44px; padding: 0 12px; border-top: 1px solid var(--l); font-size: 14px }
+.list .li:first-child { border-top: 0 }
+.list .li .id { color: var(--f3); font: 12px var(--mono) }
+.list .li .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.list .li .w { color: var(--f3); font-size: 12px; text-align: right }
+.mini { height: 4px; border-radius: 2px; background: var(--l2); overflow: hidden }
+.mini i { display: block; height: 100%; background: var(--g) }
+
+/* Inbox */
+.ibx { display: grid; grid-template-columns: 420px minmax(0, 1fr); height: 100%; min-height: 0 }
+.ilist { border-right: 1px solid var(--l); padding: 32px 0 0; overflow: hidden }
+.ig { font-size: 12px; color: var(--f3); padding: 16px 24px 6px; display: flex; justify-content: space-between }
+.it { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 2px 12px; padding: 12px 24px; cursor: pointer; transition: background var(--hover) var(--ease); border-left: 2px solid transparent }
+.it:hover { background: #111113 }
+.it.sel { background: var(--r2); border-left-color: var(--a) }
+.it .q { font-size: 14px; line-height: 20px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.it .age { font-size: 12px; color: var(--f3) }
+.idet { padding: 40px 48px; display: flex; flex-direction: column; gap: 20px; min-width: 0 }
+.idet h1 { font: 600 32px/38px var(--font); letter-spacing: -.015em; max-width: 680px }
+.ctx { padding: 16px 20px; display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 10px 16px; font-size: 14px }
+.ctx dt { color: var(--f3) }
+.ctx dd { margin: 0 }
+.ctx a { color: var(--f); text-decoration: underline; text-decoration-color: var(--l3); text-underline-offset: 3px }
+.answers { display: flex; gap: 8px; flex-wrap: wrap }
+.answers .btn { height: 44px; padding: 0 20px; font-size: 16px }
+.toast { white-space: nowrap; position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--f); color: var(--b); border-radius: 12px; padding: 0 8px 0 16px; height: 48px; display: flex; align-items: center; gap: 12px; font-weight: 500; box-shadow: 0 8px 32px rgba(0, 0, 0, .5) }
+.toast .btn { height: 36px; background: transparent; border: 0; color: var(--b); text-decoration: underline; text-underline-offset: 3px }
+
+/* Chat */
+.cpanel { border-left: 1px solid var(--l); display: flex; flex-direction: column; background: #0d0d0e; border-radius: 0 12px 12px 0; min-width: 0 }
+.chead { height: 64px; display: flex; align-items: center; gap: 12px; padding: 0 20px; border-bottom: 1px solid var(--l) }
+.chead .who { flex: 1 }
+.chead .who b { display: block; font-size: 16px }
+.msgs { flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 14px; overflow: hidden; justify-content: flex-end }
+.m { max-width: 88%; font-size: 14px; line-height: 21px }
+.m.me { align-self: flex-end; background: var(--r3); padding: 10px 14px; border-radius: 16px 16px 4px 16px }
+.m.dp { align-self: flex-start }
+.m.dp .by { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--f3); margin-bottom: 4px }
+.handon { margin-top: 10px; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--l2); border-radius: 12px; background: var(--r) }
+.handon .t { flex: 1; font-size: 14px }
+.handon .t span { display: block; color: var(--f3); font-size: 12px }
+.comp { margin: 0 16px 16px; border: 1px solid var(--l2); border-radius: 16px; background: var(--r); padding: 12px 12px 8px 16px }
+.comp .ph { all: unset; display: block; color: var(--f3); font-size: 14px; min-height: 40px }
+.comp .bar { display: flex; justify-content: space-between; align-items: center }
+.send { width: 36px; height: 36px; border-radius: 18px; background: var(--f); color: var(--b); display: grid; place-items: center }
+.phone .send { width: 48px; height: 48px; border-radius: 24px }
+
+/* Usage */
+.ugrid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px }
+.tile { padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; min-width: 0 }
+.tile .k { font-size: 12px; color: var(--f3); display: flex; justify-content: space-between; align-items: center; gap: 8px }
+.tile .v { font: 600 32px/38px var(--font); letter-spacing: -.02em; font-variant-numeric: tabular-nums }
+.tile .v small { font-size: 14px; font-weight: 500; color: var(--f2); letter-spacing: 0 }
+.tile .s { font-size: 12px; color: var(--f2) }
+.est { font-size: 12px; color: var(--f2); border: 1px dashed var(--l3); border-radius: 10px; padding: 1px 7px; white-space: nowrap }
+.lim { display: grid; grid-template-columns: 132px minmax(0, 1fr) 132px; gap: 12px; align-items: center; height: 44px; font-size: 14px; border-top: 1px solid var(--l); padding: 0 16px }
+.lim:first-child { border-top: 0 }
+.lim .bar { height: 8px; border-radius: 4px; background: var(--l2); position: relative }
+.lim .bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: var(--f2) }
+.lim .r { font-size: 12px; color: var(--f3); text-align: right }
+.siding { display: grid; grid-template-columns: 132px minmax(0, 1fr) 96px; gap: 12px; align-items: center; min-height: 52px; padding: 0 16px; border-top: 1px solid var(--l); font-size: 14px }
+.siding:first-child { border-top: 0 }
+.utab { width: 100%; border-collapse: collapse; font-size: 14px }
+.utab th { font-size: 12px; font-weight: 500; color: var(--f3); text-align: right; padding: 10px 16px; border-bottom: 1px solid var(--l) }
+.utab th:first-child, .utab td:first-child { text-align: left }
+.utab td { white-space: nowrap; text-align: right; padding: 0 16px; height: 44px; border-bottom: 1px solid var(--l); font-variant-numeric: tabular-nums }
+.utab tr:last-child td { border-bottom: 0 }
+.seg { display: inline-flex; padding: 2px; border-radius: 8px; background: var(--r2); border: 1px solid var(--l) }
+.seg span { padding: 4px 10px; border-radius: 6px; font-size: 12px; color: var(--f2) }
+.seg span.on { background: var(--r3); color: var(--f) }
+.legend { display: flex; gap: 16px; font-size: 12px; color: var(--f2) }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px }
+
+/* Settings */
+.sets { display: grid; grid-template-columns: 200px minmax(0, 720px); gap: 48px }
+.snav .nav { height: 32px }
+.sgroup { margin-bottom: 28px }
+.sgroup h2 { font: 600 18px/26px var(--font); margin-bottom: 4px }
+.sgroup > p { color: var(--f3); font-size: 14px; margin-bottom: 12px }
+.srow { display: grid; grid-template-columns: 120px minmax(0, 1fr) auto; gap: 16px; align-items: center; min-height: 52px; padding: 0 16px; border-top: 1px solid var(--l) }
+.srow:first-child { border-top: 0 }
+.srow .k { color: var(--f2); font-size: 14px }
+.order { display: flex; gap: 6px; flex-wrap: wrap }
+.order .chip { background: var(--r2); border: 1px solid var(--l2); color: var(--f); height: 28px; border-radius: 8px }
+.order .chip em { font-style: normal; color: var(--f3); font-size: 12px }
+.prow { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 0 16px; border-top: 1px solid var(--l) }
+.prow:first-child { border-top: 0 }
+.prow .t { flex: 1; min-width: 0 }
+.prow .t span { display: block; font-size: 12px; color: var(--f3) }
+
+/* Browsers */
+.bgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px }
+.bcard { overflow: hidden; cursor: pointer; transition: border-color var(--hover) var(--ease), transform var(--press) var(--ease) }
+.bcard:hover { border-color: var(--l3) }
+.shot { aspect-ratio: 16 / 10; background: #f3f1ee; position: relative; overflow: hidden; border-bottom: 1px solid var(--l) }
+.shot.dk { background: #101012 }
+.bcard .bt { padding: 12px 14px; display: flex; flex-direction: column; gap: 4px }
+.bcard .bt b { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+
+/* States */
+.stale { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 12px; border-radius: 8px; background: var(--r2); border: 1px solid var(--l2); font-size: 14px; color: var(--f2) }
+.skel { background: var(--r2); border-radius: 6px }
+.dash { border: 1px dashed var(--l3); border-radius: 12px }
+
+/* Parts and motion */
+.parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px }
+.part { padding: 14px; border-radius: 12px; background: var(--b); border: 1px solid var(--l); color: var(--f) }
+.part svg { display: block; margin-bottom: 10px }
+.part b { display: block; font-size: 14px; margin-bottom: 2px }
+.part span { display: block; font-size: 12px; line-height: 17px; color: var(--f2) }
+.tokens { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 12px }
+.tokens td, .tokens th { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line, var(--l)); vertical-align: top }
+.tokens th { font-weight: 600; color: var(--fg2, var(--f2)) }
+.demos { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px }
+.demo { border-radius: 12px; background: var(--b); border: 1px solid var(--l); color: var(--f); overflow: hidden }
+.demo .stage { height: 150px; position: relative; display: grid; place-items: center; border-bottom: 1px solid var(--l); overflow: hidden }
+.demo .info { padding: 12px 14px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: center }
+.demo .info b { font-size: 14px }
+.demo .info span { grid-column: 1; font-size: 12px; line-height: 17px; color: var(--f2) }
+.demo .info .btn { grid-row: 1 / span 2; grid-column: 2; height: 32px; font-size: 14px }
+
+@keyframes blink { 0%, 100% { opacity: 1 } 50% { opacity: .25 } }
+.blink { animation: blink 1.2s ease-in-out infinite }
+
+/* Motion demos: each plays when it scrolls into view and on Replay */
+.d-merge .train { transform: translateX(0) }
+.play.d-merge .train { animation: m-train 2.6s var(--ease-train) forwards }
+@keyframes m-train { 0% { transform: translateX(0) } 9% { transform: translateX(96px) } 62% { transform: translateX(96px) } 71%, 100% { transform: translateX(196px); opacity: 0 } }
+.play.d-merge .lampc { animation: m-lamp 2.6s linear forwards }
+@keyframes m-lamp { 0%, 32% { fill: transparent; stroke: var(--f2) } 38%, 46% { fill: transparent; stroke: var(--f2); opacity: .3 } 52% { opacity: 1; fill: transparent } 60%, 100% { fill: var(--g); stroke: var(--g) } }
+.play.d-merge .fillg { animation: m-fill 2.6s var(--ease) forwards }
+@keyframes m-fill { 0%, 76% { stroke-dashoffset: 96 } 86%, 100% { stroke-dashoffset: 0 } }
+.d-merge .fillg { stroke-dasharray: 96; stroke-dashoffset: 0 }
+.play.d-merge .stn { animation: m-stn 2.6s var(--ease) forwards }
+@keyframes m-stn { 0%, 86% { fill: var(--b); stroke: var(--f) } 91% { transform: scale(1.35) } 96%, 100% { fill: var(--g); stroke: var(--g); transform: scale(1) } }
+.d-merge .stn { fill: var(--g); stroke: var(--g); transform-box: fill-box; transform-origin: center }
+
+.d-answer .acard { transition: none }
+.play.d-answer .acard { animation: a-card 2.4s var(--ease) forwards }
+@keyframes a-card { 0%, 42% { opacity: 1; transform: none; height: 76px; margin-bottom: 0 } 50% { opacity: 0; transform: translateX(24px); height: 76px } 60%, 100% { opacity: 0; transform: translateX(24px); height: 0; margin-bottom: -8px } }
+.play.d-answer .apress { animation: a-press 2.4s linear forwards }
+@keyframes a-press { 0%, 18% { transform: none; filter: none } 20%, 24% { transform: scale(.97); filter: brightness(.85) } 28%, 100% { transform: none; filter: none } }
+.play.d-answer .alamp { animation: a-lamp 2.4s linear forwards }
+@keyframes a-lamp { 0%, 26% { fill: var(--am) } 34%, 100% { fill: var(--g) } }
+.play.d-answer .atoast { animation: a-toast 2.4s var(--ease) forwards }
+@keyframes a-toast { 0%, 60% { opacity: 0; transform: translate(-50%, 16px) } 72%, 100% { opacity: 1; transform: translate(-50%, 0) } }
+.d-answer .acard { height: 0; opacity: 0; margin-bottom: -8px; overflow: hidden }
+.d-answer .atoast { opacity: 1; transform: translate(-50%, 0) }
+
+.play.d-lay .layl { animation: l-lay 700ms var(--ease) forwards }
+.d-lay .layl { stroke-dasharray: 260; stroke-dashoffset: 0 }
+@keyframes l-lay { from { stroke-dashoffset: 260 } to { stroke-dashoffset: 0 } }
+.play.d-lay .lays { opacity: 0; animation: l-st 240ms var(--ease) forwards; transform-box: fill-box; transform-origin: center }
+@keyframes l-st { from { opacity: 0; transform: scale(.4) } to { opacity: 1; transform: none } }
+.play.d-lay .layt { opacity: 0; animation: l-t 240ms var(--ease) 640ms forwards }
+@keyframes l-t { to { opacity: 1 } }
+
+.play.d-view .vfrom { animation: v-out 1.6s var(--ease) forwards }
+.play.d-view .vto { animation: v-in 1.6s var(--ease) forwards }
+@keyframes v-out { 0%, 30% { opacity: 1; transform: none } 48%, 100% { opacity: 0; transform: translateX(-24px) } }
+@keyframes v-in { 0%, 34% { opacity: 0; transform: translateX(24px) } 52%, 100% { opacity: 1; transform: none } }
+.d-view .vfrom { opacity: 0 }
+
+.play.d-value .vbar { animation: n-bar 280ms var(--ease) 400ms both }
+@keyframes n-bar { from { width: 62% } to { width: 71% } }
+.d-value .vbar { width: 71% }
+
+.play.d-news .pulse { animation: p-pulse 280ms var(--ease) 300ms both; transform-box: fill-box; transform-origin: center }
+@keyframes p-pulse { 0% { opacity: .9; transform: scale(1) } 100% { opacity: 0; transform: scale(3) } }
+.d-news .pulse { opacity: 0 }
+.play.d-news .newst { animation: l-st 240ms var(--ease) both; transform-box: fill-box; transform-origin: center }
+
+@media (prefers-reduced-motion: reduce) {
+  .board *, .board *::before { animation: none !important; transition: none !important }
+  .d-view .vfrom { opacity: 0 }
+}
+</style>
+</head>
+<body>
+<div class="board" id="board">
+<header>
+  <h1>Lineclear: the design board for Phase 13</h1>
+  <p>The target the Phase 13 steps build to: one mock per view at 390, 768, 1440 and 2560 px, in the railway picture language and the dark graphite theme. Sample data. Every frame is plain HTML and SVG, so a step can copy the measures from it.</p>
+  <p>The rule of the board: <b>the words stay plain, the pictures carry the railway.</b> One answer per view, and the next tap is next to it.</p>
+  <ul class="toc">
+    <li><a href="#parts">Parts</a></li><li><a href="#motion">Motion</a></li><li><a href="#home">Home</a></li><li><a href="#roadmap">Roadmap</a></li>
+    <li><a href="#inbox">Inbox</a></li><li><a href="#chat">Chat</a></li><li><a href="#usage">Usage</a></li><li><a href="#settings">Settings</a></li>
+    <li><a href="#browsers">Browsers</a></li><li><a href="#how">How it works</a></li><li><a href="#first">First run</a></li><li><a href="#states">States</a></li>
+  </ul>
+</header>
+
+<section class="sec" id="parts">
+  <h2>The parts</h2>
+  <p class="ans">One set of SVG parts for every view, the README and the film (U24 builds them, U25 makes them the kit). <b>Nothing else is drawn.</b></p>
+  <div class="parts" id="partlist"></div>
+  <table class="tokens">
+    <tr><th>Rule</th><th>The measure</th></tr>
+    <tr><td>Colour</td><td>Graphite base <code>#0b0b0c</code>, raised <code>#141415</code>. Green is clear (merged, all good), amber waits for you, red only broken. The orange accent is the brand: the mark, the focus ring, the selected tab. It never means a state. A review that is checking is a grey lamp, not amber, so amber always means you.</td></tr>
+    <tr><td>Type</td><td>One family (U15). The existing scale and no new sizes: 48 the answer, 32 a view title on a phone, 22 a detail title, 18 a section or a card title, 16 body and names, 14 rows, 12 meta. Weight 600 for titles, 500 for names, 400 for the rest. Numbers tabular.</td></tr>
+    <tr><td>Grid</td><td>4 px unit. Desktop: rail 232, content up to 1128 on 12 columns with 16 gutters, 40 to 48 padding; a side panel of 400 at 1920 and up. Phone: 16 padding, 48 px targets, bottom bar of five in thumb reach.</td></tr>
+    <tr><td>Surfaces</td><td>Cards 12 radius, 1 px line <code>#26262a</code>, no shadows except the toast. Rows 44 high on a desktop, 48 on a phone. Hover lifts the fill one step in 120 ms; press scales to 0.97 in 100 ms.</td></tr>
+  </table>
+</section>
+
+<section class="sec" id="motion">
+  <h2>Motion</h2>
+  <p class="ans">Motion explains a change and never decorates. <b>Each plays once and stays under 300 ms (U2), keeps input free, and shows only the end state under reduced motion.</b> Two things loop, and only while they last: loading lays the track at U24's time while data is missing, and a lamp that waits on someone blinks slowly while a review checks or something waits for you.</p>
+  <div class="demos" id="demos"></div>
+  <table class="tokens">
+    <tr><th>Token</th><th>Time and easing</th><th>Used for</th></tr>
+    <tr><td><code>press</code></td><td>100 ms, ease-out</td><td>Scale 0.97 and dim on a button, tab or card while held.</td></tr>
+    <tr><td><code>hover</code></td><td>120 ms, ease-out</td><td>Fill and border one step up. Pointer cursor on everything that acts.</td></tr>
+    <tr><td><code>signal</code></td><td>200 ms, ease-out</td><td>A lamp changes colour; a station fills.</td></tr>
+    <tr><td><code>move</code></td><td>240 ms, cubic-bezier(.2,.8,.2,1)</td><td>Lists insert and remove with their height; panels open.</td></tr>
+    <tr><td><code>view</code></td><td>280 ms, the same curve</td><td>A view change slides 24 px the way you went; a card grows into its page.</td></tr>
+    <tr><td><code>leave</code></td><td>200 ms, ease-in</td><td>Things that go leave faster than things that come.</td></tr>
+    <tr><td><code>train</code></td><td>240 ms (U24's move), cubic-bezier(.45,0,.2,1)</td><td>A train glides to its next station. Only on a real change, never a loop.</td></tr>
+    <tr><td><code>lay</code></td><td>U24's time, while loading</td><td>Loading: the track is laid in its final place, and the data fades in on it when it comes.</td></tr>
+    <tr><td><code>pulse</code></td><td>280 ms once</td><td>News on a station: one ring, then still.</td></tr>
+    <tr><td><code>value</code></td><td>280 ms (U21)</td><td>A number counts to its new value; a bar grows.</td></tr>
+  </table>
+</section>
+
+<section class="sec" id="home">
+  <h2>Home</h2>
+  <p class="ans">The answer: <b>the state of all work, then the line.</b></p>
+  <ul class="notes">
+    <li>The headline is the answer, <b>"Line clear."</b>, and its facts are labels under it: <b>"At work: 7 · Merged today: 3 · Next merge: about 20 min"</b>. Home never asks. What waits for you shows as a count on the Inbox tab and an amber lamp on the step in its track (U50).</li>
+    <li><b>Each task at work is a row</b>: its title, its state in words, how long it has run and its expected finish from the measured pace. A tap opens its step page (U45).</li>
+    <li><b>One track per project</b>: stations are steps, a train is a task at work, a lamp is a review or a question, the curve is the merge into main. The progress bar and the text list go (F5).</li>
+    <li><b>Spend and usage leave Home</b>: one line links to Usage.</li>
+    <li>A rail with the tracks from 1024 px (F3). Chat opens as a panel beside any view, and stays open from 1920 px.</li>
+    <li>Phone: a bottom bar of five, the Inbox tab with its count; every target 48 px (F4).</li>
+  </ul>
+  <div class="frames two">
+    <div><div class="fit" data-w="1440" data-h="900" id="home-d"></div><p class="cap">1440: the Dispatcher chat is Home; beside it the work, three rows at work, a tap opens its step page (U45), and four tracks.</p></div>
+    <div><div class="fit" data-w="2560" data-h="1200" id="home-w"></div><p class="cap">2560: the Dispatcher chat is Home, the work and the line beside it.</p></div>
+    <div class="phones">
+      <div><div class="fit tb" data-w="768" data-h="1024" id="home-t"></div><p class="cap">768: the chat as Home, the line below, the bottom bar.</p></div>
+      <div><div class="fit ph" data-w="390" data-h="844" id="home-p"></div><p class="cap">390: the chat first, the headline above it, one row at work; the Inbox tab carries the count.</p></div>
+      <div><div class="fit ph" data-w="390" data-h="844" id="home-clear"></div><p class="cap">390: line clear.</p></div>
+      <div><div class="fit ph" data-w="390" data-h="844" id="home-many"></div><p class="cap">390: 40 tracks fold to a row each, the ones at work first.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="roadmap">
+  <h2>Roadmap</h2>
+  <p class="ans">The answer: <b>where the project is on its line and what moves next.</b></p>
+  <ul class="notes">
+    <li><b>Phases are segments</b> sized by their steps, so 319 steps fit 390 px and nothing scrolls sideways (F11, F12).</li>
+    <li>The current phase is drawn station by station; <b>parallel steps run on parallel tracks</b> and rejoin.</li>
+    <li>The phase bar is the only picture of the other phases: on a desktop a tap on a segment opens that phase; on a phone the bar is a picture only and one 48 px row opens the list of phases. The list names the open phase's stations; find a step by id or title (U21).</li>
+    <li>Phone: the track runs down the left edge, a station per row, the train on the task at work.</li>
+  </ul>
+  <div class="frames two">
+    <div><div class="fit" data-w="1440" data-h="900" id="road-d"></div><p class="cap">1440: phase 3 open, S13 and S15 in parallel, S14 waits for you.</p></div>
+    <div><div class="fit" data-w="2560" data-h="1200" id="road-w"></div><p class="cap">2560: the same line, more room.</p></div>
+    <div class="phones">
+      <div><div class="fit tb" data-w="768" data-h="1024" id="road-t"></div><p class="cap">768: the track down the left, wider.</p></div>
+      <div><div class="fit ph" data-w="390" data-h="844" id="road-p"></div><p class="cap">390: the same project, the track down the left.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="inbox">
+  <h2>Inbox</h2>
+  <p class="ans">The answer: <b>what you decide, one at a time, with the context to decide it.</b></p>
+  <ul class="notes">
+    <li>Each ask is an <b>amber lamp</b>; answering turns it green, the card leaves and <b>Undo</b> stays 5 s (F15).</li>
+    <li>A card names project, step, who asks and age; links are links; the whole card opens (F13).</li>
+    <li>Two panes on a desktop: the list and the one you read. Grouped by project, so 200 asks are 6 rows, not a dead end (F14).</li>
+    <li>"Details" buttons go: the card is the button.</li>
+  </ul>
+  <div class="frames two">
+    <div><div class="fit" data-w="1440" data-h="900" id="inbox-d"></div><p class="cap">1440: the list and the open ask, answers as buttons.</p></div>
+    <div><div class="fit" data-w="2560" data-h="1200" id="inbox-w"></div><p class="cap">2560: the list and the open ask.</p></div>
+    <div class="phones">
+      <div><div class="fit tb" data-w="768" data-h="1024" id="inbox-t"></div><p class="cap">768: one list, the ask opens full screen.</p></div>
+      <div><div class="fit ph" data-w="390" data-h="844" id="inbox-p"></div><p class="cap">390: answers inline, Undo after one.</p></div>
+      <div><div class="fit ph" data-w="390" data-h="844" id="inbox-many"></div><p class="cap">390: 200 asks, grouped, filter on top.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="chat">
+  <h2>Chat</h2>
+  <p class="ans">The answer: <b>the Dispatcher, the signal box, beside what you look at.</b></p>
+  <ul class="notes">
+    <li>On a desktop Chat is <b>a panel next to any view</b>, not a page with a small card in it (F16).</li>
+    <li>Work it hands on is drawn: <b>a new station appears on its project's track</b> with one pulse.</li>
+    <li>No Dispatcher yet: one screen says what it does, with the command and a copy button.</li>
+    <li>Phone: full screen, composer above the keyboard, send is one 48 px tap.</li>
+  </ul>
+  <div class="frames two">
+    <div><div class="fit" data-w="1440" data-h="900" id="chat-d"></div><p class="cap">1440: Home with the Chat panel; D7 lands on docs-site's track; the Inbox holds the asks.</p></div>
+    <div><div class="fit" data-w="2560" data-h="1200" id="chat-w"></div><p class="cap">2560: the Dispatcher in a panel.</p></div>
+    <div class="phones">
+      <div><div class="fit tb" data-w="768" data-h="1024" id="chat-t"></div><p class="cap">768: the conversation.</p></div>
+      <div><div class="fit ph" data-w="390" data-h="844" id="chat-p"></div><p class="cap">390: the conversation.</p></div>
+      <div><div class="fit ph" data-w="390" data-h="844" id="chat-setup"></div><p class="cap">390: no Dispatcher yet.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="usage">
+  <h2>Usage</h2>
+  <p class="ans">The facts: <b>each account's use and reset, the free slots, the agents at work, what the work costs.</b> No verdict headline.</p>
+  <ul class="notes">
+    <li>A view of its own (F9): <b>limits per account with reset times</b>, then machines as <b>sidings</b> with their free slots.</li>
+    <li>Per project and per day: tokens split into <b>cache reads, fresh input and output</b>, so cache hits show as a share of each bar.</li>
+    <li>Tiles: <b>$ per merged step</b>, cache hits in %, compactions, and <b>what the rules saved</b> against a timed AI coordinator, marked <b>estimate</b> with its source.</li>
+    <li>Spend a source does not report says "not reported", never $0. Machines leave Settings and come here (F10).</li>
+  </ul>
+  <div class="frames two">
+    <div><div class="fit" data-w="1440" data-h="1180" id="usage-d"></div><p class="cap">1440: limits, sidings, agents at work, then 14 days of tokens and the cost per merged step.</p></div>
+    <div><div class="fit" data-w="2560" data-h="1200" id="usage-w"></div><p class="cap">2560: limits, sidings, agents, tokens.</p></div>
+    <div class="phones">
+      <div><div class="fit tb" data-w="768" data-h="1024" id="usage-t"></div><p class="cap">768: one column of the same facts.</p></div>
+      <div><div class="fit ph" data-w="390" data-h="844" id="usage-p"></div><p class="cap">390: limits, sidings, agents at work.</p></div>
+      <div><div class="fit ph" data-w="390" data-h="844" id="usage-p2"></div><p class="cap">390: tokens and cost, per project.</p></div>
+      <div><div class="fit ph" data-w="390" data-h="844" id="usage-p3"></div><p class="cap">390: no agent at work.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="settings">
+  <h2>Settings</h2>
+  <p class="ans">The answer: <b>what you set, and nothing you only read.</b></p>
+  <ul class="notes">
+    <li>Settings keeps <b>models, projects, machines to add and secrets</b>. Status and counts live on Usage and Home.</li>
+    <li>Models are an ordered list per role: the next one takes over when one runs out.</li>
+    <li>A project shows its check command and its secrets as a count; the rest opens on a tap.</li>
+  </ul>
+  <div class="frames two">
+    <div><div class="fit" data-w="1440" data-h="900" id="set-d"></div><p class="cap">1440: the sections on the left, Models open.</p></div>
+    <div><div class="fit" data-w="2560" data-h="1200" id="set-w"></div><p class="cap">2560: the sections and Models.</p></div>
+    <div class="phones">
+      <div><div class="fit tb" data-w="768" data-h="1024" id="set-t"></div><p class="cap">768: the sections as rows.</p></div>
+      <div><div class="fit ph" data-w="390" data-h="844" id="set-p"></div><p class="cap">390: a grouped list, 52 px rows.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="browsers">
+  <h2>Agent browsers</h2>
+  <p class="ans">The answer: <b>which trains have a browser open, and what each one sees.</b></p>
+  <ul class="notes">
+    <li>Only sessions of tasks at work, each tied to its train and track; <b>a done task's browser leaves</b> (F17).</li>
+    <li>Your own sessions fold under "Other sessions". A card shows its task title and the page's host.</li>
+    <li>Two columns at 390; the picture keeps its place until the first frame comes.</li>
+  </ul>
+  <div class="frames two">
+    <div><div class="fit" data-w="1440" data-h="900" id="br-d"></div><p class="cap">1440: three browsers at work.</p></div>
+    <div><div class="fit" data-w="2560" data-h="1200" id="br-w"></div><p class="cap">2560: three browsers at work.</p></div>
+    <div class="phones">
+      <div><div class="fit tb" data-w="768" data-h="1024" id="br-t"></div><p class="cap">768: two columns.</p></div>
+      <div><div class="fit ph" data-w="390" data-h="844" id="br-p"></div><p class="cap">390: two columns.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="how">
+  <h2>How it works</h2>
+  <p class="ans">The answer: <b>who does what right now, in the same parts.</b></p>
+  <ul class="notes">
+    <li>The roles of U23 as one line from you to main, each with its live count. No new symbols.</li>
+    <li>Opens from the mark in the rail and from Home's empty state; one tap closes it.</li>
+  </ul>
+  <div class="frames two">
+    <div><div class="fit" data-w="1440" data-h="900" id="how-d"></div><p class="cap">1440: the chain with live counts.</p></div>
+    <div><div class="fit" data-w="2560" data-h="1200" id="how-w"></div><p class="cap">2560: the chain with live counts.</p></div>
+    <div class="phones">
+      <div><div class="fit tb" data-w="768" data-h="1024" id="how-t"></div><p class="cap">768: the chain, one column.</p></div>
+      <div><div class="fit ph" data-w="390" data-h="844" id="how-p"></div><p class="cap">390: the chain runs down.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="first">
+  <h2>First run</h2>
+  <p class="ans">The answer: <b>add your first project, here.</b></p>
+  <ul class="notes">
+    <li>An empty track and one field, not three empty cards with the mark as their icon (F7).</li>
+    <li>What <code>lineclear project add</code> finds shows before you save (L39).</li>
+  </ul>
+  <div class="frames two">
+    <div><div class="fit" data-w="1440" data-h="900" id="first-d"></div><p class="cap">1440: no projects yet, a folder typed in.</p></div>
+    <div><div class="fit" data-w="2560" data-h="1200" id="first-w"></div><p class="cap">2560: no projects yet.</p></div>
+    <div class="phones">
+      <div><div class="fit tb" data-w="768" data-h="1024" id="first-t"></div><p class="cap">768: the folder typed in.</p></div>
+      <div><div class="fit ph" data-w="390" data-h="844" id="first-p"></div><p class="cap">390: the same, one field.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="states">
+  <h2>States</h2>
+  <p class="ans">Every view has these. <b>An error never throws away what you saw.</b></p>
+  <ul class="notes">
+    <li><b>Loading</b> lays the track in its final place, so nothing jumps (F19).</li>
+    <li><b>Stale</b>: the last data stays with a quiet bar, "Not updated since 19:42. Retrying." (F18).</li>
+    <li><b>Broken</b> is the only red, and says the one command that fixes it.</li>
+    <li><b>Long names</b> end in an ellipsis on one line, with the full name on hover and focus.</li>
+  </ul>
+  <div class="phones">
+    <div><div class="fit ph" data-w="390" data-h="844" id="st-load"></div><p class="cap">Loading: the track is laid.</p></div>
+    <div><div class="fit ph" data-w="390" data-h="844" id="st-stale"></div><p class="cap">Stale: the data stays.</p></div>
+    <div><div class="fit ph" data-w="390" data-h="844" id="st-broken"></div><p class="cap">Broken: red, one fix.</p></div>
+    <div><div class="fit ph" data-w="390" data-h="844" id="st-long"></div><p class="cap">Long names.</p></div>
+  </div>
+</section>
+</div>
+
+<script>
+(function () {
+var C = { b: '#0b0b0c', r: '#141415', l: '#26262a', l2: '#34343a', l3: '#4a4a50', f: '#ece9e4', f2: '#a9a6a1', f3: '#8f8c87', a: '#d97757', g: '#5fa883', am: '#e7b25a', rd: '#e5484d' };
+var I = {
+  home: '<path d="M2.5 7.25 8 2.75l5.5 4.5v5.5a1 1 0 0 1-1 1h-3v-3.5h-3v3.5h-3a1 1 0 0 1-1-1z"/>',
+  inbox: '<path d="M2.25 9.25 4.25 3h7.5l2 6.25v3.25a1.25 1.25 0 0 1-1.25 1.25h-9a1.25 1.25 0 0 1-1.25-1.25z"/><path d="M2.25 9.25h3.25l1 1.5h3l1-1.5h3.25"/>',
+  chat: '<path d="M2.5 3.75a1.25 1.25 0 0 1 1.25-1.25h8.5a1.25 1.25 0 0 1 1.25 1.25v6a1.25 1.25 0 0 1-1.25 1.25H7.5l-3 2.5V11h-.75A1.25 1.25 0 0 1 2.5 9.75z"/><path d="M5.5 6.75h5"/>',
+  usage: '<path d="M2.25 11.5a5.75 5.75 0 0 1 11.5 0"/><path d="M8 11.5l2.75-4"/><path d="M2.25 13.75h11.5"/>',
+  browsers: '<rect x="1.75" y="2.75" width="12.5" height="10.5" rx="1.5"/><path d="M1.75 5.75h12.5"/>',
+  settings: '<path d="M2.5 4.5h4M9.5 4.5h4M2.5 11.5h7M12.5 11.5h1"/><circle cx="8" cy="4.5" r="1.5"/><circle cx="11" cy="11.5" r="1.5"/>',
+  search: '<circle cx="7" cy="7" r="4.25"/><path d="m10.25 10.25 3.5 3.5"/>',
+  attach: '<path d="M13 7.5 8.1 12.4a3 3 0 0 1-4.25-4.25l5-5a2 2 0 0 1 2.85 2.85l-5 5a1 1 0 0 1-1.4-1.4L9.75 5"/>',
+  send: '<path d="M8 13V3M3.75 7.25 8 3l4.25 4.25"/>',
+  back: '<path d="M10 3 5 8l5 5"/>',
+  chev: '<path d="m6 3 5 5-5 5"/>',
+  down: '<path d="m3 6 5 5 5-5"/>',
+  copy: '<rect x="5.25" y="5.25" width="8.5" height="8.5" rx="1.5"/><path d="M10.75 2.25h-7.5a1 1 0 0 0-1 1v7.5"/>',
+  plus: '<path d="M8 3v10M3 8h10"/>',
+  folder: '<path d="M1.75 4.25a1 1 0 0 1 1-1h3.5l1.5 1.5h5.5a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1h-10.5a1 1 0 0 1-1-1z"/>',
+  key: '<circle cx="5.5" cy="10.5" r="3"/><path d="m7.6 8.4 5.65-5.65M11 5l1.75 1.75"/>',
+  grip: '<circle cx="6" cy="4" r=".6"/><circle cx="10" cy="4" r=".6"/><circle cx="6" cy="8" r=".6"/><circle cx="10" cy="8" r=".6"/><circle cx="6" cy="12" r=".6"/><circle cx="10" cy="12" r=".6"/>',
+  filter: '<path d="M2.5 4h11M4.5 8h7M6.5 12h3"/>',
+  ext: '<path d="M9 2.75h4.25V7M13.25 2.75 7.5 8.5M11.5 9.5v3a.75.75 0 0 1-.75.75h-7.5a.75.75 0 0 1-.75-.75v-7.5a.75.75 0 0 1 .75-.75h3"/>',
+  undo: '<path d="M5.5 3 2.5 6l3 3"/><path d="M2.5 6h7a3.5 3.5 0 0 1 0 7H7"/>',
+  retry: '<path d="M13.25 8a5.25 5.25 0 1 1-1.54-3.71"/><path d="M13.25 2.75v3h-3"/>'
+};
+function ic(n, s, c) { s = s || 16; return '<svg class="i" width="' + s + '" height="' + s + '" viewBox="0 0 16 16" fill="none" stroke="' + (c || 'currentColor') + '" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + I[n] + '</svg>' }
+function mark(s) { return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 64 64" fill="none" aria-hidden="true"><path fill="' + C.f + '" fill-rule="evenodd" d="M5 22a17 17 0 1 0 34 0a17 17 0 1 0 -34 0ZM12 22a10 10 0 1 0 20 0a10 10 0 1 0 -20 0Z"/><circle cx="22" cy="22" r="6.5" fill="' + C.a + '"/><path d="M22 38V55H57" stroke="' + C.f + '" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg>' }
+var LAMP = { wait: C.am, clear: C.g, broken: C.rd };
+/* A signal as an icon: the bezel and its lamp. "check" is a grey ring that blinks. */
+function lamp(st, s) {
+  s = s || 16;
+  var inner = st === 'check' ? '<circle class="blink" cx="8" cy="8" r="2.6" fill="none" stroke="' + C.f2 + '" stroke-width="1.4"/>' : st === 'work' ? '<circle cx="8" cy="8" r="2.6" fill="' + C.f + '"/>' : st === 'idle' ? '' : '<circle cx="8" cy="8" r="3" fill="' + LAMP[st] + '"/>';
+  return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="' + (st === 'idle' ? C.l3 : C.f3) + '" stroke-width="1.5"/>' + inner + '</svg>';
+}
+function trainIcon(s) { s = s || 16; return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="5" width="13" height="6" rx="3" fill="' + C.f + '"/><circle cx="12" cy="8" r="1.2" fill="' + C.a + '"/></svg>' }
+function stIcon(st, s) {
+  s = s || 16;
+  var m = { done: [C.g, C.g], later: [C.b, C.l3], work: [C.b, C.f], wait: [C.b, C.am], check: [C.b, C.f2], broken: [C.b, C.rd], next: [C.b, C.f2] }[st];
+  return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="' + m[0] + '" stroke="' + m[1] + '" stroke-width="2"/></svg>';
+}
+
+/* A track: stations spaced along it, the merged part green, trains before the stations at work, a signal over a
+   station in review or waiting, and the curve into main at the end. */
+function track(o) {
+  var w = o.w, y = o.y || 30, h = o.h || 62, st = o.st, n = st.length, main = o.main !== false;
+  var x0 = 8, x1 = w - (main ? 70 : 8);
+  function sx(i) { return x0 + (x1 - x0) * (i + .5) / n }
+  var last = -1; st.forEach(function (s, i) { if (s.s === 'done') last = i });
+  var all = last === n - 1;
+  var g = '<svg class="trk" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" role="img" aria-label="' + (o.label || 'track') + '">';
+  g += '<line x1="' + x0 + '" y1="' + y + '" x2="' + x1 + '" y2="' + y + '" stroke="' + C.l2 + '" stroke-width="2" stroke-linecap="round"/>';
+  if (o.prev || last >= 0) g += '<line x1="' + x0 + '" y1="' + y + '" x2="' + (all ? x1 : last >= 0 ? sx(last) : x0 + 4) + '" y2="' + y + '" stroke="' + C.g + '" stroke-width="3" stroke-linecap="round"/>';
+  if (o.prev) g += '<text x="' + x0 + '" y="' + (y - 12) + '">' + o.prev + '</text>';
+  if (main) {
+    g += '<path d="M' + x1 + ' ' + y + 'C' + (x1 + 18) + ' ' + y + ' ' + (x1 + 18) + ' ' + (y + 16) + ' ' + (x1 + 36) + ' ' + (y + 16) + '" stroke="' + (all ? C.g : C.l2) + '" stroke-width="' + (all ? 3 : 2) + '" fill="none" stroke-linecap="round"/>';
+    g += '<line x1="' + (x1 + 36) + '" y1="' + (y + 16) + '" x2="' + (w - 3) + '" y2="' + (y + 16) + '" stroke="' + C.f3 + '" stroke-width="4" stroke-linecap="round"/>';
+    g += '<text x="' + (w - 3) + '" y="' + (y + 32) + '" text-anchor="end">main</text>';
+  }
+  var gap = (x1 - x0) / n;
+  st.forEach(function (s, i) {
+    var x = sx(i), col = { done: [C.g, C.g], later: [C.b, C.l3], work: [C.b, C.f], wait: [C.b, C.am], check: [C.b, C.f], broken: [C.b, C.rd], next: [C.b, C.f2] }[s.s];
+    var r = o.r || 5;
+    if (s.s === 'work' && gap < 44) { g += '<g><rect x="' + (x - 9) + '" y="' + (y - 5) + '" width="18" height="10" rx="5" fill="' + C.f + '"/><circle cx="' + (x + 5) + '" cy="' + y + '" r="1.6" fill="' + C.a + '"/></g>'; return }
+    if (s.s === 'work') { var tx = x - Math.min(30, gap * .5); g += '<g><rect x="' + (tx - 10) + '" y="' + (y - 5) + '" width="20" height="10" rx="5" fill="' + C.f + '"/><circle cx="' + (tx + 6) + '" cy="' + y + '" r="1.6" fill="' + C.a + '"/></g>' }
+    g += '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="' + col[0] + '" stroke="' + col[1] + '" stroke-width="2"' + (s.cls ? ' class="' + s.cls + '"' : '') + '/>';
+    if (s.s === 'wait' || s.s === 'check' || s.s === 'broken' || s.sig) {
+      var lc = s.s === 'wait' ? C.am : s.s === 'broken' ? C.rd : s.sig === 'clear' ? C.g : null;
+      g += '<line x1="' + x + '" y1="' + (y - r - 1) + '" x2="' + x + '" y2="' + (y - 15) + '" stroke="' + C.f3 + '" stroke-width="1.5"/>';
+      g += '<circle cx="' + x + '" cy="' + (y - 21) + '" r="5.5" fill="' + C.r + '" stroke="' + C.f3 + '" stroke-width="1.4"/>';
+      g += lc ? '<circle cx="' + x + '" cy="' + (y - 21) + '" r="2.8" fill="' + lc + '"/>' : '<circle class="blink" cx="' + x + '" cy="' + (y - 21) + '" r="2.4" fill="none" stroke="' + C.f2 + '" stroke-width="1.3"/>';
+    }
+  });
+  /* Labels by weight: waits first, then broken, at work, checking. One that would touch a placed one is left out. */
+  var pri = { wait: 0, broken: 1, work: 2, check: 3, next: 4, later: 5, done: 6 }, placed = [];
+  st.map(function (s, i) { return { s: s, x: sx(i) } }).filter(function (o) { return o.s.l }).sort(function (a, b) { return pri[a.s.s] - pri[b.s.s] }).forEach(function (o) {
+    var hw = o.s.l.length * 3.6 + 3;
+    if (placed.some(function (p) { return Math.abs(p.x - o.x) < p.hw + hw })) return;
+    placed.push({ x: o.x, hw: hw });
+    g += '<text x="' + o.x + '" y="' + (y + 21) + '" text-anchor="middle" class="' + (o.s.s === 'later' || o.s.s === 'done' ? '' : 'on') + '">' + o.s.l + '</text>';
+  });
+  return g + '</svg>';
+}
+function S(spec) { /* "dddwclL" to stations: d done, w work, c check, a wait, l later, b broken, n next */
+  var m = { d: 'done', w: 'work', c: 'check', a: 'wait', l: 'later', b: 'broken', n: 'next' };
+  return spec.split('').map(function (ch) { return { s: m[ch] } });
+}
+function lab(st, labels) { Object.keys(labels).forEach(function (k) { st[k].l = labels[k] }); return st }
+/* Phases as segments sized by their steps; the current one shows how far it is. */
+function phases(o) {
+  var w = o.w, ps = o.ps, tot = ps.reduce(function (a, p) { return a + p.t }, 0), gap = 4, minw = o.min || 14;
+  var free = w - gap * (ps.length - 1), ws = ps.map(function (p) { return Math.max(minw, free * p.t / tot) });
+  var sum = ws.reduce(function (a, b) { return a + b }, 0); ws = ws.map(function (x) { return x * free / sum });
+  var h = o.labels ? 40 : 8, x = 0, g = '<svg class="trk" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" role="img" aria-label="phases">';
+  ps.forEach(function (p, i) {
+    var ww = ws[i];
+    g += '<rect x="' + x + '" y="1" width="' + ww + '" height="6" rx="3" fill="' + C.l2 + '"/>';
+    if (p.d) g += '<rect x="' + x + '" y="1" width="' + (ww * p.d / p.t) + '" height="6" rx="3" fill="' + C.g + '"/>';
+    if (p.cur) g += '<rect x="' + (x - 2) + '" y="-1" width="' + (ww + 4) + '" height="10" rx="5" fill="none" stroke="' + C.f2 + '" stroke-width="1.2"/>';
+    if (o.labels && ww > 52) g += '<text x="' + x + '" y="24" class="' + (p.cur ? 'on' : '') + '">' + p.n + '</text><text x="' + x + '" y="37">' + p.d + ' of ' + p.t + '</text>';
+    x += ww + gap;
+  });
+  return g + '</svg>';
+}
+function rail(sel, o) {
+  o = o || {};
+  var items = [['home', 'Home'], ['inbox', 'Inbox', o.noTracks ? '' : '<span class="n am">2</span>'], ['chat', 'Chat'], ['usage', 'Usage'], ['browsers', 'Browsers', o.noTracks ? '' : '<span class="n">3</span>']];
+  var h = '<nav class="rail"><div class="brand">' + mark(22) + 'lineclear</div>';
+  items.forEach(function (it) { h += '<a class="nav' + (sel === it[0] ? ' sel' : '') + '">' + ic(it[0]) + it[1] + (it[2] || '') + '</a>' });
+  if (!o.noTracks) {
+    h += '<div class="rh"><span>Tracks</span><span>4</span></div>';
+    [['shop-api', 'work', '2'], ['docs-site', 'clear', ''], ['lineclear', 'work', '3'], ['mobile-app', 'clear', '']].forEach(function (p) {
+      h += '<a class="nav' + (sel === p[0] ? ' sel' : '') + '">' + lamp(p[1], 14) + p[0] + '<span class="n">' + p[2] + '</span></a>';
+    });
+  }
+  h += '<div class="rfoot"><a class="nav' + (sel === 'settings' ? ' sel' : '') + '">' + ic('settings') + 'Settings</a><div class="live"><i></i>' + (o.noTracks ? 'Live. 1 machine, 4 slots free' : 'Live. 4 of 9 slots free') + '</div></div></nav>';
+  return h;
+}
+function tabs(sel) {
+  var items = [['home', 'Home'], ['inbox', 'Inbox', 2], ['chat', 'Chat'], ['usage', 'Usage'], ['browsers', 'Browsers']];
+  return '<nav class="tabs">' + items.map(function (it) { return '<a class="tab' + (sel === it[0] ? ' sel' : '') + '">' + ic(it[0], 22) + it[1] + (it[2] ? '<span class="badge">' + it[2] + '</span>' : '') + '</a>' }).join('') + '</nav>';
+}
+function phone(body, sel, o) {
+  o = o || {};
+  return '<div class="app phone"><div class="sb"><span>9:41</span><i></i></div><div class="pbody">' + body + '</div>' + (sel === false ? '' : tabs(sel)) + (o.after || '') + '</div>';
+}
+function phead(title, o) {
+  o = o || {};
+  return '<div class="phead">' + (o.back ? '<a class="iconbtn">' + ic('back', 20) + '</a><span style="font-size:16px;color:' + C.f2 + '">' + o.back + '</span>' : '<span style="padding-left:4px">' + mark(26) + '</span>') + '<span class="sp"></span>' + (o.right || '<a class="iconbtn" aria-label="Settings">' + ic('settings', 20) + '</a>') + '</div>';
+}
+
+/* Sample data, shared by the views */
+var P = {
+  shop: { n: 'shop-api', ph: 'Phase 3 of 5, Payments', st: lab(S('dddddcwal'), { 5: 'S12', 6: 'S13', 7: 'S14' }), prev: '', c: [['train', '1 at work'], ['check', '1 in review']] },
+  docs: { n: 'docs-site', ph: 'Phase 2 of 3, Pages', st: lab(S('dddaollll'.replace('o', 'l')), { 3: 'D6' }), c: [] },
+  lc: { n: 'lineclear', ph: 'Phase 13 of 13, Finished UI', st: lab(S('dwwwclll'), { 1: 'U25', 2: 'U26', 3: 'U27', 4: 'U28' }), c: [['train', '3 at work'], ['check', '1 in review']] },
+  mob: { n: 'mobile-app', ph: 'Phase 4 of 4, Store release', st: S('dddddd'), c: [['clear', 'Line clear']] }
+};
+function cnt(c) { return '<span>' + (c[0] === 'train' ? trainIcon(14) : lamp(c[0], 14)) + c[1] + '</span>' }
+function trackRow(p, w) {
+  return '<div class="tr"><div><h3>' + p.n + '</h3><div class="p">' + p.ph + '</div></div>' + track({ w: w, st: p.st, label: p.n + ' track' }) + '<div class="c">' + p.c.map(cnt).join('') + '</div></div>';
+}
+function ptrack(p, w) {
+  return '<div class="ptr"><div class="top"><h3>' + p.n + '</h3>' + p.c.map(function (c) { return '<span class="chip' + (c[0] === 'wait' ? ' am' : c[0] === 'clear' ? ' g' : '') + '">' + (c[0] === 'train' ? trainIcon(12) : lamp(c[0], 12)) + c[1] + '</span>' }).join('') + '</div><div class="p" style="font-size:12px;color:' + C.f3 + ';margin:-4px 0 4px">' + p.ph + '</div>' + track({ w: w, st: p.st, label: p.n + ' track' }) + '</div>';
+}
+var ASK1 = { meta: '<b>shop-api</b> · S14 Retry failed payments · reviewer · 6 min', q: 'The review passed with one flaky test skipped. Merge?', d: 'Checks green, 3 files changed. The skipped test, <code>payments.retry.timeout</code>, fails one run in ten on main too.' };
+function askCard(ph) {
+  return '<div class="card ask">' + lamp('wait', ph ? 20 : 24) + '<div><div class="meta">' + ASK1.meta + '</div><p class="q">' + ASK1.q + '</p>' + (ph ? '' : '<p class="d">' + ASK1.d + '</p>') + '</div><div class="acts"><a class="btn pri">Merge</a><a class="btn">Hold</a><a class="btn gh" aria-label="Open">' + (ph ? ic('chev') : 'Open') + '</a></div></div>';
+}
+
+var WORK = [
+  ['Retry failed payments', 'shop-api', 'In review', '31 min', 'about 8 min'],
+  ['Refund webhooks', 'shop-api', 'Writing', '42 min', 'about 18 min'],
+  ['Icon set for the rail', 'lineclear', 'Writing', '12 min', 'about 25 min'],
+  ['Phone bottom bar', 'lineclear', 'Checking', '58 min', 'about 5 min'],
+  ['Currency rounding', 'shop-api', 'Writing', '1 h 10 min', 'about 20 min']
+];
+/* The state of all work, one plain line (U50). What waits for you is only a count on Inbox and a lamp on a step. */
+function homeLine(text, ph) {
+  var m = /^(Line clear\.) (\d+) at work, (\d+) merged today, next merge in about (.+)\.$/.exec(text);
+  var facts = m ? '<p>At work: ' + m[2] + ' · Merged today: ' + m[3] + ' · Next merge: about ' + m[4] + '</p>' : '';
+  return '<div class="hero"' + (ph ? ' style="margin:4px 0 16px"' : '') + '><h1' + (ph ? ' class="m"' : '') + '>' + (m ? m[1] : text) + '</h1>' + facts + '</div>';
+}
+function workRows(n, ph) {
+  return '<div class="card">' + WORK.slice(0, n).map(function (t) {
+    return ph ?
+      '<a class="row" style="min-height:64px;padding:8px 16px"><span style="flex:none">' + trainIcon(14) + '</span><span class="t"><b>' + t[0] + '</b><span class="meta" style="display:block;margin-top:2px">' + t[1] + ' · ' + t[2] + ' · Running: ' + t[3] + ' · Done in: ' + t[4] + '</span></span>' + ic('chev', 16, C.f3) + '</a>' :
+      '<a class="row">' + trainIcon(14) + '<span class="t"><b>' + t[0] + '</b> <span style="color:' + C.f3 + '">· ' + t[1] + '</span></span><span class="meta">' + t[2] + '</span><span class="meta">Running: ' + t[3] + '</span><span class="meta">Done in: about ' + t[4].replace('about ', '') + '</span>' + ic('chev', 14, C.f3) + '</a>';
+  }).join('') + '</div>';
+}
+
+/* Views */
+var V = {};
+V['home-d'] = '<div class="app desk">' + rail('home') + '<main class="main">' +
+  homeLine('Line clear. 5 at work, 7 merged today, next merge in about 5 min.') +
+  '<section><div class="sh"><h2>At work</h2><a>5 tasks</a></div>' + workRows(5) + '</section>' +
+  '<section><div class="sh"><h2>The line</h2><a>4 tracks · All on the Roadmap</a></div><div class="card">' +
+  trackRow(P.shop, 720) + trackRow(P.docs, 720) + trackRow(P.lc, 720) + trackRow(P.mob, 720) + '</div></section>' +
+  '<a class="uline">' + ic('usage') + '<span>Usage</span><span class="bar"><i style="width:62%"></i></span><span>Account: Claude, 62 %, resets 21:00 · Free slots: 4 of 9</span><span style="margin-left:auto;color:' + C.f3 + '">Usage ' + ic('chev', 12) + '</span></a>' +
+  '</main></div>';
+V['home-p'] = phone(phead() + homeLine('Line clear. 5 at work, 7 merged today, next merge in about 20 min.', true) +
+  '<div class="sh" style="margin:0 0 8px"><h2>At work</h2><a>5 tasks</a></div>' + workRows(3, true) +
+  '<div class="sh" style="margin:24px 0 8px"><h2>The line</h2><a>4 tracks</a></div><div class="card">' + ptrack(P.shop, 326) + ptrack(P.lc, 326) + '</div>', 'home');
+V['home-clear'] = phone(phead() + '<div class="hero" style="margin:4px 0 20px"><h1 style="font-size:48px;line-height:56px;font-weight:600;letter-spacing:-.025em">Line clear.</h1><p style="font-size:14px;line-height:20px">At work: 3 · Merged last hour: 4 · Next merge: about 10 min</p></div>' +
+  '<div class="card">' + ptrack({ n: 'shop-api', ph: 'Phase 3 of 5, Payments', st: lab(S('dddddddwl'), { 7: 'S15' }), c: [['train', '1 at work']] }, 326) + ptrack({ n: 'lineclear', ph: 'Phase 13 of 13, Finished UI', st: lab(S('dddwwllll'), { 3: 'U28', 4: 'U29' }), c: [['train', '2 at work']] }, 326) + ptrack(P.mob, 326) + '</div>', 'home');
+(function () {
+  var names = ['shop-api', 'docs-site', 'billing', 'search', 'auth', 'mobile-app', 'ios-widget', 'admin', 'reports', 'mailer', 'infra', 'data-jobs', 'web-store', 'help-center'];
+  var rows = names.map(function (n, i) {
+    var st = i < 6 ? 'work' : 'clear', pr = [62, 40, 88, 30, 75, 100, 100, 100, 100, 100, 100, 100, 100, 100][i];
+    return '<div class="row" style="min-height:48px">' + lamp(st) + '<span class="t" style="flex:none;width:112px"><b>' + n + '</b></span><span class="mini" style="flex:1"><i style="width:' + pr + '%"></i></span><span class="meta" style="width:64px;justify-content:flex-end">' + (st === 'work' ? (i % 3 + 1) + ' at work' : 'clear') + '</span></div>';
+  }).join('');
+  V['home-many'] = phone(phead() + '' + homeLine('Line clear. 31 at work, 52 merged today, next merge in about 3 min.', true) + '<div class="sh" style="margin-bottom:8px"><h2>At work</h2><a>31 tasks</a></div>' + workRows(3, true) + '<div class="sh" style="margin:24px 0 8px"><h2>40 tracks</h2><a>At work first</a></div><div class="card">' + rows + '</div>', 'home');
+})();
+
+/* Roadmap */
+(function () {
+  var w = 1000, y = 70, xs = [40, 140, 240, 340], g = '<svg class="trk" width="' + w + '" height="170" viewBox="0 0 ' + w + ' 170" role="img" aria-label="phase 3 track">';
+  g += '<text x="0" y="16">From phase 2, merged</text>';
+  g += '<line x1="0" y1="' + y + '" x2="440" y2="' + y + '" stroke="' + C.g + '" stroke-width="3" stroke-linecap="round"/>';
+  g += '<path d="M440 ' + y + 'C470 ' + y + ' 470 ' + (y + 48) + ' 500 ' + (y + 48) + 'H640C670 ' + (y + 48) + ' 670 ' + y + ' 700 ' + y + '" stroke="' + C.l2 + '" stroke-width="2" fill="none"/>';
+  g += '<line x1="440" y1="' + y + '" x2="860" y2="' + y + '" stroke="' + C.l2 + '" stroke-width="2"/>';
+  g += '<path d="M860 ' + y + 'C884 ' + y + ' 884 ' + (y + 24) + ' 908 ' + (y + 24) + '" stroke="' + C.l2 + '" stroke-width="2" fill="none"/><line x1="908" y1="' + (y + 24) + '" x2="996" y2="' + (y + 24) + '" stroke="' + C.f3 + '" stroke-width="5" stroke-linecap="round"/><text x="996" y="' + (y + 44) + '" text-anchor="end">main</text>';
+  function stn(x, yy, s, l, sub) {
+    var col = { done: [C.g, C.g], later: [C.b, C.l3], work: [C.b, C.f], wait: [C.b, C.am], check: [C.b, C.f] }[s], o = '';
+    if (s === 'work') o += '<rect x="' + (x - 44) + '" y="' + (yy - 6) + '" width="24" height="12" rx="6" fill="' + C.f + '"/><circle cx="' + (x - 26) + '" cy="' + yy + '" r="1.8" fill="' + C.a + '"/>';
+    o += '<circle cx="' + x + '" cy="' + yy + '" r="7" fill="' + col[0] + '" stroke="' + col[1] + '" stroke-width="2.5"/>';
+    if (s === 'wait' || s === 'check') {
+      o += '<line x1="' + x + '" y1="' + (yy - 9) + '" x2="' + x + '" y2="' + (yy - 22) + '" stroke="' + C.f3 + '" stroke-width="1.5"/><circle cx="' + x + '" cy="' + (yy - 29) + '" r="7" fill="' + C.r + '" stroke="' + C.f3 + '" stroke-width="1.5"/>';
+      o += s === 'wait' ? '<circle cx="' + x + '" cy="' + (yy - 29) + '" r="3.6" fill="' + C.am + '"/>' : '<circle class="blink" cx="' + x + '" cy="' + (yy - 29) + '" r="3" fill="none" stroke="' + C.f2 + '" stroke-width="1.5"/>';
+    }
+    o += '<text x="' + x + '" y="' + (yy + 26) + '" text-anchor="middle" class="' + (s === 'later' || s === 'done' ? '' : 'on') + '" style="font-size:12px">' + l + '</text>';
+    if (sub) o += '<text x="' + x + '" y="' + (yy + 41) + '" text-anchor="middle" style="font-size:12px">' + sub + '</text>';
+    return o;
+  }
+  g += stn(40, y, 'done', 'S9') + stn(140, y, 'done', 'S10') + stn(240, y, 'done', 'S11') + stn(340, y, 'done', 'S12');
+  g += stn(540, y, 'check', 'S13') + stn(570, y + 48, 'work', 'S15');
+  g += stn(760, y, 'wait', 'S14', 'waits for you') + stn(820, y, 'later', 'S16');
+  g += '</svg>';
+  var steps = [['done', 'S9', 'Card payments behind a flag', 'merged', '2 d'], ['done', 'S10', 'Webhooks from the payment provider', 'merged', '1 d'], ['done', 'S11', 'Refunds in the admin', 'merged', '1 d'], ['done', 'S12', 'Receipts by email', 'merged', '5 h'],
+    ['check', 'S13', 'Retry rules per card type', 'in review', '18 min'], ['wait', 'S14', 'Retry failed payments', 'waits for you', '6 min'], ['work', 'S15', 'Payment events to the data store', 'at work', '22 min'], ['later', 'S16', 'Remove the old checkout', 'after S14', '']];
+  var list = steps.map(function (s) { return '<div class="li">' + stIcon(s[0]) + '<span class="id">' + s[1] + '</span><span class="t">' + s[2] + '</span><span>' + (s[0] === 'wait' ? '<span class="chip am">waits for you</span>' : s[0] === 'done' ? '<span style="color:' + C.f3 + '">merged</span>' : s[0] === 'later' ? '<span style="color:' + C.f3 + '">' + s[3] + '</span>' : '<span class="chip">' + (s[0] === 'work' ? trainIcon(12) : lamp('check', 12)) + s[3] + '</span>') + '</span><span class="w">' + s[4] + '</span></div>' }).join('');
+  var ph = [{ n: '1 Base', d: 8, t: 8 }, { n: '2 Catalogue', d: 12, t: 12 }, { n: '3 Payments', d: 4, t: 8, cur: 1 }, { n: '4 Orders', d: 0, t: 14 }, { n: '5 Scale', d: 0, t: 9 }];
+  V['road-d'] = '<div class="app desk">' + rail('shop-api') + '<main class="main" style="gap:24px">' +
+    '<div><div class="crumb">' + ic('back', 14) + 'Home <span>/</span> <b>shop-api</b></div><div class="hero"><h1 style="font-size:32px;line-height:38px;letter-spacing:-.02em">Phase 3 of 5, Payments: 4 of 8 merged.</h1><p>2 tasks at work, 1 waits for you. S16 starts after S14.</p></div></div>' +
+    phases({ w: 1112, ps: ph, labels: true }) +
+    '<div class="card" style="padding:16px 24px 8px">' + g + '</div>' +
+    '<div><div class="sh" style="align-items:center"><h2>Phase 3, Payments</h2><div class="field" style="width:320px">' + ic('search') + 'Find a step by id or title</div></div><div class="card list">' + list + '</div></div>' +
+    '</main></div>';
+  var vrows = steps.slice(2).map(function (s, i, a) {
+    return '<div class="vs' + (s[0] === 'done' ? ' d' : '') + '"><span class="st">' + (s[0] === 'work' ? '<svg width="28" height="28" viewBox="0 0 28 28"><rect x="7" y="2" width="14" height="24" rx="7" fill="' + C.f + '"/><circle cx="14" cy="21" r="1.8" fill="' + C.a + '"/></svg>' : stIcon(s[0], 20)) + '</span><span class="tt"><b>' + s[2] + '</b><span class="meta"><span class="mono">' + s[1] + '</span>' + (s[4] ? ' · ' + s[4] : '') + '</span></span><span>' + (s[0] === 'wait' ? '<span class="chip am">waits</span>' : s[0] === 'check' ? '<span class="chip">' + lamp('check', 12) + 'review</span>' : s[0] === 'work' ? '<span class="chip">at work</span>' : '') + '</span></div>';
+  }).join('');
+  V['road-p'] = phone(phead('', { back: 'Home' }) + '<div class="hero" style="margin:0 0 16px"><div class="meta" style="margin-bottom:4px"><b>shop-api</b></div><h1 class="m" style="font-size:32px;line-height:38px">Phase 3 of 5: 4 of 8 merged.</h1><p style="font-size:14px;line-height:20px">2 at work, 1 waits for you.</p></div>' +
+    phases({ w: 358, ps: ph, labels: false }) + '<div class="meta" style="margin:8px 0 16px;justify-content:space-between"><span>Base</span><span style="color:' + C.f + '">Payments</span><span>Scale</span></div>' +
+    '<div class="vt">' + vrows + '</div>' + '<div class="row" style="padding:0;margin-top:4px;border-top:1px solid ' + C.l + '"><span class="t" style="color:' + C.f2 + '">4 other phases</span>' + ic('down', 16, C.f3) + '</div>', 'home');
+})();
+
+/* Inbox */
+(function () {
+  function it(sel, st, q, meta, age) { return '<div class="it' + (sel ? ' sel' : '') + '">' + lamp(st) + '<span class="q">' + q + '</span><span class="age">' + age + '</span><span></span><span class="meta" style="grid-column:2/4">' + meta + '</span></div>' }
+  V['inbox-d'] = '<div class="app desk">' + rail('inbox') + '<div class="ibx"><div class="ilist"><div style="padding:0 24px 8px"><h1 style="font:600 32px/38px var(--font);letter-spacing:-.02em">2 things wait for you.</h1></div>' +
+    '<div class="ig"><span>shop-api</span><span>1</span></div>' + it(1, 'wait', 'The review passed with one flaky test skipped. Merge?', 'S14 Retry failed payments · reviewer', '6 min') +
+    '<div class="ig"><span>docs-site</span><span>1</span></div>' + it(0, 'wait', 'Approve the plan of 5 steps?', 'D6 New landing page · planner', '14 min') +
+    '<div class="ig" style="margin-top:12px"><span>Answered today</span><span>5</span></div>' +
+    it(0, 'clear', 'Use the new icon set?', 'lineclear · U25 Tokens and parts · you: Yes', '1 h') + it(0, 'clear', 'Merge with the migration?', 'shop-api · S12 Receipts by email · you: Merge', '3 h') +
+    '</div><div class="idet"><div class="meta">' + lamp('wait', 14) + '<b>shop-api</b> · S14 Retry failed payments · asked by the reviewer · 6 min ago</div><h1>The review passed with one flaky test skipped. Merge?</h1>' +
+    '<dl class="card ctx"><dt>The step</dt><dd>Retry a failed card payment up to three times, with a growing wait.</dd><dt>Review</dt><dd>Clear, two small notes fixed. Reviewer: GPT-5.5, another company than the worker.</dd><dt>Checks</dt><dd>Green, 214 tests. One skipped: <code>payments.retry.timeout</code>, which fails one run in ten on main too.</dd><dt>Change</dt><dd><a>3 files, 84 lines added, 12 removed</a> · <a>pull request 142</a></dd></dl>' +
+    '<div class="answers"><a class="btn pri">Merge</a><a class="btn">Hold</a><a class="btn">Fix the test first</a></div><div class="field" style="max-width:680px;height:44px">Or answer in your own words</div>' +
+    '</div></div></div>';
+  V['inbox-p'] = phone(phead('', { right: '<a class="iconbtn">' + ic('filter', 20) + '</a>' }) + '<div class="hero" style="margin:4px 0 16px"><h1 class="m">1 thing waits for you.</h1></div>' +
+    '<div class="card ask" style="grid-template-columns:24px minmax(0,1fr)">' + lamp('wait', 20) + '<div><div class="meta"><b>docs-site</b> · D6 New landing page · planner · 14 min</div><p class="q" style="font-size:16px;line-height:22px">Approve the plan of 5 steps?</p><p class="d" style="font-size:14px">Hero, pricing table, three customer quotes, the FAQ, and the footer links.</p></div><div class="acts" style="grid-template-columns:1fr 1fr"><a class="btn pri">Approve</a><a class="btn">Open the plan</a></div></div>' +
+    '<div class="sh" style="margin:24px 0 8px"><h2>Answered today</h2><span>6</span></div><div class="card"><div class="row">' + lamp('clear') + '<span class="t"><b>shop-api</b> · Merge? <span style="color:' + C.f3 + '">You: Merge</span></span><span class="meta">now</span></div><div class="row">' + lamp('clear') + '<span class="t"><b>lineclear</b> · Use the new icon set?</span><span class="meta">1 h</span></div></div>', 'inbox', { after: '<div class="toast" style="bottom:100px">Merged S14.<a class="btn">Undo</a></div>' });
+  var groups = [['shop-api', 64], ['docs-site', 51], ['billing', 38], ['search', 27], ['auth', 12], ['mobile-app', 8]];
+  V['inbox-many'] = phone(phead('', { right: '<a class="iconbtn">' + ic('filter', 20) + '</a>' }) + '<div class="hero" style="margin:4px 0 12px"><h1 class="m">200 things wait for you.</h1><p style="font-size:14px;line-height:20px">Oldest 3 days. Grouped by project.</p></div>' +
+    '<div style="display:flex;gap:8px;margin-bottom:16px;overflow:hidden"><span class="chip" style="height:36px;padding:0 14px;background:' + C.f + ';color:' + C.b + '">All 200</span><span class="chip" style="height:36px;padding:0 14px">Merges 71</span><span class="chip" style="height:36px;padding:0 14px">Plans 18</span><span class="chip" style="height:36px;padding:0 14px">Questions</span></div>' +
+    '<div class="card">' + groups.map(function (g) { return '<div class="row" style="min-height:56px">' + lamp('wait') + '<span class="t"><b>' + g[0] + '</b></span><span class="badge">' + g[1] + '</span>' + ic('chev', 16, C.f3) + '</div>' }).join('') + '</div>' +
+    '<a class="btn" style="width:100%;margin-top:16px">Answer one by one, oldest first</a>', 'inbox');
+})();
+
+/* Chat */
+(function () {
+  var box = '<svg width="36" height="36" viewBox="0 0 36 36" aria-hidden="true"><rect x=".5" y=".5" width="35" height="35" rx="10" fill="' + C.r + '" stroke="' + C.l2 + '"/><path d="M9 16 18 10l9 6" stroke="' + C.f2 + '" stroke-width="1.6" fill="none" stroke-linejoin="round"/><rect x="11" y="16" width="14" height="10" rx="1.5" fill="none" stroke="' + C.f2 + '" stroke-width="1.6"/><circle cx="15" cy="21" r="1.8" fill="' + C.g + '"/><circle cx="21" cy="21" r="1.8" fill="' + C.l3 + '"/></svg>';
+  var msgs = '<div class="m me">Add a dark mode to docs-site. Low priority.</div>' +
+    '<div class="m dp"><div class="by">Dispatcher</div>It belongs to docs-site. I added it as a step after D6, so it starts when D6 is merged and a slot is free, in about 40 min.' +
+    '<div class="handon">' + stIcon('next', 18) + '<span class="t">D7 Dark mode <span>docs-site · after D6</span></span>' + ic('chev', 14, C.f3) + '</div></div>' +
+    '<div class="m me">What waits for me?</div><div class="m dp"><div class="by">Dispatcher</div>Two things: shop-api asks to merge S14 with one flaky test skipped, and docs-site asks you to approve the plan for D6. Both are in the Inbox.</div>';
+  var docsNew = { n: 'docs-site', ph: 'Phase 2 of 3, Pages', st: (function () { var s = lab(S('dddalllll'), { 3: 'D6', 4: 'D7' }); s[4].s = 'next'; return s })(), c: [] };
+  V['chat-d'] = '<div class="app desk panel">' + rail('home') + '<main class="main">' +
+    homeLine('Line clear. 5 at work, 7 merged today, next merge in about 20 min.') +
+    '<section><div class="sh"><h2>At work</h2><a>5 tasks</a></div>' + workRows(3, true) + '</section>' +
+    '<section><div class="sh"><h2>The line</h2><a>4 tracks</a></div><div class="card">' + trackRow(P.shop, 380) + trackRow(docsNew, 380).replace('<div class="tr">', '<div class="tr" style="background:#121214;box-shadow:inset 2px 0 ' + C.a + '">') + trackRow(P.lc, 380) + trackRow(P.mob, 380) + '</div></section></main>' +
+    '<aside class="cpanel"><div class="chead">' + box + '<span class="who"><b>Dispatcher</b><span class="meta">Knows 4 tracks · Claude Opus</span></span><a class="iconbtn" style="width:36px;height:36px">' + ic('ext') + '</a></div><div class="msgs">' + msgs + '</div>' +
+    '<div class="comp"><span class="ph">Ask, or hand on work for any project</span><div class="bar"><a class="iconbtn" style="width:36px;height:36px">' + ic('attach') + '</a><span class="send">' + ic('send') + '</span></div></div></aside></div>';
+  V['chat-p'] = phone('<div class="phead"><a class="iconbtn">' + ic('back', 20) + '</a>' + box + '<span style="flex:1;margin-left:8px"><b style="display:block;font-size:16px">Dispatcher</b><span class="meta">Knows 4 tracks</span></span></div>' +
+    '<div class="msgs" style="padding:12px 0;height:560px">' + msgs + '</div>', false, { after: '<div class="comp" style="margin:0 12px 34px;display:flex;align-items:center;gap:8px;padding:6px 6px 6px 8px"><a class="iconbtn">' + ic('attach', 20) + '</a><span class="ph" style="all:unset;flex:1;color:' + C.f3 + '">Message</span><span class="send">' + ic('send', 18) + '</span></div>' });
+  V['chat-setup'] = phone(phead() + '<div style="display:flex;flex-direction:column;gap:16px;margin-top:24px">' + '<svg width="72" height="72" viewBox="0 0 36 36" aria-hidden="true"><rect x=".5" y=".5" width="35" height="35" rx="10" fill="' + C.r + '" stroke="' + C.l2 + '"/><path d="M9 16 18 10l9 6" stroke="' + C.f2 + '" stroke-width="1.4" fill="none"/><rect x="11" y="16" width="14" height="10" rx="1.5" fill="none" stroke="' + C.f2 + '" stroke-width="1.4"/><circle cx="15" cy="21" r="1.8" fill="' + C.l3 + '"/><circle cx="21" cy="21" r="1.8" fill="' + C.l3 + '"/></svg>' +
+    '<h1 class="m" style="font:600 32px/38px var(--font);letter-spacing:-.02em">Set up the Dispatcher.</h1><p style="color:' + C.f2 + ';font-size:16px;line-height:22px">The Dispatcher is the one chat for all your projects. It knows which project a request belongs to, hands the work on, and answers from the live status.</p>' +
+    '<div class="card" style="padding:12px 12px 12px 16px;display:flex;align-items:center;gap:8px"><code style="flex:1;background:none;padding:0;color:' + C.f + '">lineclear dispatcher on</code><a class="btn sm" style="height:44px">' + ic('copy') + 'Copy</a></div>' +
+    '<p class="meta">Run it on the machine that runs Lineclear. This page changes by itself when it is on.</p></div>', 'chat');
+  /* Home is the Dispatcher chat; the state of all work and the line sit beside it, or above it on a narrow screen */
+  var comp = '<div class="comp"><span class="ph">Ask, or hand on work for any project</span><div class="bar"><a class="iconbtn" style="width:36px;height:36px">' + ic('attach') + '</a><span class="send">' + ic('send') + '</span></div></div>';
+  var homeText = 'Line clear. 5 at work, 7 merged today, next merge in about 20 min.';
+  function homeDesk(cls, w) {
+    return '<div class="app desk ' + cls + '">' + rail('home') + '<main class="main" style="padding:32px 0 0;gap:0"><div style="padding:0 48px">' + homeLine(homeText) + '</div><div class="msgs" style="padding:20px 48px">' + msgs + '</div>' + comp + '</main>' +
+      '<aside class="cpanel" style="padding:32px 24px;gap:24px;overflow:hidden"><section><div class="sh"><h2>At work</h2><a>5 tasks</a></div>' + workRows(3, true) + '</section>' +
+      '<section><div class="sh"><h2>The line</h2><a>4 tracks</a></div><div class="card">' + trackRow(P.shop, w) + trackRow(docsNew, w) + trackRow(P.lc, w) + trackRow(P.mob, w) + '</div></section></aside></div>';
+  }
+  V['home-d'] = homeDesk('panel', 300);
+  V['home-w'] = homeDesk('panel wide', 540);
+  V['home-p'] = phone(phead() + homeLine(homeText, true) + '<div class="msgs" style="padding:0 0 12px;height:470px">' + msgs + '</div>' +
+    '<div class="comp" style="margin:0;display:flex;align-items:center;gap:8px;padding:6px 6px 6px 8px"><a class="iconbtn">' + ic('attach', 20) + '</a><span class="ph" style="all:unset;flex:1;color:' + C.f3 + '">Message</span><span class="send">' + ic('send', 18) + '</span></div>' +
+    '<div class="sh" style="margin:16px 0 8px"><h2>At work</h2><a>5 tasks</a></div>' + workRows(1, true), 'home');
+  V['home-t'] = phone(phead() + homeLine(homeText, true) + '<div class="card" style="margin-bottom:16px">' + ptrack(P.shop, 700) + ptrack(P.lc, 700) + '</div><div class="msgs" style="padding:0 0 12px;height:400px">' + msgs + '</div>' +
+    '<div class="comp" style="margin:0;display:flex;align-items:center;gap:8px;padding:6px 6px 6px 8px"><a class="iconbtn">' + ic('attach', 20) + '</a><span class="ph" style="all:unset;flex:1;color:' + C.f3 + '">Message</span><span class="send">' + ic('send', 18) + '</span></div>', 'home').replace('app phone', 'app phone tab');
+
+})();
+
+/* Usage */
+(function () {
+  var days = [[5.1, 1.1, .3], [6.4, 1.3, .4], [4.2, .9, .3], [7.9, 1.2, .5], [8.4, 1.6, .5], [3.1, .7, .2], [2.6, .5, .2], [6.8, 1.0, .4], [9.2, 1.5, .6], [8.8, 1.1, .6], [7.4, 1.4, .5], [10.1, 1.2, .7], [9.6, 1.0, .6], [6.1, .8, .4]];
+  function chart(w, h, n) {
+    var d = days.slice(-n), max = 12.5, bw = (w - 32) / d.length, g = '<svg class="trk" width="' + w + '" height="' + (h + 22) + '" viewBox="0 0 ' + w + ' ' + (h + 22) + '" role="img" aria-label="tokens per day">';
+    [0, 5, 10].forEach(function (v) { var yy = h - h * v / max; g += '<line x1="32" x2="' + w + '" y1="' + yy + '" y2="' + yy + '" stroke="' + C.l + '"/><text x="0" y="' + (yy + 4) + '">' + v + ' M</text>' });
+    d.forEach(function (x, i) {
+      var xx = 32 + i * bw + bw * .18, ww = bw * .64, yy = h, segs = [[x[0], '#3d3b39'], [x[1], C.f2], [x[2], C.f]];
+      segs.forEach(function (s) { var hh = h * s[0] / max; yy -= hh; g += '<rect x="' + xx + '" y="' + yy + '" width="' + ww + '" height="' + Math.max(hh - 1, 1) + '" rx="2" fill="' + s[1] + '"/>' });
+      if (i % (n > 7 ? 2 : 1) === 0) g += '<text x="' + (xx + ww / 2) + '" y="' + (h + 16) + '" text-anchor="middle">' + (18 + i + (14 - n)) + '</text>';
+    });
+    return g + '</svg>';
+  }
+  function siding(name, load, used, free, tasks, w) {
+    var g = '<svg class="trk" width="' + w + '" height="44" viewBox="0 0 ' + w + ' 44">', sw = w / (used + free);
+    for (var i = 0; i < used + free; i++) {
+      var x = i * sw + 8;
+      var tw = Math.min(64, sw - 24);
+      g += '<path d="M' + x + ' 34H' + (x + sw - 16) + '" stroke="' + (i < used ? C.l3 : C.l2) + '" stroke-width="2" stroke-linecap="round"' + (i < used ? '' : ' stroke-dasharray="4 5"') + '/>';
+      if (i < used) g += '<rect x="' + (x + 4) + '" y="16" width="' + tw + '" height="20" rx="10" fill="' + C.f + '"/><circle cx="' + (x + tw - 4) + '" cy="26" r="2" fill="' + C.a + '"/><text x="' + (x + 12) + '" y="30" style="fill:' + C.b + ';font-weight:600">' + tasks[i] + '</text>';
+      else g += '<text x="' + (x + 4) + '" y="26">free</text>';
+    }
+    return '<div class="siding"><span><b style="font-weight:500">' + name + '</b><span class="meta">load ' + load + '</span></span>' + g + '</svg><span class="meta" style="justify-content:flex-end">' + free + ' free of ' + (used + free) + '</span></div>';
+  }
+  var tiles = [['$ per merged step', '$1.84', '14 days, 212 steps', '-16 % vs the 14 before'], ['Cache hits', '87<small>%</small>', 'of input tokens read from cache', ''], ['Compactions', '23', '0.11 per merged step', ''], ['Saved by the rules', '3.1<small> M tokens</small>', 'against a timed AI coordinator', 'est']];
+  function tile(t, span) { return '<div class="card tile" style="grid-column:span ' + span + '"><div class="k"><span>' + t[0] + '</span>' + (t[3] === 'est' ? '<span class="est">estimate</span>' : '') + '</div><div class="v">' + t[1] + '</div><div class="s">' + t[2] + (t[3] && t[3] !== 'est' ? '<br><span style="color:' + C.f3 + '">' + t[3] + '</span>' : '') + '</div></div>' }
+  var lims = '<div class="lim"><span>Claude<span class="meta">5 h window</span></span><span class="bar"><i style="width:62%"></i></span><span class="r">62 %, resets 21:00</span></div>' +
+    '<div class="lim"><span>Codex<span class="meta">5 h window</span></span><span class="bar"><i style="width:18%"></i></span><span class="r">18 %, resets 23:40</span></div>' +
+    '<div class="lim"><span>Gemini<span class="meta">day</span></span><span class="bar"><i style="width:100%"></i></span><span class="r">100 %, resets 02:00</span></div>';
+  var rows = [['shop-api', 96, '61.2 M', '$171', '$1.78', '89%', 9], ['lineclear', 71, '48.4 M', '$138', '$1.94', '86%', 8], ['docs-site', 29, '17.9 M', '$52', '$1.79', '88%', 4], ['mobile-app', 16, '11.0 M', 'not reported', '', '82%', 2]];
+  var table = '<table class="utab"><tr><th>Project</th><th>Merged</th><th>Spend</th><th>Per step</th><th>Cache hits</th></tr>' + rows.map(function (r) { return '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td><td' + (r[3] === 'not reported' ? ' style="color:' + C.f3 + '"' : '') + '>' + r[3] + '</td><td>' + (r[4] || '<span style="color:' + C.f3 + '">-</span>') + '</td><td>' + r[5] + '</td></tr>' }).join('') + '</table>';
+  var legend = '<div class="legend"><span><i style="background:#3d3b39"></i>Cache reads</span><span><i style="background:' + C.f2 + '"></i>Fresh input</span><span><i style="background:' + C.f + '"></i>Output</span></div>';
+  var agents = [['U27 Usage view', 'claude-opus-5-5', 'Claude', 'Builder', 42, '3.1 M', '$4.20', '38 min'], ['S15 Payment events to the data store', 'claude-sonnet-5-5', 'Claude', 'Builder', 67, '5.8 M', '$6.90', '1 h 12 min'], ['U26 A frame that uses the screen', 'gpt-5.5', 'Codex', 'Reviewer', 23, '0.9 M', '$0.80', '6 min'], ['D6 New landing page', 'claude-sonnet-5-5', 'Claude', 'Builder', 12, '0.6 M', '$0.70', '4 min']];
+  var agtab = '<table class="utab"><tr><th>Task</th><th>Model</th><th>Account</th><th>Role</th><th>Context</th><th>Tokens</th><th>Cost</th><th>Running</th></tr>' + agents.map(function (a) { return '<tr><td style="max-width:260px;overflow:hidden;text-overflow:ellipsis">' + a[0] + '</td><td>' + a[1] + '</td><td>' + a[2] + '</td><td>' + a[3] + '</td><td>' + a[4] + '%</td><td>' + a[5] + '</td><td>' + a[6] + '</td><td>' + a[7] + '</td></tr>' }).join('') + '</table>';
+  var agcards = agents.map(function (a) { return '<div class="row" style="min-height:76px;padding:10px 14px;align-items:flex-start"><span class="t" style="white-space:normal"><b>' + a[0] + '</b><span class="meta">' + a[1] + ' · ' + a[2] + ' · ' + a[3] + '</span><span class="meta">context ' + a[4] + '% · ' + a[5] + ' tokens · ' + a[6] + '</span></span><span class="meta" style="white-space:nowrap">' + a[7] + '</span></div>' }).join('');
+  var noagents = '<div class="card" style="padding:20px 16px"><p style="font-size:14px;color:' + C.f2 + '">No agent at work. Each one that starts shows here with its model, account, context and cost so far.</p></div>';
+  function phSidings() { return '<div class="card" style="margin-bottom:12px">' + (siding('this-box', '2.1 of 8', 2, 2, ['S15', 'U25'], 326) + siding('studio', '3.4 of 12', 3, 2, ['U26', 'U27', 'S13'], 326)).replace(/class="siding"/g, 'class="siding" style="grid-template-columns:1fr;gap:0;padding:8px 12px"').replace(/<span class="meta" style="justify-content:flex-end">/g, '<span class="meta">') + '</div>' }
+  function phLims() { return '<div class="card" style="margin-bottom:12px">' + lims.replace(/class="lim"/g, 'class="lim" style="grid-template-columns:72px 1fr 128px;padding:0 12px"') + '</div>' }
+  function sh(t, r) { return '<div class="sh" style="margin:16px 0 8px"><h2>' + t + '</h2><span>' + r + '</span></div>' }
+  V['usage-d'] = '<div class="app desk" style="height:1180px">' + rail('usage') + '<main class="main" style="gap:24px">' +
+    '<div class="hero"><h1 style="font-size:32px;line-height:38px;letter-spacing:-.02em">Usage</h1></div>' +
+    '<div class="ugrid"><div style="grid-column:span 5"><div class="sh"><h2>Limits</h2><span>now</span></div><div class="card">' + lims + '</div></div>' +
+    '<div style="grid-column:span 7"><div class="sh"><h2>Machines</h2><span>a siding per slot</span></div><div class="card">' +
+    siding('this-box', '2.1 of 8', 2, 2, ['S15', 'U25'], 384) + siding('studio', '3.4 of 12', 3, 2, ['U26', 'U27', 'S13'], 384) + '</div></div></div>' +
+    '<div><div class="sh"><h2>Agents at work</h2><span>4 now</span></div><div class="card" style="padding:0;overflow:hidden">' + agtab + '</div></div>' +
+    '<div class="ugrid">' + tiles.map(function (t) { return tile(t, 3) }).join('') + '</div>' +
+    '<div class="ugrid"><div class="card" style="grid-column:span 6;padding:16px 18px"><div class="sh" style="margin-bottom:8px"><h2>Tokens per day</h2><span class="seg"><span class="on">All</span><span>shop-api</span><span>lineclear</span><span>docs-site</span></span></div>' + legend + '<div style="margin-top:12px">' + chart(500, 150, 14) + '</div></div>' +
+    '<div class="card" style="grid-column:span 6;padding:0;overflow:hidden">' + table + '<p class="meta" style="padding:10px 16px">The estimate: the turns a coordinator on a 5 min timer would run, at the tokens per turn measured in docs/numbers.md.</p></div></div>' +
+    '</main></div>';
+  V['usage-p'] = phone(phead() + '<h1 class="m" style="margin:4px 0 12px">Usage</h1>' + phLims() + phSidings() + sh('Agents at work', '4 now') + '<div class="card">' + agcards + '</div>', 'usage');
+  V['usage-p3'] = phone(phead() + '<h1 class="m" style="margin:4px 0 12px">Usage</h1>' + phLims() + phSidings() + sh('Agents at work', 'none') + noagents, 'usage');
+  V['usage-p2'] = phone(phead('', {}) + '<div class="ugrid" style="grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">' + tiles.map(function (t) { return tile(t, 1).replace('class="v"', 'class="v" style="font-size:22px;line-height:28px"') }).join('') + '</div>' +
+    '<div class="card" style="padding:14px"><div class="sh" style="margin-bottom:8px"><h2>Tokens per day</h2><span>7 days</span></div>' + legend.replace('gap:16px', 'gap:10px') + '<div style="margin-top:10px">' + chart(326, 120, 7) + '</div></div>' +
+    '<div class="sh" style="margin:20px 0 8px"><h2>Per project</h2><span>14 days</span></div><div class="card">' + rows.map(function (r) { return '<div class="row" style="min-height:60px;align-items:center"><span class="t"><b>' + r[0] + '</b><span class="meta">' + r[1] + ' merged · cache ' + r[5] + ' · ' + r[6] + ' compactions</span></span><span style="text-align:right"><b class="num" style="font-weight:600">' + (r[4] || '<span style="color:' + C.f3 + ';font-weight:400;font-size:12px">not reported</span>') + '</b><span class="meta" style="justify-content:flex-end">per step</span></span></div>' }).join('') + '</div>' +
+    '<div class="card" style="margin-top:12px;padding:12px 14px"><div class="meta" style="justify-content:space-between"><b>Saved by the rules</b><span class="est">estimate</span></div><p style="font-size:14px;color:' + C.f2 + ';margin-top:6px">Saved: 3.1 M tokens in 14 days, vs a coordinator on a 5 min timer. How: docs/numbers.md.</p></div>', 'usage');
+})();
+
+/* Settings */
+(function () {
+  function ord(ms) { return '<span class="order">' + ms.map(function (m, i) { return '<span class="chip">' + ic('grip', 12, C.f3) + '<em>' + (i + 1) + '</em>' + m + '</span>' }).join('') + '</span>' }
+  var roles = [['Worker', ['Claude Opus', 'GPT-5.5', 'Gemini Pro']], ['Reviewer', ['GPT-5.5', 'Gemini Pro']], ['Planner', ['Claude Opus']], ['Dispatcher', ['Claude Sonnet', 'GPT-5.5']]];
+  V['set-d'] = '<div class="app desk">' + rail('settings') + '<main class="main"><div class="hero"><h1 style="font-size:32px;line-height:38px;letter-spacing:-.02em">Settings</h1><p>What you set. Limits, machines at work and spend are on Usage.</p></div>' +
+    '<div class="sets"><nav class="snav"><a class="nav sel">Models</a><a class="nav">Projects</a><a class="nav">Machines</a><a class="nav">Secrets</a></nav><div>' +
+    '<div class="sgroup"><h2>Models</h2><p>In order: when one runs out, the next one takes over. Drag to change the order.</p><div class="card">' + roles.map(function (r) { return '<div class="srow"><span class="k">' + r[0] + '</span>' + ord(r[1]) + '<a class="btn sm gh">' + ic('plus', 14) + 'Add</a></div>' }).join('') + '</div></div>' +
+    '<div class="sgroup"><h2>Projects</h2><p>Each one checks with its own command.</p><div class="card">' + [['shop-api', 'bun run check', 3], ['docs-site', 'npm test', 1], ['lineclear', 'bun run check', 2], ['mobile-app', 'make test', 0]].map(function (p) { return '<div class="prow">' + ic('folder', 16, C.f3) + '<span class="t">' + p[0] + '<span>checks with <code>' + p[1] + '</code></span></span><span class="chip">' + ic('key', 12) + p[2] + (p[2] === 1 ? ' secret' : ' secrets') + '</span>' + ic('chev', 16, C.f3) + '</div>' }).join('') + '<div class="prow" style="color:' + C.f2 + '">' + ic('plus') + '<span class="t">Add a project</span></div></div></div>' +
+    '</div></div></main></div>';
+  V['set-p'] = phone(phead('', { right: ' ' }) + '<div class="hero" style="margin:4px 0 16px"><h1 class="m">Settings</h1><p style="font-size:14px;line-height:20px">What you set.</p></div>' +
+    ['Models', 'Projects', 'Machines', 'Secrets'].map(function (s, i) { return '' }).join('') +
+    '<div class="sh" style="margin-bottom:6px"><h2 style="font-size:14px;color:' + C.f3 + ';font-weight:500">Models</h2></div><div class="card">' + roles.map(function (r) { return '<div class="row" style="min-height:52px"><span class="t">' + r[0] + '</span><span class="meta">' + r[1][0] + (r[1].length > 1 ? ' +' + (r[1].length - 1) : '') + '</span>' + ic('chev', 16, C.f3) + '</div>' }).join('') + '</div>' +
+    '<div class="sh" style="margin:20px 0 6px"><h2 style="font-size:14px;color:' + C.f3 + ';font-weight:500">Projects</h2></div><div class="card">' + ['shop-api', 'docs-site', 'lineclear'].map(function (p) { return '<div class="row" style="min-height:52px"><span class="t">' + p + '</span>' + ic('chev', 16, C.f3) + '</div>' }).join('') + '</div>' +
+    '<div class="card" style="margin-top:20px"><div class="row" style="min-height:52px"><span class="t">Machines</span><span class="meta">3</span>' + ic('chev', 16, C.f3) + '</div><div class="row" style="min-height:52px"><span class="t">Secrets</span><span class="meta">6</span>' + ic('chev', 16, C.f3) + '</div></div>', 'home');
+})();
+
+/* Browsers */
+(function () {
+  function shot(kind) {
+    if (kind === 'shop') return '<div class="shot"><div style="position:absolute;inset:0;padding:8% 9%;display:flex;flex-direction:column;gap:7%"><div style="height:7%;width:30%;background:#1f1f22;border-radius:3px"></div><div style="display:flex;gap:6%;flex:1"><div style="flex:1;background:#e3dfda;border-radius:6px"></div><div style="flex:1;display:flex;flex-direction:column;gap:9%"><div style="height:12%;background:#c9c4be;border-radius:3px"></div><div style="height:12%;width:70%;background:#d8d3cd;border-radius:3px"></div><div style="height:18%;width:52%;background:#2f6d4f;border-radius:5px;margin-top:auto"></div></div></div></div></div>';
+    if (kind === 'docs') return '<div class="shot dk"><div style="position:absolute;inset:0;padding:9% 10%"><div style="height:9%;width:56%;background:#ece9e4;border-radius:3px;margin-bottom:5%"></div><div style="height:5%;width:80%;background:#55534f;border-radius:3px;margin-bottom:3%"></div><div style="height:5%;width:70%;background:#55534f;border-radius:3px;margin-bottom:9%"></div><div style="display:flex;gap:5%;height:40%"><div style="flex:1;border:1px solid #333;border-radius:6px"></div><div style="flex:1;border:1px solid #d97757;border-radius:6px"></div><div style="flex:1;border:1px solid #333;border-radius:6px"></div></div></div></div>';
+    return '<div class="shot"><div style="position:absolute;inset:0;padding:8% 9%;display:grid;grid-template-columns:22% 1fr;gap:6%"><div style="background:#e7e3de;border-radius:4px"></div><div style="display:flex;flex-direction:column;gap:6%"><div style="height:9%;width:44%;background:#26262a;border-radius:3px"></div>' + [1, 2, 3, 4].map(function () { return '<div style="height:10%;background:#ebe7e2;border-radius:3px"></div>' }).join('') + '</div></div></div>';
+  }
+  var cards = [['shop', 'S15 Payment events to the data store', 'localhost:5173', 'shop-api'], ['docs', 'D6 New landing page', 'localhost:4321', 'docs-site'], ['admin', 'U27 Usage view', '127.0.0.1:7432', 'lineclear']];
+  function bc(c, ph) { return '<div class="card bcard">' + shot(c[0]) + '<div class="bt"' + (ph ? ' style="padding:10px"' : '') + '><b' + (ph ? ' style="font-size:14px;white-space:normal;line-height:17px"' : '') + '>' + c[1] + '</b><span class="meta">' + trainIcon(12) + c[3] + (ph ? '' : ' · ' + c[2]) + '</span></div></div>' }
+  V['br-d'] = '<div class="app desk">' + rail('browsers') + '<main class="main"><div class="hero"><h1 style="font-size:32px;line-height:38px;letter-spacing:-.02em">3 browsers at work.</h1><p>One per task that tests a page. Tap one to watch it live or take over.</p></div>' +
+    '<div class="bgrid">' + cards.map(function (c) { return bc(c) }).join('') + '</div>' +
+    '<div class="card"><div class="row" style="min-height:52px">' + ic('browsers', 16, C.f3) + '<span class="t" style="color:' + C.f2 + '">Other sessions</span><span class="meta">1, yours</span>' + ic('down', 16, C.f3) + '</div></div></main></div>';
+  V['br-p'] = phone(phead() + '<div class="hero" style="margin:4px 0 16px"><h1 class="m">3 browsers at work.</h1></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' + cards.map(function (c) { return bc(c, 1) }).join('') + '<div class="card dash" style="display:grid;place-items:center;color:' + C.f3 + ';font-size:12px;text-align:center;padding:12px;background:none">Other sessions<br>1, yours</div></div>', 'browsers');
+})();
+
+/* How it works */
+(function () {
+  var chain = [['You', 'you decide', '2 asks open', 'wait'], ['Dispatcher', 'the signal box', 'on, knows 4 tracks', 'box'], ['Roadmap', 'stations in order', '31 steps open', 'st'], ['Rules', 'plain code starts work', 'no AI while idle', 'rule'], ['Workers', 'a train each', '5 at work', 'train'], ['Reviewers', 'the signal', '1 checking', 'check'], ['Main', 'the junction', '7 merged today', 'main']];
+  function pic(k, s) { return k === 'train' ? trainIcon(s) : k === 'wait' || k === 'check' ? lamp(k, s) : k === 'st' ? stIcon('done', s) : k === 'main' ? '<svg width="' + s + '" height="' + s + '" viewBox="0 0 16 16"><path d="M3 3v5c0 3 2 5 5 5h5" stroke="' + C.f2 + '" stroke-width="2.5" fill="none" stroke-linecap="round"/></svg>' : k === 'box' ? '<svg width="' + s + '" height="' + s + '" viewBox="0 0 16 16"><path d="M2 7 8 3l6 4" stroke="' + C.f2 + '" stroke-width="1.5" fill="none"/><rect x="3.5" y="7" width="9" height="6.5" rx="1" fill="none" stroke="' + C.f2 + '" stroke-width="1.5"/><circle cx="8" cy="10.2" r="1.4" fill="' + C.g + '"/></svg>' : '<svg width="' + s + '" height="' + s + '" viewBox="0 0 16 16"><path d="M5.25 4a2.75 2.75 0 0 1 5.5 0v4.5a2.75 2.75 0 0 1-5.5 0z" stroke="' + C.f2 + '" stroke-width="1.5" fill="none"/><circle cx="8" cy="4.25" r="1.1" fill="' + C.f2 + '"/><circle cx="8" cy="8.25" r="1.1" fill="' + C.g + '"/><path d="M8 11.25v3M5.5 14.25h5" stroke="' + C.f2 + '" stroke-width="1.5"/></svg>' }
+  var w = 1100, step = w / chain.length, g = '<div style="position:relative;height:180px"><svg class="trk" width="' + w + '" height="180" viewBox="0 0 ' + w + ' 180" style="position:absolute;inset:0"><line x1="' + step / 2 + '" y1="30" x2="' + (w - step / 2) + '" y2="30" stroke="' + C.l2 + '" stroke-width="2"/><line x1="' + step / 2 + '" y1="30" x2="' + (step * 4.5) + '" y2="30" stroke="' + C.g + '" stroke-width="3"/></svg>';
+  chain.forEach(function (c, i) { g += '<div style="position:absolute;left:' + (i * step) + 'px;width:' + step + 'px;top:0;display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px"><span style="width:60px;height:60px;border-radius:16px;background:' + C.r + ';border:1px solid ' + C.l2 + ';display:grid;place-items:center">' + pic(c[3], 26) + '</span><b style="font-size:16px;margin-top:6px">' + c[0] + '</b><span class="meta">' + c[1] + '</span><span class="chip' + (c[3] === 'wait' ? ' am' : '') + '">' + c[2] + '</span></div>' });
+  g += '</div>';
+  V['how-d'] = '<div class="app desk">' + rail('home') + '<main class="main"><div class="hero"><h1 style="font-size:32px;line-height:38px;letter-spacing:-.02em">How it works, right now.</h1><p>You talk to one contact. Plain code starts each step; AI workers build them and a reviewer from another company checks them.</p></div><div class="card" style="padding:24px 12px">' + g + '</div>' +
+    '<p class="meta" style="font-size:14px">Each count is live and opens what it counts. The same parts as the line on Home.</p></main></div>';
+  V['how-p'] = phone(phead('', { back: 'Home' }) + '<div class="hero" style="margin:0 0 12px"><h1 class="m" style="font-size:32px;line-height:38px">How it works, right now.</h1></div><div class="vt">' + chain.map(function (c, i) { return '<div class="vs' + (i < 5 ? ' d' : '') + '" style="min-height:76px"><span class="st" style="width:28px;height:28px;background:' + C.b + '">' + pic(c[3], 22) + '</span><span class="tt"><b style="font-size:16px">' + c[0] + '</b><span class="meta">' + c[1] + '</span></span><span class="chip' + (c[3] === 'wait' ? ' am' : '') + '">' + c[2] + '</span></div>' }).join('') + '</div>', 'home');
+})();
+
+/* First run */
+(function () {
+  var empty = '<svg class="trk" width="560" height="70" viewBox="0 0 560 70"><line x1="8" y1="30" x2="470" y2="30" stroke="' + C.l3 + '" stroke-width="2" stroke-dasharray="6 7" stroke-linecap="round"/>' + [80, 200, 320, 440].map(function (x) { return '<circle cx="' + x + '" cy="30" r="6" fill="' + C.b + '" stroke="' + C.l3 + '" stroke-width="2" stroke-dasharray="3 3"/>' }).join('') + '<path d="M470 30C488 30 488 46 506 46H556" stroke="' + C.l3 + '" stroke-width="2" fill="none" stroke-dasharray="6 7"/></svg>';
+  var found = '<div class="card" style="padding:4px 0"><div class="row">' + stIcon('done') + '<span class="t">Roadmap <code>docs/ROADMAP.md</code>, 12 steps in 3 phases</span></div><div class="row">' + stIcon('done') + '<span class="t">Checks with <code>bun run check</code></span></div><div class="row">' + stIcon('done') + '<span class="t">Branch <code>main</code>, clean</span></div></div>';
+  V['first-d'] = '<div class="app desk">' + rail('home', { noTracks: 1 }) + '<main class="main" style="max-width:760px"><div class="hero"><h1>Add your first project.</h1><p>A project is a git folder with a roadmap. Lineclear turns its steps into work, one station at a time.</p></div>' + empty +
+    '<div style="display:flex;gap:8px"><div class="field" style="flex:1;color:' + C.f + '">' + ic('folder', 16, C.f3) + '~/code/shop-api</div><a class="btn pri" style="height:40px">Add</a></div>' + '<div><div class="meta" style="margin-bottom:8px">Found in the folder</div>' + found + '</div>' +
+    '<p class="meta" style="font-size:14px">The same as <code>lineclear project add ~/code/shop-api</code>. <a style="color:' + C.f2 + ';text-decoration:underline">How it works</a></p></main></div>';
+  V['first-p'] = phone(phead() + '<div class="hero" style="margin:4px 0 20px"><h1 class="m">Add your first project.</h1><p style="font-size:14px;line-height:20px">A git folder with a roadmap.</p></div>' + empty.replace('width="560"', 'width="358"').replace('viewBox="0 0 560 70"', 'viewBox="0 0 560 70" preserveAspectRatio="none"') +
+    '<div class="field" style="color:' + C.f + ';margin:12px 0 8px">' + ic('folder', 16, C.f3) + '~/code/shop-api</div><a class="btn pri" style="width:100%">Add</a><div class="meta" style="margin:20px 0 8px">Found in the folder</div>' + found, 'home');
+})();
+
+/* States */
+(function () {
+  function skelTrack(w) { return '<svg class="trk" width="' + w + '" height="48" viewBox="0 0 ' + w + ' 48"><line class="layl" x1="8" y1="24" x2="' + (w - 70) + '" y2="24" stroke="' + C.l2 + '" stroke-width="2"/>' + [0, 1, 2, 3, 4, 5].map(function (i) { return '<circle cx="' + (8 + (w - 78) * (i + .5) / 6) + '" cy="24" r="5" fill="' + C.b + '" stroke="' + C.l2 + '" stroke-width="2"/>' }).join('') + '</svg>' }
+  V['st-load'] = phone(phead() + '<div style="margin:4px 0 16px"><div class="skel" style="height:34px;width:84%;margin-bottom:8px"></div><div class="skel" style="height:14px;width:52%"></div></div><div class="card" style="margin-bottom:24px;opacity:.6">' + [1, 2].map(function () { return '<div class="row" style="min-height:64px"><div class="skel" style="height:14px;width:70%"></div></div>' }).join('') + '</div><div class="sh"><h2>The line</h2></div><div class="card">' + [1, 2, 3].map(function () { return '<div class="ptr"><div class="skel" style="height:14px;width:40%;margin:4px 0 12px"></div>' + skelTrack(326) + '</div>' }).join('') + '</div>', 'home');
+  V['st-stale'] = phone(phead() + '<div class="stale" style="margin-bottom:12px">' + ic('retry', 14) + '<span style="flex:1">Not updated since 19:42. Retrying.</span></div><div style="opacity:.85">' + homeLine('Line clear. 5 at work, 7 merged today, next merge in about 20 min.', true) + workRows(2, true) + '</div><div class="card" style="margin-top:20px;opacity:.85">' + ptrack(P.shop, 326) + '</div>', 'home');
+  V['st-broken'] = phone(phead() + '<div style="margin-top:24px;display:flex;flex-direction:column;gap:16px">' + lamp('broken', 48) + '<h1 class="m" style="font-size:32px;line-height:38px">The service stopped.</h1><p style="color:' + C.f2 + ';font-size:16px;line-height:22px">Nothing has started since 19:42. Work on the machines goes on, and the last view stays below.</p><div class="card" style="padding:12px 12px 12px 16px;display:flex;align-items:center;gap:8px"><code style="flex:1;background:none;padding:0;color:' + C.f + '">lineclear doctor</code><a class="btn sm" style="height:44px">' + ic('copy') + 'Copy</a></div><a class="btn">' + ic('retry') + 'Try again</a></div>', 'home');
+  var longP = { n: 'customer-onboarding-and-identity-verification-service', ph: 'Phase 12 of 14, Rewrite the verification flow for business accounts in the EU', st: lab(S('ddddddddwal'), { 8: 'V117', 9: 'V118' }), c: [['train', '1 at work']] };
+  V['st-long'] = phone(phead() + homeLine('Line clear. 1 at work, 3 merged today, next merge in about 2 h.', true) + '<div class="card"><a class="row" style="min-height:64px;padding:8px 16px"><span style="flex:none">' + trainIcon(14) + '</span><span class="t"><b>Fix the document upload screen shown twice when the network is slow</b><span class="meta" style="display:block;margin-top:2px;overflow:hidden;text-overflow:ellipsis">customer-onboarding-and-identity-verification-service · Writing · 2 h 5 min · done in about 1 h 40 min</span></span>' + ic('chev', 16, C.f3) + '</a></div><div class="card" style="margin-top:16px">' + ptrack(longP, 326) + '</div>', 'home');
+})();
+
+/* Parts */
+(function () {
+  var parts = [
+    ['Track', 'A project. It fills green as its steps merge.', '<svg width="172" height="36"><line x1="4" y1="18" x2="168" y2="18" stroke="' + C.l2 + '" stroke-width="2" stroke-linecap="round"/><line x1="4" y1="18" x2="96" y2="18" stroke="' + C.g + '" stroke-width="3" stroke-linecap="round"/></svg>'],
+    ['Station', 'A step. Grey ring later, filled green merged, white ring at work.', '<svg width="172" height="36">' + [[24, 'later'], [64, 'work'], [104, 'done'], [144, 'next']].map(function (s) { var c = { done: [C.g, C.g], later: [C.b, C.l3], work: [C.b, C.f], next: [C.b, C.f2] }[s[1]]; return '<circle cx="' + s[0] + '" cy="18" r="7" fill="' + c[0] + '" stroke="' + c[1] + '" stroke-width="2.5"/>' }).join('') + '</svg>'],
+    ['Train', 'A task at work, on its way to its station. It moves only when the task does.', '<svg width="172" height="36"><line x1="4" y1="18" x2="168" y2="18" stroke="' + C.l2 + '" stroke-width="2"/><rect x="60" y="11" width="28" height="14" rx="7" fill="' + C.f + '"/><circle cx="83" cy="18" r="2" fill="' + C.a + '"/><circle cx="130" cy="18" r="7" fill="' + C.b + '" stroke="' + C.f + '" stroke-width="2.5"/></svg>'],
+    ['Signal', 'A lamp on a mast. Grey ring checking, green clear, amber waits for you, red broken.', '<svg width="172" height="40">' + [[24, 'check'], [64, C.g], [104, C.am], [144, C.rd]].map(function (s) { return '<line x1="' + s[0] + '" y1="20" x2="' + s[0] + '" y2="38" stroke="' + C.f3 + '" stroke-width="1.5"/><circle cx="' + s[0] + '" cy="13" r="9" fill="' + C.r + '" stroke="' + C.f3 + '" stroke-width="1.5"/>' + (s[1] === 'check' ? '<circle class="blink" cx="' + s[0] + '" cy="13" r="4" fill="none" stroke="' + C.f2 + '" stroke-width="1.5"/>' : '<circle cx="' + s[0] + '" cy="13" r="4.6" fill="' + s[1] + '"/>') }).join('') + '</svg>'],
+    ['Junction and main', 'The merge: the track curves into the main line, like the mark.', '<svg width="172" height="40"><line x1="4" y1="12" x2="80" y2="12" stroke="' + C.g + '" stroke-width="3" stroke-linecap="round"/><path d="M80 12C100 12 100 30 120 30" stroke="' + C.g + '" stroke-width="3" fill="none"/><line x1="120" y1="30" x2="168" y2="30" stroke="' + C.f3 + '" stroke-width="5" stroke-linecap="round"/></svg>'],
+    ['Siding', 'A slot on a machine. Dashed when free, a train in it when used.', '<svg width="172" height="36"><path d="M4 26H76" stroke="' + C.l3 + '" stroke-width="2"/><rect x="12" y="14" width="44" height="16" rx="8" fill="' + C.f + '"/><path d="M92 26H168" stroke="' + C.l2 + '" stroke-width="2" stroke-dasharray="4 5"/></svg>'],
+    ['Signal box', 'The Dispatcher: the one you talk to. It sets the routes.', '<svg width="172" height="40" viewBox="0 0 172 40"><g transform="translate(66 2)"><path d="M2 16 20 4l18 12" stroke="' + C.f2 + '" stroke-width="2" fill="none" stroke-linejoin="round"/><rect x="6" y="16" width="28" height="20" rx="2" fill="none" stroke="' + C.f2 + '" stroke-width="2"/><circle cx="14" cy="26" r="3" fill="' + C.g + '"/><circle cx="26" cy="26" r="3" fill="' + C.l3 + '"/></g></svg>'],
+    ['Phase strip', 'A roadmap at a glance: a segment per phase, sized by its steps, the current one ringed.', phases({ w: 172, ps: [{ d: 8, t: 8 }, { d: 12, t: 12 }, { d: 4, t: 8, cur: 1 }, { d: 0, t: 14 }, { d: 0, t: 9 }] }).replace('height="8"', 'height="36"').replace('viewBox="0 0 172 8"', 'viewBox="0 -14 172 36"')]
+  ];
+  document.getElementById('partlist').innerHTML = parts.map(function (p) { return '<div class="part">' + p[2] + '<b>' + p[0] + '</b><span>' + p[1] + '</span></div>' }).join('');
+})();
+
+/* Motion demos */
+(function () {
+  var demos = [
+    ['d-merge', 'A step merges', 'The train runs to its station, the review lamp checks, turns green, the train joins main and the station fills. train, signal.',
+      '<svg width="300" height="90" viewBox="0 0 300 90"><line x1="20" y1="40" x2="200" y2="40" stroke="' + C.l2 + '" stroke-width="2"/><line x1="20" y1="40" x2="56" y2="40" stroke="' + C.g + '" stroke-width="3"/><line class="fillg" x1="56" y1="40" x2="152" y2="40" stroke="' + C.g + '" stroke-width="3"/><path d="M200 40C220 40 220 60 240 60H290" stroke="' + C.l2 + '" stroke-width="2" fill="none"/><line x1="240" y1="60" x2="290" y2="60" stroke="' + C.f3 + '" stroke-width="5" stroke-linecap="round"/><circle cx="56" cy="40" r="7" fill="' + C.g + '" stroke="' + C.g + '" stroke-width="2.5"/><line x1="152" y1="31" x2="152" y2="18" stroke="' + C.f3 + '" stroke-width="1.5"/><circle cx="152" cy="12" r="7" fill="' + C.r + '" stroke="' + C.f3 + '" stroke-width="1.5"/><circle class="lampc" cx="152" cy="12" r="3.6" fill="' + C.g + '" stroke="' + C.g + '" stroke-width="1.5"/><circle class="stn" cx="152" cy="40" r="7" stroke-width="2.5"/><g class="train"><rect x="30" y="34" width="26" height="12" rx="6" fill="' + C.f + '" style="opacity:0"/></g><g class="train" style="opacity:1"><rect x="34" y="34" width="26" height="12" rx="6" fill="' + C.f + '"/><circle cx="55" cy="40" r="1.8" fill="' + C.a + '"/></g><text x="152" y="66" text-anchor="middle" style="font:12px var(--font);fill:' + C.f2 + '">S14</text></svg>'],
+    ['d-answer', 'You answer', 'Press, the lamp turns green, the card leaves with its height, Undo comes up. press, signal, leave, move.',
+      '<div style="width:280px;position:relative;height:120px;display:flex;flex-direction:column;justify-content:center;gap:8px"><div class="acard" style="background:' + C.r + ';border:1px solid ' + C.l + ';border-radius:10px;display:flex;align-items:center;gap:10px;padding:0 12px;height:76px"><svg width="18" height="18" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="' + C.f3 + '" stroke-width="1.5"/><circle class="alamp" cx="8" cy="8" r="3" fill="' + C.am + '"/></svg><span style="flex:1;font-size:14px">Merge S14?</span><span class="btn sm pri apress" style="height:30px">Merge</span></div><div style="background:' + C.r + ';border:1px solid ' + C.l + ';border-radius:10px;height:40px;display:flex;align-items:center;gap:10px;padding:0 12px;font-size:14px;color:' + C.f2 + '">' + lamp('wait', 16) + 'Approve the plan?</div><div class="atoast toast" style="bottom:-6px;height:34px;font-size:12px;padding:0 4px 0 12px">Merged S14.<span class="btn" style="height:28px;font-size:12px">Undo</span></div></div>'],
+    ['d-lay', 'Loading lays the track', 'The track draws in its final place, the stations come in turn, then the words. No grey slabs, no jump. lay.',
+      '<svg width="300" height="80" viewBox="0 0 300 80"><line class="layl" x1="20" y1="34" x2="280" y2="34" stroke="' + C.l3 + '" stroke-width="2"/>' + [0, 1, 2, 3, 4].map(function (i) { return '<circle class="lays" style="animation-delay:' + (200 + i * 60) + 'ms" cx="' + (46 + i * 52) + '" cy="34" r="6" fill="' + (i < 2 ? C.g : C.b) + '" stroke="' + (i < 2 ? C.g : C.l3) + '" stroke-width="2"/>' }).join('') + '<text class="layt" x="20" y="64" style="font:12px var(--font);fill:' + C.f2 + '">shop-api · Phase 3 of 5</text></svg>'],
+    ['d-view', 'A view change', 'The page slides 24 px the way you went and fades; back slides the other way. A project row grows into its roadmap. view.',
+      '<div style="position:relative;width:260px;height:110px"><div class="vfrom" style="position:absolute;inset:0;background:' + C.r + ';border:1px solid ' + C.l + ';border-radius:10px;padding:12px;font-size:14px"><b>Home</b><div style="margin-top:10px;height:8px;width:70%;background:' + C.l2 + ';border-radius:4px"></div><div style="margin-top:8px;height:8px;width:50%;background:' + C.l2 + ';border-radius:4px"></div></div><div class="vto" style="position:absolute;inset:0;background:' + C.r + ';border:1px solid ' + C.l + ';border-radius:10px;padding:12px;font-size:14px"><b>shop-api</b>' + phases({ w: 234, ps: [{ d: 8, t: 8 }, { d: 12, t: 12 }, { d: 4, t: 8, cur: 1 }, { d: 0, t: 14 }] }).replace('<svg ', '<svg style="margin-top:14px" ') + '</div></div>'],
+    ['d-value', 'A number changes', 'The number counts to its new value and the bar grows with it, under 300 ms. value.',
+      '<div style="width:260px"><div style="font:600 32px/38px var(--font);font-variant-numeric:tabular-nums" class="vnum">71%</div><div style="height:8px;border-radius:4px;background:' + C.l2 + ';margin-top:10px;overflow:hidden"><div class="vbar" style="height:100%;background:' + C.f2 + ';border-radius:4px"></div></div><div style="font-size:12px;color:' + C.f3 + ';margin-top:6px">Claude, 5 h window, resets 21:00</div></div>'],
+    ['d-news', 'News on a track', 'A new station lands where the Dispatcher put it, with one ring of news, then stays still. pulse.',
+      '<svg width="300" height="80" viewBox="0 0 300 80"><line x1="20" y1="40" x2="280" y2="40" stroke="' + C.l2 + '" stroke-width="2"/><line x1="20" y1="40" x2="100" y2="40" stroke="' + C.g + '" stroke-width="3"/>' + [[60, 'd'], [100, 'd'], [160, 'a']].map(function (s) { return '<circle cx="' + s[0] + '" cy="40" r="6" fill="' + (s[1] === 'd' ? C.g : C.b) + '" stroke="' + (s[1] === 'd' ? C.g : C.am) + '" stroke-width="2"/>' }).join('') + '<circle class="pulse" cx="220" cy="40" r="6" fill="none" stroke="' + C.f2 + '" stroke-width="1.5"/><circle class="newst" cx="220" cy="40" r="6" fill="' + C.b + '" stroke="' + C.f2 + '" stroke-width="2"/><text x="220" y="64" text-anchor="middle" style="font:12px var(--font);fill:' + C.f2 + '">D7</text></svg>']
+  ];
+  var el = document.getElementById('demos');
+  el.innerHTML = demos.map(function (d) { return '<div class="demo"><div class="stage ' + d[0] + '">' + d[3] + '</div><div class="info"><b>' + d[1] + '</b><span>' + d[2] + '</span><button class="btn" type="button" data-replay>Replay</button></div></div>' }).join('');
+  function play(stage) {
+    stage.classList.remove('play'); void stage.offsetWidth; stage.classList.add('play');
+    var n = stage.querySelector('.vnum');
+    if (n && !matchMedia('(prefers-reduced-motion: reduce)').matches) { var t0 = performance.now() + 400; (function f(t) { var p = Math.min(1, Math.max(0, (t - t0) / 300)); n.textContent = Math.round(62 + 9 * (1 - Math.pow(1 - p, 3))) + '%'; if (p < 1) requestAnimationFrame(f) })(t0) }
+  }
+  el.addEventListener('click', function (e) { var b = e.target.closest('[data-replay]'); if (b) play(b.closest('.demo').querySelector('.stage')) });
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (es) { es.forEach(function (x) { if (x.isIntersecting) { play(x.target); io.unobserve(x.target) } }) }, { threshold: .6 });
+    el.querySelectorAll('.stage').forEach(function (s) { io.observe(s) });
+  }
+})();
+
+/* 768 and 2560 px: the phone layout on a wider screen, the desktop layout with more room */
+['home', 'road', 'inbox', 'chat', 'usage', 'set', 'br', 'how', 'first'].forEach(function (k) {
+  if (!V[k + '-w']) V[k + '-w'] = V[k + '-d'].replace('app desk', 'app desk wide');
+  if (!V[k + '-t']) V[k + '-t'] = V[k + '-p'].replace('app phone', 'app phone tab');
+});
+
+/* Put each view in its frame and scale it to the frame's width */
+Object.keys(V).forEach(function (id) { var f = document.getElementById(id); if (f) f.innerHTML = V[id] });
+var frames = [].slice.call(document.querySelectorAll('.fit'));
+var lastW = 0;
+function fit() {
+  var bw = document.getElementById('board').clientWidth;
+  if (bw === lastW) return; lastW = bw;
+  frames.forEach(function (f) { var w = +f.dataset.w, h = +f.dataset.h, s = Math.min(1, f.clientWidth / w); f.firstChild.style.transform = 'scale(' + s + ')'; f.style.height = Math.round(h * s) + 'px' });
+}
+fit();
+addEventListener('resize', fit);
+})();
+</script>
+</body>
+</html>

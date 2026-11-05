@@ -1,0 +1,47 @@
+#!/bin/sh
+# ssh for the tests: `ssh -o .. -o .. -- <host> <command>`. A host named offline* cannot be reached, and one named
+# broken* fails its doctor. The install reads install.sh from stdin and takes FAKE_SSH_SECONDS. Each call is logged to
+# FAKE_SSH_LOG, with the first line of what came on stdin.
+while [ "$1" != "--" ]; do shift; done
+host=$2
+cmd=$3
+log=${FAKE_SSH_LOG:-/dev/null}
+case "$host" in offline*) echo "ssh: connect to host $host port 22: Connection refused" >&2; exit 255 ;; esac
+case "$cmd" in
+  *"sh -s")
+    echo "$host $cmd < $(head -n 1)" >> "$log"
+    echo x >> "$log.$host.installs"
+    sleep "${FAKE_SSH_SECONDS:-0}"
+    echo "Lineclear: installing main"
+    echo "Done. Run 'lineclear doctor' to check it."
+    ;;
+  *"doctor --fix --here")
+    echo "$host doctor --fix --here" >> "$log"
+    echo "Nothing to remove."
+    ;;
+  *"lineclear\" doctor")
+    echo "$host doctor" >> "$log"
+    echo "ok     git"
+    case "$host" in
+      broken*) echo "FAILED service: lineclear.service is not running"; echo "       fix: systemctl --user enable --now lineclear.service"; exit 1 ;;
+    esac
+    echo "ok     service"
+    echo "All well."
+    ;;
+  *"--version")
+    echo "lineclear 0.1.0 build$(wc -l < "$log.$host.installs" 2>/dev/null || echo 0)"
+    ;;
+  *"release rollback")
+    echo "$host rollback" >> "$log"
+    echo "current is now previous"
+    ;;
+  *"lineclear\" 'export'")
+    # FAKE_SSH_EXPORT is what `lineclear export` prints there; unset, the Lineclear there has no export
+    [ -n "$FAKE_SSH_EXPORT" ] && { echo "$FAKE_SSH_EXPORT"; exit 0; }
+    echo "fake-ssh: no export" >&2; exit 2
+    ;;
+  *loadavg*)
+    printf '2.50 2.10 1.80 3/400 4242\n4\n'
+    ;;
+  *) echo "fake-ssh: unknown command: $cmd" >&2; exit 2 ;;
+esac

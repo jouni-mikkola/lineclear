@@ -1,0 +1,324 @@
+// The one check: Lineclear's types, tests, dashes, roadmap, part pages and code gates (scripts/gates/) and README pictures
+// (bun run media check), then the server's own types and tests (server/).
+// `bun run check` is the merge lane's: only what the branch's change reaches (below), the independent steps side by side,
+// each step's time recorded (scripts/check-speed.ts) and a file or the whole run over its limit failed by name.
+// `--full` runs everything, the browser suite included: the nightly job and a release candidate. `--changed` is the
+// worker's loop: the same without the browser suite.
+// A test that fails and then passes alone is a flake (scripts/flaky.ts): recorded, not failed.
+// The budget is 180 s on a machine that is not busy (docs/numbers.md); a busy one is slower for reasons outside the change.
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { compileCacheDir, diskTmpRoot, trimCache } from "../src/tmpdirs.ts";
+import { specsFor, testsFor } from "./changed.ts";
+import { buildMap, readMap, saveMap } from "./load-map.ts";
+import {
+  junitTimes,
+  loadFactorMeter,
+  lowered,
+  overBudget,
+  readSlowBaseline,
+  readTimes,
+  recordSteps,
+  slowFails,
+  slowFaults,
+  split,
+  specTimes,
+  type StepTime,
+  table,
+  type Times,
+  writeSlowBaseline,
+  writeTimes,
+} from "./check-speed.ts";
+import { fastGates } from "./fast-gates.ts";
+import { describeFailure, type Failure, outsideChange, parseFailures, settleFailures } from "./flaky.ts";
+import { changedSince } from "./gates/tools.ts";
+
+// Every step but the server's (below) runs with TMPDIR in a folder of this run, on disk. Each test process clears its own
+// folder inside it (tmp-scope.ts), so anything left in it when the steps end was left by a process that did not get
+// to: that fails the check.
+// The run's folder is on disk, not in /tmp (RAM on many machines), and so is the runtime's compile cache, capped.
+const runTmp = mkdtempSync(join(diskTmpRoot(), "lc-check-"));
+// A playwright daemon keeps its session files in a cache dir shared by default: each run gets its own, so a daemon of another run never writes into this one's HOME.
+const env = { ...process.env, TMPDIR: runTmp, NODE_COMPILE_CACHE: compileCacheDir(), PWTEST_DAEMON_SESSION_DIR: join(runTmp, "playwright-daemon") };
+// The server's tests bind unix sockets under their temp folder, and a socket path stops at 107 bytes: one more folder
+// level puts them over it. They get the temp root, where their own tmp-scope.ts still clears what they make.
+const serverEnv = { ...env, TMPDIR: diskTmpRoot() };
+// reports of this run's test runners, outside the folders the tests are checked to leave clean
+const reports = join(runTmp, "reports");
+mkdirSync(reports);
+// the repo's bin/lineclear refuses the stable config, data folders and ports (src/paths.ts), and a lane's shell may carry
+// the stable ports; these commands listen on none
+const ownFolders = [`LINECLEAR_CONFIG=${join(reports, "config")}`, `LINECLEAR_HOME=${join(reports, "home")}`, "LINECLEAR_PORT=0", "LINECLEAR_WEB_PORT=0"];
+// the browser suite serves on a port of its own, free when picked, so a suite of another run on the machine never collides
+const uiPort = (() => {
+  const probe = Bun.serve({ port: 0, fetch: () => new Response("") });
+  const port = probe.port;
+  probe.stop(true);
+  return String(port);
+})();
+const finish = (code: number, record?: (ok: boolean) => void): never => {
+  trimCache(compileCacheDir());
+  // jiti is the code gates' own transpile cache and playwright-daemon the browser sessions': not a test's folders
+  // the UI suite's fixture is removed on its next start, and a browser killed by a failed spec never clears its profile: a failed run leaves both
+  const left = readdirSync(runTmp).filter(
+    (n) =>
+      n !== "jiti" &&
+      n !== "playwright-daemon" &&
+      n !== `lineclear-ui-${uiPort}` &&
+      !(code !== 0 && n.startsWith("playwright_chromiumdev_profile-")) &&
+      !n.startsWith("playwright-transform-cache") &&
+      n !== "reports",
+  );
+  rmSync(runTmp, { recursive: true, force: true });
+  record?.(code === 0 && left.length === 0);
+  if (left.length > 0) {
+    console.error(`check: the tests left ${left.length} folder${left.length === 1 ? "" : "s"} behind: ${left.slice(0, 10).join(" ")}`);
+    process.exit(1);
+  }
+  process.exit(code);
+};
+
+/** A step waits for the steps it `needs` and does not run when one of them failed. */
+type Step = { name: string; cmd: string[]; cwd?: string; needs?: string[] };
+
+const full = process.argv.includes("--full");
+const onlyChanged = process.argv.includes("--changed");
+// the release run: load decides a test file's time there, not the code, so the times are recorded and not judged
+const untimed = process.argv.includes("--untimed");
+const lowering = process.argv.includes("--lower-slow");
+// the first baseline, or a slow file taken in on purpose: --lower-slow alone never adds a file
+const adding = process.argv.includes("--add-slow");
+// no main to compare with: nothing is known to be unchanged, so everything runs
+const known = full ? undefined : changedSince(".", "main");
+const changed = known ?? [];
+const isDoc = (f: string) => f.startsWith("docs/") || f.endsWith(".md");
+// a change of docs alone reaches the doc checks and the tests that name the doc, and nothing else
+const code = known === undefined || changed.some((f) => !isDoc(f));
+// the server imports the check log of src/check-runs.ts (docs/architecture.md, check-line)
+const inServer = known === undefined || changed.some((f) => (f.startsWith("server/") && !isDoc(f)) || f === "src/check-runs.ts");
+const outsideServer = known === undefined || changed.some((f) => !f.startsWith("server/") && !isDoc(f));
+// the incremental build is kept between runs: the second run of the types takes a fraction of the first
+const TSC_CHANGED = ["bunx", "tsc", "--noEmit", "--incremental", "--tsBuildInfoFile", "node_modules/.cache/tsc-changed.tsbuildinfo"];
+const TEST_SHARDS = 4;
+
+// the tests the change reaches: a failure in any other file is not the change's
+// none when the change reaches every test or the whole run is asked for: then no failure is outside it
+const reached = known ? testsFor(".", changed) : undefined;
+const touched = reached ? new Set([...changed, ...reached]) : undefined;
+
+const allTests = () => Array.from(new Bun.Glob("test/**/*.test.{ts,tsx}").scanSync(".")).map((f) => `./${f}`);
+
+// the release tests run the server's store scripts, which import the registries a fresh checkout has not built yet
+const PLUGINS: Step = { name: "plugins", cmd: ["bun", "scripts/build-plugins.ts"], cwd: "server" };
+const needsPlugins = () => !existsSync("server/generated/server-plugins.ts");
+const SERVER_INSTALL: Step = { name: "server install", cmd: ["bun", "install", "--frozen-lockfile"], cwd: "server" };
+
+// a run of the whole suite records which files each test loads (scripts/load-map.ts) for the next changed run
+const loadDir = join(reports, "loads");
+let recording = false;
+
+function testSteps(): Step[] {
+  const files = known ? testsFor(".", changed, readMap("."))?.map((f) => `./${f}`) : undefined;
+  if (files?.length === 0) return [];
+  const list = files ?? allTests();
+  if (files === undefined) {
+    recording = true;
+    Object.assign(env, { LINECLEAR_LOAD_MAP: loadDir, LINECLEAR_LOAD_ROOT: process.cwd() });
+  }
+  const runs = split(list, Math.min(TEST_SHARDS, Math.max(1, Math.ceil(list.length / 6))), readTimes());
+  // a test waits for its event, never for a time: the limit only stops a hang, so a busy machine never reaches it
+  const built = needsPlugins();
+  // the same release tests run the server's scripts, which import its dependencies: an install under way (a fresh
+  // worktree, a moved lockfile) leaves them half there, so the tests wait for it
+  const installs = inServer || !existsSync("server/node_modules");
+  const needs = [...(built ? [PLUGINS.name] : []), ...(installs ? [SERVER_INSTALL.name] : [])];
+  const tests = runs.map((run, i) => ({
+    name: runs.length === 1 ? "tests" : `tests ${i + 1}/${runs.length}`,
+    ...(needs.length ? { needs } : {}),
+    cmd: ["bun", "test", "--timeout", "120000", "--reporter=junit", `--reporter-outfile=${join(reports, `unit-${i}.xml`)}`, ...run],
+  }));
+  return [...(built ? [PLUGINS] : []), ...(installs && !inServer ? [SERVER_INSTALL] : []), ...tests];
+}
+
+function serverSteps(): Step[] {
+  if (!inServer) return [];
+  return [
+    SERVER_INSTALL,
+    { name: "server types", cmd: ["bun", "run", full || known === undefined ? "typecheck" : "typecheck:changed"], cwd: "server", needs: ["server install"] },
+    { name: "server tests", cmd: ["bun", "scripts/test.ts", full || known === undefined ? "--force" : "changed"], cwd: "server", needs: ["server install"] },
+  ];
+}
+
+// the browser suite is slow: only a change in ui/ can break it. The full check runs all of it; a branch, the specs of what it changed.
+function uiSteps(others: string[]): Step[] {
+  if (onlyChanged) return [];
+  const specs = full ? undefined : specsFor(changed);
+  if (specs?.length === 0) return [];
+  // shared ui code reaches every view: the lane would need the whole suite, which is the full check's
+  if (!full && specs === undefined) {
+    console.log("check: shared ui code changed: the full check takes the whole browser suite");
+    return [];
+  }
+  const report = `PLAYWRIGHT_JSON_OUTPUT_NAME=${join(reports, "ui.json")}`;
+  const port = `LINECLEAR_UI_PORT=${uiPort}`;
+  return [
+    { name: "ui build", cmd: ["bun", "run", "web:build"] },
+    {
+      name: "ui tests",
+      cmd: ["env", report, port, "bunx", "playwright", "test", "--workers", "1", "--reporter", "dot,json", ...(specs ?? [])],
+      // one worker: the specs share one fixture and one server. The motion tests read frame times: the full run gives them a machine the other steps are done with
+      needs: ["ui build", ...(full ? others : [])],
+    },
+  ];
+}
+
+function steps(): Step[] {
+  const base = [
+    ...(outsideServer && (code || full) ? [{ name: "types", cmd: full || known === undefined ? ["bun", "run", "types"] : TSC_CHANGED }] : []),
+    ...testSteps(),
+    { name: "dashes", cmd: full || known === undefined ? ["bun", "run", "dashes"] : ["bun", "scripts/dash-check.ts", ".", "--changed"] },
+    // each under a second
+    { name: "words", cmd: ["bun", "run", "words"] },
+    { name: "shots", cmd: ["bun", "run", "shots:check"] },
+    { name: "direction", cmd: ["bun", "run", "direction"] },
+    ...(onlyChanged ? [] : [{ name: "scales", cmd: ["bun", "scripts/scales-check.ts", "."] }]),
+    ...fastGates(ownFolders, code, full),
+    ...serverSteps(),
+  ];
+  const ui = uiSteps(base.map((b) => b.name));
+  return [
+    ...base,
+    ...ui,
+    ...budgetSteps(
+      ui.length > 0,
+      [...base, ...ui].map((b) => b.name),
+    ),
+  ];
+}
+
+// what the speed budgets (scripts/budgets.json) read: the views, the server's answers and the stream
+const BUDGET_REACH = /^(ui\/web\/|ui\/kit\/|ui\/budget\/|src\/(web|live|home|progress|demo)|scripts\/budget)/;
+
+/** The speed budget run: after every other step, so its CPU and timing numbers see a quiet machine. */
+function budgetSteps(built: boolean, others: string[]): Step[] {
+  if (onlyChanged || !(full || changed.some((f) => BUDGET_REACH.test(f)))) return [];
+  return [
+    ...(built ? [] : [{ name: "ui build", cmd: ["bun", "run", "web:build"] }]),
+    { name: "budgets", cmd: ["bun", "scripts/budget.ts"], needs: others.includes("ui build") ? others : ["ui build", ...others] },
+  ];
+}
+
+/** The last line of a failed step's output that says what went wrong: an error line, else the last line. */
+const lastErrorLine = (output: string): string => {
+  const lines = output.split("\n").filter((l) => l.trim() !== "" && !l.startsWith("check:"));
+  return (lines.findLast((l) => /error|fail|timed out|killed/i.test(l)) ?? lines.at(-1) ?? "no output").trim().slice(0, 200);
+};
+
+/** Runs a step and keeps its output, which is printed only when the step fails: the steps run side by side. */
+async function run(step: Step): Promise<{ code: number; failing: Failure[]; output: string }> {
+  const p = Bun.spawn(step.cmd, { cwd: step.cwd, stdin: "ignore", stdout: "pipe", stderr: "pipe", env: step.cwd === "server" ? serverEnv : env });
+  const [out, err] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
+  return { code: await p.exited, failing: [...parseFailures(out), ...parseFailures(err)], output: out + err };
+}
+
+// read again once the steps are through: the machine may have got busy while they ran
+const measure = loadFactorMeter();
+let factor = measure();
+const started = performance.now();
+const times: StepTime[] = [];
+const outcome = new Map<string, Promise<boolean>>();
+
+/** Runs one step after the steps it needs. Resolves to whether it passed; a step skipped for a failed need counts as failed. */
+async function runStep(step: Step): Promise<boolean> {
+  // every step is in the map before any looks for its needs, whatever their order in the plan
+  await null;
+  for (const need of step.needs ?? []) if (!(await outcome.get(need))) return false;
+  const at = performance.now();
+  const { code, failing, output } = await run(step);
+  const isTests = step.name.startsWith("tests");
+  // a test that fails and then passes alone is a flake: recorded, and the check goes on
+  const ok = code === 0 || (isTests && settleFailures(failing, env));
+  times.push({ step: step.name, seconds: (performance.now() - at) / 1000, ok });
+  if (!ok) {
+    console.error(
+      `${output}\n${
+        failing.length > 0
+          ? `check: failing tests:\n${failing
+              .slice(0, 20)
+              .map((f) => `  ${describeFailure(f)}`)
+              .join("\n")}${failing.length > 20 ? `\n  and ${failing.length - 20} more` : ""}\n`
+          : ""
+      }${
+        isTests && touched && outsideChange(failing, touched) ? `${failing.map((f) => `check: outside the change: ${f.test}`).join("\n")}\n` : ""
+      }check: ${step.name} failed${failing.length > 0 ? "" : `: ${lastErrorLine(output)}`}`,
+    );
+  }
+  return ok;
+}
+
+const plan = steps();
+for (const step of plan) outcome.set(step.name, runStep(step));
+// every step runs even after one fails: one run names every failure, so no rerun is needed to find the next one, and
+// `lineclear check` can tell a run that failed only on quarantined tests from one where another failed
+const results = await Promise.all(plan.map((s) => outcome.get(s.name)));
+const wall = (performance.now() - started) / 1000;
+factor = measure();
+let failed = results.some((ok) => !ok) ? 1 : 0;
+if (recording && failed === 0) {
+  const tests = allTests().map((f) => f.slice(2));
+  saveMap(".", buildMap(loadDir, tests));
+}
+
+/** Test files and specs over their limits; the reports are read even when a step failed. */
+function speed(): void {
+  const baseline = readSlowBaseline();
+  const read = (names: string[], parse: (t: string) => Times): Times => {
+    const all: Times = new Map();
+    for (const n of names) for (const [f, s] of parse(readFileSync(join(reports, n), "utf8"))) all.set(f, s);
+    return all;
+  };
+  const exists = (n: string) => readdirSync(reports).includes(n);
+  const unit = read(
+    readdirSync(reports).filter((n) => n.startsWith("unit-")),
+    junitTimes,
+  );
+  writeTimes(unit);
+  const spec = exists("ui.json") ? read(["ui.json"], specTimes) : new Map<string, number>();
+  if (lowering) {
+    const next = lowered("spec", spec, lowered("unit", unit, baseline, factor, adding), factor, adding);
+    writeSlowBaseline(".", next);
+    console.log("check: scripts/gates/baseline/slow.json lowered to the files over their limits");
+    return;
+  }
+  const faults = [...slowFaults("unit", unit, baseline, factor), ...slowFaults("spec", spec, baseline, factor)];
+  if (faults.length > 0 && !slowFails(faults, untimed)) {
+    console.log(`check: --untimed, not failing on ${faults.length} slow file(s); the slowest: ${faults[0]}`);
+  } else if (faults.length > 0) {
+    console.error(
+      `check: too slow, a test file over 5 s or a spec over 20 s (docs/numbers.md); the slowest first:\n${faults
+        .slice(0, 8)
+        .map((f) => `  ${f}`)
+        .join("\n")}`,
+    );
+    failed ||= 1;
+  }
+}
+speed();
+
+console.log(`check${full ? " --full" : onlyChanged ? " --changed" : ""}: steps, slowest first (load factor ${factor.toFixed(2)})\n${table(times)}`);
+
+// the budget is for the lane's run on a machine that is not busy; the full check has none
+const slow = full || onlyChanged || lowering ? undefined : overBudget(times, wall, factor);
+if (slow) {
+  console.error(`check: ${slow}`);
+  failed ||= 1;
+}
+const record = (ok: boolean) => recordSteps(times, full ? "full" : onlyChanged ? "changed" : "lane", wall, factor, ok);
+if (failed !== 0) {
+  // EVERY_STEP_RAN of src/check-runs.ts: lineclear check reads it to know no step went unrun, so a failure of
+  // quarantined tests alone may pass
+  console.error("check: every step ran");
+  finish(failed, record);
+}
+console.log(`check: passed in ${wall.toFixed(0)} s (budget 180 s on a machine that is not busy)`);
+finish(0, record);

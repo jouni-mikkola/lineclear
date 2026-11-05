@@ -1,0 +1,19 @@
+#!/bin/sh
+# playwright-cli for the UI bar's tests. `list --all --json` gives the sessions the tests wrote, a picture is the
+# committed browser-picture.jpg, and every other piece of code a session runs is written to browser-inputs.log.
+dir="$LINECLEAR_SHEPHERDR_DIR/.."
+# a test that makes the file "hang" there holds every call until it is gone
+while [ -e "$dir/hang" ]; do sleep 0.05; done
+if [ "$1" = "list" ]; then
+  [ -n "$LINECLEAR_FAKE_DELAY" ] && sleep "$LINECLEAR_FAKE_DELAY"
+  cat "$dir/browsers.json" 2>/dev/null || echo '{"browsers":[]}'
+  exit 0
+fi
+[ -n "$LINECLEAR_FAKE_DELAY" ] && sleep "$LINECLEAR_FAKE_DELAY"
+name="${1#-s=}"
+file="${4#--filename=}"
+if grep -q screenshot "$file"; then
+  printf '{"url":"http://localhost:5173/login","title":"Sign in","picture":"%s"}' "$(base64 -w0 "$(dirname "$0")/browser-picture.jpg")"
+else
+  echo "$name $(cat "$file")" >> "$dir/browser-inputs.log"
+fi

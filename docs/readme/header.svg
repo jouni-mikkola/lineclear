@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 280" role="img" aria-labelledby="t d">
+<title id="t">Lineclear</title>
+<desc id="d">Lineclear. You talk to one contact. It hands the work to AI workers and reviewers, and shows you everything live. You only make the decisions.</desc>
+<defs>
+<radialGradient id="bg" cx=".5" cy=".3" r=".8"><stop offset="0" stop-color="#18181a"/><stop offset="1" stop-color="#0b0b0c"/></radialGradient>
+<radialGradient id="glow"><stop offset="0" stop-color="#d97757" stop-opacity=".22"/><stop offset="1" stop-color="#d97757" stop-opacity="0"/></radialGradient>
+<filter id="bl" x="-1" y="-1" width="3" height="3"><feGaussianBlur stdDeviation="9"/></filter>
+</defs>
+<style>
+text{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif}
+@media (prefers-reduced-motion:no-preference){
+.line{stroke-dasharray:52 60;animation:line 1.1s cubic-bezier(.45,0,.25,1) .3s both}
+.lamp{animation:lamp .9s ease-out 1.1s both}
+.bloom{animation:lamp .9s ease-out 1.1s both,breathe 4s ease-in-out 2s infinite}
+.word{animation:rise .9s cubic-bezier(.2,0,.2,1) .7s both}
+.say{animation:rise .9s cubic-bezier(.2,0,.2,1) 1.2s both}
+@keyframes line{0%{stroke-dashoffset:52}100%{stroke-dashoffset:0}}
+@keyframes lamp{0%{opacity:.25}100%{opacity:1}}
+@keyframes breathe{0%,100%{opacity:1}50%{opacity:.45}}
+@keyframes rise{0%{opacity:0;transform:translateY(6px)}100%{opacity:1;transform:none}}
+}
+</style>
+<rect width="980" height="280" rx="20" fill="url(#bg)"/>
+<circle cx="280" cy="84" r="120" fill="url(#glow)"/>
+<g transform="translate(236 40) scale(2)" fill="none">
+  <path fill="#ece9e4" fill-rule="evenodd" d="M5 22a17 17 0 1 0 34 0a17 17 0 1 0 -34 0ZM12 22a10 10 0 1 0 20 0a10 10 0 1 0 -20 0Z"/>
+  <circle class="bloom" cx="22" cy="22" r="7" fill="#d97757" opacity=".8" filter="url(#bl)"/>
+  <circle class="lamp" cx="22" cy="22" r="6.5" fill="#d97757"/>
+  <path class="line" d="M22 38V55H57" stroke="#ece9e4" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <g class="word"><g transform="translate(76 23)" stroke="#ece9e4" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M2 0V32"/><path transform="translate(10 0)" d="M2 12V32"/><circle cx="12" cy="2" r="3.3" fill="#ece9e4" stroke="none"/><path transform="translate(20 0)" d="M2 12V32M2 20C2 10 16 10 16 20V32"/><path transform="translate(44 0)" d="M2 22H18C18 15 14 12 10 12C5 12 2 16 2 22C2 28 5 32 10 32C13 32 16 31 17.5 28"/><path transform="translate(70 0)" d="M17 15C15.5 13 13 12 10 12C5 12 2 16 2 22C2 28 5 32 10 32C13 32 15.5 31 17 29"/><path transform="translate(95 0)" d="M2 0V32"/><path transform="translate(105 0)" d="M2 22H18C18 15 14 12 10 12C5 12 2 16 2 22C2 28 5 32 10 32C13 32 16 31 17.5 28"/><path transform="translate(131 0)" d="M17 12V32M17 22A7.5 7.5 0 1 0 2 22A7.5 7.5 0 1 0 17 22"/><path transform="translate(156 0)" d="M2 12V32M2 21C2 14 8 12 15 13"/></g></g>
+</g>
+<g class="say" font-size="22" fill="#a9a6a1" text-anchor="middle">
+  <text x="490" y="210"><tspan fill="#ece9e4" font-weight="600">You talk to one contact.</tspan> It hands the work to AI workers and reviewers,</text>
+  <text x="490" y="241">and shows you everything live. You only make the decisions.</text>
+</g>
+</svg>

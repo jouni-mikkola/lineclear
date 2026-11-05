@@ -1,0 +1,477 @@
+import { tailnetName } from "../src/published.ts";
+import { expect, test } from "bun:test";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { removeFolders, testFolders, trimCache } from "../src/tmpdirs.ts";
+import { doctor, doctorChecks, herdrVersions, realProbe, testedHerdr, type Probe } from "../src/doctor.ts";
+import { cacheEnvFile, pathsFor } from "../src/paths.ts";
+import { isOpen, noticeTimers, readItems } from "../src/inbox.ts";
+import { fixRetired, leftLines, onlyShepherdrLeft } from "../src/retire.ts";
+
+const paths = pathsFor({ HOME: "/nonexistent-home" });
+const probe = (over: Partial<Probe> = {}): Probe => ({
+  oldDir: "/nonexistent-old",
+  dataDir: "/nonexistent-home/data",
+  paths,
+  pathDirs: ["/nonexistent-home/.local/bin"],
+  which: (c) => `/usr/bin/${c}`,
+  run: () => null,
+  ...over,
+});
+
+test("a missing tool is one problem with its installer command", () => {
+  const checks = doctorChecks(probe({ which: (c) => (c === "herdr" ? null : `/usr/bin/${c}`) }));
+  const herdr = checks.find((c) => c.name === "herdr");
+  expect(herdr?.problem).toBe("herdr is not installed");
+  expect(herdr?.fix).toBe("curl -fsSL https://herdr.dev/install.sh | sh");
+});
+
+test("a running Shepherdr 2.0 is named, with the command that stops it", () => {
+  const dir = mkdtempSync(join(tmpdir(), "doctor-old-"));
+  writeFileSync(join(dir, "server.json"), JSON.stringify({ port: 7787, pid: 4242 }));
+  const running = doctorChecks(probe({ oldDir: dir, run: () => "" })).find((c) => c.name === "old install stopped");
+  expect(running?.problem).toContain("still running");
+  expect(running?.fix).toBe("herdr plugin disable herdr-projects");
+  const stopped = doctorChecks(probe({ oldDir: dir, run: () => null })).find((c) => c.name === "old install stopped");
+  expect(stopped?.problem).toBe("");
+  rmSync(dir, { recursive: true });
+});
+
+test("doctor does not ask for Shepherdr 2.0 to be installed", () => {
+  const names = doctorChecks(probe()).map((c) => c.name);
+  expect(names).not.toContain("Shepherdr");
+});
+
+test("doctor exits 1 and prints one fix per problem on a machine with nothing installed", () => {
+  const out: string[] = [];
+  const code = doctor(probe({ which: () => null, pathDirs: [] }), (l) => out.push(l));
+  expect(code).toBe(1);
+  expect(out.filter((l) => l.startsWith("FAILED"))).toHaveLength(out.filter((l) => l.includes("fix:")).length);
+  expect(out.join("\n")).toContain("git is not installed");
+});
+
+test("a failing command's exit code and last lines are shown, secrets masked", () => {
+  const probe = realProbe(paths, { LINECLEAR_CONFIG: "/nonexistent" });
+  expect(probe.run(["sh", "-c", "echo boom >&2; exit 3"])).toBeNull();
+  expect(probe.failure).toBe("exit 3\nboom");
+});
+
+test("doctor prints the failure tail under a problem", () => {
+  const dir = mkdtempSync(join(tmpdir(), "doctor-svc-"));
+  const own = pathsFor({ HOME: dir });
+  mkdirSync(join(own.unit, ".."), { recursive: true });
+  writeFileSync(own.unit, `ExecStart=${own.app}/bin/lineclear run\n`);
+  const lines: string[] = [];
+  const bus = (cmd: string[]) => (cmd.includes("show-environment") ? "" : null);
+  doctor(probe({ paths: own, run: bus, failure: "exit 7\nno service" }), (l) => lines.push(l));
+  expect(lines.join("\n")).toContain("is not running\nexit 7\nno service");
+  rmSync(dir, { recursive: true });
+});
+
+test("a machine with no systemd user services needs no unit: the loop runs with its board", () => {
+  const dir = mkdtempSync(join(tmpdir(), "doctor-nobus-"));
+  const own = pathsFor({ HOME: dir });
+  const svc = doctorChecks(probe({ paths: own, run: () => null })).find((c) => c.name.startsWith("service"));
+  expect(svc?.problem).toBe("");
+  expect(svc?.name).toContain("lineclear run --board");
+  rmSync(dir, { recursive: true });
+});
+
+test("doctor warns when the server listens beyond 127.0.0.1, with the command that fixes it", () => {
+  const name = "listens on 127.0.0.1 only";
+  const find = (over: Partial<Probe>) => doctorChecks(probe(over)).find((c) => c.name === name)!;
+  expect(find({}).problem).toBe("");
+  expect(find({ listen: "127.0.0.1" }).problem).toBe("");
+  const wide = find({ listen: "0.0.0.0" });
+  expect(wide.problem).toContain("0.0.0.0");
+  expect(wide.fix).toContain("unset-environment LINECLEAR_HOST");
+  expect(wide.fix).toContain("restart lineclear.service");
+  const dir = mkdtempSync(join(tmpdir(), "doctor-listen-"));
+  const own = pathsFor({ HOME: dir });
+  mkdirSync(join(own.unit, ".."), { recursive: true });
+  writeFileSync(own.unit, `ExecStart=${own.app}/bin/lineclear run\nEnvironment=LINECLEAR_HOST=0.0.0.0\n`);
+  expect(find({ paths: own }).problem).toContain("0.0.0.0");
+  rmSync(dir, { recursive: true });
+});
+
+test("doctor names Shepherdr 2.0's plugin, skills, unmoved spaces and timers, and --fix removes the first, second and last", () => {
+  const timerSetting = process.env.LINECLEAR_COORDINATOR_TIMER;
+  delete process.env.LINECLEAR_COORDINATOR_TIMER;
+  const dir = mkdtempSync(join(tmpdir(), "doctor-retired-"));
+  const skills = join(dir, "skills");
+  const data = join(dir, "data");
+  const old = join(dir, "old");
+  for (const n of ["shepherdr", "shepherdr-agent", "other"]) {
+    mkdirSync(join(skills, n), { recursive: true });
+    writeFileSync(join(skills, n, "SKILL.md"), `---\nname: ${n}\n---\n`);
+  }
+  mkdirSync(data, { recursive: true });
+  mkdirSync(old, { recursive: true });
+  writeFileSync(join(data, "modes.json"), JSON.stringify({ a: "autopilot", b: "regular" }));
+  writeFileSync(join(old, "spaces.json"), "[]");
+  const ran: string[][] = [];
+  let installed = true;
+  const p = probe({
+    oldDir: old,
+    dataDir: data,
+    skillRoots: [skills],
+    run: (cmd) => {
+      ran.push(cmd);
+      if (cmd.join(" ") === "herdr plugin list --json") return JSON.stringify({ result: { plugins: installed ? [{ plugin_id: "herdr-projects" }] : [] } });
+      if (cmd[2] === "uninstall") installed = false;
+      return "";
+    },
+  });
+  const mine = ["old install plugin removed", "old install skills removed", "spaces moved to Lineclear", "no coordinator on a timer"];
+  const bad = () =>
+    doctorChecks(p)
+      .filter((c) => mine.includes(c.name) && c.problem !== "")
+      .map((c) => c.name);
+  expect(bad()).toEqual(["old install plugin removed", "old install skills removed", "spaces moved to Lineclear", "no coordinator on a timer"]);
+  const out: string[] = [];
+  fixRetired(p, (l) => out.push(l));
+  expect(out).toEqual([
+    "Removed the herdr plugin herdr-projects",
+    `Removed the skill ${join(skills, "shepherdr")}`,
+    `Removed the skill ${join(skills, "shepherdr-agent")}`,
+    "Turned off the timer of a",
+  ]);
+  expect(bad()).toEqual(["spaces moved to Lineclear"]);
+  expect(onlyShepherdrLeft(["ok     git", "FAILED spaces moved to Lineclear: x", "       fix: lineclear migrate"])).toBe(true);
+  expect(onlyShepherdrLeft(["FAILED service: x", "FAILED spaces moved to Lineclear: x"])).toBe(false);
+  writeFileSync(join(data, "modes.json"), JSON.stringify({ a: "autopilot" }));
+  const live: string[] = [];
+  const asked: string[] = [];
+  expect(
+    fixRetired(
+      {
+        ...p,
+        running: () => true,
+        setRegular: (id) => {
+          asked.push(id);
+          return true;
+        },
+      },
+      (l) => live.push(l),
+    ),
+  ).toBe(0);
+  expect(asked).toEqual(["a"]);
+  expect(JSON.parse(readFileSync(join(data, "modes.json"), "utf8"))).toEqual({ a: "autopilot" });
+  expect(fixRetired({ ...p, running: () => true, setRegular: () => false }, (l) => live.push(l))).toBe(1);
+  expect(live.at(-1)).toContain("did not take the change");
+  writeFileSync(join(data, "modes.json"), JSON.stringify({ a: "regular", b: "regular" }));
+  expect(JSON.parse(readFileSync(join(data, "modes.json"), "utf8"))).toEqual({ a: "regular", b: "regular" });
+  expect(existsSync(join(skills, "other"))).toBe(true);
+  if (timerSetting !== undefined) process.env.LINECLEAR_COORDINATOR_TIMER = timerSetting;
+  rmSync(dir, { recursive: true });
+});
+
+test("heal never flips a mode: it shows the timer in the Inbox once, and honours LINECLEAR_COORDINATOR_TIMER like the server", () => {
+  const dir = mkdtempSync(join(tmpdir(), "doctor-heal-"));
+  const data = join(dir, "data");
+  mkdirSync(data, { recursive: true });
+  writeFileSync(join(data, "modes.json"), JSON.stringify({ a: "autopilot" }));
+  const p = probe({ oldDir: join(dir, "old"), dataDir: data });
+  const env = { ...process.env, HOME: dir, LINECLEAR_CONFIG: join(dir, "config"), LINECLEAR_COORDINATOR_TIMER: undefined };
+  const out: string[] = [];
+  const was = process.env.LINECLEAR_COORDINATOR_TIMER;
+  delete process.env.LINECLEAR_COORDINATOR_TIMER;
+  const report = (spaces: string[]) => noticeTimers(spaces, env);
+  fixRetired(p, (l) => out.push(l), report);
+  fixRetired(p, (l) => out.push(l), report);
+  expect(out).toEqual([]);
+  expect(JSON.parse(readFileSync(join(data, "modes.json"), "utf8"))).toEqual({ a: "autopilot" });
+  const open = readItems(env).filter(isOpen);
+  expect(open).toHaveLength(1);
+  expect(open[0]!.question).toContain("Coordinator timer is on for a");
+  process.env.LINECLEAR_COORDINATOR_TIMER = "on";
+  try {
+    expect(doctorChecks(p).find((c) => c.name === "no coordinator on a timer")?.problem).toBe("");
+  } finally {
+    if (was === undefined) delete process.env.LINECLEAR_COORDINATOR_TIMER;
+    else process.env.LINECLEAR_COORDINATOR_TIMER = was;
+  }
+  rmSync(dir, { recursive: true });
+});
+
+test("agents are told nothing about Shepherdr 2.0 or its plugin", () => {
+  const root = join(import.meta.dir, "..", "server");
+  const files: string[] = [];
+  const walk = (d: string) => {
+    for (const e of readdirSync(d, { withFileTypes: true }).filter((x) => !x.isSymbolicLink()))
+      e.isDirectory() ? walk(join(d, e.name)) : files.push(join(d, e.name));
+  };
+  walk(join(root, "skill"));
+  files.push(join(root, "server", "live", "prompts.ts"));
+  for (const f of files) expect(readFileSync(f, "utf8")).not.toMatch(/Shepherdr 2\.0|herdr-projects/);
+  // the skills the brief points to are this repo's own, found beside the code and not in a herdr plugin folder
+  const brief = readFileSync(join(root, "server", "live", "prompts.ts"), "utf8");
+  expect(brief).toContain("const SKILLS = join(OWN, 'skill')");
+  for (const n of ["lineclear", "lineclear-agent", "lineclear-coordinator"]) expect(existsSync(join(root, "skill", n, "SKILL.md"))).toBe(true);
+});
+
+test("doctor names old test folders and --fix removes them", () => {
+  const dir = mkdtempSync(join(tmpdir(), "lineclear-doctor-tmp-"));
+  try {
+    const old = join(dir, "shep-repo-old");
+    const fresh = join(dir, "shep-repo-fresh");
+    const other = join(dir, "not-ours");
+    for (const d of [old, fresh, other]) mkdirSync(d);
+    const day = Date.now() / 1000 - 2 * 86_400;
+    utimesSync(old, day, day);
+    utimesSync(other, day, day);
+    expect(testFolders(dir)).toEqual([old]);
+    const p = probe({ oldTestFolders: testFolders(dir), removeTestFolders: removeFolders });
+    expect(doctorChecks(p).find((c) => c.name === "old test folders")?.problem).toContain("1 test folder");
+    const lines: string[] = [];
+    fixRetired(p, (l) => lines.push(l));
+    expect(lines.join("\n")).toContain("Removed 1 test folder");
+    expect(existsSync(old)).toBe(false);
+    expect(existsSync(fresh)).toBe(true);
+    expect(existsSync(other)).toBe(true);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("doctor names a RAM /tmp over 2 GB as a stall", () => {
+  const find = (tmpRamBytes: number) => doctorChecks(probe({ tmpRamBytes })).find((c) => c.name === "temp folder size");
+  expect(find(1024 ** 3)?.problem).toBe("");
+  expect(find(3 * 1024 ** 3)?.problem).toContain("3.0 GB");
+});
+
+test("doctor checks lingering and names the one command that turns it on", () => {
+  const off = doctorChecks(probe({ user: "ann", run: (c) => (c[0] === "loginctl" ? "Linger=no\n" : null) })).find((c) => c.name === "starts at boot");
+  expect(off?.problem).toContain("lingering is off for ann");
+  expect(off?.fix).toBe("sudo loginctl enable-linger ann");
+  const on = doctorChecks(probe({ user: "ann", run: (c) => (c[0] === "loginctl" ? "Linger=yes\n" : null) })).find((c) => c.name === "starts at boot");
+  expect(on?.problem).toBe("");
+});
+
+test("the compile cache is trimmed oldest first to its cap", () => {
+  const dir = mkdtempSync(join(tmpdir(), "lineclear-cache-"));
+  try {
+    for (const [name, age] of [
+      ["a", 3],
+      ["b", 2],
+      ["c", 1],
+    ] as const) {
+      writeFileSync(join(dir, name), "x".repeat(100));
+      utimesSync(join(dir, name), Date.now() / 1000 - age * 100, Date.now() / 1000 - age * 100);
+    }
+    expect(trimCache(dir, 200)).toBe(100);
+    expect(readdirSync(dir).sort()).toEqual(["b", "c"]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a machine whose herdr is not the tested one is named, and one that answers nothing too", () => {
+  const answers: Record<string, string> = {
+    "herdr --version": "herdr 0.9.5\n",
+    "herdr machine list --json": JSON.stringify([
+      { id: "a1", label: "desktop", enabled: true },
+      { id: "b2", label: "old", enabled: false },
+      { id: "c3", label: "laptop", enabled: true },
+    ]),
+    "timeout -k 5 20 herdr --machine a1 status server": "status: running\nversion: 0.9.6\n",
+  };
+  const asked: string[] = [];
+  const machines = herdrVersions((cmd) => {
+    asked.push(cmd.join(" "));
+    return answers[cmd.join(" ")] ?? null;
+  }, false);
+  expect(machines).toEqual([
+    { machine: "this machine", version: "0.9.5" },
+    { machine: "desktop", version: "0.9.6" },
+    { machine: "laptop", version: null },
+  ]);
+  expect(asked.some((c) => c.includes("--machine b2"))).toBe(false);
+  const checks = doctorChecks(probe({ herdr: { tested: "0.9.5", machines } })).filter((c) => c.name.startsWith("herdr 0.9.5"));
+  expect(checks.map((c) => c.problem)).toEqual(["", "desktop runs herdr 0.9.6, and Lineclear is tested with 0.9.5", "the herdr on laptop does not answer"]);
+  expect(herdrVersions(() => "herdr 0.9.5", true)).toEqual([{ machine: "this machine", version: "0.9.5" }]);
+});
+
+test("the tested herdr is the adapter's pin", () => {
+  const adapter = readFileSync(join(import.meta.dir, "..", "server", "server", "live", "herdr.ts"), "utf8");
+  expect(adapter).toContain(`version: '${testedHerdr()}'`);
+  expect(testedHerdr()).toMatch(/^\d+\.\d+\.\d+$/);
+});
+
+test("doctor says the old folder is free only when no process still uses it", () => {
+  const free = doctorChecks(probe({ oldUsers: () => [] })).find((c) => c.name === "old folder free");
+  expect(free?.problem).toBe("");
+  const held = doctorChecks(probe({ oldUsers: () => ["42 bash"] })).find((c) => c.name === "old folder free");
+  expect(held?.problem).toContain("1 running process still use");
+});
+
+test("doctor shows the builds, names a roadmap stable cannot read, and says when another machine promotes", () => {
+  const at = "2026-11-01T12:12:00Z";
+  const release = {
+    stable: { commit: "a".repeat(40), at },
+    next: { commit: "b".repeat(40), at, result: "red" as const },
+    checked: at,
+    held: "next bbbbbbb failed: smoke",
+  };
+  const check = (over: Partial<Probe>) => doctorChecks(probe(over)).find((c) => c.name === "release");
+  expect(check({})?.skip).toBe(true);
+  expect(check({ release })?.problem).toBe("");
+  expect(check({ release })?.info).toContain("held next bbbbbbb failed: smoke");
+  expect(check({ release: { ...release, held: "cannot read main: ROADMAP.md:3" } })?.problem).toBe("cannot read main: ROADMAP.md:3");
+  expect(check({ release: { ...release, held: "cannot read main: no ref" }, ci: true })?.problem).toBe("");
+  expect(check({ release, follows: "desk" })?.info).toBe("follows desk, which promotes for it");
+});
+
+test("the stable build check fails for a checkout or a build that is not a release, and passes for a release", () => {
+  const data = mkdtempSync(join(tmpdir(), "lineclear-builds-"));
+  const build = (name: string, files: string[]) => {
+    mkdirSync(join(data, "builds", name, "bin"), { recursive: true });
+    for (const f of files) mkdirSync(join(data, "builds", name, f), { recursive: true });
+    writeFileSync(join(data, "builds", name, "bin/lineclear"), "");
+    return join(data, "builds", name, "bin/lineclear");
+  };
+  const check = (service: string, command: string) =>
+    doctorChecks(probe({ dataDir: data, runFrom: { service, command } })).filter((c) => c.name === "stable build")[0] as { problem: string; fix: string };
+  const release = build("1.0.0", []);
+  writeFileSync(join(data, "builds/1.0.0/.release"), "1.0.0\n");
+  const loose = build("scratch", []);
+  const checkout = build("2.0.0", [".git"]);
+  writeFileSync(join(data, "builds/2.0.0/.release"), "2.0.0\n");
+  expect(check(release, release).problem).toBe("");
+  expect(check(loose, release).problem).toContain("is not a release build");
+  expect(check(release, checkout).problem).toContain("is a git checkout");
+  const outside = join(data, "repo/bin/lineclear");
+  mkdirSync(join(data, "repo/bin"), { recursive: true });
+  writeFileSync(outside, "");
+  expect(check(outside, release).problem).toContain("is not in");
+  expect(check(release, release).fix).toContain("LINECLEAR_REF=v");
+  rmSync(data, { recursive: true, force: true });
+});
+
+test("doctor fails on an installed file or pi setting that points into a git checkout, and names it", () => {
+  const dir = mkdtempSync(join(tmpdir(), "doctor-checkout-"));
+  const own = pathsFor({ HOME: dir });
+  const check = () => doctorChecks(probe({ paths: own, dataDir: join(dir, ".lineclear") })).find((c) => c.name === "installed paths");
+  expect(check()?.problem).toBe("");
+  const tree = join(dir, "work/tree");
+  mkdirSync(join(tree, "pi"), { recursive: true });
+  writeFileSync(join(tree, ".git"), "gitdir: /nowhere\n");
+  mkdirSync(join(dir, ".pi/agent"), { recursive: true });
+  const settings = join(dir, ".pi/agent/settings.json");
+  writeFileSync(settings, JSON.stringify({ extensions: [join(tree, "pi/extension.ts")] }));
+  expect(check()?.problem).toBe(`${settings} points into ${tree}`);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("doctor --fix rewrites old paths when no server runs, and says to stop a running one", () => {
+  const dir = mkdtempSync(join(tmpdir(), "fixpaths-"));
+  const old = join(dir, "old");
+  const data = join(dir, "data");
+  mkdirSync(join(old, "browser", "T-1"), { recursive: true });
+  mkdirSync(data, { recursive: true });
+  writeFileSync(join(data, "agents.json"), JSON.stringify({ "T-1/Agent": { env: { AGENT_BROWSER_PROFILE: join(old, "browser", "T-1") } } }));
+  const p = probe({ oldDir: old, dataDir: data, run: () => null });
+  const bad = () => doctorChecks(p).find((c) => c.name === "records hold no old paths")?.problem;
+  expect(bad()).toContain("agents.json");
+  const busy: string[] = [];
+  expect(fixRetired({ ...p, running: () => true }, (l) => busy.push(l))).toBe(1);
+  expect(busy.join(" ")).toContain("stop it");
+  expect(bad()).toContain("agents.json");
+  const out: string[] = [];
+  expect(fixRetired({ ...p, running: () => false }, (l) => out.push(l))).toBe(0);
+  expect(out).toContain("Rewrote the old paths in agents.json");
+  expect(busy.join(" ")).toContain("Copied the browser profile of T-1");
+  expect(bad()).toBe("");
+});
+
+test("two board units on one store fail the one-server check", () => {
+  const units = "lineclear-serve-7421.service loaded active running a\nlineclear-serve-7787.service loaded active running b\n";
+  const two = doctorChecks(probe({ run: (c) => (c.includes("lineclear-serve-*.service") ? units : null) })).find((c) => c.name === "one server");
+  expect(two?.problem).toContain("lineclear-serve-7787.service");
+  expect(two?.fix).toBe("systemctl --user stop lineclear-serve-7787.service");
+  const one = doctorChecks(probe({ run: (c) => (c.includes("lineclear-serve-*.service") ? units.split("\n").slice(0, 1).join("") : null) })).find(
+    (c) => c.name === "one server",
+  );
+  expect(one?.problem).toBe("");
+});
+
+test("doctor names a running Control Center unit and process, and --fix stops, disables and ends them", () => {
+  let units = true;
+  let procs = true;
+  const ran: string[] = [];
+  const p = probe({
+    run: (cmd) => {
+      const line = cmd.join(" ");
+      ran.push(line);
+      if (line.includes("list-units")) {
+        return units
+          ? "cc-control-center.service loaded active running UI\ncc-tailnet@8799.service loaded active running tail\ncc-machine-backup@x.service loaded active running keep\ncc-tick.timer loaded inactive dead tick\n"
+          : "";
+      }
+      if (line.includes("list-unit-files")) return units ? "cc-tick.timer enabled enabled\ncc-restore-drill.timer enabled enabled\n" : "";
+      if (cmd[0] === "find") return units ? "/h/.config/systemd/user/default.target.wants/cc-tailnet@8787.service\n" : "";
+      if (cmd[0] === "ps") return procs ? "  42 python3 /x/scripts/control-center/server.py\n  43 bun run lineclear doctor --fix\n  44 vim notes\n" : "";
+      if (cmd[2] === "disable") units = false;
+      if (cmd[0] === "kill") procs = false;
+      return "";
+    },
+  });
+  const check = () => doctorChecks(p).find((c) => c.name === "no Control Center left")?.problem;
+  expect(check()).toBe(
+    "Control Center still has units cc-control-center.service, cc-tailnet@8799.service, cc-tick.timer, cc-tailnet@8787.service; processes 42",
+  );
+  const out: string[] = [];
+  expect(fixRetired(p, (l) => out.push(l))).toBe(0);
+  expect(out).toEqual([
+    "Stopped and disabled cc-control-center.service, cc-tailnet@8799.service, cc-tick.timer, cc-tailnet@8787.service",
+    "Ended Control Center process 42",
+  ]);
+  expect(ran).toContain("systemctl --user disable --now cc-control-center.service cc-tailnet@8799.service cc-tick.timer cc-tailnet@8787.service");
+  expect(check()).toBe("");
+});
+
+test("doctor fails when the published address of the web pages does not answer", () => {
+  const find = (p: Partial<Probe>) => doctorChecks(probe(p)).find((c) => c.name.startsWith("published address"));
+  expect(find({})?.problem).toBe("");
+  expect(find({ published: "https://box.ts.net:7420", run: (c) => (c[0] === "curl" ? "" : null) })?.problem).toBe("");
+  const bad = find({ published: "https://box.ts.net:7420", run: () => null });
+  expect(bad?.problem).toContain("https://box.ts.net:7420 does not answer");
+  expect(bad?.fix).toBe("tailscale serve --bg --https=7420 http://127.0.0.1:7420");
+});
+
+test("the tailnet name comes from tailscale status", () => {
+  expect(tailnetName('{"Self":{"DNSName":"box.tail1.ts.net."}}')).toBe("box.tail1.ts.net");
+  expect(tailnetName("")).toBeUndefined();
+});
+
+test("a machine whose doctor names a running Control Center is listed as left, a plain failure is not", () => {
+  const lines = ["FAILED no Control Center left: Control Center still has units cc-tick.timer", "FAILED git: x", "ok     herdr"];
+  expect(leftLines(lines)).toEqual(lines.slice(0, 1));
+});
+
+test("doctor fails when NODE_COMPILE_CACHE is not set where install sets it, and the fix installs again", () => {
+  const dir = mkdtempSync(join(tmpdir(), "doctor-cache-"));
+  const own = pathsFor({ HOME: dir });
+  let withManager = "";
+  const find = () => doctorChecks(probe({ paths: own, run: () => withManager })).find((c) => c.name === "compile cache on disk");
+  expect(find()?.problem).toContain("NODE_COMPILE_CACHE");
+  expect(find()?.fix).toContain("install.sh");
+  mkdirSync(join(own.cacheEnv, ".."), { recursive: true });
+  writeFileSync(own.cacheEnv, "NODE_COMPILE_CACHE=/tmp/node-compile-cache\n");
+  expect(find()?.problem).not.toBe("");
+  writeFileSync(own.cacheEnv, cacheEnvFile());
+  expect(find()?.problem).not.toBe(""); // the manager does not have it
+  withManager = cacheEnvFile();
+  expect(find()?.problem).toBe("");
+  expect(doctorChecks(probe({ paths: own })).find((c) => c.name === "compile cache on disk")?.skip).toBe(true); // no systemd user services
+  rmSync(dir, { recursive: true });
+});
+
+test("a malformed models.json is a doctor problem and a good or missing one is not", () => {
+  const dir = mkdtempSync(join(tmpdir(), "doctor-models-"));
+  const problem = () => doctorChecks(probe({ dataDir: dir })).find((c) => c.name === "models.json")?.problem;
+  expect(problem()).toBe("");
+  writeFileSync(join(dir, "models.json"), "{nope");
+  expect(problem()).toContain("models.json");
+});

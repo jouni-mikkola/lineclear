@@ -1,0 +1,12 @@
+{
+  "network": { "rttMs": 100, "downKbps": 10000, "upKbps": 5000 },
+  "firstViewMs": 1000,
+  "largestPaintMs": 1500,
+  "layoutShift": 0.01,
+  "firstScriptsGzipKb": 183,
+  "idleHomeKbPerMin": 50,
+  "idleRoadmapKbPerMin": 100,
+  "homeAnswerMs": 200,
+  "idleCpuPercent": 1,
+  "idleMemoryMb": 300
+}

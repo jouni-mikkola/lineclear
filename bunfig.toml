@@ -1,0 +1,4 @@
+[test]
+preload = ["./test/tmp-scope.ts", "./test/load-map-preload.ts"]
+# Drivers of Blender, Chromium and a live service: only a run of the tool itself reaches them (docs/architecture.md, Coverage floors).
+coveragePathIgnorePatterns = ["scripts/media.ts", "scripts/budget.ts", "scripts/smoke.ts"]

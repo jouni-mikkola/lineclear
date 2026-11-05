@@ -1,0 +1,14 @@
+#!/bin/sh
+# Shepherdr for the UI bar's tests: `task list --space <name> --json` gives the space's tasks from the test files
+# (`task list --json` all of them),
+# `space list` gives the lines the test wrote, and every other command does nothing, so the rule loop starts no task.
+if [ "$1 $2 $3" = "task list --json" ]; then
+  exec bun -e 'const fs = require("fs"), d = process.env.LINECLEAR_SHEPHERDR_DIR; console.log(JSON.stringify(fs.readdirSync(d).filter((f) => f.startsWith("task-list-")).flatMap((f) => JSON.parse(fs.readFileSync(d + "/" + f, "utf8")))))'
+fi
+if [ "$1 $2" = "task list" ]; then
+  cat "$LINECLEAR_SHEPHERDR_DIR/task-list-$4.json" 2>/dev/null || echo "[]"
+fi
+if [ "$1 $2" = "space list" ]; then
+  cat "$LINECLEAR_SHEPHERDR_DIR/space-list.txt" 2>/dev/null
+fi
+exit 0

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    ".": {
+      // pi loads its parts and the dispatcher eval runs fake-cli.ts by path, so nothing imports them
+      "entry": ["bin/lineclear", "src/cli.ts", "src/heal.ts", "src/projects-worker.ts", "test/fixtures/*-projects-worker.ts", "pi/extension.ts", "pi/parts/*.ts", "scripts/*.ts", "scripts/gates/run.ts", "test/**/*.test.{ts,tsx}", "test/dispatcher-eval/fake-cli.ts", "ui/test/*.pw.ts", "ui/budget/*.pw.ts", "ui/test/fake-shepherdr-server.ts"],
+      "project": ["bin/lineclear", "src/**/*.{ts,tsx}", "pi/**/*.ts", "scripts/**/*.ts", "test/**/*.{ts,tsx}", "ui/**/*.{ts,tsx}"],
+      // the gates run Biome and jscpd from node_modules/.bin by path; CSS imports tailwindcss; the UI bar reads axe-core's
+      // file by path
+      "ignoreDependencies": ["@biomejs/biome", "axe-core", "jscpd", "tailwindcss"],
+      // ui:test runs the CLI by path
+      "ignoreUnresolved": ["bin/lineclear"]
+    },
+    "server": {
+      // server/bin/shepherdr runs server/cli.ts by path; the build's registries import the plugins' parts; a remote
+      // machine runs the autopilot bootstrap
+      "entry": ["server/cli.ts", "scripts/*.ts", "plugins/*/client.tsx", "plugins/*/server.ts", "helper/autopilot/bootstrap.ts", "test/**/*.test.{ts,tsx}"],
+      "project": ["server/**/*.{ts,tsx}", "src/**/*.{ts,tsx}", "shared/**/*.{ts,tsx}", "plugins/**/*.{ts,tsx}", "helper/**/*.ts", "scripts/**/*.ts", "test/**/*.{ts,tsx}"],
+      // agent-browser runs as a command; CSS imports inter-ui (the font) and tailwindcss
+      "ignoreDependencies": ["agent-browser", "inter-ui", "tailwindcss"]
+    }
+  },
+  // tools of the machine, not of npm
+  "ignoreBinaries": ["tailscale", "perl", "herdr"]
+}

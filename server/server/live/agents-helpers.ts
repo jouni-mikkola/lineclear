@@ -1,0 +1,120 @@
+import { join } from 'node:path'
+import type { TermScreen } from '../../shared/types.ts'
+import type { AgentStatus } from './herdr.ts'
+import { tag } from './chatlines.ts'
+import { boxDir } from './mfs.ts'
+
+export interface AgentRecord {
+  /** Identity for startup instructions; every replacement invalidates the old ones. */
+  launch?: string
+  /** Trusted isolation metadata; never set by a prompt. */
+  isolation?: { run: string; home: string; captures?: string; control: string; path: string }
+  /** chat key */
+  key: string
+  /** herdr agent name */
+  name: string
+  /** herdr agent kind: claude, codex, pi */
+  kind: string
+  cwd: string
+  /** herdr workspace label it lives in */
+  workspace: string
+  tab?: string
+  model?: string
+  effort?: string
+  /** instructions appended to the CLI's system prompt (or sent first, hidden, where it has no such option) */
+  system?: string
+  /** log files, oldest first: one per session */
+  logs: string[]
+  /** the CLI's own session id (claude, pi), for resuming */
+  sessionId?: string
+  started: number
+  /** whether it was at work when last seen running: kept on disk, so a reboot still tells it to carry on */
+  working?: boolean
+  /** set when the agent's run ended for good (task done): writing resumes it */
+  finished?: boolean
+  /** 'ask' keeps the CLI's own approvals; otherwise (task agents) it runs without asking */
+  access?: 'full' | 'ask'
+  /** environment for its terminal: who it is to the shepherdr command */
+  env?: Record<string, string>
+  /** where its hooks record what it reports of itself (Claude Code: readers/hooks.ts) */
+  hooks?: string
+  /** the CLI, model and effort Settings said for its role when it last started on them: a change since is offered as
+   *  a restart in its chat (restart.ts) */
+  set?: { kind: string; model?: string; effort?: string }
+}
+
+export interface OutItem {
+  generation?: string
+  launch?: string
+  id: string
+  key: string
+  text: string
+  /** a reaction line: shown as a faded pill until it goes in */
+  reaction?: { message: string; emoji: string }
+  at: number
+  /** the screen's own id for it (Message.cid) */
+  cid?: string
+  /** the first message of a launch (the brief) */
+  brief?: boolean
+  /** a CLI command (/model, /compact): goes in only between turns */
+  idle?: boolean
+  /** a slash command you typed: Shepherdr follows what it does (commands.ts) */
+  command?: boolean
+}
+
+/** what starts an agent: its record, the first thing it is told, and where its pane comes from when it isn't its
+ *  workspace by label (a task's herdr worktree space) */
+/** was: the label its workspace had before, renamed in place when that one is still open */
+export type Spec = Omit<AgentRecord, 'logs' | 'started'> & { first?: string; pane?: () => Promise<string>; was?: string; fresh?: boolean }
+
+/** why what you send waits: a menu or permission prompt is up, the agent is starting, or (a CLI command) mid-turn */
+export type Hold = 'menu' | 'start' | 'turn'
+
+export interface SendOpts {
+  generation?: string
+  /** a reaction line: shown as a faded pill until it goes in */
+  reaction?: OutItem['reaction']
+  /** starts (or resumes) the agent when it isn't running */
+  ensure?: () => Promise<unknown>
+  /** the screen's own id for it */
+  cid?: string
+  /** a CLI command: only between turns */
+  idle?: boolean
+  /** a slash command you typed (commands.ts) */
+  command?: boolean
+}
+
+export interface Sent {
+  waiting: boolean
+  /** why it waits */
+  waitsFor?: Hold
+  item: OutItem
+}
+
+export const ROUTING_FAILURE = 'Could not provision private agent command routing'
+
+export type Events = {
+  routed: [key: string]
+  status: [key: string, status: AgentStatus | 'gone']
+  logs: [key: string]
+  sent: [item: OutItem]
+  /** what a screen sent couldn't go in */
+  failed: [key: string]
+  /** a first message that never arrived: given up on */
+  undelivered: [key: string]
+  output: [key: string, screen: TermScreen]
+}
+
+/** where the hooks of the agents Shepherdr starts record their events */
+export const HOOKS_DIR = join(boxDir(), 'hooks')
+
+/** where an agent's instructions are kept for its CLI to read */
+export const promptPath = (name: string) => join(boxDir(), 'prompts', `${name}.md`)
+
+/** what an agent's hooks said is read again at most this often */
+export const SAID_MS = 250
+
+/** wraps text Shepherdr sends that is not for the chat (instructions, news), in a tag of what it is when it is one
+ *  of its lines: <shepherdr><news task="SHE-9" event="merged">…</news></shepherdr>; readers' text is stripped of it */
+export const hidden = (s: string, kind?: string, attrs: Record<string, string> = {}) => tag('shepherdr', {}, kind ? tag(kind, attrs, s) : s)
+export const stripHidden = (s: string) => s.replace(/<shepherdr(?:\s+[\w-]+="[^"]*")*\s*>[\s\S]*?<\/shepherdr>\s*/g, '').trim()

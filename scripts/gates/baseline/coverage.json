@@ -1,0 +1,22 @@
+{
+  "bin": 77.7,
+  "brand": 99.2,
+  "check-line": 85.1,
+  "cli": 90.3,
+  "gates": 63,
+  "helper": 0,
+  "kit": 23.2,
+  "pi": 97.1,
+  "plugins": 0,
+  "registry": 97.6,
+  "screen": 0,
+  "scripts": 93.1,
+  "server": 72.8,
+  "server-scripts": 0,
+  "server-tests": 0,
+  "shared": 32.8,
+  "tests": 94.6,
+  "timer-rule": 100,
+  "ui-test": 94,
+  "web": 56.7
+}

@@ -1,0 +1,17 @@
+# Code audit: plugins' server parts, helper, shared
+
+Scope: `server/plugins` (non-client files), `server/helper`, `server/shared`. Left out: what L71, L74, L165 and L166 already delete (old UI, plugin client parts, `plugins.json`, `lineclear migrate`). knip is clean, so every row was found by hand. Proof is a search of the repo, the board's data (`~/.lineclear/tasks.json`) and the callers named.
+
+Checked and found no finding: every other exported name in `server/shared` and the plugins' `.ts` files has a production caller or is used inside its own module; `plugins/*/server.ts` are 3 to 7 line registrations (used by `server/plugins.ts`); `helper/agent-browser`, `health.pl`, `mirror.pl`, `relay.pl`, `hook.pl` and `autopilot/bootstrap.ts` each have a caller in `server/live/` (install list, or the sandbox copy in `autopilot-sandbox.ts`).
+
+| # | What | Where | Proof | Lines saved | Risk | State |
+|---|------|-------|-------|-------------|------|-------|
+| 1 | Two old Settings-block headings read for "briefs written before" | `shared/brief.ts` `OLD_HEADS`, `server/live/prompts.ts` `splitBrief`, tests in `live-c.test.ts` and `layout-sending.test.ts` | `~/.lineclear/tasks.json` holds 11 current headings and 0 of either old one; no other store (chatlog, artifacts, prompts) matches | 5 | none: a brief with an old heading would show as plain text | deleted here; `live-c` and `layout-sending` pass, `tsc` clean |
+| 2 | Guard for helper copies without `route.pl` ("Older helper copies still work alone") | `server/helper/shepherdr` lines 20 to 28 | `install.ts` writes `route.pl` beside `shepherdr` in the same list, and a version change rewrites both | 3 | low: a machine whose install broke half way; `server/test/cli.test.ts` copies `shepherdr` alone and must copy `route.pl` too | LL196 |
+| 3 | `readBrief` and `SettingLine`: a reader of the Settings block that only tests call | `shared/brief.ts`, `server/test/live-fixture.ts`, one test in `live-c.test.ts` | grep over `server/`, `src/`, `ui/`: no caller but the test fixture and its test | 18 | none | deleted here; `live-c` passes, `tsc` clean |
+| 4 | The secret run, secret env and merge-retry logic exists twice: Perl on a remote machine, TypeScript in `server/cli.ts` (the Perl comments say "as server/cli.ts") | `server/helper/shepherdr`, `server/cli.ts` | the same job in two languages; the remote has no bun, so the Perl stays | not counted | a merge: they must be changed together | kept; noted so a change touches both |
+| 5 | `typing()` and `working()` repeat the "last card waits on the human" test | `server/plugins/chat/typing.ts` | the two bodies share two lines; the only callers are `chat-messages.tsx` and `test/typing.test.ts`, both old UI | 4 | none | left to L165 and L166, which delete the callers |
+| 6 | Client-only code in `plugins/*` (`days.ts`, `paste.ts`, `reply.ts`, `drag.ts`, `screen.ts`, `input.ts`, `call.ts`, `search-*.ts`) and the tests that cover only it | `server/plugins/*`, `server/test/{paste,typing,search,emoji,...}.test.ts` | callers are old UI files only | about 900 | none | left to L166 |
+| 7 | `buildId` and its test serve the old UI's reload check | `server/shared/build.ts`, `server/test/reload.test.ts` | callers: `server/server/app.ts`, `src/kernel-connection.ts` (old UI) | 6 | none | left to L165 |
+
+Not proven: whether `laptop` and `desktop` hold task data the main board does not (row 1 reads the main board's data, which holds every task's brief); the old-UI-only rows are not run.
