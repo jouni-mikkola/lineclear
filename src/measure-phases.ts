@@ -41,10 +41,11 @@ export interface TaskPhases {
   readyMs: number;
 }
 
-const FINISHING = /lineclear (ready|merge|pr)\b|git (commit|rebase|push)|checkpoint/;
+const FINISHING = /lineclear (ready|merge|pr)\b|git (commit|rebase|push)|lineclear checkpoint\b/;
 const REVIEW = /\/Reviewer|review round|^subagent/;
 const CHECK_WAIT = /lineclear (check|checks|wait)\b/;
 const TESTS = /\b(bun (run )?(test|check|types|gates|ui:\w+)|tsc|biome|knip|playwright|vitest|jest|pytest)\b/;
+const CODING = /^(edit|write)\b|sed -i|\bcat >|\btee\b|python3? - <<|apply_patch|git apply/;
 const ORIENTING = /\/skill\/|AGENTS\.md|CLAUDE\.md|docs\/idea\.md|lineclear (roadmap|task) show/;
 
 /** The phase of each call, in order. The leading calls that only read the rules and the brief are `start`; a call with no tool continues the phase before it. */
@@ -60,7 +61,7 @@ function phasesOf(calls: Call[], reviewer: boolean): Phase[] {
     else if (any(REVIEW)) phase = "review";
     else if (any(CHECK_WAIT)) phase = "check wait";
     else if (any(TESTS)) phase = "tests";
-    else if (c.tools.some((t) => /^(edit|write)\b/.test(t))) phase = "coding";
+    else if (c.tools.some((t) => CODING.test(t))) phase = "coding";
     else if (!started && c.tools.some((t) => ORIENTING.test(t))) phase = "start";
     else phase = "reading";
     if (phase !== "start") started = true;
@@ -102,7 +103,7 @@ export function taskPhases(id: string, sessions: SessionCalls[], cpu: CpuLine[])
       inputs.push(c.input + c.cacheRead);
       first = Math.min(first, c.at - c.ms);
       lastAt = Math.max(lastAt, c.at);
-      if (!s.reviewer && ready === undefined && c.tools.some((t) => /lineclear ready\b/.test(t))) ready = c.at;
+      if (!s.reviewer && c.tools.some((t) => /lineclear ready\b/.test(t))) ready = Math.min(ready ?? c.at, c.at);
       if (s.reviewer) return;
       const next = s.calls[i + 1];
       const from = i === 0 ? c.at - c.ms : c.at;

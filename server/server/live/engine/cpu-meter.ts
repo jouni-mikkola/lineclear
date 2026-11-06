@@ -5,12 +5,14 @@ import { appendFileSync, mkdirSync, readdirSync, readFileSync, realpathSync, rea
 import { join } from 'node:path'
 
 const CPU_KINDS = ['agent', 'bridge', 'tests', 'server', 'other'] as const
-export type CpuKind = (typeof CPU_KINDS)[number]
+type CpuKind = (typeof CPU_KINDS)[number]
 
 export interface CpuRow {
   parent: number
-  /** the CPU ticks it has used itself, not through children */
+  /** the CPU ticks it has used itself */
   ticks: number
+  /** the ticks of its children that ended and were waited for */
+  childTicks: number
   cwd: string
   cmd: string
 }
@@ -49,7 +51,7 @@ export function readProc(root = '/proc'): Map<number, CpuRow> {
         } catch {
           // ended just now
         }
-        rows.set(Number(d), { parent: Number(f[1]), ticks: Number(f[11]) + Number(f[12]), cwd, cmd })
+        rows.set(Number(d), { parent: Number(f[1]), ticks: Number(f[11]) + Number(f[12]), childTicks: Number(f[13]) + Number(f[14]), cwd, cmd })
       } catch {
         // ended just now
       }
@@ -60,9 +62,8 @@ export function readProc(root = '/proc'): Map<number, CpuRow> {
   return rows
 }
 
-/** The ticks used in total, by kind, by the processes working in `worktree` and everything they started. */
-function ticksByKind(rows: Map<number, CpuRow>, worktree: string): Record<CpuKind, number> {
-  const out: Record<CpuKind, number> = { agent: 0, bridge: 0, tests: 0, server: 0, other: 0 }
+/** the processes working in `worktree` and everything they started */
+function treeOf(rows: Map<number, CpuRow>, worktree: string): Set<number> {
   const inside = (cwd: string) => cwd === worktree || cwd.startsWith(`${worktree}/`)
   const mine = new Set<number>()
   for (const [pid, r] of rows) if (inside(r.cwd)) mine.add(pid)
@@ -75,11 +76,7 @@ function ticksByKind(rows: Map<number, CpuRow>, worktree: string): Record<CpuKin
       grown = true
     }
   }
-  for (const pid of mine) {
-    const r = rows.get(pid)
-    if (r) out[kindOf(r.cmd)] += r.ticks
-  }
-  return out
+  return mine
 }
 
 export interface CpuEvent {
@@ -89,9 +86,19 @@ export interface CpuEvent {
   ticks: number
 }
 
-/** Keeps each task's last totals and writes what each tick added. A process that ended takes its ticks out of the total: that tick adds nothing. */
+interface Seen {
+  ticks: number
+  childTicks: number
+  parent: number
+  kind: CpuKind
+}
+
+/**
+ * Keeps what each process of a task had used at the last tick and writes what each tick added, by kind. A process that
+ * ended in between adds nothing itself: its parent's waited-for children show what it used, less what was seen before.
+ */
 export class CpuMeter {
-  private last = new Map<string, Record<CpuKind, number>>()
+  private last = new Map<string, Map<number, Seen>>()
 
   constructor(private dir: string) {}
 
@@ -102,11 +109,25 @@ export class CpuMeter {
     } catch {
       // the folder is gone: nothing runs in it
     }
-    const total = ticksByKind(rows, real)
+    const seen = new Map<number, Seen>()
+    for (const pid of treeOf(rows, real)) {
+      const r = rows.get(pid)
+      if (r) seen.set(pid, { ticks: r.ticks, childTicks: r.childTicks, parent: r.parent, kind: kindOf(r.cmd) })
+    }
     const before = this.last.get(task)
-    this.last.set(task, total)
+    this.last.set(task, seen)
     if (!before) return []
-    const events = CPU_KINDS.flatMap((kind) => (total[kind] > before[kind] ? [{ at: now, kind, ticks: total[kind] - before[kind] }] : []))
+    const added: Record<CpuKind, number> = { agent: 0, bridge: 0, tests: 0, server: 0, other: 0 }
+    for (const [pid, cur] of seen) {
+      const old = before.get(pid)
+      // a process still going: its own ticks since the last tick, or all of them when it started since
+      added[cur.kind] += Math.max(0, cur.ticks - (old?.ticks ?? 0))
+      if (!old) continue
+      let gone = 0
+      for (const [other, o] of before) if (o.parent === pid && !seen.has(other)) gone += o.ticks
+      added[cur.kind] += Math.max(0, cur.childTicks - old.childTicks - gone)
+    }
+    const events = CPU_KINDS.flatMap((kind) => (added[kind] > 0 ? [{ at: now, kind, ticks: added[kind] }] : []))
     if (events.length) {
       mkdirSync(this.dir, { recursive: true })
       appendFileSync(join(this.dir, `${task}.jsonl`), events.map((e) => `${JSON.stringify(e)}\n`).join(''))

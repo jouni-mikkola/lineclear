@@ -19,29 +19,30 @@ No line has a holder and waiter that share no lock, no file and no part.
 
 ## Cost per phase
 
-Made by `lineclear measure phases --last 30` on the last 30 tasks. CPU is 0.0 here: the server records it from L416 on, so tasks before it have none.
+Made by `lineclear measure phases --last 30` on the last 30 tasks. CPU is 0.0 until the server has recorded it, and a task on another machine has none.
 
 ```
-30 tasks. Input is tokens sent to the model, fresh and read from cache. Wall time is a call and the tool it ran; a reviewer's calls add tokens and no wall time.
+29 tasks. Input is tokens sent to the model, fresh and read from cache. Wall time is a call and the tool it ran; a reviewer's calls add tokens and no wall time.
 
 phase       calls     input  cache writes  output  wall min  cpu min
-start          33    109336        354034    6590       5.2      0.0
-reading       377  10890740        562818  142295      73.7      0.0
-coding          3    109611          1022    4840       0.5      0.0
-tests          54   1532089         72412   13266      68.1      0.0
-review         90   1957390        171412   46586      17.5      0.0
-check wait      4    116587          1558     573      14.8      0.0
-finishing      57   2114354         42371   15677      44.5      0.0
-all           618  16830107       1205627  229827     224.2      0.0
+start          31     93916        340438    6150       4.9      0.0
+reading       333   9615072        510745   85651      62.6      0.0
+coding         65   2699991         92576   72644      28.8      0.0
+tests          61   1964012         80988   16164      99.0      0.0
+review        144   3314577        288590   76729      20.9      0.0
+check wait      3     69614          1384     455       5.5      0.0
+finishing      62   2400518         47734   17443      59.7      0.0
+all           699  20157700       1362455  275236     281.4      0.0
 
 cpu min by kind: none
 
 task      median call  largest call    input  min to ready
-LIN-1215        44396         64746   964832           1.1
-LIN-1214        47461         75172  1421134           6.2
-LIN-1213        23802         30557   166245           2.7
-LIN-1212        27346         34901   378331           3.5
-LIN-1211        31910         47015   422067           6.3
+LIN-1216         7892         13902    15784           0.2
+LIN-1215        43442         74178  2344746           1.1
+LIN-1214        35193         79077  2884244          24.1
+LIN-1213        25093         39726   684516          22.9
+LIN-1212        38944         61195  1436134          23.9
+LIN-1211        33319         53058  1095888          23.8
 LIN-1210        21944         24402   125484           0.4
 LIN-1209        30937         36227   437885           2.5
 LIN-1208        21883         24935   255296           0.8
@@ -65,6 +66,4 @@ LIN-1191        22534         30645   536423           8.7
 LIN-1190        28503         33593   427312          12.7
 LIN-1189        18869         29113   577106          19.4
 LIN-1188        33252         60167  1891918          26.1
-LIN-1187        38215         57418  1511087          31.7
-LIN-1186        21746         24218   270023           7.6
 ```

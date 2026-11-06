@@ -13,7 +13,7 @@ function call(at: number, ms: number, usage: number[], command?: string, name = 
 
 const AGENT = [
   call(60_000, 10_000, [2, 100, 50, 10], "cat /x/skill/lineclear/SKILL.md"),
-  call(100_000, 5_000, [3, 200, 0, 20], "x", "edit"),
+  call(100_000, 5_000, [3, 200, 0, 20], "python3 - <<EOF\nopen('a','w')\nEOF"),
   call(130_000, 4_000, [4, 300, 10, 5], "bun test test/a.test.ts"),
   call(200_000, 3_000, [5, 400, 0, 7], "lineclear ready --summary done"),
 ].join("\n");

@@ -18,7 +18,8 @@ export function reviewerRound(text: string): number | undefined {
   for (const line of text.split("\n")) {
     if (!line.includes('"role":"user"')) continue;
     try {
-      const m = JSON.parse(line)?.message;
+      const entry = JSON.parse(line);
+      const m = entry?.message;
       if (m?.role !== "user") continue;
       const c = m.content;
       const body = typeof c === "string" ? c : (c ?? []).map((x: { text?: string } | null) => x?.text ?? "").join("");
@@ -37,7 +38,8 @@ export function sessionUsage(text: string): Usage[] {
   for (const line of text.split("\n")) {
     if (!line.includes('"usage"')) continue;
     try {
-      const m = JSON.parse(line)?.message;
+      const entry = JSON.parse(line);
+      const m = entry?.message;
       if (m?.role !== "assistant" || !m.usage) continue;
       out.push({
         model: String(m.model ?? ""),
@@ -175,13 +177,14 @@ export function sessionCalls(text: string): Call[] {
   for (const line of text.split("\n")) {
     if (!line.includes('"role":"assistant"')) continue;
     try {
-      const m = JSON.parse(line)?.message;
+      const entry = JSON.parse(line);
+      const m = entry?.message;
       if (m?.role !== "assistant" || !m.usage) continue;
       const tools = (Array.isArray(m.content) ? m.content : [])
         .filter((c: { type?: string }) => c?.type === "toolCall")
         .map((c: { name?: string; arguments?: unknown }) => `${c.name ?? ""} ${JSON.stringify(c.arguments ?? {}).slice(0, 400)}`);
       out.push({
-        at: Number(m.timestamp) || new Date(JSON.parse(line).timestamp).getTime(),
+        at: Number(m.timestamp) || new Date(entry.timestamp).getTime(),
         ms: Number(m.durationMs) || 0,
         input: m.usage.input ?? 0,
         cacheRead: m.usage.cacheRead ?? 0,

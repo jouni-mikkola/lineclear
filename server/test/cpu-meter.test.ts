@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { CpuMeter, type CpuRow } from '../server/live/engine/cpu-meter.ts'
 
 describe('cpu meter', () => {
-  const row = (parent: number, ticks: number, cwd: string, cmd: string): CpuRow => ({ parent, ticks, cwd, cmd })
+  const row = (parent: number, ticks: number, cwd: string, cmd: string, childTicks = 0): CpuRow => ({ parent, ticks, childTicks, cwd, cmd })
   const tree = (extra: number) =>
     new Map<number, CpuRow>([
       [10, row(1, 100 + extra, '/w', 'pi --model m')],
@@ -25,5 +25,31 @@ describe('cpu meter', () => {
       { at: 2000, kind: 'server', ticks: 30 },
     ])
     expect(readFileSync(join(dir, 'T-1.jsonl'), 'utf8').trim().split('\n')).toHaveLength(3)
+  })
+
+  test('a child that ended between ticks still counts once, and an ended process takes nothing from the others', () => {
+    const meter = new CpuMeter(mkdtempSync(join(tmpdir(), 'cpu-')))
+    const at = (a: Map<number, CpuRow>, n: number) => meter.sample('T-2', '/w', a, n)
+    at(
+      new Map([
+        [10, row(1, 100, '/w', 'pi')],
+        [11, row(10, 40, '/w', 'bun test a')],
+        [12, row(10, 40, '/w', 'bun test b')],
+      ]),
+      1,
+    )
+    // 11 ended: its 45 ticks reach 10's waited-for children, 40 of them were seen; 12 used 10 more
+    expect(
+      at(
+        new Map([
+          [10, row(1, 103, '/w', 'pi', 45)],
+          [12, row(10, 50, '/w', 'bun test b')],
+        ]),
+        2,
+      ),
+    ).toEqual([
+      { at: 2, kind: 'agent', ticks: 8 },
+      { at: 2, kind: 'tests', ticks: 10 },
+    ])
   })
 })
