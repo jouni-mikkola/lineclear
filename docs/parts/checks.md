@@ -27,14 +27,14 @@ The check tiers of each project and what keeps its checks honest: `lineclear che
 
 `lineclear check [--tier <tier>] [command]`, `lineclear check --release <test>`, the check
 log `check-runs.jsonl`, and these names:
-- `src/check-runs.ts`: `Tier`, `CheckRun`, `loadMeter`, `recordStepTimes`, `fullCheckPassed`, `readRuns`, `laneDays`, `redByCause`, `refusedMergeBranches`, `whereRun`, `testKey`, `recordRun`
+- `src/check-runs.ts`: `Tier`, `CheckRun`, `loadMeter`, `recordStepTimes`, `readRuns`, `laneDays`, `redByCause`, `refusedMergeBranches`, `whereRun`, `testKey`
 - `src/git.ts`: `git`, `gitWith`, `gitText`, `gitAsLineclear`
 - `src/check-tier.ts`: `checkTier`, `flakeFixIn`
 
 ## Files
 
 - code: `src/check-runs.ts`, `src/check-tier.ts`, `src/git.ts`
-- tests: `test/contracts/checks.test.ts`, `test/red-causes.test.ts`
+- tests: `test/contracts/checks.test.ts`, `test/red-causes.test.ts`, `test/light-checks.test.ts`
 
 ## Tests
 
