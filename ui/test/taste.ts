@@ -253,7 +253,6 @@ const DRAWN: Record<string, string[]> = {
   "ui/web/roadmap/chain.tsx": ["9px"], // the dot sits on the rail's centre
   "ui/kit/spend-charts.tsx": ["3px"], // the gap of the bars
   "ui/kit/settings.tsx": ["38px"], // the height of a one-line hint, so the form does not jump
-  "ui/web/roadmap/goals-print.ts": ["3px", "10px", "13px"], // the print sheet's own type scale
 };
 
 /** Pixel values in the source of ui/ that are on no token: below 100 px, not 1 or 2 (lines) or a multiple of the 4 px unit. */

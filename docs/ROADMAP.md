@@ -293,7 +293,7 @@ Result: On the owner's busy machine a release run promotes main or names the fai
 - parts: install, measure
 - locks: release
 - after: L278, L280, L281, L283
-- files: docs/numbers.md
+- files: 
 
 ### L267 The rule loop spawns no herdr
 Result: The rule loop learns whether a task's agent started or stalled from the server, without starting a herdr command for it.
@@ -355,7 +355,7 @@ Result: `docs/simplify.md` lists each process, timer, store, loop and gate with 
 - parts: measure (health), checks
 - locks: simplify-doc
 - after: none
-- files: scripts/simplify-count.ts, test/simplify.test.ts, docs/simplify.md, docs/parts/measure.md
+- files: docs/parts/measure.md
 
 ### L315 Task ids are unique everywhere
 Result: `lineclear task show <id>` and `close <id>` find the one task with that id, on any machine, and no two tasks share an id.
@@ -405,7 +405,7 @@ Result: A gate or check that caught no fault in 7 days of runs is cut or merged 
 - parts: gates, checks (health), measure
 - locks: gate-list
 - after: L314
-- files: scripts/gates/run.ts, scripts/gates/borders.ts, scripts/gates/code-rules.ts, scripts/gates/baseline/, scripts/check.ts, src/check-runs.ts, src/catches.ts, src/measure-main.ts, test/measure.test.ts, test/catches.test.ts, test/gates.test.ts, docs/simplify.md, docs/parts/measure.md, docs/parts/checks.md, scripts/gates/herdr-calls.ts, scripts/gates/model-names.ts
+- files: scripts/gates/run.ts, scripts/gates/borders.ts, scripts/gates/code-rules.ts, scripts/gates/baseline/, scripts/check.ts, src/check-runs.ts, src/catches.ts, test/catches.test.ts, test/gates.test.ts, docs/parts/measure.md, docs/parts/checks.md
 
 ### L319 No new measuring before tier 2
 Result: The roadmap check refuses a new step that adds a measurement or report feature until tiers 1 and 2 are done.
@@ -417,7 +417,7 @@ Result: The roadmap check refuses a new step that adds a measurement or report f
 - parts: planner, measure
 - locks: roadmap-check
 - after: L314
-- files: src/roadmap.ts, src/roadmap-cli.ts, test/roadmap.test.ts, docs/simplify.md
+- files: src/roadmap.ts, src/roadmap-cli.ts, test/roadmap.test.ts
 
 ### L94 Work goes where there is room
 Result: A step starts on the machine with room, found through herdr.
@@ -512,7 +512,7 @@ Result: The waste watch finds no step of Lineclear started more than twice in 24
 - parts: rules
 - locks: starts
 - after: L212
-- files: src/tick-project.ts, src/starts.ts, src/waste.ts, test/starts.test.ts
+- files: src/tick-project.ts, src/starts.ts, test/starts.test.ts
 
 ### L213 One way to file a fix
 Result: Every fix task the rule loop files goes through one function with one cap, one dedupe and an end that reaches the owner.
@@ -540,7 +540,7 @@ Result: `lineclear measure` lists, per step, how often its fix task was filed in
 - parts: measure
 - locks: measure-refiles
 - after: none
-- files: src/measure.ts, src/measure-main.ts, src/measure-refiles.ts, test/measure.test.ts, test/measure-refiles.test.ts, docs/parts/measure.md, docs/numbers.md
+- files: src/measure.ts, docs/parts/measure.md
 
 ### L275 A step gets one fix a day
 Result: A step whose fix task is open, or ended in the last 24 hours, gets no other fix task, on any machine.
@@ -644,7 +644,7 @@ Result: A rebase onto an unrelated main change reads a step's earlier pass inste
 - parts: checks, gates, measure
 - locks: none
 - after: L218, L250
-- files: scripts/check.ts, src/check-runs.ts, test/contracts/checks.test.ts, docs/numbers.md
+- files: scripts/check.ts, src/check-runs.ts, test/contracts/checks.test.ts
 
 ### L257 A busy agent is never silent
 Result: A task whose agent runs a long command is no longer called silent and reminded or restarted mid-work.
@@ -745,7 +745,7 @@ Result: For a day of normal runs, no step of this repo is recorded waiting on a 
 - parts: measure
 - locks: numbers
 - after: L261, L263
-- files: docs/numbers.md
+- files: 
 
 ### L259 Install has a contract test
 Result: The install part's interface that other parts call is pinned by one contract test, and its debt line goes.
@@ -776,7 +776,7 @@ Result: A session compacts where its measured cost says, and old tool output is 
 - parts: pi, measure
 - locks: none
 - after: L52, L54
-- files: pi/compaction.ts, pi/parts/compaction.ts, pi/parts/cut-output.ts, src/measure.ts, src/measure-main.ts, docs/numbers.md, src/measure-bands.ts, test/measure-bands.test.ts, test/measure.test.ts
+- files: pi/compaction.ts, pi/parts/compaction.ts, pi/parts/cut-output.ts, src/measure.ts
 
 ### L217 Review cost is read, not guessed
 Result: The ledger names a reviewer's calls, and a change that touches only docs or a roadmap file gets no review.
@@ -788,7 +788,7 @@ Result: The ledger names a reviewer's calls, and a change that touches only docs
 - parts: planner, measure, rules
 - locks: none
 - after: none
-- files: src/brief.ts, templates/brief.md, src/measure.ts, test/briefs.test.ts, test/measure.test.ts
+- files: src/brief.ts, templates/brief.md, src/measure.ts, test/briefs.test.ts
 
 ### L178 Owner-only steps stay off agents
 Result: A step only the owner can do by hand, like L172, is never started as an agent task and shows in the Inbox as an owner step.
@@ -844,7 +844,7 @@ Result: `lineclear measure --server` prints the server's event-loop lag and a CP
 - parts: server, measure (health)
 - locks: loop-measure
 - after: none
-- files: server/server/live/loop-lag.ts, server/server/app.ts, server/server/live/source.ts, server/server/store.ts, src/measure-main.ts, src/measure-server.ts, test/measure-server.test.ts, docs/parts/measure.md, server/test/loop-lag.test.ts
+- files: server/server/live/loop-lag.ts, server/server/app.ts, server/server/live/source.ts, server/server/store.ts, docs/parts/measure.md, server/test/loop-lag.test.ts
 
 ### L307 The loop is free of hot paths
 Result: On a busy board the server's loop lag stays under 50 ms at p95 and its main thread uses under 15 % of one core.
@@ -856,7 +856,7 @@ Result: On a busy board the server's loop lag stays under 50 ms at p95 and its m
 - parts: server, measure
 - locks: loop-hot-paths
 - after: L306
-- files: server/server/, server/shared/time.ts, server/test/, docs/numbers.md
+- files: server/server/, server/shared/time.ts, server/test/
 
 ### L308 A closed herdr call is retried
 Result: When herdr closes a connection before its reply, the call is retried once and any failure reads "herdr closed the connection".
@@ -893,7 +893,7 @@ Result: Done tasks move out of `tasks.json` into the cold file, so the hot file 
 - parts: server, measure
 - locks: task-store
 - after: L220
-- files: server/server/store.ts, server/server/live/engine/, server/test/store-cold.test.ts, docs/numbers.md
+- files: server/server/store.ts, server/server/live/engine/, server/test/store-cold.test.ts
 
 ### L253 Herdr stays healthy
 Result: A herdr server at high CPU, one outside its service, or a workspace of a closed task is found and fixed by Lineclear itself.
@@ -1259,7 +1259,7 @@ Result: With nothing at work, the server, the rule loop and herdr together use o
 - parts: server (health), rules, measure
 - locks: none
 - after: none
-- files: server/, src/remotes.ts, src/measure.ts, docs/numbers.md, test/second-machine.test.ts
+- files: server/, src/remotes.ts, src/measure.ts, test/second-machine.test.ts
 
 ### L154 No old setup left running
 Result: No service of the old setup, timer or server still runs on any machine once its part has moved.
@@ -2070,7 +2070,7 @@ Result: The README film shows how Lineclear works, with a source for each claim.
     text tells the whole story. Frames of every scene at 390 and 1440 px of GitHub's render are on the pull request.
 - locks: none
 - after: none
-- files: README.md, docs/readme/, scripts/readme-film.ts, docs/numbers.md
+- files: README.md, docs/readme/, scripts/readme-film.ts
 
 ### U23 Who does what
 Result: The film shows who you talk to and how work travels from there to main.
@@ -2747,7 +2747,7 @@ Result: After a reboot, a killed service, a full disk or a lost network, work co
   - A full disk or a lost network shows once on Home with what to do, and clears when it is over.
 - locks: install, rules
 - after: L127
-- files: install.sh, test/recovery.test.ts, docs/numbers.md
+- files: install.sh, test/recovery.test.ts
 
 ### L51 Token savings for all
 Result: Every user gets the measured token savings, on by default.
@@ -2836,7 +2836,7 @@ Result: A worker gets its step, its files and the rules, not the whole roadmap.
   - Tests cover the size of the brief and `roadmap show`.
 - locks: rules, measure
 - after: L51
-- files: src/brief.ts, src/roadmap-cli.ts, docs/numbers.md
+- files: src/brief.ts, src/roadmap-cli.ts
 
 ### L67 pi finds the extension
 Result: The Lineclear extension loads in pi on every machine.
@@ -3631,7 +3631,7 @@ Result: Merges per hour and the longest lane wait are measured and shown.
 - parts: measure (health), checks
 - locks: none
 - after: L119
-- files: src/measure.ts, src/check-runs.ts, docs/numbers.md, test/measure.test.ts
+- files: src/measure.ts, src/check-runs.ts
 
 ### L124 Check line contract test
 Result: A test fails when the check line's server and CLI sides stop agreeing.
@@ -4005,7 +4005,7 @@ Result: Each account's quota comes from an adapter, and one with no adapter show
 - parts: rules
 - locks: quota
 - after: none
-- files: src/quota.ts, src/model-use.ts, test/quota.test.ts
+- files: src/quota.ts, test/quota.test.ts
 
 ### L203 Harness interface, pi adapter
 Result: A harness is one interface (start, session reader, stall signals, usage) and pi is its first adapter.
@@ -4224,7 +4224,7 @@ Result: `lineclear measure` splits the wait from ready to start by cause: lock, 
 - parts: measure
 - locks: measure-wait
 - after: none
-- files: src/measure.ts, src/measure-main.ts, test/measure.test.ts, docs/numbers.md
+- files: src/measure.ts
 
 ### L235 A free step starts in one tick
 Result: A ready step whose locks, slots and load are free starts within one tick of the rule loop.
@@ -4271,7 +4271,7 @@ Result: The heavy run writes the median wait from ready to start of the last 3 d
 - parts: measure, gates
 - locks: heavy
 - after: L235, L236, L237
-- files: scripts/heavy.ts, src/measure.ts, test/measure.test.ts, docs/numbers.md
+- files: scripts/heavy.ts, src/measure.ts
 
 ### L239 Cost per step is split by cause
 Result: `lineclear measure` splits the cost of a merged step into work, review rounds, step check, rework and idle context.
@@ -4283,7 +4283,7 @@ Result: `lineclear measure` splits the cost of a merged step into work, review r
 - parts: measure
 - locks: measure-cost
 - after: none
-- files: src/measure.ts, src/measure-sessions.ts, test/measure.test.ts, docs/numbers.md
+- files: src/measure.ts
 
 ### L240 Routine steps run cheap
 Result: A step marked routine by rule (docs only, a rename, a baseline lowering) starts on the cheap worker model.
@@ -4295,7 +4295,7 @@ Result: A step marked routine by rule (docs only, a rename, a baseline lowering)
 - parts: rules, planner
 - locks: models
 - after: L239
-- files: src/starts.ts, src/model-use.ts, test/model-use.test.ts, docs/parts/rules.md
+- files: src/starts.ts, docs/parts/rules.md
 
 ### L241 Reviews stay within their rounds
 Result: A review round that finds nothing to fix ends the review, and a task never runs a third round.
@@ -4318,7 +4318,7 @@ Result: The heavy run writes the cost per merged step of the last 3 days and fai
 - parts: measure, gates
 - locks: heavy
 - after: L238, L240, L241
-- files: scripts/heavy.ts, src/measure.ts, test/measure.test.ts, docs/numbers.md
+- files: scripts/heavy.ts, src/measure.ts
 
 ### L243 Each ask is named by its kind
 Result: `lineclear asks --days 1` lists each ask of the day with its kind and the rule that should have answered it.
@@ -4330,7 +4330,7 @@ Result: `lineclear asks --days 1` lists each ask of the day with its kind and th
 - parts: inbox, measure
 - locks: asks
 - after: none
-- files: src/asks.ts, test/asks.test.ts, docs/asks.md, docs/numbers.md
+- files: src/asks.ts, test/asks.test.ts, docs/asks.md
 
 ### L244 Rules answer each ask kind
 Result: Each kind of ask named in L243 that a rule can answer is answered by a rule, and a kind that cannot is a task.
@@ -4353,7 +4353,7 @@ Result: The heavy run fails when a day has 3 asks or more, and names each card.
 - parts: measure, gates, inbox
 - locks: heavy
 - after: L244, L242
-- files: scripts/heavy.ts, src/asks.ts, test/asks.test.ts, docs/numbers.md
+- files: scripts/heavy.ts, src/asks.ts, test/asks.test.ts
 
 ### L247 The check log holds slot waits
 Result: Each run in the check log records the minutes it waited for a check slot, and `lineclear check` prints them.
@@ -4441,7 +4441,7 @@ Result: A merge check that ends with no named failure is rerun once at low load,
 - parts: checks (health), install, measure, server
 - locks: check-rerun
 - after: none
-- files: src/check-runs.ts, src/candidate-check.ts, src/check-tier.ts, src/measure-main.ts, server/server/live/engine/lane.ts, server/test/engine-lane.test.ts, test/contracts/checks.test.ts, docs/parts/checks.md, src/check-tier.ts
+- files: src/check-runs.ts, src/candidate-check.ts, src/check-tier.ts, server/server/live/engine/lane.ts, server/test/engine-lane.test.ts, test/contracts/checks.test.ts, docs/parts/checks.md, src/check-tier.ts
 
 ### L301 Agents share the check slots
 Result: An agent's `lineclear check` runs through the machine-wide check slots, with a cap of heavy runs per core and the lane first.
@@ -4481,7 +4481,7 @@ Result: `lineclear measure --herdr` prints the herdr CLI spawns a minute and the
 - parts: measure
 - locks: none
 - after: L267
-- files: src/measure.ts, test/measure.test.ts, docs/numbers.md
+- files: src/measure.ts
 
 ### L276 Home shows a looping step
 Result: Home lists each step started more than 3 times in 24 hours, fix filings included, with the reason of each start.
@@ -4595,7 +4595,7 @@ Result: A test proves a message sent during a long command is answered within 30
 - parts: measure, rules
 - locks: none
 - after: L173, L174, L175, L271
-- files: src/measure.ts, src/tick-project.ts, test/measure.test.ts
+- files: src/measure.ts, src/tick-project.ts
 
 ### L195 Reply time is measured
 Result: `lineclear dispatcher latency` prints the time from each owner message to the Dispatcher's first reply.
@@ -4607,7 +4607,7 @@ Result: `lineclear dispatcher latency` prints the time from each owner message t
 - parts: dispatcher, measure
 - locks: none
 - after: L194, L271
-- files: src/dispatcher.ts, test/dispatcher.test.ts, docs/numbers.md
+- files: src/dispatcher.ts, test/dispatcher.test.ts
 
 ### L269 The UI's interface has a test
 Result: A change that breaks a name the UI part offers other parts fails `bun run test` at once.
@@ -4618,7 +4618,7 @@ Result: A change that breaks a name the UI part offers other parts fails `bun ru
 - parts: ui (health)
 - locks: none
 - after: L271
-- files: test/contracts/ui.test.ts, docs/parts/ui.md
+- files: docs/parts/ui.md
 
 ### L193 The Dispatcher wakes on an event
 Result: The Dispatcher gets a turn when an op or task ends, with the events of a 2 s window in one message.
@@ -4800,7 +4800,7 @@ Result: The running service is measured and stays light on every machine.
   and its memory peak is under 300 MB, measured by a script in `scripts/`. The numbers are in `docs/numbers.md`.
   - Reopened: docs/numbers.md has no one-hour reading of the live service's CPU and memory.
 - locks: none
-- files: scripts/measure-service.ts, docs/numbers.md
+- files: 
 - after: L26, L27, L28, L29
 
 ### L33 Reports do not ask
@@ -4815,7 +4815,7 @@ Result: Reports with no question stop showing up as needs-you cards.
   - The asks per day of 7 days before and after are in `docs/numbers.md`.
   - Reopened: docs/numbers.md has no asks per day for the 7 days after the brief template change.
 - locks: none
-- files: src/asks.ts, templates/brief.md, docs/asks.md, docs/numbers.md, test/asks.test.ts
+- files: src/asks.ts, templates/brief.md, docs/asks.md, test/asks.test.ts
 - after: L22, L32
 
 ### L34 Lineclear plans itself
@@ -5005,7 +5005,7 @@ Result: The step check stays only while it saves more than it costs.
   - Reopened: The side-by-side waits for 20 steps planned with the check; only 2 plans have a check record.
 - parts: planner, measure, rules
 - after: L63, L64
-- files: src/step-check-cost.ts, src/stepcheck.ts, docs/numbers.md, test/stepcheck.test.ts
+- files: src/step-check-cost.ts, src/stepcheck.ts, test/stepcheck.test.ts
 
 ### L69 Lineclear's own names inside
 Result: Variables, classes and file names inside the code say Lineclear, not Lineclear.
@@ -5055,7 +5055,7 @@ Result: `docs/numbers.md` says how many lines the old UI's removal took out.
   - `docs/design.md` marks the old UI as gone, and the line "It goes only once each view still needed lives in Lineclear's UI" is rewritten in the past tense.
 - parts: server, ui, measure
 - locks: design-doc
-- files: docs/numbers.md, docs/design.md
+- files: docs/design.md
 - after: L166
 
 ### L71 What no one uses is gone
@@ -5121,7 +5121,7 @@ Result: `src/` has one `git` runner, one `quote`, one open-fix test and one set 
 - parts: core, install, rules, measure, checks, dispatcher, gates, inbox, planner, ui
 - locks: none
 - after: none
-- files: docs/ROADMAP.md, docs/architecture.md, docs/parts/checks.md, docs/parts/core.md, docs/parts/measure.md, src/api-latency.ts, src/asks.ts, src/autoplan.ts, src/backup.ts, src/brief.ts, src/check-runs.ts, src/cli.ts, src/compaction-gauge.ts, src/demo.ts, src/dispatcher.ts, src/full.ts, src/git.ts, src/goals.ts, src/health-numbers.ts, src/home-data.ts, src/home-spend.ts, src/inbox-answer.ts, src/inbox.ts, src/leftovers.ts, src/limits.ts, src/machines.ts, src/main-branch.ts, src/measure-main.ts, src/measure-refiles.ts, src/measure.ts, src/outside-fix.ts, src/parts-check.ts, src/paths.ts, src/plan.ts, src/promote.ts, src/release.ts, src/remotes.ts, src/roadmap-cli.ts, src/roadmap-source.ts, src/secrets.ts, src/self-fix.ts, src/stall-class.ts, src/stalls.ts, src/start-limit.ts, src/stepcheck.ts, src/store-copies.ts, src/task-changes.ts, src/task-detail.ts, src/time.ts, src/tmpdirs.ts, src/track.ts, src/try-instance.ts, src/wait-goal.ts, src/waits.ts, src/waste-facts.ts, src/waste-watch.ts
+- files: docs/ROADMAP.md, docs/architecture.md, docs/parts/checks.md, docs/parts/core.md, docs/parts/measure.md, src/asks.ts, src/autoplan.ts, src/backup.ts, src/brief.ts, src/check-runs.ts, src/cli.ts, src/demo.ts, src/dispatcher.ts, src/full.ts, src/git.ts, src/home-data.ts, src/home-spend.ts, src/inbox-answer.ts, src/inbox.ts, src/leftovers.ts, src/limits.ts, src/machines.ts, src/main-branch.ts, src/measure.ts, src/outside-fix.ts, src/parts-check.ts, src/paths.ts, src/plan.ts, src/promote.ts, src/release.ts, src/remotes.ts, src/roadmap-cli.ts, src/roadmap-source.ts, src/secrets.ts, src/self-fix.ts, src/stall-class.ts, src/stalls.ts, src/start-limit.ts, src/stepcheck.ts, src/store-copies.ts, src/task-changes.ts, src/task-detail.ts, src/time.ts, src/tmpdirs.ts, src/track.ts, src/try-instance.ts, src/waits.ts
 
 ### L169 Event stream: read or gone
 Result: `events.jsonl` and `/api/events` are either read by a view of Lineclear's UI or removed with `lineclear event`.
@@ -5165,7 +5165,7 @@ Result: One function answers how many times busier than its cores the machine is
 - parts: gates (health), ui, install
 - locks: none
 - after: none
-- files: scripts/budget.ts, scripts/canary.ts, scripts/check-speed.ts, test/budget.test.ts, test/canary.test.ts, docs/parts/gates.md
+- files: scripts/canary.ts, scripts/check-speed.ts, test/canary.test.ts, docs/parts/gates.md
 
 ### L181 One call path in the pages
 Result: Finding repos and adding a project go through the same call helper as every other page write.
@@ -5235,7 +5235,7 @@ Result: You see one part's steps and its health on the roadmap at a glance.
     no extra text; the UI bar holds for it.
 - parts: ui
 - after: L101
-- files: src/roadmap-view.ts, ui/web/, ui/test/, docs/readme/, scripts/budgets.json
+- files: src/roadmap-view.ts, ui/web/, ui/test/, docs/readme/
 
 ### L103 Parts for other projects
 Result: Another project gets its parts and their pages proposed from its code.
@@ -5257,7 +5257,7 @@ Result: No part with an interface is without its contract test, with no way out.
     test shows it.
 - parts: rules, dispatcher, install, pi, ui, gates
 - after: L100
-- files: src/parts-check.ts, test/contracts/rules.test.ts, test/contracts/dispatcher.test.ts, test/contracts/install.test.ts, test/contracts/pi.test.ts, test/contracts/ui.test.ts, test/parts.test.ts, docs/parts/rules.md, docs/parts/dispatcher.md, docs/parts/install.md, docs/parts/pi.md, docs/parts/ui.md
+- files: src/parts-check.ts, test/contracts/install.test.ts, test/parts.test.ts, docs/parts/rules.md, docs/parts/dispatcher.md, docs/parts/install.md, docs/parts/pi.md, docs/parts/ui.md
 
 ### L108 One secrets store, with codes
 Result: Secrets live in one store, and an agent gets a login code from it.
@@ -5352,7 +5352,7 @@ Result: A page of numbers shows whether merges per hour rose and the longest wai
 - parts: measure
 - locks: none
 - after: L120, L121, L122, L123, L126
-- files: docs/numbers.md
+- files: 
 
 ### L114 A test track runs the chain
 Result: A fixture project runs the whole chain every night and after each update, and a broken update is rolled back.
@@ -5379,7 +5379,7 @@ Result: `lineclear measure` shows whether Lineclear stays on the rails, and a st
     that makes one of them worse.
 - parts: measure
 - after: L112
-- files: src/measure.ts, src/health-numbers.ts, docs/numbers.md, test/measure.test.ts
+- files: src/measure.ts
 
 ### L116 It scales
 Result: Ten projects and 1000 tasks keep the loop and Home fast, and no data file grows without bound.
@@ -5470,7 +5470,7 @@ Result: `docs/numbers.md` shows the three goals met on the last 3 days of work, 
 - parts: measure
 - locks: measure
 - after: L245
-- files: docs/numbers.md
+- files: 
 
 ### L172 A power cut leaves work intact
 Result: A pulled plug on a machine with lingering on ends no work for good: tasks resume and no half-written file is read.
@@ -5481,7 +5481,7 @@ Result: A pulled plug on a machine with lingering on ends no work for good: task
 - parts: rules, measure
 - locks: none
 - after: none
-- files: docs/numbers.md
+- files: docs/stalls.md
 
 ### L305 Measure shows dev cost
 Result: `lineclear measure` shows per day the load factor of checks, the unnamed failures and the starts per merged step, each with a goal.
@@ -5494,7 +5494,7 @@ Result: `lineclear measure` shows per day the load factor of checks, the unnamed
 - parts: measure, core
 - locks: measure
 - after: L300, L301, L302, L303, L304
-- files: src/measure.ts, src/measure-main.ts, docs/idea.md, docs/numbers.md, test/measure.test.ts
+- files: src/measure.ts, docs/idea.md
 
 ### L409 Format test holds on load
 Result: The release-formats test "the stable build reads this tree's roadmap and store files" passes on a loaded machine.
@@ -5590,7 +5590,7 @@ Result: The test "every process, timer, store, loop and gate has a row" passes o
 - parts: measure (health)
 - locks: simplify-test
 - after: none
-- files: test/simplify.test.ts, scripts/simplify-count.ts
+- files: 
 
 ### L411 A quiet task's cause is fixed
 Result: A task that goes quiet gets its cause named and fixed, so the same task is not called "no sign of life" again within a day.
@@ -5639,4 +5639,4 @@ Result: The chat's composer lives in its own kit file, and `ui/kit/chat.tsx` has
 - parts: ui (health)
 - locks: kit-chat
 - after: none
-- files: ui/kit/chat.tsx, ui/kit/composer.tsx, ui/kit/index.ts
+- files: ui/kit/chat.tsx, ui/kit/index.ts

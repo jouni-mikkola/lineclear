@@ -24,8 +24,6 @@ export interface Task extends TrainFacts, RowFacts {
   result?: string;
   /** The model of the role at work on it now. */
   model?: string;
-  /** Why that model differs from the project's list: "set by coordinator: ...". */
-  modelNote?: string;
   /** Since when it is at its stage (ms). */
   since?: number;
   /** No sign of life from it for a while. */

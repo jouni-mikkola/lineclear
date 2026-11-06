@@ -2,25 +2,12 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { cutStats, logFile } from "../pi/parts/cut-output.ts";
 import { writeAtomic } from "../pi/atomic.ts";
-import { type Effect, APP, type Kit, kitDiff, kitMarkdown, kitOthers, readKit, wantedKit } from "./kit.ts";
+import { APP, type Kit, kitDiff, kitMarkdown, kitOthers, readKit, wantedKit } from "./kit.ts";
 import { readMachines } from "./machine-list.ts";
-import { measureMain } from "./measure-main.ts";
 import { remoteLineclearSync } from "./ssh.ts";
 
 type Env = Record<string, string | undefined>;
 type Out = (line: string) => void;
-
-/** Each part's measured effect: the pack's numbers from `lineclear measure`, or none when no project is named. */
-function effects(project: string | undefined, since: string, env: Env): Effect[] {
-  if (!project) return [];
-  const lines: string[] = [];
-  if (measureMain(["--json", "--since", since, project], (l) => lines.push(l), env) !== 0) return [];
-  try {
-    return JSON.parse(lines.join("\n")).parts ?? [];
-  } catch {
-    return [];
-  }
-}
 
 /** How the cut-output part's cuts were met: through the saved file as told, or by running the command again (the waste). */
 export function cutLine(env: Env): string {
@@ -87,9 +74,9 @@ export function kitMain(args: string[], out: Out, env: Env = process.env, app = 
   const rest = args.slice(1);
   const opts = writeOptions(rest);
   if (!opts) return fail(out);
-  const { project, since } = opts;
+  const { since } = opts;
   const machines = [{ name: "this machine", kit }, ...remoteKits(env).map((r) => ({ name: r.host, kit: r.kit }))];
-  const text = kitMarkdown(machines, wantedKit(app, env), effects(project, since, env), since, [cutLine(env)]);
+  const text = kitMarkdown(machines, wantedKit(app, env), [], since, [cutLine(env)]);
   writeAtomic(join(app, "docs", "kit.md"), text);
   out(`docs/kit.md written`);
   return 0;

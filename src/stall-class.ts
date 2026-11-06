@@ -366,7 +366,7 @@ export function rotateDecisions(file: string, now: Date): number {
 }
 
 /** The middle of `xs`, null for none. */
-export const median = (xs: number[]) => {
+const median = (xs: number[]) => {
   if (xs.length === 0) return null;
   const s = [...xs].sort((a, b) => a - b);
   const m = Math.floor(s.length / 2);

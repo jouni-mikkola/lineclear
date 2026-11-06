@@ -1,6 +1,5 @@
 import { type Account, readAccounts } from "./full.ts";
 import type { PiSpend } from "./home-data.ts";
-import { type ModelReason, modelReasons } from "./model-use.ts";
 import { type AskBefore, askBefore, listProjectNames, readSettings, type Role } from "./project.ts";
 import { secretNames } from "./secrets.ts";
 import type { MachineView } from "./machines.ts";
@@ -15,8 +14,6 @@ export interface ProjectSettings {
   models: Record<Role, string[]>;
   secrets: string[];
   askBefore: AskBefore;
-  /** Why each model of each list is or is not in use now, in the list's order. */
-  reasons: Record<Role, ModelReason[]>;
 }
 
 export interface SettingsData {
@@ -70,7 +67,6 @@ export function projectSettings(env: Env): ProjectSettings[] {
       models,
       secrets: secretNames(name, env),
       askBefore: askBefore(s),
-      reasons: { worker: modelReasons(models.worker, env), reviewer: modelReasons(models.reviewer, env), planner: modelReasons(models.planner, env) },
     });
   }
   return out;

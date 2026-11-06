@@ -5,8 +5,7 @@ import { DEFAULT_ROUNDS, fill, stepBrief, template } from "./brief.ts";
 import { CHECKS_PER_TICK, type ProveTools, missingItem, needsProof, testOf } from "./doneproof.ts";
 import { type FixSpec, fileFix } from "./self-fix.ts";
 import { ownerStepItem, ownerStepsDone } from "./owner-steps.ts";
-import { overStartLimit, recordStepStart, startsInDay } from "./start-limit.ts";
-import { LIMITS } from "./waste.ts";
+import { overStartLimit, recordStepStart, START_LIMIT, startsInDay } from "./start-limit.ts";
 import { type FaultFix, holdForFault } from "./system-fault.ts";
 import { placeHeld } from "./held.ts";
 import { heavyTasks } from "./heavy-run.ts";
@@ -405,7 +404,7 @@ function whyStale(s: Starting, step: Step): string | undefined {
 function startStep(s: Starting, step: Step): boolean {
   const { t, cap, limit } = s;
   const { settings, world, state, dryRun, note, env } = t;
-  if (overStartLimit({ ...t, space: settings.space }, step, LIMITS.starts.limit)) return false;
+  if (overStartLimit({ ...t, space: settings.space }, step, START_LIMIT)) return false;
   // A routine step (docs, tests, baselines) starts on the cheapest worker model that has room; the stall ladder moves it back after two failed checks.
   const cheap = routineWorker(step, s.picked().workers, env, (m) => availability(m, env, world.now()) === "ok");
   const worker = cheap ?? (s.picked().worker as string);
@@ -459,7 +458,7 @@ function startStep(s: Starting, step: Step): boolean {
 function refileReopened(s: Starting, step: Step): boolean {
   const { t } = s;
   const { settings, world, dryRun, note } = t;
-  if (overStartLimit({ ...t, space: settings.space }, step, LIMITS.starts.limit)) return true;
+  if (overStartLimit({ ...t, space: settings.space }, step, START_LIMIT)) return true;
   const line = (step.fields["done when"]?.more ?? []).find((l) => /^\s+- Reopened: /.test(l));
   const since = line === undefined ? undefined : world.commitsSince?.(settings.repo, line);
   if (line !== undefined && since === undefined) {
@@ -495,8 +494,7 @@ function restartUnproven(s: Starting, step: Step, item: string): boolean {
   if (typeof main !== "string" && world.proofs?.(settings.repo)[step.id]?.head !== main.head) return false;
   const list = world.tasks(settings.space);
   const n = startsInDay(state, step.id, world.now(), typeof list === "string" ? [] : list);
-  // The cap is LIMITS.starts.limit from waste.ts: the waste watch alarms above the same number.
-  if (n < LIMITS.starts.limit) return true;
+  if (n < START_LIMIT) return true;
   if (dryRun) return (note("start", `would file one Fix task: ${step.id} is still unproven after ${n} starts in 24 hours`, step.id), false);
   const brief = `Step ${step.id} ${step.title} is merged, but this item of its done-when is not proven: ${item}
 

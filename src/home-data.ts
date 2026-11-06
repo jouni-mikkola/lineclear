@@ -7,7 +7,6 @@ import { existsSync, readdirSync } from "node:fs";
 import { hostname } from "node:os";
 import { join } from "node:path";
 import { herdrLines } from "./herdr-health.ts";
-import { type CompactionGauge, compactionGauge } from "./compaction-gauge.ts";
 import { type Blocker, countSteps, lineOf, readPlan, type RoadmapLine, type Where } from "./progress.ts";
 import { roadmapSource, lineclearAllTasks } from "./roadmap-source.ts";
 import { titledByStep } from "./task-steps.ts";
@@ -18,9 +17,7 @@ import { type Export, remoteExports } from "./remotes.ts";
 import { readWaits, type Wait, type WaitGroup, waitsForOwner } from "./waits.ts";
 import { type AccountUse, usageLimits } from "./limits.ts";
 import { type Move, readAccounts, readMoves } from "./full.ts";
-import { modelNote } from "./model-use.ts";
 import { listProjectNames, readSettings, type Role } from "./project.ts";
-import { noteTokens, wasteLines } from "./waste-watch.ts";
 import { mainRefs } from "./main-branch.ts";
 import { rowFacts } from "./task-detail.ts";
 import { type MonthSpend, type PiSpend, monthSpend, piSpendAndUsage } from "./home-spend.ts";
@@ -53,10 +50,6 @@ export interface HomeData {
   dispatcher?: { writing: boolean };
   /** Stable and next, once the rule loop has looked at main (`lineclear release`). */
   release?: ReleaseState;
-  /** Compactions, their fallbacks and tokens per merged task, of the last 14 days. */
-  compaction?: CompactionGauge;
-  /** The waste watch's standing alarms, each a line: "Waste: <what>, <number>". */
-  waste?: string[];
   /** A failing herdr.service with its failure count (see herdr-health.ts), as a line. */
   herdr?: string[];
   /** What `lineclear doctor` finds wrong on this machine, each as "problem: fix command". */
@@ -79,8 +72,6 @@ export interface HomeTask {
   result?: string;
   /** The model of the role at work now: the worker's, or the reviewer's in review. */
   model?: string;
-  /** Why that model is not in the project's list for its role: "set by coordinator: ...". Missing when it is, or no list says. */
-  modelNote?: string;
   /** Since when the task is at its stage (ms). */
   since: number;
   /** The other machine the task runs on, when it is not this one. */
@@ -267,14 +258,11 @@ function machineSpaces(dir: string, env: Env, now: number): HomeProject[] {
         .map((f) => readJsonKept<object>(join(log, f)))
     : [];
   const cards = lastCards(chats);
-  // each project's model lists, by the space it points at
-  const lists = new Map<string, Record<Role, string[]>>();
   const owners = new Map<string, { project: string; paused: boolean }[]>();
   const strays: Raw[] = [];
   const unreadable: string[] = [];
   for (const n of listProjectNames(env as NodeJS.ProcessEnv)) {
     const p = readSettings(n, env as NodeJS.ProcessEnv);
-    if (typeof p !== "string" && p.models) lists.set(p.space, p.models);
     if (typeof p === "string") {
       unreadable.push(n);
       continue;
@@ -285,7 +273,7 @@ function machineSpaces(dir: string, env: Env, now: number): HomeProject[] {
   const every = spaces.length ? lineclearAllTasks(env) : [];
   // tasks the server retired after 90 days are counted in archive/counts.json, by space key
   const retired = readJsonKept<Record<string, { merged: number; closed: number }>>(join(dir, "archive", "counts.json")) ?? {};
-  const ctx: SpaceContext = { tasks, red, names, machine, waits, honest, cards, lists, every, retired, env, now };
+  const ctx: SpaceContext = { tasks, red, names, machine, waits, honest, cards, every, retired, env, now };
   // one line per project of `lineclear project list`, whatever the server holds: a space two projects share shows twice, a missing one empty
   const lines = [...spaces, ...strays].flatMap((s) => (owners.get(s.name) ?? [undefined]).map((owner) => spaceView(s, ctx, owner)));
   // a project whose settings do not read is still in `project list`: it shows as an empty line
@@ -300,7 +288,6 @@ interface SpaceContext {
   waits: Wait[];
   honest: Map<string, string>;
   cards: ReturnType<typeof lastCards>;
-  lists: Map<string, Record<Role, string[]>>;
   every: ReturnType<typeof lineclearAllTasks>;
   retired: Record<string, { merged: number; closed: number }>;
   env: Env;
@@ -357,8 +344,6 @@ function localRow(x: { t: Raw; state: TaskState }, space: Raw, roadmap: Roadmap,
   const stage = taskStage(t, state, line);
   const lane = state === "done" ? undefined : laneNote(t, now);
   const model = (stage === "review" ? t.reviewer?.model : t.agent?.model) as unknown;
-  const list = ctx.lists.get(space.name)?.[stage === "review" ? "reviewer" : "worker"];
-  const note = typeof model === "string" && model && list?.length ? modelNote(model, list) : undefined;
   // a machine wait (a task, a check slot, a time, a failed start) is said as it is, never as the agent's last line to you
   const text = state === "need" ? (ctx.honest.get(t.id) ?? cards.get(t.id)?.text) : undefined;
   return {
@@ -369,7 +354,6 @@ function localRow(x: { t: Raw; state: TaskState }, space: Raw, roadmap: Roadmap,
     ...(step ? { step } : {}),
     ...(result ? { result } : {}),
     ...(typeof model === "string" && stage !== "queued" ? { model } : {}),
-    ...(note && stage !== "queued" ? { modelNote: note } : {}),
     since: stageSince(t, stage, now),
     ...(state !== "done" ? rowFacts(t, cards.get(t.id), stage !== "queued", env, now) : {}),
     ...(stage === "work" && typeof t.report?.progress === "number" ? { progress: Math.max(0, Math.min(1, t.report.progress / 100)) } : {}),
@@ -435,9 +419,8 @@ function spaceView(s: Raw, ctx: SpaceContext, owner?: { project: string; paused:
   } satisfies HomeProject;
 }
 
-/** Home's Usage, Spend and Compaction cards: spend per day, each account's limits, the last moves and compactions. */
-export const usageData = (pi: PiSpend, env: Env, now: number): Pick<HomeData, "usage" | "spend" | "moves" | "month" | "compaction"> => ({
-  compaction: compactionGauge(pi.tokens ?? 0, env, now),
+/** Home's Usage and Spend cards: spend per day, each account's limits and the last moves. */
+export const usageData = (pi: PiSpend, env: Env, now: number): Pick<HomeData, "usage" | "spend" | "moves" | "month"> => ({
   spend: pi.spend,
   month: monthSpend(pi, readAccounts(env as NodeJS.ProcessEnv), now),
   usage: usageLimits(pi.active ?? [], env as NodeJS.ProcessEnv, now),
@@ -481,14 +464,12 @@ export function projectsData(env: Env = process.env, now = Date.now(), remote: E
 export function homeData(env: Env = process.env, now = Date.now(), remote?: Export[]): HomeData {
   const all = projectsData(env, now, remote);
   const usage = usageData(piSpendAndUsage(env, now), env, now);
-  noteTokens(env, usage.compaction?.tokensPerTask ?? null);
   return {
     at: now,
     host: hostname(),
     projects: withProject(all),
     loose: looseTasks(all),
     ...usage,
-    waste: wasteLines(env, now),
     herdr: herdrLines(env),
   };
 }

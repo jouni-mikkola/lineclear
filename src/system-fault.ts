@@ -1,6 +1,5 @@
 import type { Step, Task } from "./roadmap.ts";
-import { startsInDay } from "./start-limit.ts";
-import { LIMITS } from "./waste.ts";
+import { START_LIMIT, startsInDay } from "./start-limit.ts";
 import type { State } from "./rules.ts";
 import { clearWait, writeWait } from "./waits.ts";
 import type { World } from "./world.ts";
@@ -122,7 +121,7 @@ export function holdForFault(t: Hold, step: Step, workerRoom: boolean, file: (fi
   const list = t.world.tasks(t.settings.space);
   if (typeof list === "string") return false;
   const n = startsInDay(t.state, step.id, t.world.now(), list);
-  const repeat = n >= LIMITS.starts.limit ? repeatedFault(t.world, step, list, t.settings.check) : undefined;
+  const repeat = n >= START_LIMIT ? repeatedFault(t.world, step, list, t.settings.check) : undefined;
   if (repeat) {
     if (t.dryRun) t.note("start", `would file one Fix task: ${repeat.why}`, step.id);
     else file(repeat);

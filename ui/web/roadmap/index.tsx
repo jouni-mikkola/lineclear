@@ -4,10 +4,8 @@ import type { RoadmapData, RoadmapStep } from "../../../src/roadmap-view.ts";
 import type { StepRecord } from "../../../src/step-page.ts";
 import type { PlanCard } from "../../../src/web.ts";
 import { BackLink, flip, layoutOf, Part, play, type Spot, stop } from "../../kit/index.ts";
-import { roadmapPath } from "../routes.ts";
 import type { Load } from "../data.ts";
 import { isOpen, Label, needsYou, StepPic, stateWord } from "./common.tsx";
-import { GoalsPage } from "./goals.tsx";
 import { PhaseLine } from "./line.tsx";
 import { LineOfRoadmap, RunSwitch } from "./summary.tsx";
 import { SinceLook } from "./since-look.tsx";
@@ -44,15 +42,15 @@ export function Roadmap({
   }
   return (
     <>
-      <BackLink href={step === TRACK && load.status === "ok" ? roadmapPath(load.data.project) : "/"}>{step === TRACK ? "Roadmap" : "Home"}</BackLink>
+      <BackLink href="/">Home</BackLink>
       <div className="mt-6">
-        <Page load={load} plan={plan} planNote={planNote} goals={step !== TRACK} />
+        <Page load={load} plan={plan} planNote={planNote} />
       </div>
     </>
   );
 }
 
-function Page({ load, plan, planNote, goals }: { load: Load<RoadmapData>; plan?: PlanCard; planNote?: string; goals: boolean }) {
+function Page({ load, plan, planNote }: { load: Load<RoadmapData>; plan?: PlanCard; planNote?: string }) {
   if (load.status === "error") return <Part main state="error" label="The roadmap" empty={{ text: "" }} error={load.error} onRetry={load.retry} />;
   const d = load.status === "ok" ? load.data : undefined;
   return (
@@ -70,8 +68,7 @@ function Page({ load, plan, planNote, goals }: { load: Load<RoadmapData>; plan?:
         ),
       }}
     >
-      {d && goals && <GoalsPage d={d} />}
-      {d && !goals && (
+      {d && (
         <Filled
           key={d.project}
           d={d}

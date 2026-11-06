@@ -191,11 +191,6 @@ export function TrainCard({ p, w, onClose }: { p: Placed; w: number; onClose: ()
         </span>
       </p>
       {t.model && stage !== "queued" && stage !== "done" && <p className="mt-1 truncate font-mono text-xs text-fg3">{t.model}</p>}
-      {t.model && t.modelNote && stage !== "queued" && stage !== "done" && (
-        <p className="mt-0.5 text-xs text-caution" data-model-note>
-          {t.modelNote}
-        </p>
-      )}
       {load && (
         <p className="mt-0.5 text-xs text-fg3" data-load-words>
           Context {kilo(load.used)} of {kilo(load.limit)}

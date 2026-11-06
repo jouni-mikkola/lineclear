@@ -66,7 +66,6 @@ export function Home({
         {(
           [
             ["herdr", d?.herdr],
-            ["waste", d?.waste],
             ["doctor", d?.doctor],
           ] as const
         ).map(

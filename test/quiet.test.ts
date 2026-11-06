@@ -2,7 +2,6 @@ import { afterAll, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { cpus } from "node:os";
 import { join } from "node:path";
-import { measure } from "../src/measure.ts";
 import { turnTimes } from "../src/session-text.ts";
 import { ownMark, tick } from "../src/rules.ts";
 import { availability } from "../src/stalls.ts";
@@ -78,11 +77,4 @@ test("measure counts the model turns that no step and no owner message started",
     user("[lineclear] You may be stuck", 8000),
   ].join("\n");
   expect(turnTimes(session)).toEqual([6000, 7000, 8000]);
-});
-
-test("the day table carries the count, 0 on a quiet day", () => {
-  const day = Date.parse("2026-06-01T10:00:00Z");
-  const base = { asks: [], steps: [], tasks: [], usageOf: () => undefined, priceOf: () => undefined };
-  expect(measure({ ...base, turns: [day, day + 1] }, "2026-06-01").days[0]?.turns).toBe(2);
-  expect(measure(base, "2026-06-01").days[0]?.turns).toBe(0);
 });

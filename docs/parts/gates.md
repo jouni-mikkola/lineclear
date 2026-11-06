@@ -23,7 +23,7 @@ names:
 
 ## Files
 
-- code: `scripts/gates/`, `scripts/personal-scan.ts`, `scripts/personal-words.ts`, `scripts/public-tree.ts`, `scripts/check.ts`, `scripts/check-speed.ts`, `scripts/result-cache.ts`, `scripts/dash-check.ts`, `scripts/words-check.ts`, `src/dashes.ts`, `src/parts.ts`, `src/parts-check.ts`, `scripts/coverage.ts`, `scripts/under-load.ts`, `scripts/changed.ts`, `scripts/load-map.ts`, `test/load-map-preload.ts`, `scripts/flaky.ts`, `scripts/fast-gates.ts`, `scripts/ui-changed.ts`, `src/heavy-run.ts`, `scripts/heavy.ts`
+- code: `scripts/gates/`, `scripts/personal-scan.ts`, `scripts/personal-words.ts`, `scripts/public-tree.ts`, `scripts/check.ts`, `scripts/check-speed.ts`, `scripts/result-cache.ts`, `scripts/dash-check.ts`, `scripts/words-check.ts`, `src/dashes.ts`, `src/parts.ts`, `src/parts-check.ts`, `scripts/coverage.ts`, `scripts/changed.ts`, `scripts/load-map.ts`, `test/load-map-preload.ts`, `scripts/flaky.ts`, `scripts/fast-gates.ts`, `scripts/ui-changed.ts`, `src/heavy-run.ts`, `scripts/heavy.ts`
 - config: `biome.json`, `knip.jsonc`
 - tests: `test/gates.test.ts`, `test/result-cache.test.ts`, `test/personal-scan.test.ts`, `test/prose.test.ts`, `test/dashes.test.ts`, `test/one-word.test.ts`, `test/parts.test.ts`, `test/coverage-floor.test.ts`, `test/bin-lineclear.test.ts`, `test/changed.test.ts`, `test/flaky.test.ts`, `test/check-speed.test.ts`, `test/check-steps.test.ts`, `test/heavy-run.test.ts`
 

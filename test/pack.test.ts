@@ -5,7 +5,6 @@ import pack, { PACK_ENTRY, parts, switchesFile } from "../pi/pack.ts";
 import { packMain } from "../src/pack.ts";
 import { applyCompaction, reserveFor, rolePoint, unknownWindows } from "../pi/compaction.ts";
 import { doctorChecks } from "../src/doctor.ts";
-import { measure } from "../src/measure.ts";
 import { sessionParts } from "../src/session-text.ts";
 import { extensionFile, pathsFor } from "../src/paths.ts";
 import { tmp } from "./helpers.ts";
@@ -159,29 +158,10 @@ test("the shipped parts hold no account, provider or owner rule", () => {
   }
 });
 
-test("measure splits the cost per step by part", () => {
+test("a session lists the parts it had on", () => {
   const line = (on: string[]) => JSON.stringify({ type: "custom", customType: "lineclear-pack", data: { on } });
   expect(sessionParts(`${line(["a"])}\n${line(["a", "b"])}\n{"half`)).toEqual(["a", "b"]);
   expect(sessionParts("")).toEqual([]);
-  const at = (iso: string) => Date.parse(`${iso}Z`);
-  const task = (id: string, worktree: string) => ({ id, title: `${id} x`, start: at("2026-01-01T09:00:00"), worktree });
-  const tasks = [task("S1", "w1"), task("S2", "w2")];
-  const on: Record<string, string[]> = { w1: ["a"], w2: [] };
-  const n = measure(
-    {
-      asks: [],
-      steps: [
-        { id: "S1", after: ["none"], merged: at("2026-01-01T10:00:00") },
-        { id: "S2", after: ["none"], merged: at("2026-01-01T11:00:00") },
-      ],
-      tasks,
-      usageOf: (t) => [{ model: "m", provider: "p", input: t.worktree === "w1" ? 1_000_000 : 3_000_000, output: 0, cacheRead: 0, cacheWrite: 0 }],
-      priceOf: () => ({ input: 1, output: 0, cacheRead: 0, cacheWrite: 0 }),
-      partsOf: (t) => on[t.worktree] ?? [],
-    },
-    "2026-01-01",
-  );
-  expect(n.parts).toEqual([{ part: "a", on: { perStep: 1, tokens: 1_000_000, steps: 1 }, off: { perStep: 3, tokens: 3_000_000, steps: 1 } }]);
 });
 
 test("compaction point: a role has its own, a pack.json value and the switch change it", () => {

@@ -6,14 +6,13 @@ import type { RoadmapData } from "../../src/roadmap-view.ts";
 import type { StepRecord } from "../../src/step-page.ts";
 import { browserSamples } from "./browser-samples.ts";
 import type { AppliedChange, PlanCard } from "../../src/web.ts";
-import type { CompactionGauge } from "../../src/compaction-gauge.ts";
 import { ApiError, forget, startRead } from "./health.ts";
 import { noteRevision, useStreamed, watch } from "./live.ts";
 import { emptyRoadmap, roadmapSample, stepSample } from "./roadmap-samples.ts";
 import { lazySamples } from "./lazy-samples.ts";
 import { emptySettings } from "./settings-empty.ts";
 import type { SettingsData } from "./settings-empty.ts";
-import { CHAT_STATES, compaction, detected, inbox, moves, type PageState, projects, sampleRepos, spend, STATES, usage } from "./samples.ts";
+import { CHAT_STATES, detected, inbox, moves, type PageState, projects, sampleRepos, spend, STATES, usage } from "./samples.ts";
 
 const SAMPLE_MONTH: MonthSpend = {
   month: "2026-01",
@@ -46,10 +45,6 @@ export interface HomeData {
   dispatcher?: { writing: boolean };
   /** How many requests the Planner is laying steps for now. */
   planning?: number;
-  /** Compactions, their fallbacks and tokens per merged task, of the last 14 days. */
-  compaction?: CompactionGauge;
-  /** The waste watch's standing alarms, one line each. */
-  waste?: string[];
   herdr?: string[];
   /** What `lineclear doctor` finds wrong, each with its fix command. */
   doctor?: string[];
@@ -158,10 +153,8 @@ export const useHome = (state: PageState | undefined) =>
       usage: usage(s),
       month: SAMPLE_MONTH,
       moves,
-      compaction: compaction(s),
-      ...(s === "many" ? { waste: ["Waste: step started again and again, 146 starts of a T2"] } : {}),
     }),
-    { projects: [], spend: [], usage: [], compaction: { compactions: 0, fellBack: 0, tokensPerTask: null, tasks: 0 } },
+    { projects: [], spend: [], usage: [] },
     true,
     (d) => hasLists("projects")(d) && (d as HomeData).projects.every((p) => typeof p?.name === "string" && Array.isArray(p.tasks)),
   );

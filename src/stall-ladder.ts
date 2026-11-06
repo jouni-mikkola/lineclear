@@ -10,7 +10,6 @@ import { fileFixes } from "./self-fix.ts";
 import { decisionsPath } from "../pi/config.ts";
 import { CLASS_INFO, type Observation, type StallClass, cutDecisionsDaily, taskObservations, watchStalls } from "./stall-class.ts";
 import { readWaits } from "./waits.ts";
-import { watchWaste } from "./waste-watch.ts";
 
 /** What a project's tick learned that its stall detectors read. */
 export interface TickFacts {
@@ -135,7 +134,7 @@ function unanswered(starts: State["starts"] = {}): Record<string, { since: numbe
 
 /** After every project's tick: the fixes to file, then once a day the archive. The new decisions. */
 export function afterTick(world: World, all: Decision[], env = process.env): Decision[] {
-  const filed = [...fileFixes(world, decisionsPath(env), all, env), ...watchWaste(world, env)];
+  const filed = fileFixes(world, decisionsPath(env), all, env);
   fileOutsideFixes(world, env);
   if (filed.length > 0) appendFileSync(decisionsPath(env), `${filed.map((d) => JSON.stringify(d)).join("\n")}\n`);
   cutDecisionsDaily(decisionsPath(env), world.now());

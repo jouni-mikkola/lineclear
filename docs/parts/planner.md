@@ -17,7 +17,6 @@ The roadmap and its plans: the format of `docs/ROADMAP.md`, its check, which ste
 `docs/ROADMAP.md`'s format, `lineclear roadmap` and `lineclear plan`, and these names:
 
 - `src/roadmap.ts`: `Step`, `checkRoadmap`, `closedSteps`, `Task`, `doneIds`, `parseRoadmap`, `State`, `stepStatuses`, `resultOf`, `resultFlag`, `fitTitle`, `stepOfTask`, `isFrozen`
-- `src/goals.ts`: `goalsOf`, `Goal`, `Hold`
 - `src/plan.ts`: `planMain`
 - `src/roadmap-cli.ts`: `roadmapMain` (its tasks come from the Lineclear server)
 - `src/task-steps.ts`: `statusesOf`, `taskOfStep`, `titledByStep`
@@ -32,9 +31,9 @@ The roadmap and its plans: the format of `docs/ROADMAP.md`, its check, which ste
 
 ## Files
 
-- code: `src/plan.ts`, `src/autoplan.ts`, `src/roadmap.ts`, `src/roadmap-cli.ts`, `src/task-steps.ts`, `src/roadmap-import.ts`, `src/brief.ts`, `src/progress.ts`, `src/goals.ts`, `src/direction.ts`, `src/stepcheck.ts`, `src/doneproof.ts`, `src/doneproof-run.ts`, `src/ask-model.ts`, `src/reader-ask.ts`, `scripts/direction-check.ts`, `scripts/scales-check.ts`, `src/plan-brief.ts`
+- code: `src/plan.ts`, `src/autoplan.ts`, `src/roadmap.ts`, `src/roadmap-cli.ts`, `src/task-steps.ts`, `src/roadmap-import.ts`, `src/brief.ts`, `src/progress.ts`, `src/direction.ts`, `src/stepcheck.ts`, `src/doneproof.ts`, `src/doneproof-run.ts`, `src/ask-model.ts`, `src/reader-ask.ts`, `scripts/direction-check.ts`, `scripts/scales-check.ts`, `src/plan-brief.ts`
 - words: `templates/plan.md`, `docs/ROADMAP.md`, `docs/import.md`, `templates/direction.md`
-- tests: `test/plan.test.ts`, `test/autoplan.test.ts`, `test/autoplan-apply.test.ts`, `test/roadmap.test.ts`, `test/frozen-steps.test.ts`, `test/reopened.test.ts`, `test/goals.test.ts`, `test/roadmap-import.test.ts`, `test/briefs.test.ts`, `test/direction.test.ts`, `test/stepcheck.test.ts`, `test/stepcheck-pi.test.ts`, `test/doneproof.test.ts`
+- tests: `test/plan.test.ts`, `test/autoplan.test.ts`, `test/autoplan-apply.test.ts`, `test/roadmap.test.ts`, `test/frozen-steps.test.ts`, `test/reopened.test.ts`, `test/roadmap-import.test.ts`, `test/briefs.test.ts`, `test/direction.test.ts`, `test/stepcheck.test.ts`, `test/stepcheck-pi.test.ts`, `test/doneproof.test.ts`
 
 ## Tests
 

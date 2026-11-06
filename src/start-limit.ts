@@ -4,6 +4,9 @@ import type { Step, Task } from "./roadmap.ts";
 import type { Decision, State, World } from "./rules.ts";
 import { DAY } from "./time.ts";
 
+/** A step started this many times in 24 hours is not started again. */
+export const START_LIMIT = 3;
+
 /** What the limit needs of a tick. */
 interface Ask {
   name: string;
