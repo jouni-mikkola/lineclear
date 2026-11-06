@@ -21,10 +21,10 @@ export class EngineLand extends EngineHandoff {
   protected async nudgeToMerge(t: TaskRec, n: number, c: GH.PrChecks) {
     const key = this.key(t)
     if (!t.landing || t.landing.nudged || (c.state !== 'pass' && c.state !== 'none') || this.agents.background(key)) return
-    // its process ended at ready (landAtReady): the board merges, nothing is left to nudge
-    if (this.agents.record(key)?.finished) return
     t.landing.nudged = true
     this.save()
+    // its process ended at ready (landAtReady): the board merges, there is no agent to tell
+    if (this.agents.record(key)?.finished) return void this.merge(t.id).catch(() => undefined)
     const text = `GitHub's checks passed on PR #${n}: merge ${t.id} now (lineclear merge ${t.id}), as your brief says.`
     await this.agents.send(key, hidden(text, 'github', { task: t.id, pr: String(n) }), { ensure: () => this.launch(t) }).catch(() => undefined)
   }
@@ -36,7 +36,7 @@ export class EngineLand extends EngineHandoff {
    */
   landAtReady(id: string): boolean {
     const t = this.req(id)
-    if (this.settings.ways(this.proj(t).name).merge === 'ask me first') return false
+    if (t.askFirst || this.settings.ways(this.proj(t).name).merge === 'ask me first') return false
     void this.endAndMerge(t).catch(() => undefined)
     return true
   }

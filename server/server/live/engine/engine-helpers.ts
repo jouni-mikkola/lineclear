@@ -102,6 +102,8 @@ export interface TaskRec {
   /** lineclear merge waits for GitHub's checks, as its brief's Settings block said when it was added (Settings, or
    *  task add --set); none: a task from before, which follows Settings as they are now */
   waitChecks?: boolean
+  /** its brief said to wait for the human's yes before merging, whatever Settings say now */
+  askFirst?: boolean
   /** what its agent last said of its own progress (lineclear status): kept while it works or waits on you */
   report?: Reported
   /** its backup agent took over once its agent couldn't go on (retry.ts): from which CLI, to which, and why */

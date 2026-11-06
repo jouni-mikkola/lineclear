@@ -350,6 +350,7 @@ export class EngineLaunch extends EngineStalls {
       agent,
       reviewer,
       waitChecks: ways.waitChecks,
+      ...(ways.merge === 'ask me first' ? { askFirst: true } : {}),
     }
     if (after.length) t.after = after
     // one that starts work now waits for room; one for later only reads its brief, so it starts at once
