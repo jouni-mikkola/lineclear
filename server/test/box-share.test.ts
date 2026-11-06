@@ -32,8 +32,8 @@ test('a git write between two reads makes the second read ask again', () => {
 })
 
 test('a read that began while a write ran is not shared once the write is done', () => {
-  // the fake ssh counts the commits that landed; a commit lands only once the first read has asked, however busy the machine
-  const ssh = `case "$*" in *commit*) for i in $(seq 600); do [ -e $DIR/asked ] && break; sleep 0.1; done; echo c >> $DIR/commits;; *) touch $DIR/asked; wc -l < $DIR/commits 2>/dev/null || echo 0;; esac`
+  // the fake ssh counts the commits that landed; a commit lands only once the first read has counted and asked, however busy the machine
+  const ssh = `case "$*" in *commit*) for i in $(seq 600); do [ -e $DIR/asked ] && break; sleep 0.1; done; echo c >> $DIR/commits;; *) n=$(cat $DIR/commits 2>/dev/null | wc -l); touch $DIR/asked; echo $n;; esac`
   const body = `const w = git('/r', 'commit', '-m', 'x'); const during = (await git('/r', 'rev-parse', 'HEAD')).out; await w; console.log(during, (await git('/r', 'rev-parse', 'HEAD')).out)`
   expect(inWorker(body, ssh).out.replace(/\s+/g, ' ')).toBe('0 1')
 })
