@@ -168,7 +168,7 @@ export class LiveSourceViews extends LiveSourceState {
         ...this.engine.tasks
           .filter((t) => this.places.space(t.project))
           .map((t) => ({ ...this.engine.view(t), ...(this.browsers && !ended(t) ? { browser: t.stopped ? STOPPED : this.browsers.status() } : {}) })),
-        ...peers.flatMap((l) => l.snap?.tasks ?? []),
+        ...peers.flatMap((l) => this.peers!.tasksOf(l)),
       ],
       automations,
       artifacts: [...Object.values(this.artifacts.list).map((a) => this.artifactView(a)), ...peers.flatMap((l) => l.snap?.artifacts ?? [])].sort(

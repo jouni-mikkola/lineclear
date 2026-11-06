@@ -2,6 +2,7 @@ import { WorkerHealth } from './recovery.ts'
 import { mkdirSync, openSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Action, Chat, Snapshot } from '../../shared/types.ts'
+import { clock } from '../../shared/time.ts'
 import { Emitter } from '../source.ts'
 import { HOME, readJson, writeJson } from '../store.ts'
 import {
@@ -50,7 +51,6 @@ export class MachinesLinks extends Emitter<Events> {
     if (k.saved.enabled === false) return
     const l = this.links.get(k.saved.label) ?? this.link(k.saved)
     l.probe = k.probe
-    l.snap = k.snap
     for (const c of k.chats ?? []) l.chats.set(c.key, c)
     const was = readJson<{ port?: number; pid?: number; code?: string }>(join('machines', dirOf(k.saved.label), 'server.json'), {})
     const w = running(was.pid)
@@ -104,7 +104,7 @@ export class MachinesLinks extends Emitter<Events> {
       if (this.links.get(l.saved.label) !== l || l.saved.enabled === false) return
       const chats = l.watching.chats.map((k) => l.chats.get(k)).filter((c): c is Chat => !!c)
       try {
-        writeJson(join('machines', dirOf(l.rec.machine), 'last.json'), { saved: l.saved, probe: l.probe, snap: l.snap, chats } satisfies Kept)
+        writeJson(join('machines', dirOf(l.rec.machine), 'last.json'), { saved: l.saved, probe: l.probe, chats } satisfies Kept)
       } catch {
         /* a full disk: the next start shows it once it answers */
       }
@@ -435,6 +435,12 @@ export class MachinesLinks extends Emitter<Events> {
     ws.onclose = () => {
       if (l.ws === ws) l.ws = undefined
     }
+  }
+
+  /** a machine's tasks as it last showed them over the link; out of reach they stay, marked, and nothing is written */
+  tasksOf(l: Link) {
+    const tasks = l.snap?.tasks ?? []
+    return l.reachable || l.connecting ? tasks : tasks.map((t) => ({ ...t, unreachableSince: clock(l.down ?? l.rec.lastSeen) }))
   }
 
   /* ---------- who owns what ---------- */

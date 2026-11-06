@@ -18,7 +18,6 @@ export class Machines extends MachinesActions {
       for (const k of kept()) {
         const l = this.links.get(k.saved.label) ?? this.link(k.saved)
         l.probe = k.probe
-        l.snap = k.snap
         for (const c of k.chats ?? []) l.chats.set(c.key, c)
         this.pendingResume.set(k.saved.label, k)
       }

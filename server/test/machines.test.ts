@@ -466,8 +466,9 @@ describe('a restart of the main server (an update)', () => {
     )
     try {
       const l = m.list().find((x) => x.rec.machine === 'far')!
-      // at once: its places and the chats on screen, as before the restart, connecting rather than out of reach
-      expect(l.snap?.places.map((p) => p.id)).toEqual(['m:far', 'p:far:web'])
+      // at once: the chats on screen, as before the restart, connecting rather than out of reach; its tasks and places
+      // are read over the link, not kept
+      expect(l.snap).toBeUndefined()
       expect(l.chats.get('p:far:web')?.messages[0].text).toBe('Done.')
       expect(l.connecting).toBe(true)
       expect(m.rows()[0].state).toBe('Connecting…')

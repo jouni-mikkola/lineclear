@@ -4,7 +4,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import type { Action, Alert, Chat, Snapshot, TermScreen } from '../../shared/types.ts'
 import type { Overview } from '../source.ts'
-import { HOME, readJson } from '../store.ts'
+import { HOME, readJson, writeJson } from '../store.ts'
 import { boxInfo, helperVersion, lacks, type Probe, type Saved } from './install.ts'
 
 export interface MachineRec {
@@ -55,12 +55,10 @@ export interface Worker {
   exited: Promise<unknown>
 }
 
-/** what of a machine is kept across a restart: herdr's record of it, the last look, and what it showed last (its
- *  places, tasks, and the chats on screen) */
+/** what of a machine is kept across a restart: herdr's record of it, the last look, and the chats on screen */
 export interface Kept {
   saved: Saved
   probe?: Probe
-  snap?: Snapshot
   chats?: Chat[]
 }
 
@@ -123,12 +121,18 @@ export const machineHome = (label: string) => join(HOME, 'machines', dirOf(label
 /** a machine's folder name under machines/ */
 export const dirOf = (label: string) => label.replace(/[^\w.-]+/g, '_')
 
-/** what every machine showed before this server started */
+/** what every machine showed before this server started. A machine's tasks are read over the link, never kept here:
+ *  the snapshot an earlier version wrote into last.json is removed. (machines/<label>/tasks.json is not a copy: it is
+ *  the store of that machine's own worker, which runs from this folder) */
 export function kept(): Kept[] {
   const dir = join(HOME, 'machines')
   if (!existsSync(dir)) return []
   return readdirSync(dir).flatMap((d) => {
-    const k = readJson<Kept | null>(join('machines', d, 'last.json'), null)
+    const k = readJson<(Kept & { snap?: unknown }) | null>(join('machines', d, 'last.json'), null)
+    if (k && 'snap' in k) {
+      delete k.snap
+      writeJson(join('machines', d, 'last.json'), k)
+    }
     return k?.saved?.label ? [k] : []
   })
 }
