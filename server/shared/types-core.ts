@@ -196,6 +196,8 @@ export interface Task {
   place: string
   /** the machine its worktree and agent are on; none: the server's own */
   machine?: string
+  /** its machine cannot be reached: the task as that machine last showed it, since this time */
+  unreachableSince?: string
   /** when it was made (ms), and the former ids a rename kept, like `machine-b:OMA-91` */
   createdAt?: number
   aliases?: string[]
