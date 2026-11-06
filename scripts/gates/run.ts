@@ -1,10 +1,11 @@
-// The code gates of `bun run check`: Biome (lint and format), knip (dead code) and the module borders of docs/architecture.md.
+// The code gates of `bun run check`: Biome (lint and format), knip (dead code) the module borders of docs/architecture.md and the test-strength rule.
 // `bun scripts/gates/run.ts [--root <dir>] [gate ...]`. Any fault fails.
 import { borders } from "./borders.ts";
 import { deadCode } from "./dead-code.ts";
 import { lint } from "./lint.ts";
+import { testStrength } from "./test-strength.ts";
 
-const GATES: Record<string, (root: string) => Promise<string[]>> = { lint, "dead-code": deadCode, borders };
+const GATES: Record<string, (root: string) => Promise<string[]>> = { lint, "dead-code": deadCode, borders, "test-strength": testStrength };
 const SHOWN = 20;
 
 const args = process.argv.slice(2);
