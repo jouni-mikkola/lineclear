@@ -24,7 +24,8 @@ fake.h.createTab = async () => {
   throw new Error('herdr is not here')
 }
 Object.assign(src.engine, { wt: new Worktrees(fake.h as never) })
-export const stopSource = () => src.stop()
+// --rerun-each runs the file's afterAll after every run, and the next run still needs the source: it ends with the process then
+export const stopSource = () => process.env.LINECLEAR_TEST_RERUN || src.stop()
 
 /** what a test waits for has come true, however slow the machine (a timer, another process) */
 export const until = async (f: () => boolean, ms = 60_000) => {
@@ -38,7 +39,10 @@ export async function workedTask(name: string) {
     cwd: dir,
     shell: '/bin/sh',
   })
-  const p = await src.places.add(dir, name)
+  // a rerun of the same test (--rerun-each) finds its first run's space still there
+  let unique = name
+  for (let n = 2; src.places.nameProblem(unique); n++) unique = `${name}-${n}`
+  const p = await src.places.add(dir, unique)
   // no herdr is there, so a sampled machine reads as not ready and would hold the new task; and the slots follow the
   // machine's cores, so the tasks of earlier tests would hold it on a small one
   const machine = src.engine.machine
