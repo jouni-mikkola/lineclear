@@ -166,7 +166,8 @@ export class LiveSourceCli extends LiveSourceSubcommands {
         if (!ctx.chat) throw new Error('lineclear card works from an agent Lineclear started')
         const title = a1
         const labels = p.opts.choice ?? []
-        if (!title || labels.length < 2) throw new Error(`lineclear card "<question>" --choice "<label>" --choice "<label>" …. ${readSection('lineclear', 'Asking')}`)
+        if (!title || labels.length < 2)
+          throw new Error(`lineclear card "<question>" --choice "<label>" --choice "<label>" …. ${readSection('lineclear', 'Asking')}`)
         const desc = Object.fromEntries((p.opts.desc ?? []).map((d) => d.split('=').map((s) => s.trim()) as [string, string]))
         const id = `ask:${randomUUID().slice(0, 8)}`
         this.chats.post(ctx.chat, {
