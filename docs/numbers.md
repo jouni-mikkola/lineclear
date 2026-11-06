@@ -17,3 +17,19 @@ number      beat            source
 
 `test/readme-film.test.ts` fails when the film shows a number that is not in this list. The film's size, 63.2 kB, and
 its length, 14.6 s, are held by the same test (under 150 kB, 12 to 15 s).
+
+## Lock waits on another area
+
+`decisions.jsonl` was read for the 24 hours after L263 merged (2026-11-05 07:40 UTC to 2026-11-06 07:40 UTC),
+while the rule loop started this repo's open steps as usual. It has four `stall` lines of the class `lock-held`
+for this repo. Each is a wait on the same area:
+
+```
+waiter  lock     holder  shared
+L172    rules    L212    part rules
+L302    release  L281    lock release, part install
+L69     ui       U71     part ui, which L69 needs whole
+L100    inbox    L47     part inbox, lock inbox
+```
+
+No line has a holder and waiter that share no lock, no file and no part.
