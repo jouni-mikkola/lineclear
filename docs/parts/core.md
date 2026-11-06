@@ -35,7 +35,7 @@ The `lineclear` command and its `--help`, and these names:
 - code: `bin/`, `src/prose.ts`, `scripts/prose-check.ts`, `src/cli.ts`, `src/paths.ts`, `src/project.ts`, `src/resolve.ts`, `src/tmpdirs.ts`, `src/worktree.ts`, `src/zone.ts`, `src/kept-read.ts`, `src/main-branch.ts`, `src/models.ts`, `src/company.ts`, `src/setup.ts`, `templates/models.json`, `src/lineclear-client.ts`, `src/herdr.ts`
 - repo: `package.json`, `bun.lock`, `tsconfig.json`, `bunfig.toml`, `.gitignore`, `LICENSE`, `AGENTS.md`, `CONTRIBUTING.md`
 - docs: `docs/idea.md`, `docs/public.md`, `docs/public-roadmap.md`, `docs/backlog.md`, `docs/architecture.md`
-- tests: `test/cli.test.ts`, `test/lineclear-client.test.ts`, `test/stack.test.ts`, `test/no-old-folder.test.ts`, `test/project.test.ts`, `test/resolve.test.ts`, `test/tmpdirs.test.ts`, `test/helpers.ts`, `test/fakes.ts`, `test/tmp-scope.ts`, `test/chat-client.ts`, `test/demo-world.ts`, `test/smoke-branch.test.ts`, `test/board-frames.ts`, `test/kept-read.test.ts`, `test/main-branch.test.ts`, `test/models.test.ts`, `test/setup.test.ts`
+- tests: `test/cli.test.ts`, `test/agent-commands.test.ts`, `test/lineclear-client.test.ts`, `test/stack.test.ts`, `test/no-old-folder.test.ts`, `test/project.test.ts`, `test/resolve.test.ts`, `test/tmpdirs.test.ts`, `test/helpers.ts`, `test/fakes.ts`, `test/tmp-scope.ts`, `test/chat-client.ts`, `test/demo-world.ts`, `test/smoke-branch.test.ts`, `test/board-frames.ts`, `test/kept-read.test.ts`, `test/main-branch.test.ts`, `test/models.test.ts`, `test/setup.test.ts`
 
 ## Tests
 - `test/contracts/core.test.ts`, `test/cli.test.ts`, `test/project.test.ts`, `test/resolve.test.ts`
