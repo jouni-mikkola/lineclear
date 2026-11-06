@@ -3,10 +3,9 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, wr
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { dispatcherDir, dispatcherMain, moveMain } from "../src/dispatcher.ts";
-import { addItem, readItems } from "../src/inbox.ts";
+import { readItems } from "../src/inbox.ts";
 import { inboxMain } from "../src/inbox-answer.ts";
 import { planMain } from "../src/plan.ts";
-import { cachedRead, forgetReads, keepReads } from "../src/reads-cache.ts";
 import { status } from "../src/status.ts";
 import { STATUS_MAX_CHARS } from "../src/status.ts";
 import { writeWait } from "../src/waits.ts";
@@ -180,32 +179,6 @@ test("status for many projects stays under 2000 tokens, and names the rest", () 
   expect(r.text).toContain("more lines");
   expect(t.run((o) => status(o, t.env, "project-number-3")).text).toContain("T-3-0");
   expect(t.run((o) => status(o, t.env, "zzz")).code).toBe(1);
-});
-
-test("status and inbox of 20 projects each answer in under 2 s from the kept reads, and an Inbox change drops them", () => {
-  const t = setup(
-    Array.from({ length: 20 }, (_, i) => `proj-${i}`),
-    false,
-  );
-  expect(cachedRead("status", () => {}, t.env)).toBeUndefined();
-  // the board's walk of the 20 projects takes seconds; what it kept is read back at once
-  keepReads({ code: 0, lines: ["ok: proj-0 proj-1"] }, { code: 0, lines: ["The Inbox is empty."] }, t.env);
-  for (const [kind, line] of [
-    ["status", "ok: proj-0 proj-1"],
-    ["inbox", "The Inbox is empty."],
-  ] as const) {
-    const lines: string[] = [];
-    const began = performance.now();
-    expect(cachedRead(kind, (l) => lines.push(l), t.env)).toBe(0);
-    expect(performance.now() - began).toBeLessThan(2000);
-    expect(lines).toEqual([line]);
-  }
-  expect(cachedRead("status", () => {}, t.env, Date.now() + 10 * 60_000)).toBeUndefined();
-  addItem({ kind: "outward", task: "T-1", question: "Which?", choices: ["a"], since: "2026-01-01T00:00:00.000Z" }, t.env);
-  expect(cachedRead("inbox", () => {}, t.env)).toBeUndefined();
-  keepReads({ code: 0, lines: [] }, { code: 0, lines: [] }, t.env);
-  forgetReads(t.env);
-  expect(cachedRead("inbox", () => {}, t.env)).toBeUndefined();
 });
 
 test("an approved move is pushed to the remote, and undone when the push fails", () => {

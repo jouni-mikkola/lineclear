@@ -88,18 +88,6 @@ export function webApi(
     const fix = () => void aside("heal").catch(() => {});
     fix();
     setInterval(fix, 30_000).unref();
-    // `lineclear status` and `inbox` print this
-    let walking = false;
-    const reads = () => {
-      if (walking) return;
-      walking = true;
-      void aside("reads")
-        .catch(() => {})
-        .finally(() => (walking = false));
-    };
-    // the first walk waits, so it never competes with the first page views
-    setTimeout(reads, 10_000).unref();
-    setInterval(reads, 30_000).unref();
   }
   const roadmaps = new Map<string, Kept<RoadmapRead>>();
   const warmed = new Set<string>();

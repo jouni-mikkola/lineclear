@@ -1,7 +1,6 @@
 import { pathsFor, serverBin } from "./paths.ts";
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { createAtomic, writeAtomic } from "../pi/atomic.ts";
-import { forgetReads } from "./reads-cache.ts";
 import { join } from "node:path";
 import { askBefore, readSettings } from "./project.ts";
 import type { StepCheck } from "./stepcheck.ts";
@@ -87,10 +86,7 @@ export const isOpen = (i: Item) => i.answer === undefined && i.closed === undefi
 
 const inboxDir = (env = process.env) => join(configDir(env), "inbox");
 export const itemPath = (n: number, env = process.env) => join(inboxDir(env), `${n}.json`);
-const writeItem = (item: Item, env = process.env) => {
-  writeAtomic(itemPath(item.n, env), `${JSON.stringify(item, null, 2)}\n`);
-  forgetReads(env);
-};
+const writeItem = (item: Item, env = process.env) => writeAtomic(itemPath(item.n, env), `${JSON.stringify(item, null, 2)}\n`);
 export const waitReason = (task: string, env = process.env) => readWaits(env).find((w) => w.task === task)?.reason;
 export const lineclear = serverBin;
 
@@ -126,7 +122,6 @@ export function addItem(item: Omit<Item, "n">, env = process.env): Item {
     try {
       const full = { n, ...item };
       createAtomic(itemPath(n, env), `${JSON.stringify(full, null, 2)}\n`);
-      forgetReads(env);
       return full;
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
