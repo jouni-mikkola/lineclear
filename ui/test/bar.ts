@@ -219,6 +219,9 @@ export function liveMotionTests<L extends { after: string }>(o: MotionSuite<L>) 
       }
     });
 
+    // frame times and click latency read the machine, not only the page: a busy one gets a retry, a real regression fails all three
+    test.describe.configure({ retries: 2 });
+
     test(`${m}: 60 fps in a performance trace, no long task`, async ({ page }) => {
       await o.fresh(page, live);
       await o.prepare?.(live, page);
