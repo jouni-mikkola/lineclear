@@ -76,7 +76,7 @@ export const commands: Record<string, string> = {
   progress: 'A space\'s coordinator saves or reads its progress: progress ["<text>"]',
   checkpoint: "A space's coordinator commits its owned task's work: checkpoint \"<message>\"",
   complete: 'A space\'s coordinator proves its stopping goal and ends its run: complete "<evidence>"',
-  measure: "Where a task's tokens and minutes went: measure phases [--last N]",
+  measure: "Where a task's tokens and minutes went: measure phases [--last N]; measure checks [--days N] sorts red GitHub checks by first cause",
   stalls: "Print the stalls of the last day by class with the minutes lost (--hours N, --json)",
   track: "Run the test track: a fixture project through the whole chain; pass, or the stall class that broke it (--after-update rolls back a broken update)",
   release:

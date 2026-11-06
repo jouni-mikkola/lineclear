@@ -67,3 +67,45 @@ LIN-1190        28503         33593   427312          12.7
 LIN-1189        18869         29113   577106          19.4
 LIN-1188        33252         60167  1891918          26.1
 ```
+
+## Check failures
+
+Read with `lineclear measure checks --days 2` on 2026-11-06. Cancelled runs are ones a newer push replaced. A test is flaky when it failed and passed on the same commit, or on main when the next main run passed with no `fix` commit between.
+
+| | runs | green | red | cancelled | flaky test | real break | gate | setup | time limit |
+|---|---|---|---|---|---|---|---|---|---|
+| main | 59 | 10 | 31 | 18 | 2 | 29 | 0 | 0 | 0 |
+| pull requests | 108 | 75 | 31 | 2 | 0 | 13 | 18 | 0 | 0 |
+
+| failing test | runs | cause | longest |
+|---|---|---|---|
+| a task's question on its needs-you card in its space's chat > answered in the task chat instead: the card follows, and says where | 25 | flaky test | 60.3 s |
+| a head released twice in a row has its agent restarted | 18 | real break | 0.4 s |
+| a read that began while a write ran is not shared once the write is done | 8 | flaky test | 0.1 s |
+| doctor names a problem and its fix, and exits 1 | 6 | real break | 1.6 s |
+| install replaces the link an older install made, and doctor fails a link | 6 | real break | 1.7 s |
+| where lingering needs root, install prints the one command and doctor names it | 6 | real break | 2.9 s |
+| a head in "Rebasing on main" with no git process for 15 minutes is released, the task behind it lands, the head is told why | 5 | real break | 60.3 s |
+| a task's CLI, model and effort > Settings' for tasks, unless the coordinator chose others for this one; only on its first start | 5 | real break | 60.5 s |
+| Queued after other tasks > refused: a task that is not there, itself, a circle; those done already are not waited for | 5 | real break | 0.4 s |
+| Queued after other tasks > task queue: queues a task at work (its agent is told to hold on), changes what it waits for, and clears it | 5 | real break | 60.2 s |
+| a string done_when and an object with steps work | 4 | real break | 0.1 s |
+| a turn the provider cut off > the backup agent takes over once, in the same worktree, with the brief and what was done so far | 4 | real break | 0.1 s |
+| every state imports, checks, and done survives in the commit | 4 | real break | 0.1 s |
+| making a new project > a new folder gets git on main and a first commit | 4 | real break | 0.0 s |
+| making a new project > an existing folder keeps its files, uncommitted | 4 | real break | 0.0 s |
+| on GitHub: a pull request per task > main moved on GitHub without a conflict: merged as it is, its passed checks kept, no new push | 4 | real break | 1.5 s |
+| on GitHub: a pull request per task > merge opens the pull request itself when the agent never did, and merges it at the commit here | 4 | real break | 0.6 s |
+| Queued from the command > task add --after queues it; task queue changes or clears it; what is not there, or a circle, is refused | 4 | real break | 0.3 s |
+| the example in docs/import.md imports | 4 | real break | 0.1 s |
+| a coordinator's alert about a task > says what the task needs, then the why, in place of the task's own alert | 3 | real break | 4.4 s |
+| a task's own progress (lineclear status) > its agent reports a line, % done and time left; the task shows it while it works, frozen while it waits on you, gone once done | 3 | real break | 60.1 s |
+| every process, timer, store, loop and gate has a row | 3 | real break | 0.0 s |
+| starts here and on another machine share the cap | 2 | real break | 0.1 s |
+| (unnamed) | 1 | real break | 0.1 s |
+| a task's question on its needs-you card in its space's chat > a choice card answered on the card: it goes to the task, both copies say where, the coordinator hears it | 1 | real break | 4.2 s |
+| every subcommand that the code, skills and templates call is a lineclear command | 1 | real break | 0.0 s |
+| machine link recovery > failed SSH/name lookup recovers inside the same worker, every call over the one shared bridge | 1 | real break | 0.3 s |
+| no source file writes a state file in place | 1 | real break | 0.0 s |
+| the start caps read LIMITS.starts.limit, so the rules and the waste watch hold one number | 1 | real break | 0.0 s |
+| three checks with two slots still run one at a time, and the two after the first declare checks waits | 1 | real break | 0.3 s |
