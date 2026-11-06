@@ -304,7 +304,11 @@ export class EngineLand extends EngineHandoff {
       if (pr.isDraft) await GH.readyPr(g, wt, pr.number)
     }
     const n = t.pr!.number
-    const c = await this.checksOf(t, g, n, 0)
+    const wait = t.waitChecks ?? this.settings.ways(p.name).waitChecks
+    // not waited for (Settings): its own quick checks passed, and GitHub's run on, here and then on main
+    // (watchMain); only a failure GitHub already shows at this very commit stops it
+    const now = wait || pushing ? undefined : await GH.prChecks(g, wt, n)
+    const c = wait ? await this.checksOf(t, g, n, 0) : now?.state === 'fail' ? now : { state: 'pass' as const, passed: 0, failed: [] }
     if (c.state === 'pending') {
       this.land(t, 'checks', await this.checksDue(t, p, g, head))
       return {
@@ -344,7 +348,7 @@ export class EngineLand extends EngineHandoff {
       }
     }
     await G.git(p.path, 'push', '--quiet', 'origin', '--delete', t.branch!)
-    return this.mergedOnGitHub(t, p, `merged PR #${n} on GitHub`)
+    return this.mergedOnGitHub(t, p, `merged PR #${n} on GitHub${wait ? '' : ', not waiting for its checks'}`)
   }
 
   /** main here comes up to GitHub's, so the merge is here too (and Lineclear's own update sees it), then it is marked */
