@@ -1,6 +1,6 @@
 // Keeps the server running and up to date. When Lineclear's own checkout moves to a new commit (a task merged into
-// main), the plugin list file changes, or the human's own plugins or their list (~/.lineclear/plugins) change, it makes a release (scripts/update.ts) and restarts the server on it, once no
-// voice call is on (scripts/supervisor.ts); open screens then reload themselves. The server always runs from a frozen
+// main), the plugin list file changes, or the human's own plugins or their list (~/.lineclear/plugins) change, it makes a release (scripts/update.ts) and restarts the server on it
+// (scripts/supervisor.ts); open screens then reload themselves. The server always runs from a frozen
 // release, so a later merge can't change what runs. A failed update keeps the running version, and update.json says
 // why (the screen shows it). A merge that changes the supervisor's own code starts it again on that code.
 import { spawn, type ChildProcess } from 'node:child_process'
@@ -64,8 +64,8 @@ let handover: ChildProcess | null = null
 /** new code of its own that didn't load: not tried again */
 let broken = ''
 /** A merge changed the supervisor's own code (it ran on older code until herdr started it again): it starts itself
- *  again on the new code, with the server, once the new release is past its trial, no update is being made and no
- *  voice call is on. A release that failed, or new code that doesn't load or start Lineclear, leaves this one running. */
+ *  again on the new code, with the server, once the new release is past its trial and no update is being made.
+ *  A release that failed, or new code that doesn't load or start Lineclear, leaves this one running. */
 async function renew() {
   const state = () => sup.status?.state
   const now = codeOf(import.meta.path)

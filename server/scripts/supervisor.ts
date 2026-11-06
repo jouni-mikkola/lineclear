@@ -1,4 +1,5 @@
-// What the supervisor decides: when to make a release, when to restart on it, and when to take a release back. scripts/supervise.ts wires it to the server process and watchers.
+// What the supervisor decides: when to make a release, when to restart on it, and when to take a release
+// back. scripts/supervise.ts wires it to the server process and watchers.
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
