@@ -82,6 +82,11 @@ export const commands: Record<string, string> = {
   done: "End a task that has nothing to merge: done <id>",
   secret: "Use a secret by name in a command: secret run NAME -- <command>",
   secrets: "Set, list and load secrets from the vault Settings > Secrets shows (values come from stdin, never from arguments)",
+  alive: "A task's agent beats: alive <id>",
+  room: "A machine's room as herdr reads it, with its tasks at work and its slots: room [<machine>]",
+  progress: 'A space\'s coordinator saves or reads its progress: progress ["<text>"]',
+  checkpoint: "A space's coordinator commits its owned task's work: checkpoint \"<message>\"",
+  complete: 'A space\'s coordinator proves its stopping goal and ends its run: complete "<evidence>"',
   stalls: "Print the stalls of the last day by class with the minutes lost (--hours N, --json)",
   track: "Run the test track: a fixture project through the whole chain; pass, or the stall class that broke it (--after-update rolls back a broken update)",
   release:
