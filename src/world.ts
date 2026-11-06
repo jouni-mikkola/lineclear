@@ -55,10 +55,8 @@ export interface World {
   tellTask(id: string, text: string, kind?: TellKind): string | undefined;
   /** `lineclear task close`, which keeps a branch with unmerged work. Returns an error text, or undefined. */
   closeTask(id: string): string | undefined;
-  /** `lineclear merge`, which rebases, checks and merges a Ready task. Returns an error text, or undefined. */
+  /** Starts `lineclear merge` for a Ready task without waiting for it (it rebases, checks and merges; the board runs one merge at a time per task). Returns an error text, or undefined. */
   mergeTask(id: string): string | undefined;
-  /** Shows a failure's cause on the task's card (its status line). Returns an error text, or undefined. */
-  showCause(id: string, cause: string): string | undefined;
   /** The `work/<n>-...` branch of a task, if the repo still has it. */
   branchOf(repo: string, task: string): string | undefined;
   pushBranch(repo: string, branch: string): string | undefined;

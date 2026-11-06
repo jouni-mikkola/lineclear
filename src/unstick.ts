@@ -1,3 +1,4 @@
+import { keepsMerge } from "./asks.ts";
 import type { Settings } from "./project.ts";
 import type { Task } from "./roadmap.ts";
 import type { Decision, State, World } from "./rules.ts";
@@ -10,8 +11,8 @@ import type { Wait } from "./waits.ts";
 /** A task shows Ready to merge this long before its merge is started, and again at most this often. */
 const READY_AFTER_MS = 10 * 60_000;
 const MERGE_GAP_MS = 10 * 60_000;
-/** After this many failed merges the cause is shown on the card and the rules leave the task alone. */
-const MAX_FAILS = 2;
+/** After this many merges that left the task on Ready the rules leave it alone; the card shows why the last one stopped. */
+const MAX_TRIES = 2;
 
 /** A started wrong task is closed only after it has shown Went wrong this long: a hand-over may still try again. */
 const WRONG_AFTER_MS = 3 * 60_000;
@@ -56,7 +57,7 @@ function closeFailedStarts(a: Args, tasks: Task[], out: Decision[]): void {
   }
 }
 
-/** The first task on Ready to merge for 10 minutes has its merge started (one per tick), unless it declared a wait or the owner wrote to it. */
+/** The first task on Ready to merge for 10 minutes has its merge started (one per tick), unless it declared a wait, its merge is the owner's, or the owner wrote to it. */
 function mergeReady(a: Args, tasks: Task[], out: Decision[]): void {
   const { world, state, dryRun } = a;
   const now = world.now().getTime();
@@ -67,28 +68,29 @@ function mergeReady(a: Args, tasks: Task[], out: Decision[]): void {
     if (t.id === undefined || t.status !== "ready") continue;
     const entry = (seen[t.id] ??= { since: now });
     const idle = now - entry.since >= READY_AFTER_MS && now - (entry.tried ?? 0) >= MERGE_GAP_MS;
-    if (started || !idle || (entry.fails ?? 0) >= MAX_FAILS || waiting.has(t.id)) continue;
+    if (started || !idle || (entry.tries ?? 0) >= MAX_TRIES || waiting.has(t.id) || keepsMerge(t.desc)) continue;
     if (world.ownerWrote(t.id, new Date(entry.since).toISOString())) continue;
     started = true;
     const err = dryRun ? undefined : world.mergeTask(t.id);
-    if (!dryRun) entry.tried = now;
-    if (err) entry.fails = (entry.fails ?? 0) + 1;
-    const shown = err && entry.fails === MAX_FAILS ? world.showCause(t.id, err) : undefined;
+    if (!dryRun) {
+      entry.tried = now;
+      entry.tries = (entry.tries ?? 0) + 1;
+    }
     out.push({
       time: world.now().toISOString(),
       project: a.project,
       step: t.id,
       kind: "run",
       reason: err
-        ? `merging ${t.id} failed (${entry.fails} of ${MAX_FAILS}): ${err}${shown ? `; showing it failed too: ${shown}` : ""}`
-        : `${dryRun ? "would merge" : "merged"} ${t.id}: it has shown Ready to merge for ${Math.round((now - entry.since) / 60_000)} minutes`,
+        ? `starting the merge of ${t.id} failed: ${err}`
+        : `${dryRun ? "would merge" : "started the merge of"} ${t.id}: it has shown Ready to merge for ${Math.round((now - entry.since) / 60_000)} minutes`,
     });
   }
-  // a task that works again keeps its failures; only a gone one loses its record
+  // a task that works again starts over; only a gone one loses its record
   for (const [id, entry] of Object.entries(seen)) {
     const task = tasks.find((t) => t.id === id);
     if (!task) delete seen[id];
-    else if (task.status !== "ready") entry.since = now;
+    else if (task.status !== "ready") Object.assign(entry, { since: now, tries: 0 });
   }
 }
 

@@ -94,8 +94,8 @@ export interface State extends StartRecord {
   ownerItems?: Record<string, number>;
   /** Tasks showing Went wrong: when first seen (ms). */
   wrongSeen?: Record<string, number>;
-  /** Tasks on Ready to merge: when first seen (ms) and when its merge was last tried and how often it failed (see unstick.ts). */
-  readySeen?: Record<string, { since: number; tried?: number; fails?: number }>;
+  /** Tasks on Ready to merge: when first seen (ms) and when its merge was last tried and how many merges were started (see unstick.ts). */
+  readySeen?: Record<string, { since: number; tried?: number; tries?: number }>;
 }
 const emptyState = (): State => ({ healthFailures: 0, stopped: false, roadmapErrors: [], last: {}, ladder: {}, models: {}, handed: [], starts: {} });
 const statePath = (name: string, env = process.env) => join(projectsDir(env), name, "state.json");
