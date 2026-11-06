@@ -401,7 +401,7 @@ export function runFullCheck(
         at: Date.now(),
         ...whereRun(dir),
         repo: dir,
-        tier: "nightly",
+        tier: "heavy",
         command: cmd.join(" "),
         seconds,
         slotWaitMin: (started - arrived) / 60_000,

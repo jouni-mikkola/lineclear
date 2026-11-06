@@ -13,7 +13,7 @@ const settings = {
   space: "s",
   check: "x",
   models: {},
-  tiers: { inner: { commands: ["x"], budgetS: 9 }, merge: { commands: ["x"], budgetS: 9 }, nightly: { commands: ["x"], budgetS: 9 } },
+  tiers: { inner: { commands: ["x"], budgetS: 9 }, merge: { commands: ["x"], budgetS: 9 }, heavy: { commands: ["x"], budgetS: 9 } },
 } as unknown as Settings;
 
 const redRun = async (name: string, output: string, code: number) => {

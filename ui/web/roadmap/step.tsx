@@ -22,7 +22,7 @@ const Field = ({ label, by, children }: { label: string; by?: RoleName; children
   </div>
 );
 
-const CHECK_WHEN: Record<string, string> = { inner: "while working", merge: "at merge", nightly: "at night" };
+const CHECK_WHEN: Record<string, string> = { inner: "while working", merge: "at merge", heavy: "after merge" };
 const TASK_WORD: Record<string, string> = { work: "at work", need: "waits for you", queued: "in line", done: "merged" };
 
 /** The step's task: its state, id and line, or why it has none. */

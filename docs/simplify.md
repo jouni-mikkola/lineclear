@@ -74,7 +74,7 @@ A zero in restarts or gate failures can mean the log has no such line on this ma
 | gate `code-rules` | 0.4 | 0 | 0 | A model name is hard-coded where a setting should hold it, or herdr is called outside its one adapter. |
 | gate `old-name` | 0.2 | 0 | 0 | The old product's name comes back into code, a brief or a skill. |
 
-`dead-code` is the largest cost on the page (a cold run: knip reads the whole repo). It is the first candidate to move to the nightly run.
+`dead-code` is the largest cost on the page (a cold run: knip reads the whole repo). It is the first candidate to move to the heavy run.
 
 ## Existing measuring steps
 

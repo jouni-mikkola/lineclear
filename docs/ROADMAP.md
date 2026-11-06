@@ -26,7 +26,7 @@ done. The rules will read it, so it follows its own format.
   while it saves more than it costs (L61, L62, L65).
 - The work measured so far meets the goals in idea.md: under 3 asks a day, a median wait from ready to start under 5 min,
   and a cost per merged step at least 15 % below the pilot's before Lineclear (L57).
-- The code stays clean by rule: every gate, in the check and in the nightly job, finds no fault, with no baseline left, and the check stays fast (L77 to L90).
+- The code stays clean by rule: every gate, in the check and in the heavy run, finds no fault, with no baseline left, and the check stays fast (L77 to L90).
 - No task sits in Needs you with no question: it asks one Inbox question or keeps going, and the stall ladder
   catches the rest within minutes (L140 to L146).
 - The one Lineclear that runs the work is a released build in its own folder, never the repo or main; a new build
@@ -133,7 +133,7 @@ The owner set this cut and its order. Moved after 0.1, in this order of priority
 2. The flagship line (LIN-149, LIN-150, LIN-152): it makes the work worth watching; using Lineclear does not need
    it.
 3. The Blender film and the finished look (LIN-153, Phase 15): a still serves the README for 0.1.
-4. Code gates beyond lint and dead code (LIN-154, L83 to L90): coverage floors, splits and the nightly check keep
+4. Code gates beyond lint and dead code (LIN-154, L83 to L90): coverage floors, splits and the heavy check keep
    the code clean over months; the check already runs lint and dead code.
 5. Parts with keepers (LIN-168): quality over long work, not what a stranger meets.
 6. Stall classes (LIN-158): a loop that finds new kinds of stall matters once Lineclear runs long without a human.
@@ -401,7 +401,7 @@ Result: A gate or check that caught no fault in 7 days of runs is cut or merged 
 - done when:
   - `lineclear measure` lists per gate and per merge-check step the faults it caught in the last 7 days, counted from `check-runs.jsonl` and `decisions.jsonl`, and a test on a fixed log finds each count.
   - Each gate with 0 catches is merged into a gate that runs the same files, or cut; `docs/simplify.md` names each and the time per merge saved, measured before and after.
-  - A cut gate's fault class is still planted by a test in the nightly tier; no check the merge needs for a fault class that was caught is removed, and a test plants one fault per remaining class and finds the merge check refuse it.
+  - A cut gate's fault class is still planted by a test in the heavy tier; no check the merge needs for a fault class that was caught is removed, and a test plants one fault per remaining class and finds the merge check refuse it.
 - parts: gates, checks (health), measure
 - locks: gate-list
 - after: L314
@@ -3216,7 +3216,7 @@ fix also lowers the baseline in the same commit. Nothing is turned off to pass. 
 what and which may import which. Steps that split big files in `server/` wait for L71, which trims it first.
 
 The check stays fast: the gates add 20 s to `bun run check` at most, and the check fails when they take longer.
-Anything slower, such as coverage over the whole server or a heavy copy scan, runs in the nightly job and before a
+Anything slower, such as coverage over the whole server or a heavy copy scan, runs in the heavy run and before a
 release (L90), not on every merge.
 
 ### L77 One lint and format rule
@@ -3299,7 +3299,7 @@ Result: A check fails on commented-out code and on comments that only retell the
 Result: A module whose tests cover less than its floor fails the check.
 - why: a module without tests for its contract breaks quietly when another changes.
 - done when:
-  - The nightly job and a release (L90) measure line coverage of the root tests per module of
+  - The heavy run and a release (L90) measure line coverage of the root tests per module of
     `docs/architecture.md`, and fail when a module falls below its floor in the baseline. A floor only rises.
     `bun run check` does not, since coverage of every module is slower than its 20 s for the gates.
   - A test shows a module under its floor fails.
@@ -3364,12 +3364,12 @@ Result: Every list of known faults is empty, so a fault is fixed, not parked.
 - parts: gates (health)
 - after: L78, L82, L83, L86, L87, L88
 
-### L90 The nightly check
-Result: A long check runs every night, so a slow fault still shows up.
+### L90 The heavy check
+Result: A long check runs on each push to main, so a slow fault still shows up.
 - why: a merge's check has to stay fast, so the gates there look only at what the branch changed. A check that
   takes minutes still has to run somewhere, or the faults it finds pile up.
 - done when:
-  - A nightly job on main runs `bun run gates:full`, the coverage floors of L83, the cold start of L49
+  - A heavy run on GitHub on each push to main runs `bun run gates:full`, the coverage floors of L83, the cold start of L49
     (`bun run cold-start`) and any check too slow for a merge,
     and a failure shows on the board as a task to fix it.
   - A release runs the same checks first and does not go out when one fails.
@@ -4261,17 +4261,17 @@ Result: A lock or part held by a task that is merged, closed or dead is freed in
 - after: L234
 - files: src/starts.ts, src/measure.ts, test/rules.test.ts, docs/parts/rules.md
 
-### L238 Wait goal checked nightly
-Result: The nightly run writes the median wait from ready to start of the last 3 days and fails when it is 5 min or more.
+### L238 Wait goal checked after a merge
+Result: The heavy run writes the median wait from ready to start of the last 3 days and fails when it is 5 min or more.
 - why: a goal without a check slips back unseen.
 - done when:
-  - `bun run nightly` appends the median and each day's count to `docs/numbers.md` under "L238" and exits non-zero at
+  - `bun run heavy` appends the median and each day's count to `docs/numbers.md` under "L238" and exits non-zero at
     5 min or more, naming the largest cause from L234.
   - A test on a recorded fixture passes at 4 min and fails at 6 min.
 - parts: measure, gates
-- locks: nightly
+- locks: heavy
 - after: L235, L236, L237
-- files: scripts/nightly.ts, src/measure.ts, test/measure.test.ts, docs/numbers.md
+- files: scripts/heavy.ts, src/measure.ts, test/measure.test.ts, docs/numbers.md
 
 ### L239 Cost per step is split by cause
 Result: `lineclear measure` splits the cost of a merged step into work, review rounds, step check, rework and idle context.
@@ -4308,17 +4308,17 @@ Result: A review round that finds nothing to fix ends the review, and a task nev
 - after: L239
 - files: src/tick-project.ts, src/measure.ts, test/starts.test.ts
 
-### L242 Cost goal checked nightly
-Result: The nightly run writes the cost per merged step of the last 3 days and fails when it is above $1.18.
-- why: the goal is at least 15 % below the pilot's $1.39, and only a nightly figure shows a slip.
+### L242 Cost goal checked after a merge
+Result: The heavy run writes the cost per merged step of the last 3 days and fails when it is above $1.18.
+- why: the goal is at least 15 % below the pilot's $1.39, and only a figure after a merge shows a slip.
 - done when:
-  - `bun run nightly` appends the cost and step count to `docs/numbers.md` under "L242" and exits non-zero above
+  - `bun run heavy` appends the cost and step count to `docs/numbers.md` under "L242" and exits non-zero above
     $1.18, naming the largest share from L239.
   - A test on a fixture passes at $1.10 and fails at $1.30.
 - parts: measure, gates
-- locks: nightly
+- locks: heavy
 - after: L238, L240, L241
-- files: scripts/nightly.ts, src/measure.ts, test/measure.test.ts, docs/numbers.md
+- files: scripts/heavy.ts, src/measure.ts, test/measure.test.ts, docs/numbers.md
 
 ### L243 Each ask is named by its kind
 Result: `lineclear asks --days 1` lists each ask of the day with its kind and the rule that should have answered it.
@@ -4343,17 +4343,17 @@ Result: Each kind of ask named in L243 that a rule can answer is answered by a r
 - after: L243
 - files: src/asks.ts, src/rules.ts, test/asks.test.ts, docs/asks.md
 
-### L245 Ask goal checked nightly
-Result: The nightly run fails when a day has 3 asks or more, and names each card.
+### L245 Ask goal checked after a merge
+Result: The heavy run fails when a day has 3 asks or more, and names each card.
 - why: the goal is under 3 asks a day, and a check that fails on any other ask is open in principle 11.
 - done when:
-  - `bun run nightly` counts the asks of the last 3 days with work, appends them to `docs/numbers.md` under "L245"
+  - `bun run heavy` counts the asks of the last 3 days with work, appends them to `docs/numbers.md` under "L245"
     and exits non-zero at 3 on any day.
   - A test passes at 2 and fails at 3.
 - parts: measure, gates, inbox
-- locks: nightly
+- locks: heavy
 - after: L244, L242
-- files: scripts/nightly.ts, src/asks.ts, test/asks.test.ts, docs/numbers.md
+- files: scripts/heavy.ts, src/asks.ts, test/asks.test.ts, docs/numbers.md
 
 ### L247 The check log holds slot waits
 Result: Each run in the check log records the minutes it waited for a check slot, and `lineclear check` prints them.
@@ -4591,7 +4591,7 @@ Result: A test proves a message sent during a long command is answered within 30
 - why: L173 to L175 are each tested alone. The promise to the owner is the whole chain, so one test holds it.
 - done when:
   - A test starts a Dispatcher turn with a command that runs 120 s, sends a message after 5 s and finds the answer in the chat within 30 s of sending, on a fixture project with a stub model.
-  - The same test runs in the nightly tier with a real model once a week, and a miss files a fix through L113.
+  - The same test runs in the heavy tier with a real model once a week, and a miss files a fix through L113.
 - parts: measure, rules
 - locks: none
 - after: L173, L174, L175, L271
@@ -4603,7 +4603,7 @@ Result: `lineclear dispatcher latency` prints the time from each owner message t
 - done when:
   - The command counts from the board receiving the message, not the session's delivery stamp, and a test on a
     recorded fixture prints its median and p90.
-  - The nightly job writes the live median and p90 to `docs/numbers.md`; the goal is under 10 s and under 30 s.
+  - The heavy run writes the live median and p90 to `docs/numbers.md`; the goal is under 10 s and under 30 s.
 - parts: dispatcher, measure
 - locks: none
 - after: L194, L271

@@ -348,7 +348,7 @@ function changedRun(
 }
 
 /**
- * `lineclear check [--tier inner|merge|nightly] [command]`: a tier's commands (the merge tier, the full check, when no
+ * `lineclear check [--tier inner|merge|heavy] [command]`: a tier's commands (the merge tier, the full check, when no
  * tier is named), or the command given, in its turn: one full check at a time. The inner tier waits for no turn.
  * `lineclear check --changed` is the worker's loop: the project's check told to look only at what the branch changed,
  * in an ordinary check slot, since it is short. The full check runs once, in the merge lane.
@@ -422,7 +422,7 @@ function usage(name: string): string {
   return {
     wait: 'usage: lineclear wait <login|checks|browser> "<reason>" | lineclear wait owner --kind <login|money|outward> "<reason>" | lineclear wait until <time> "<reason>" | lineclear wait task <id> "<reason>"',
     resume: "usage: lineclear resume",
-    check: "usage: lineclear check [--changed] [--tier inner|merge|nightly] [command] | lineclear check --release <test> | lineclear check --log",
+    check: "usage: lineclear check [--changed] [--tier inner|merge|heavy] [command] | lineclear check --release <test> | lineclear check --log",
     slot: "usage: lineclear slot <command> | lineclear slot --list",
   }[name]!;
 }

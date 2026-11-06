@@ -54,9 +54,9 @@ interface TierSpec {
 
 export type Tiers = Record<Tier, TierSpec>;
 
-export const tierNames: readonly Tier[] = ["inner", "merge", "nightly"];
-/** inner runs on the changed files while working, merge once per task in the merge lane, nightly the heavy rest. */
-const BUDGET_S: Record<Tier, number> = { inner: 30, merge: 180, nightly: 3600 };
+export const tierNames: readonly Tier[] = ["inner", "merge", "heavy"];
+/** inner runs on the changed files while working, merge once per task in the merge lane, heavy the slow rest, run after a merge. */
+const BUDGET_S: Record<Tier, number> = { inner: 30, merge: 180, heavy: 3600 };
 
 /** What the owner is asked before: a plan or roadmap change, a release (what leaves for the public), spending beyond the budget. */
 export interface AskBefore {
@@ -201,12 +201,12 @@ function heavyScripts(repo: string, check: string): string[] {
 
 /** A script light enough to run on every change: types, or a lint or test marked fast (also in Finnish: nopea, kevyt). */
 const FAST_SCRIPT = /^(types|typecheck|tsc|(lint|test|unit|types):(fast|quick|changed|nopea|kevyt)|[\w-]+:(fast|quick|changed|nopea|kevyt))$/;
-/** A script for the nightly run, by its name: coverage, browser suites, mutation tests, duplication scans, whole-repo verifies. */
-const NIGHTLY_SCRIPT = /(coverage|kattavuus|e2e|playwright|cypress|mutation|mutaatio|stryker|jscpd|verify|bench|:full$|ui:test|cold-start|one-name)/;
+/** A script for the heavy run, by its name: coverage, browser suites, mutation tests, duplication scans, whole-repo verifies. */
+const SLOW_SCRIPT = /(coverage|kattavuus|e2e|playwright|cypress|mutation|mutaatio|stryker|jscpd|verify|bench|:full$|ui:test|cold-start|one-name)/;
 
 /**
- * The tiers a repo's package.json suggests. A repo that names them (`check:inner`, `check:nightly`)
- * gets those; else inner takes the fast scripts, merge the check, and nightly the heavy scripts it is too slow for.
+ * The tiers a repo's package.json suggests. A repo that names them (`check:inner`, `check:heavy`)
+ * gets those; else inner takes the fast scripts, merge the check, and heavy the scripts it is too slow for.
  */
 export function proposeTiers(repo: string, check: string): Tiers {
   let scripts: Record<string, unknown> = {};
@@ -218,12 +218,12 @@ export function proposeTiers(repo: string, check: string): Tiers {
   const runner = `${scriptRunner(repo, check)} run`;
   const names = Object.keys(scripts).filter((n) => typeof scripts[n] === "string" && !ENDLESS.test(n));
   const named = (tier: Tier) => (names.includes(`check:${tier}`) ? [`${runner} check:${tier}`] : undefined);
-  const nightly = (n: string) => n !== "check" && `${runner} ${n}` !== check && NIGHTLY_SCRIPT.test(n);
+  const heavy = (n: string) => n !== "check" && `${runner} ${n}` !== check && SLOW_SCRIPT.test(n);
   return {
     inner: { commands: named("inner") ?? names.filter((n) => FAST_SCRIPT.test(n)).map((n) => `${runner} ${n}`), budgetS: BUDGET_S.inner },
     // the merge tier is the project's check, so the merge lane and a changed check never part
     merge: { commands: [check], budgetS: BUDGET_S.merge },
-    nightly: { commands: named("nightly") ?? names.filter(nightly).map((n) => `${runner} ${n}`), budgetS: BUDGET_S.nightly },
+    heavy: { commands: named("heavy") ?? names.filter(heavy).map((n) => `${runner} ${n}`), budgetS: BUDGET_S.heavy },
   };
 }
 
@@ -231,12 +231,13 @@ export function proposeTiers(repo: string, check: string): Tiers {
 export function tiersOf(s: Pick<Settings, "repo" | "check" | "tiers">): Tiers {
   let proposed: Tiers | undefined;
   const one = (t: Tier): TierSpec => {
-    const own = s.tiers?.[t];
+    // a settings file written before the rename keeps its heavy tier under the old name
+    const own = s.tiers?.[t] ?? (t === "heavy" ? (s.tiers as Record<string, TierSpec> | undefined)?.nightly : undefined);
     if (!own?.commands) proposed = proposed ?? proposeTiers(s.repo, s.check);
     const commands = own?.commands ?? (proposed as Tiers)[t].commands;
     return { commands, budgetS: own?.budgetS ?? BUDGET_S[t] };
   };
-  return { inner: one("inner"), merge: one("merge"), nightly: one("nightly") };
+  return { inner: one("inner"), merge: one("merge"), heavy: one("heavy") };
 }
 
 const splitHeavy = (text: string) => [
@@ -254,6 +255,10 @@ const parseModels = (text: string) =>
     .map((m) => m.trim())
     .filter(Boolean);
 
+/** The tier flags of `project set`: --heavy already names the project's heavy tools, so the heavy tier is --after-merge. */
+const tierFlagNames = ["inner", "merge", "after-merge"];
+const tierFlagOf = (t: Tier) => (t === "heavy" ? "after-merge" : t);
+
 type Flags = Record<string, string>;
 
 function parseFlags(args: string[]): { flags: Flags; rest: string[] } | string {
@@ -269,8 +274,8 @@ function parseFlags(args: string[]): { flags: Flags; rest: string[] } | string {
     "step-check",
     ...roles,
     ...askBeforeKeys.map((k) => `ask-${k}`),
-    ...tierNames,
-    ...tierNames.map((t) => `${t}-budget`),
+    ...tierFlagNames,
+    ...tierFlagNames.map((t) => `${t}-budget`),
   ];
   for (let i = 0; i < args.length; i++) {
     const a = args[i]!;
@@ -282,7 +287,7 @@ function parseFlags(args: string[]): { flags: Flags; rest: string[] } | string {
     const value = args[i + 1];
     if (!known.includes(key)) return `unknown option '${a}'`;
     if (value === undefined) return `'${a}' needs a value`;
-    const many = key === "heavy" || (tierNames as readonly string[]).includes(key);
+    const many = key === "heavy" || tierFlagNames.includes(key);
     flags[key] = many && flags[key] !== undefined ? `${flags[key]}\n${value}` : value;
     i++;
   }
@@ -299,7 +304,7 @@ export async function addProject(args: string[], ask: Ask, out: (l: string) => v
       out,
       "usage: lineclear project add <repo> [--name N] [--space S] [--check CMD] [--health CMD] [--heavy CMD]... [--worker M,M] [--reviewer M,M] [--planner M,M]",
     );
-  const tierFlag = Object.keys(flags).find((f) => (tierNames as readonly string[]).includes(f.replace(/-budget$/, "")));
+  const tierFlag = Object.keys(flags).find((f) => tierFlagNames.includes(f.replace(/-budget$/, "")));
   if (tierFlag) return fail(out, `add proposes the tiers from the repo; change them after with 'lineclear project set <name> --${tierFlag} ...'`);
   const repo = resolve(rest[0]!);
   if (!existsSync(repo) || !statSync(repo).isDirectory()) return fail(out, `no such folder: ${repo}`);
@@ -384,7 +389,7 @@ export interface SettingsChange {
 
 /** The tiers with a change put in, or why the change cannot be. */
 function changedTiers(s: Settings, change: NonNullable<SettingsChange["tiers"]>): Settings["tiers"] | string {
-  if (typeof change !== "object" || change === null) return "the tiers must be inner, merge and nightly";
+  if (typeof change !== "object" || change === null) return "the tiers must be inner, merge and heavy";
   // only the tiers the owner set are kept: the rest follow the repo and the check as they change
   const next: NonNullable<Settings["tiers"]> = { ...s.tiers };
   for (const [t, spec] of Object.entries(change)) {
@@ -481,9 +486,10 @@ export function changeSettings(name: string, change: SettingsChange, env = proce
 function tierFlags(flags: Record<string, string | undefined>): Partial<Record<Tier, Partial<TierSpec>>> | string {
   const tiers: Partial<Record<Tier, Partial<TierSpec>>> = {};
   for (const t of tierNames) {
-    const commands = flags[t];
-    const budget = flags[`${t}-budget`];
-    if (budget !== undefined && !/^\d+$/.test(budget)) return `--${t}-budget takes whole seconds`;
+    const flag = tierFlagOf(t);
+    const commands = flags[flag];
+    const budget = flags[`${flag}-budget`];
+    if (budget !== undefined && !/^\d+$/.test(budget)) return `--${flag}-budget takes whole seconds`;
     if (commands !== undefined || budget !== undefined)
       tiers[t] = { ...(commands !== undefined ? { commands: splitHeavy(commands) } : {}), ...(budget !== undefined ? { budgetS: Number(budget) } : {}) };
   }
@@ -497,7 +503,7 @@ export function setProject(args: string[], out: (l: string) => void, env = proce
   if (rest.length !== 1 || flags.name || flags.space || Object.keys(flags).length === 0) {
     return fail(
       out,
-      "usage: lineclear project set <name> [--check CMD] [--health CMD] [--heavy CMD]... [--worker M,M] [--reviewer M,M] [--planner M,M] [--ask-plans on|off] [--ask-releases on|off] [--ask-spending on|off] [--inner CMD]... [--merge CMD]... [--nightly CMD]... [--inner-budget S] [--merge-budget S] [--nightly-budget S] [--paused on|off] [--step-check on|off]",
+      "usage: lineclear project set <name> [--check CMD] [--health CMD] [--heavy CMD]... [--worker M,M] [--reviewer M,M] [--planner M,M] [--ask-plans on|off] [--ask-releases on|off] [--ask-spending on|off] [--inner CMD]... [--merge CMD]... [--after-merge CMD]... [--inner-budget S] [--merge-budget S] [--after-merge-budget S] [--paused on|off] [--step-check on|off]",
     );
   }
   const paused = flags.paused;

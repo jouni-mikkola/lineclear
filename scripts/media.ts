@@ -10,7 +10,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-import { slowFailures } from "../src/nightly.ts";
+import { slowFailures } from "../src/heavy-run.ts";
 import { proposeTiers } from "../src/project.ts";
 import sharp, { type OverlayOptions } from "sharp";
 import {
@@ -184,8 +184,8 @@ export function releaseNotes(template: string, ver: string, pictures: string[]):
 
 async function release(ver: string, paths: string[], v: string, tmp: string) {
   if (!/^\d+\.\d+\.\d+$/.test(ver) || paths.length === 0) throw new Error("media: bun run media release <version, such as 0.2.0> <view path>...");
-  const slow = slowFailures(root, proposeTiers(root, "bun run check").nightly.commands);
-  if (slow.length > 0) throw new Error(`media: no release while a slow check fails: ${slow.map((f) => f.name).join(", ")} (bun run nightly)`);
+  const slow = slowFailures(root, proposeTiers(root, "bun run check").heavy.commands);
+  if (slow.length > 0) throw new Error(`media: no release while a slow check fails: ${slow.map((f) => f.name).join(", ")} (bun run heavy)`);
   const dir = rel(`docs/releases/${ver}`);
   mkdirSync(dir, { recursive: true });
   run(["bun", "run", "web:build"]);

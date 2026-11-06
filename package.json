@@ -23,7 +23,7 @@
     "direction": "bun scripts/direction-check.ts",
     "gates": "bun scripts/gates/run.ts",
     "coverage": "bun scripts/coverage.ts",
-    "nightly": "bun scripts/nightly.ts",
+    "heavy": "bun scripts/heavy.ts",
     "gates:full": "bun scripts/gates/run.ts --full",
     "media": "bun scripts/media.ts",
     "check": "bun scripts/check.ts",

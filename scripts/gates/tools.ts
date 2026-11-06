@@ -6,7 +6,7 @@ const repoDir = join(import.meta.dir, "..", "..");
 const binDir = join(repoDir, "node_modules", ".bin");
 let installing: Promise<unknown> | undefined;
 
-/** A fresh checkout has no node_modules (the nightly job runs on one); the first tool run installs them once. */
+/** A fresh checkout has no node_modules (the heavy run is on one); the first tool run installs them once. */
 function ensureInstalled(): Promise<unknown> {
   if (existsSync(join(binDir, "biome"))) return Promise.resolve();
   installing ??= Bun.spawn(["bun", "install", "--frozen-lockfile"], { cwd: repoDir, stdin: "ignore", stdout: "ignore", stderr: "ignore" }).exited;

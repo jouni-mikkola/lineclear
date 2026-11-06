@@ -1,14 +1,20 @@
-name: nightly
+name: heavy
 
 # The heavy suites no pull request or merge waits for: the whole-repo gates, the coverage floors and the browser suite.
+# They run after each push to main. A newer push cancels the run before it, so only the newest main is tested.
+# A red run on main files one fix task for its commit (Lineclear reads it with gh run list).
 # (cold-start and the model evals spend tokens and run on the owner's machines.)
 on:
-  schedule:
-    - cron: "37 2 * * *"
+  push:
+    branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: heavy
+  cancel-in-progress: true
+
 jobs:
-  nightly:
+  heavy:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:

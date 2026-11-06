@@ -165,7 +165,7 @@ export async function checkTier(
     return code;
   };
   const usage = () =>
-    say("usage: lineclear check [--changed] [--tier inner|merge|nightly] [command] | lineclear check --release <test> | lineclear check --log", 2);
+    say("usage: lineclear check [--changed] [--tier inner|merge|heavy] [command] | lineclear check --release <test> | lineclear check --log", 2);
   if (args[0] === "--log") {
     if (args.length !== 1) return usage();
     for (const line of runLog(settings.repo, env)) out(line);

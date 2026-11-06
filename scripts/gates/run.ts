@@ -2,7 +2,7 @@
 // `bun scripts/gates/run.ts [--root <dir>] [--full] [--lower] [--limit <s>] [gate ...]`: --lower writes each baseline
 // down to what is found, --limit fails a run that takes longer. A gate whose faults in a file follow from that file alone (perFile) looks only at the files changed since
 // main, which keeps a merge's check fast; --full, --lower, a change to its config or no main to compare with run it
-// over the whole repo. The nightly job and a release run --full.
+// over the whole repo. The heavy run and a release run --full.
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { borders } from "./borders.ts";
@@ -96,7 +96,7 @@ const took = (performance.now() - runStarted) / 1000;
 if (limit !== undefined && took > limit) {
   if (unusual.length > 0) console.log(`gates: ${took.toFixed(0)} s, over the limit of ${limit} s, not counted: ${unusual.join(", ")} ran cold or whole`);
   else {
-    console.error(`gates: ${took.toFixed(0)} s, over the limit of ${limit} s: move the slow part to the nightly job (L90)`);
+    console.error(`gates: ${took.toFixed(0)} s, over the limit of ${limit} s: move the slow part to the heavy run (L90)`);
     failed = true;
   }
 }

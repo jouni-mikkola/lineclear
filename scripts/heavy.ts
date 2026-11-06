@@ -1,9 +1,9 @@
-// Runs the checks too slow for a merge (src/nightly.ts): the whole-repo gates and the coverage floors. A release
-// runs it first (`bun run media release`) and does not go out when it fails. The rule loop starts it each night with
+// Runs the checks too slow for a merge (src/heavy-run.ts): the whole-repo gates and the coverage floors. A release
+// runs it first (`bun run media release`) and does not go out when it fails. The rule loop starts it after main moves, in a repo with no heavy workflow, with
 // `--out <file>`, which gets the failures as JSON instead of an exit code.
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { slowFailures } from "../src/nightly.ts";
+import { slowFailures } from "../src/heavy-run.ts";
 import type { Numbers } from "../src/measure.ts";
 import { measureMain } from "../src/measure-main.ts";
 import { proposeTiers } from "../src/project.ts";
@@ -35,11 +35,11 @@ function goalChecks(repo: string): { name: string; output: string }[] {
   ].flatMap((f) => (f.output ? [{ name: f.name, output: f.output }] : []));
 }
 
-// `bun run nightly` runs this repo's nightly tier; the rule loop passes the project's own commands after `--out <file>`.
+// `bun run heavy` runs this repo's heavy tier; the rule loop passes the project's own commands after `--out <file>`.
 const args = process.argv.slice(2);
 const out = args.indexOf("--out");
 const given = out >= 0 ? args.slice(out + 2) : [];
-const commands = given.length > 0 ? given : proposeTiers(process.cwd(), "bun run check").nightly.commands;
+const commands = given.length > 0 ? given : proposeTiers(process.cwd(), "bun run check").heavy.commands;
 const failures = [...slowFailures(process.cwd(), commands), ...goalChecks(process.cwd())];
 if (out >= 0) {
   const file = String(args[out + 1]);
@@ -47,6 +47,6 @@ if (out >= 0) {
   renameSync(`${file}.tmp`, file);
   process.exit(0);
 }
-for (const f of failures) console.error(`nightly: ${f.name} failed\n${f.output}`);
-console.log(failures.length ? `nightly: ${failures.length} check(s) failed` : "nightly: every slow check passed");
+for (const f of failures) console.error(`heavy: ${f.name} failed\n${f.output}`);
+console.log(failures.length ? `heavy: ${failures.length} check(s) failed` : "heavy: every slow check passed");
 process.exit(failures.length ? 1 : 0);

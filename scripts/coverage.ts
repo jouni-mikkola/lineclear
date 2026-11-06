@@ -1,5 +1,5 @@
 // Runs the root tests with line coverage and fails when a module is below its floor (scripts/gates/baseline/coverage.json).
-// `--raise` lifts the floors to what is measured; a floor only rises. Run by the nightly job and a release, not by the check.
+// `--raise` lifts the floors to what is measured; a floor only rises. Run by the heavy run and a release, not by the check.
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
