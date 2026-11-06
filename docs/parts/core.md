@@ -7,7 +7,8 @@ settings, writing a file safely, matching a loose name, and the repo's own rules
 
 - An unknown command prints one line and exits 2; a command that throws prints one line, never a stack trace.
 - Every file Lineclear writes for itself goes through `writeAtomic` or `createAtomic`: a crash leaves the old file or the new one.
-- Every path comes from `paths.ts` and the XDG and pi folder variables, so a test can move them all.
+- Every path comes from `paths.ts` and the XDG and pi folder variables, so a test can move them all. `Paths.builds` is the release builds folder, where a release install links the command and the pi extension.
+- `Paths.builds` is the release builds folder: a release install links the command and the pi extension into its `current`, so uninstall treats a link there as its own.
 - A project's settings are read and written by `project.ts` only. Check tiers are `inner`, `merge` and `heavy`; the heavy tier runs after a merge, never by the clock, and a settings file that still says `nightly` is read as `heavy`.
 - A project's `stepCheck` setting, false, turns the step check's model call off; the form rule has no setting.
 - A project's `release.promote` setting, `ask`, makes a checked build wait for the owner's tap instead of promoting by itself.
