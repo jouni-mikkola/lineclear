@@ -6,7 +6,7 @@ import { type TaskRec, ended, labelOf, archiveAfterMs } from './engine-helpers.t
 import { EngineMerge } from './engine-merge.ts'
 import { retireDue } from './retire.ts'
 import * as Lane from './lane.ts'
-import * as Queue from './check-queue.ts'
+import { killWork, workIn } from './machine.ts'
 import { decide } from './lane-watch.ts'
 
 export class EngineTidy extends EngineMerge {
@@ -15,7 +15,7 @@ export class EngineTidy extends EngineMerge {
     const look = this.headWatch.look(
       now,
       (id) => this.task(id)?.landing?.step,
-      (dirs) => Queue.workIn(dirs),
+      (dirs) => workIn(dirs),
     )
     for (const r of look) {
       const t = this.task(r.id)
@@ -35,8 +35,7 @@ export class EngineTidy extends EngineMerge {
       const run = this.runOf.get(t.id)
       if (run !== undefined) this.cut.add(run)
       this.headWatch.end(t.id)
-      Queue.killWork(t.worktree ? [t.worktree] : [])
-      Queue.releaseTurn(Queue.lineOn(repo, t.machine), t.id)
+      killWork(t.worktree ? [t.worktree] : [])
       this.land(t)
       t.mergeStopped = hung.slice(0, 300)
       this.save()

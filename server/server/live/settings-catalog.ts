@@ -211,12 +211,6 @@ export const CATALOG: Section[] = [
     ],
   },
   {
-    name: 'Checks',
-    about:
-      "Where a task's full check runs before it lands. Local: on this machine, in the merge line. GitHub: the task's pull request is opened or updated and lineclear merge waits for the checks GitHub runs on it (and its merge queue).",
-    rows: [{ label: 'Full check runs', key: 'check.where', value: 'local', options: ['local', 'github'] }],
-  },
-  {
     // which agent (CLI), model and effort each kind of agent starts with
     name: 'Agents',
     about:

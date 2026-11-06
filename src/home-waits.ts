@@ -4,7 +4,7 @@ import { DAY } from "./time.ts";
 import { dataDir } from "./paths.ts";
 import { join } from "node:path";
 import { type Blocker, day } from "./progress.ts";
-import { checkLines, readWaits, type Wait, waitGroups } from "./waits.ts";
+import { readWaits, type Wait, waitGroups } from "./waits.ts";
 import type { Decision } from "./rules.ts";
 import { readDecisionsSince } from "./stall-class.ts";
 import type { Env, HomeTask, HomeWaiting } from "./home-data.ts";
@@ -23,15 +23,15 @@ export function waitBlocker(w: Wait): Blocker {
 }
 
 /** What holds up a space's open tasks: their waits, and a main that stays red. Home and the roadmap's line read the same. */
-export function spaceStops(key: string, path: string, waits: Wait[], env: Env): Blocker[] {
-  return [...waits.filter((w) => String(w.task).startsWith(`${key}-`)).map(waitBlocker), ...checkLines(path, env).map((text) => ({ text }))];
+export function spaceStops(key: string, waits: Wait[]): Blocker[] {
+  return [...waits.filter((w) => String(w.task).startsWith(`${key}-`)).map(waitBlocker)];
 }
 
 /** `spaceStops` for a space known by its name. */
-export function stopsOfSpace(name: string, path: string, env: Env): Blocker[] {
+export function stopsOfSpace(name: string, env: Env): Blocker[] {
   const spaces: { name?: string; key?: string }[] = readJson(join(dataDir(env), "spaces.json")) ?? [];
   const key = spaces.find((s) => s.name === name)?.key;
-  return key ? spaceStops(String(key), path, readWaits(env), env) : [];
+  return key ? spaceStops(String(key), readWaits(env)) : [];
 }
 
 /** The rule loop's reason for a skipped step in plain words: no lock names, and the step that holds a lock by its title. */

@@ -8,7 +8,7 @@ import { join } from 'node:path'
 const IDLE_MS = 15 * 60_000
 
 interface Head {
-  /** when it took the line, moved forward while it waits for the check slot */
+  /** when it took the line */
   since: number
   /** when its steps or processes last showed progress */
   moved: number
@@ -41,15 +41,14 @@ export class HeadWatch {
 
   /**
    * One look at every head: `step` is its landing step and `work` its processes (their count and CPU ticks). A new
-   * step, a process that came or went, or CPU used is progress. A head waiting for the check slot holds nothing yet.
+   * step, a process that came or went, or CPU used is progress.
    */
   look(now: number, step: (id: string) => string | undefined, work: (dirs: string[]) => { pids: number[]; ticks: number }): Release[] {
     const out: Release[] = []
     for (const [id, h] of this.heads) {
       const [s, w] = [step(id) ?? '', work(h.dirs)]
       const seen = `${s} ${w.pids.length} ${w.ticks}`
-      if (s === 'queue') h.since += now - h.at
-      if (s === 'queue' || (h.seen !== undefined && seen !== h.seen)) h.moved = now
+      if (h.seen !== undefined && seen !== h.seen) h.moved = now
       h.seen = seen
       h.at = now
       const minutes = Math.round((now - h.since) / 60_000)

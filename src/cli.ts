@@ -98,7 +98,6 @@ export const commands: Record<string, string> = {
   inbox: "List open items of every machine (--all adds closed ones of this one), or answer one: inbox answer <n> <choice>",
   resume: "End this task's declared wait",
   check: "Run the project's check (or the command given) in its turn: one full check at a time per machine; --changed runs only what the branch changed",
-  slot: 'Run a heavy command (a test or browser suite) when a check slot is free: slot "<command>"',
   uninstall: "Remove what install added (--all also removes settings and secrets)",
   help: "List the commands (one meaning per name: status, plan and ask say above which job a word does, doctor checks every machine)",
 };
@@ -156,7 +155,7 @@ async function dispatch(args: string[], out: (line: string) => void = console.lo
     out(versionLine());
     return 0;
   }
-  if (name === "wait" || name === "resume" || name === "check" || name === "slot") return waitsMain(name, rest, out);
+  if (name === "wait" || name === "resume" || name === "check") return waitsMain(name, rest, out);
   if (name === "doctor" || name === "uninstall") {
     try {
       return await installCommand(name, rest, out);

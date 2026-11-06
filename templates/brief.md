@@ -19,14 +19,12 @@ Read the rest of the idea only as you need. Do exactly what "done when" says, no
 Do not read the whole docs/ROADMAP.md: it is large and stays in your context on every turn. To see another step, run
 `lineclear roadmap show <id>`.
 {{files}}{{rules}}
-Check: while you work, run the test files you touch directly (`bun test <file>`); run `lineclear check --changed` once before `lineclear ready`, not after each edit (it runs `{{check}}` with `--changed` when a
-check slot is free: only the tests that reach your change, the types and the gates of what you changed). It must pass.
+Check: while you work, run the test files you touch directly (`bun test <file>`); run `lineclear check --changed` once before `lineclear ready`, not after each edit (it runs `{{check}}` with `--changed`:
+only the tests that reach your change, the types and the gates of what you changed). It must pass.
 Do not run the full check yourself: it runs once, in the merge lane, after the rebase, and a red result comes back to
 you with the failing test named. For a change in ui/ run `bun run ui:changed` (only the specs of the views you changed).
 When a check fails, read its output and fix the cause: never run it again to get past a failure. A test that failed
 and then passed on one commit is quarantined by itself.
-A project script must not keep its own global lock (flock or similar) for heavy tests: it blocks everyone outside the line.
-Wrap the heavy part in `lineclear slot` instead.
 
 {{review}}
 Outward actions: anything that reaches outside this repo (a push to another repo, a message, a deploy, a delete

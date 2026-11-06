@@ -10,7 +10,7 @@ import { lineclearTasks } from "./roadmap-source.ts";
 import { readState } from "./rules.ts";
 import { notReached, silentMachines } from "./spread.ts";
 import { countWaiting, waitingForYou } from "./waiting.ts";
-import { projectCheckLines, readWaits, type Wait, waitsForOwner } from "./waits.ts";
+import { readWaits, type Wait, waitsForOwner } from "./waits.ts";
 
 const describeWait = (w: Wait) =>
   `${w.task} ${waitsForOwner(w) ? "waits" : "paused, waits"} for ${w.kind === "until" ? `${w.until}` : w.kind === "task" ? `task ${w.for}` : w.kind}: ${w.reason}`;
@@ -68,7 +68,6 @@ function problemsOf(name: string, env: NodeJS.ProcessEnv): string[] {
   return [
     ...state.roadmapErrors.map((e) => `roadmap broken, nothing starts: ${e}`),
     ...(state.stopped ? ["new starts stopped: the health command failed twice in a row"] : []),
-    ...projectCheckLines(name, env),
     ...laneLines(name, env),
     ...readWaits(env)
       .filter((w) => w.project === name)

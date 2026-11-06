@@ -10,7 +10,6 @@ import { EngineTidy } from './engine-tidy.ts'
 import { CpuMeter, readProc } from './cpu-meter.ts'
 import { type TaskRec, ended, RECHECK_FIRST, SWEEP_FIRST, SWEEP_EVERY, WATCH_FIRST, WATCH_EVERY, STALL_EVERY, CPU_EVERY, LATER } from './engine-helpers.ts'
 export type { TaskRec, Harness } from './engine-helpers.ts'
-export { landingLine } from './lane.ts'
 export { reportOf, ended, MERGE_DEADLINE, STALL_QUIET, SILENT_NEED, checkTitle } from './engine-helpers.ts'
 
 export class Engine extends EngineTidy {

@@ -25,7 +25,6 @@ interface Opts {
   remoteTasks?: object[];
   remoteMax?: number;
   remoteLoadPerCore?: number;
-  slotsBusy?: number;
   unreachable?: boolean;
   freeKb?: number;
   /** Project settings added to the project's (`local: false`). */
@@ -59,9 +58,8 @@ function setup(o: Opts) {
   if (o.unreachable) writeFileSync(join(home, "down"), "");
   // `secrets import <space>` keeps what it was sent and the space, since the fake machine has no vault of its own
   script(join(home, ".local", "bin", "lineclear"), `[ "$1 $2" = "secrets import" ] && { echo "$3" > "$HOME/imported-space"; cat > "$HOME/imported"; exit 0; }`);
-  mkdirSync(join(dir, "config", "check-slots", "farbox"), { recursive: true });
-  writeFileSync(join(dir, "config", "machine.json"), JSON.stringify({ loadPerCore: o.remoteLoadPerCore ?? 0.5, checkSlots: 2 }));
-  for (let i = 0; i < (o.slotsBusy ?? 0); i++) writeFileSync(join(dir, "config", "check-slots", "farbox", `slot-${i}`), String(process.pid));
+  mkdirSync(join(dir, "config"), { recursive: true });
+  writeFileSync(join(dir, "config", "machine.json"), JSON.stringify({ loadPerCore: o.remoteLoadPerCore ?? 0.5 }));
   // The one server's `room` and `task list` for farbox, and `task add --on farbox`, which lands in the second machine's log.
   writeFileSync(
     join(fake, "farbox.js"),
@@ -311,13 +309,10 @@ test("with no room anywhere the step waits, and the reason names each machine", 
   expect(d[0]!.reason).toContain("farbox: no free slot (1 of 1 working)");
 });
 
-test("a second machine that is loaded or has all its check slots busy takes no task", () => {
+test("a second machine that is loaded takes no task", () => {
   const loaded = setup({ steps: [step("A")], localMax: 0, remoteLoadPerCore: 0.0001 });
   expect(loaded.doTick()[0]!.reason).toContain("farbox: load average");
   expect(loaded.remote()).toBe("");
-  const busy = setup({ steps: [step("A")], localMax: 0, slotsBusy: 2 });
-  expect(busy.doTick()[0]!.reason).toContain("farbox: all 2 check slots are in use");
-  expect(busy.remote()).toBe("");
 });
 
 test("a dry run starts nothing on the second machine", () => {

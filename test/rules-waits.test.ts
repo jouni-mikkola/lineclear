@@ -1,11 +1,10 @@
 // lineclear wait, ask, inbox and check on a project of the rules tests (rules-world.ts).
 import { expect, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { inboxMain } from "../src/inbox-answer.ts";
 import { askMain, readItems } from "../src/inbox.ts";
-import { check, isCheap, lineOf, parseUntil, waitsMain } from "../src/waits.ts";
-import { until } from "./helpers.ts";
+import { parseUntil } from "../src/waits.ts";
 import { run, setup, status, step, waitsOf } from "./rules-world.ts";
 
 test("each wait kind is declared, shows in status and ends with resume", async () => {
@@ -142,58 +141,6 @@ test("a task wait: refuses an unknown task, holds while the other works, wakes w
   expect(waitsOf(t)).toHaveLength(0);
 });
 
-test("three checks with two slots still run one at a time, and the two after the first declare checks waits", async () => {
-  const t = setup();
-  const log = join(t.dir, "check.log");
-  const gate = join(t.dir, "go");
-  const cmd = `echo start >> ${log}; while [ ! -f ${gate} ]; do sleep 0.02; done; echo end >> ${log}`;
-  const settingsFile = join(t.env.LINECLEAR_CONFIG, "projects", "demo", "settings.json");
-  writeFileSync(settingsFile, JSON.stringify({ ...JSON.parse(readFileSync(settingsFile, "utf8")), check: cmd }));
-  writeFileSync(join(t.env.LINECLEAR_CONFIG, "machine.json"), JSON.stringify({ checkSlots: 2, loadPerCore: 1e6 }));
-  const go = (task: string) => check(() => {}, { ...t.env, LINECLEAR_TASK: task }, { cwd: t.repo, pollMs: 20 });
-  const runs = [go("LIN-1"), go("LIN-2"), go("LIN-3")];
-  await until(() => existsSync(log) && readFileSync(log, "utf8").includes("start") && waitsOf(t).length === 2);
-  expect(readFileSync(log, "utf8").trim().split("\n")).toEqual(["start"]);
-  expect(waitsOf(t).map((w) => `${w.task}:${w.kind}`)).toEqual(["LIN-2:checks", "LIN-3:checks"]);
-  writeFileSync(gate, "");
-  expect(await Promise.all(runs)).toEqual([0, 0, 0]);
-  const order = readFileSync(log, "utf8").trim().split("\n");
-  let open = 0;
-  let peak = 0;
-  for (const e of order) {
-    open += e === "start" ? 1 : -1;
-    peak = Math.max(peak, open);
-  }
-  expect(order).toHaveLength(6);
-  expect(peak).toBe(1);
-  expect(waitsOf(t)).toHaveLength(0);
-});
-
-/** a turn in the full-check line held by this process, as `lineclear check` leaves one */
-const joinLine = (config: string, repo: string, who: string, since: number) => {
-  const dir = join(config, "check-queue", lineOf(repo));
-  mkdirSync(dir, { recursive: true });
-  const file = join(dir, `${String(since).padStart(15, "0")}-${who}.json`);
-  writeFileSync(file, JSON.stringify({ pid: process.pid, who, since }));
-  return file;
-};
-
-test("a slot waits for the full checks in line before it, and not for those that came after it", async () => {
-  const world = setup();
-  writeFileSync(join(world.env.LINECLEAR_CONFIG, "machine.json"), JSON.stringify({ checkSlots: 2, loadPerCore: 1e6 }));
-  const config = world.env.LINECLEAR_CONFIG;
-  const mark = join(world.dir, "slot-ran");
-  const before = joinLine(config, world.repo, "LIN-1", Date.now() - 50);
-  const slotRun = waitsMain("slot", [`touch ${mark}`], () => {}, { ...world.env, LINECLEAR_TASK: "LIN-2" }, world.repo);
-  const after = joinLine(config, world.repo, "LIN-3", Date.now() + 5000);
-  await Bun.sleep(1500);
-  expect(existsSync(mark)).toBe(false);
-  rmSync(before);
-  expect(await slotRun).toBe(0);
-  expect(existsSync(mark)).toBe(true);
-  rmSync(after);
-});
-
 test("a wait for the owner without a kind is refused, and so is a kind that is not one of the three", async () => {
   const t = setup();
   for (const args of [
@@ -257,17 +204,6 @@ test("a login wait for the owner is refused when the TOTP is loadable, and must 
   // the plain login wait is the same door, and a captcha stays the owner's
   expect((await run(t, "wait", ["login", "Approve the push, number 65"])).code).toBe(1);
   expect((await run(t, "wait", ["login", "M365_GA shows a captcha"])).code).toBe(0);
-});
-
-test("a cheap command named to lineclear check takes no turn; a bun test of a whole suite does", () => {
-  expect(isCheap("bun run types")).toBe(true);
-  expect(isCheap("bun test test/rules-waits.test.ts")).toBe(true);
-  expect(isCheap("bun test")).toBe(false);
-  expect(isCheap("bun run check")).toBe(false);
-  expect(isCheap("bun test --coverage")).toBe(false);
-  expect(isCheap("bun test a.ts && rm -rf x")).toBe(false);
-  expect(isCheap("bun test .")).toBe(false);
-  expect(isCheap("tsc && bun run check")).toBe(false);
 });
 
 test("a login wait is sent back to a stored USER and PASSWORD login its text names, and reaches the owner when none matches", async () => {

@@ -216,7 +216,6 @@ export class Settings {
       rounds: Number.isFinite(rounds) && rounds > 0 ? rounds : 3,
       merge: merge === 'ask me first' ? merge : 'on its own',
       waitChecks: merge === 'after GitHub checks',
-      checkWhere: get('check.where') === 'github' ? 'github' : 'local',
     }
   }
 
@@ -235,13 +234,12 @@ export class Settings {
         .map((p) => p.from)
       return (['space', 'machine', 'all'] as const).find((f) => froms.includes(f))
     }
-    const all: Record<Said, SetBy | undefined> = {
+    const all: Record<Exclude<Said, 'check'>, SetBy | undefined> = {
       review: by('brief.review'),
       reviewer: by('reviewer.agent', 'reviewer.model', 'reviewer.effort'),
       mustFix: by('review.mustFix'),
       rounds: by('review.rounds'),
       merge: by('brief.merge'),
-      check: by('check.where'),
       agent: by('task.agent', 'task.model', 'task.effort'),
     }
     return Object.fromEntries(Object.entries(all).filter(([, v]) => v)) as Partial<Record<Said, SetBy>>

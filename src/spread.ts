@@ -1,4 +1,4 @@
-import { machineLimits, slotsHeld } from "../server/server/live/engine/check-queue.ts";
+import { machineLimits } from "../server/server/live/engine/machine.ts";
 import { serverBin } from "./paths.ts";
 import { listProjectNames, projectsDir, readSettings } from "./project.ts";
 import { readFileSync } from "node:fs";
@@ -26,9 +26,6 @@ export interface Room {
   max: number | undefined;
   load: number;
   loadLimit: number;
-  /** Check slots in use and in all. */
-  slotsBusy: number;
-  slots: number;
   /** Free memory in KiB, as herdr reads it there. */
   freeKb?: number;
 }
@@ -92,23 +89,19 @@ export interface Candidate {
   host: string | undefined;
   load: number;
   loadLimit: number;
-  /** Task slots left, then check slots left. */
+  /** Task slots left. */
   free: number;
-  slotsFree: number;
 }
 
-/** The candidate with the most room: the lowest load against its limit, then the most free task slots, then check slots. The first of equals wins, so this machine goes first. */
+/** The candidate with the most room: the lowest load against its limit, then the most free task slots. The first of equals wins, so this machine goes first. */
 export function mostRoom(candidates: Candidate[]): Candidate | undefined {
   const used = (c: Candidate) => c.load / c.loadLimit;
   const better = (c: Candidate, best: Candidate) => {
     if (Math.abs(used(best) - used(c)) > 0.05) return used(c) < used(best);
-    return c.free !== best.free ? c.free > best.free : c.slotsFree > best.slotsFree;
+    return c.free > best.free;
   };
   return candidates.reduce<Candidate | undefined>((best, c) => (best === undefined || better(c, best) ? c : best), undefined);
 }
-
-/** Check slots free on this machine. */
-export const localSlotsFree = (env: Env = process.env) => machineLimits(env).slots - slotsHeld(env);
 
 /** Why the machine takes no new task now, or undefined when it has room. */
 export function roomLack(r: Room): string | undefined {
@@ -116,7 +109,6 @@ export function roomLack(r: Room): string | undefined {
   if (r.working >= r.max) return `no free slot (${r.working} of ${r.max} working)`;
   if (r.load > r.loadLimit) return `load average ${r.load.toFixed(1)} is above its limit of ${r.loadLimit}`;
   if (r.freeKb !== undefined && r.freeKb < MIN_FREE_KB) return `only ${Math.round(r.freeKb / 1024)} MiB of memory is free (it needs ${MIN_FREE_KB / 1024})`;
-  if (r.slotsBusy >= r.slots) return `all ${r.slots} check slots are in use`;
   return undefined;
 }
 
@@ -147,7 +139,7 @@ export function readRoom(host: string, space: string, env: Env = process.env): R
   if (typeof read === "string") return `${host} cannot be reached: ${read}`;
   const list = serverJson<(Task & { machine?: string })[]>(env, ["task", "list", "--space", space, "--json"]);
   if (typeof list === "string") return `${host}: task list failed: ${list}`;
-  const { slots, loadLimit } = machineLimits({ ...env, LINECLEAR_CORES: String(read.cores) });
+  const { loadLimit } = machineLimits({ ...env, LINECLEAR_CORES: String(read.cores) });
   return {
     host,
     tasks: list
@@ -157,8 +149,6 @@ export function readRoom(host: string, space: string, env: Env = process.env): R
     max: read.max ?? undefined,
     load: read.load,
     loadLimit,
-    slotsBusy: slotsHeld({ ...env, LINECLEAR_MACHINE: host }),
-    slots,
     freeKb: read.freeKb,
   };
 }

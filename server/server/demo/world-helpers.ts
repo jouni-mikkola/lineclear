@@ -6,7 +6,6 @@ export const DEFAULT_WAYS = {
   rounds: Number.parseInt(defaultOf('review.rounds')!, 10),
   merge: defaultOf('brief.merge')!,
   waitChecks: defaultOf('brief.merge') === 'after GitHub checks',
-  checkWhere: 'local' as const,
 }
 export const DEFAULT_REVIEWER = { kind: kindOf(defaultOf('reviewer.agent')!)! }
 

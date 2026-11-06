@@ -4,9 +4,9 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync 
 import { writeAtomic } from "../pi/atomic.ts";
 import { dirname, join } from "node:path";
 import { guardGroup, killGroup } from "./process-group.ts";
-import * as Q from "../server/server/live/engine/check-queue.ts";
+import * as Q from "../server/server/live/engine/machine.ts";
 import { storedLoginAdvice } from "./secrets.ts";
-import { detectHeavy, listProjectNames, readSettings, type Settings } from "./project.ts";
+import { listProjectNames, readSettings, type Settings } from "./project.ts";
 import { checkTier } from "./check-tier.ts";
 import type { Tier } from "./check-runs.ts";
 import { day } from "./progress.ts";
@@ -17,7 +17,6 @@ import { serverBin } from "./paths.ts";
 const waitKinds = ["owner", "login", "checks", "browser"] as const;
 /** The only things an owner wait may be for: a login code, money beyond the budget, or something that leaves the machine. */
 const ownerKinds = ["login", "money", "outward"] as const;
-const CHECK_POLL_MS = 1000;
 const TASK_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 
 export interface Wait {
@@ -42,26 +41,10 @@ const waitsDir = (env = process.env) => join(configDir(env), "waits");
 export const waitPath = (task: string, env = process.env) => join(waitsDir(env), `${task}.json`);
 
 export const limitOf = Q.limitOf;
-export const lineOf = Q.lineOf;
-export const machineOf = Q.machineOf;
-
-/** One line for each check line of a repo that has a check in it, named with its machine: what it holds, or that it is stuck. */
-export const checkLines = (repo: string, env = process.env): string[] =>
-  Q.linesOf(repo, env).flatMap((line) => {
-    const stuck = Q.stuckHeads(line, env).map((h) => Q.stuckLine(h, line));
-    return stuck.length ? stuck : [Q.lineState(line, env)].filter(Boolean);
-  });
-
-/** The same for a project's repo. */
-export function projectCheckLines(project: string, env = process.env): string[] {
-  const s = readSettings(project, env);
-  return typeof s === "string" ? [] : checkLines(s.repo, env);
-}
-
 /** A machine's load limit: its machine.json's load per core (1 if unset) times its cores. */
 export const loadLimit = (env = process.env) => Q.machineLimits(env).loadLimit;
 
-/** A wait the owner answers; every other wait (a task, a time, a check slot, a failed start) pauses the agent alone. */
+/** A wait the owner answers; every other wait (a task, a time, a failed start) pauses the agent alone. */
 export const waitsForOwner = (w: Wait) => w.kind === "owner" || w.kind === "login" || w.kind === "browser";
 
 export function readWaits(env = process.env): Wait[] {
@@ -144,34 +127,6 @@ export function parseUntil(text: string, now: Date): Date | undefined {
   return Number.isNaN(d.getTime()) ? undefined : d;
 }
 
-/**
- * What a command costs, in slots. A browser suite starts a browser per worker and loads the machine like several
- * suites, so it takes two slots; any other command takes one. A cost above the machine's slots takes them all.
- */
-function slotCost(command: string): number {
-  return /playwright|ui:test|ui:record|test:e2e|\be2e\b|chromium|cypress|puppeteer/i.test(command) ? 2 : 1;
-}
-
-/** A command named on the command line that is quick: the types, or a few test files. It takes a slot but no full-check turn. */
-export function isCheap(command: string): boolean {
-  return /^\s*(bun run types|bunx? tsc( --noEmit)?|bun test( [\w./-]+\.(ts|tsx|js|jsx)){1,5})\s*$/.test(command);
-}
-
-export interface CheckOptions {
-  cwd?: string;
-  pollMs?: number;
-  /** A light run (the inner tier) takes a slot but is not refused while the merge lane runs. */
-  noTurn?: boolean;
-  /** A full check: one at a time in its repo's line, which merges wait in too, and holding a check slot while it runs. */
-  full?: boolean;
-  /** `lineclear check`, not `lineclear slot`: an agent's own check is refused while the merge lane is in the line. */
-  checking?: boolean;
-  /** Hears the command's output as it comes, which still goes to this process's own output too. */
-  hear?: (text: string) => void;
-  /** Hears how long the run waited for its turn and a slot, in ms, when it starts. */
-  waited?: (ms: number) => void;
-}
-
 /** Copies a child's output to this process's own, and hands each piece to `hear` as text. */
 async function tee(from: unknown, to: NodeJS.WriteStream, hear: (text: string) => void) {
   const text = new TextDecoder();
@@ -181,44 +136,10 @@ async function tee(from: unknown, to: NodeJS.WriteStream, hear: (text: string) =
   }
 }
 
-/** An agent's own check meets the merge lane in the line: it is refused. */
-function refuseForLane(): number {
-  console.error("lineclear check: the merge lane runs the check; run the tests you changed");
-  return 1;
-}
-
-/** What a run waiting for its turn says on its task's line. */
-function waitReason(w: { full: boolean; noSlot: boolean; behindCheck: boolean; ahead: number; cost: number; slots: number; machine: string }): string {
-  if (w.full && w.noSlot) return `waiting for a check slot on ${w.machine} (${w.slots} at once, shared by every repo on ${w.machine})`;
-  if (w.full) return `waiting for the check slot on ${w.machine} (${w.ahead} ahead, one full check at a time)`;
-  if (w.behindCheck) return `waiting for the full check in line on ${w.machine} to end (it goes first)`;
-  return `waiting for ${w.cost > 1 ? `${Math.min(w.cost, w.slots)} check slots` : "a check slot"} on ${w.machine} (${w.slots} at once)`;
-}
-
-const SLOT_HELD = "LINECLEAR_SLOT_HELD"; // set in a slot's command: a check script it starts takes no second slot
-/** A heavy job runs at the lowest CPU and disk priority, so the board, the chats and herdr keep the machine. */
-export const lowPriority = (command: string, ionice = Bun.which("ionice") !== null): string[] => [
-  "nice",
-  "-n",
-  "19",
-  ...(ionice ? ["ionice", "-c", "3"] : []),
-  "sh",
-  "-c",
-  command,
-];
-
-/** Runs the command (at low priority) in a process group of its own (the check's), its output on ours (and heard, when asked); `started` gets the process. */
-async function runChild(command: string, cwd: string, hear: CheckOptions["hear"], started: (c: ReturnType<typeof Bun.spawn>) => void): Promise<number> {
+/** Runs the command in a process group of its own (the check's), its output on ours (and heard, when asked). */
+async function runChild(command: string, cwd: string, hear: ((text: string) => void) | undefined): Promise<number> {
   const io = hear ? "pipe" : "inherit";
-  const child = Bun.spawn(lowPriority(command), {
-    cwd,
-    stdin: "ignore",
-    stdout: io,
-    stderr: io,
-    detached: true,
-    env: { ...process.env, [SLOT_HELD]: "1" },
-  });
-  started(child);
+  const child = Bun.spawn(["sh", "-c", command], { cwd, stdin: "ignore", stdout: io, stderr: io, detached: true });
   const watcher = guardGroup(child.pid, process.pid);
   try {
     if (!hear) return await child.exited;
@@ -231,134 +152,9 @@ async function runChild(command: string, cwd: string, hear: CheckOptions["hear"]
   }
 }
 
-/**
- * Runs a shell command once its turn comes: a full check when the ones before it in its repo's line are done and a
- * check slot is free, any other heavy command when its repo has no check in line and a check slot is free. Two repos
- * never wait for each other's line. Waiting is a `checks` wait. The turn and slot are freed when the command ends or is
- * killed.
- */
-async function runInSlot(command: string, name: string, env = process.env, o: CheckOptions = {}): Promise<number> {
-  const cwd = o.cwd ?? process.cwd();
-  const task = findTask(cwd, env);
-  const slots = Q.machineLimits(env).slots;
-  const cost = slotCost(command);
-  const settings = readSettings(name, env);
-  const line = Q.lineOf(typeof settings === "object" ? settings.repo : name, env);
-  const turn = o.full ? Q.joinLine(task ?? name, line, env) : undefined;
-  const watch = turn === undefined ? undefined : Q.watchProgress(turn, env);
-  let slot: string[] | undefined;
-  let noSlot = false; // a full check whose turn has come and no slot is free
-  let releaseHeld = false; // a release check holds the machine's slots
-  let behindCheck = false; // another heavy run waits for the full checks in line before it, even with a slot free
-  // a full check: the checks before it in line, or 1 with no slot free; any other heavy command: 1 behind a full check or with no slot
-  const arrived = Date.now();
-  const checksBefore = () => Q.checkLine(line, env).filter((t) => t.since <= arrived).length;
-  const before = () => {
-    if ((releaseHeld = Q.releaseHolder(env) !== undefined)) return 1;
-    if (turn !== undefined) {
-      const n = Q.ahead(turn, env);
-      if (n) return n;
-      slot = Q.takeSlots(1, env, { yieldToLane: task !== undefined });
-      noSlot = slot === undefined;
-      if (!noSlot) Q.startTurn(turn, env);
-      return noSlot ? 1 : 0;
-    }
-    // a light run is quick: it waits for a slot, never for the full checks in line
-    behindCheck = !o.noTurn && checksBefore() > 0;
-    if (behindCheck) return 1;
-    slot = Q.takeSlots(cost, env, { yieldToLane: task !== undefined });
-    if (slot === undefined) return 1;
-    // a check from before this run joined the line meanwhile: it counted this slot as held, or this run lets go
-    if (!o.noTurn && checksBefore() > 0) {
-      for (const f of slot) rmSync(f, { force: true });
-      slot = undefined;
-      behindCheck = true;
-      return 1;
-    }
-    return 0;
-  };
-  let mine = false;
-  let said = "";
-  const since = new Date().toISOString();
-  // an agent's own wait (for the owner, say) is never written over
-  const own = task !== undefined && existsSync(waitPath(task, env));
-  const say = (n: number) => {
-    if (own) return;
-    const machine = Q.machineOf(env);
-    const reason = releaseHeld
-      ? `waiting for the release check on ${machine}`
-      : waitReason({ full: turn !== undefined, noSlot, behindCheck, ahead: n, cost, slots, machine });
-    if (mine && reason === said) return;
-    if (task === undefined)
-      console.error(`lineclear: ${reason}`); // shows a person at a terminal that nothing hung
-    else writeWait({ task, project: name, kind: "checks", reason, since }, env);
-    mine = true;
-    said = reason;
-  };
-  let n = before();
-  if (n > 0) say(n);
-  const dropWait = () => {
-    if (mine && task !== undefined) clearWait(task, env);
-    mine = false;
-  };
-  let child: ReturnType<typeof Bun.spawn> | undefined;
-  const release = () => {
-    for (const f of slot ?? []) rmSync(f, { force: true });
-    watch?.stop();
-    if (turn !== undefined) Q.leaveLine(turn, env);
-    dropWait();
-  };
-  const onExit = () => {
-    if (child !== undefined) killGroup(child.pid);
-    release();
-  };
-  const killed = (code: number) => () => {
-    onExit();
-    process.exit(code);
-  };
-  const onInt = killed(130);
-  const onTerm = killed(143);
-  process.once("SIGINT", onInt);
-  process.once("SIGTERM", onTerm);
-  process.once("exit", onExit);
-  // an agent's own check never goes ahead of the merge lane
-  const gives = () => o.checking === true && !o.noTurn && agentTask(env) !== undefined && Q.laneInLine(line, env);
-  try {
-    if (gives()) return refuseForLane();
-    while (n > 0) {
-      await Bun.sleep(o.pollMs ?? CHECK_POLL_MS);
-      if (gives()) return refuseForLane();
-      n = before();
-      if (n > 0) say(n);
-    }
-    dropWait();
-    o.waited?.(Date.now() - arrived);
-    return await runChild(command, cwd, o.hear, (c) => {
-      child = c;
-      watch?.track(c.pid);
-    });
-  } finally {
-    release();
-    process.removeListener("exit", onExit);
-    process.removeListener("SIGINT", onInt);
-    process.removeListener("SIGTERM", onTerm);
-  }
-}
-
 /** One `--changed` run, in the check log like every other. */
-function changedRun(
-  command: string,
-  tier: Tier,
-  settings: Settings,
-  name: string,
-  env: NodeJS.ProcessEnv,
-  cwd: string,
-  out: (l: string) => void,
-  o: CheckOptions,
-) {
-  return checkTier(["--tier", tier, command], settings, out, env, cwd, (c, _t, hear, waited) =>
-    runInSlot(c, name, env, { ...o, checking: true, hear, waited }),
-  );
+function changedRun(command: string, tier: Tier, settings: Settings, env: NodeJS.ProcessEnv, cwd: string, out: (l: string) => void) {
+  return checkTier(["--tier", tier, command], settings, out, env, cwd, (c, _t, hear) => runChild(c, cwd, hear));
 }
 
 /** Runs the server's command for this agent; its words, and whether it passed. */
@@ -368,13 +164,13 @@ function serverCall(args: string[], env: NodeJS.ProcessEnv, cwd: string) {
 }
 
 /**
- * The full check of a project whose Settings run it on GitHub: the task's branch goes to GitHub as a pull request and
+ * The full check of an agent: the task's branch goes to GitHub as a pull request and
  * the result of GitHub's check run comes back with the failed tests, so no check script runs on this machine.
- * Undefined when this is not an agent's check or its space runs the full check here.
+ * Undefined when this is not an agent's check.
  */
 function checkOnGitHub(out: (l: string) => void, env: NodeJS.ProcessEnv, cwd: string): number | undefined {
   const task = agentTask(env);
-  if (task === undefined || serverCall(["check-where"], env, cwd).text !== "github") return undefined;
+  if (task === undefined) return undefined;
   const pushed = serverCall(["pr", task], env, cwd);
   out(pushed.text);
   if (!pushed.ok) return 1;
@@ -387,12 +183,11 @@ function checkOnGitHub(out: (l: string) => void, env: NodeJS.ProcessEnv, cwd: st
 }
 
 /**
- * `lineclear check [--tier inner|merge|heavy] [command]`: a tier's commands (the merge tier, the full check, when no
- * tier is named), or the command given, in its turn: one full check at a time. The inner tier waits for no turn.
- * `lineclear check --changed` is the worker's loop: the project's check told to look only at what the branch changed,
- * in an ordinary check slot, since it is short. The full check runs once, in the merge lane.
+ * `lineclear check [--tier inner|merge|heavy] [command]`: an agent's full check goes to GitHub; a tier's commands, or the
+ * command given, run here. `lineclear check --changed` is the worker's loop: the project's check told to look only at
+ * what the branch changed, since it is short.
  */
-export async function check(out: (l: string) => void, env = process.env, o: CheckOptions = {}, args: string[] = []): Promise<number> {
+export async function check(out: (l: string) => void, env = process.env, o: { cwd?: string } = {}, args: string[] = []): Promise<number> {
   const cwd = o.cwd ?? process.cwd();
   const name = findProject(cwd, env);
   const settings = name === undefined ? undefined : readSettings(name, env);
@@ -407,59 +202,17 @@ export async function check(out: (l: string) => void, env = process.env, o: Chec
     // only a check that is Lineclear's own script is known to take the flag; any other project's runs in full
     const script = join(cwd, "scripts/check.ts");
     if (!command && /\bbun run check\b/.test(settings.check) && existsSync(script) && readFileSync(script, "utf8").includes("--changed")) {
-      return changedRun(`${settings.check} --changed`, "inner", settings, name, env, cwd, out, o);
+      return changedRun(`${settings.check} --changed`, "inner", settings, env, cwd, out);
     }
     out("lineclear check --changed: this project's check does not take --changed, so the full check runs");
-    return changedRun(command ?? settings.check, "inner", settings, name, env, cwd, out, { ...o, full: true });
+    return changedRun(command ?? settings.check, "inner", settings, env, cwd, out);
   }
-  // an agent's full check goes to GitHub where Settings say so; a named command or tier runs as asked
+  // an agent's full check goes to GitHub; a named command or tier runs as asked
   if (args.length === 0) {
     const github = checkOnGitHub(out, env, cwd);
     if (github !== undefined) return github;
   }
-  // only a command the caller named: the project's own tier commands keep their turn
-  const cheap = (command: string) => args.includes(command) && isCheap(command);
-  return checkTier(args, settings, out, env, cwd, (command, tier, hear, waited) =>
-    runInSlot(command, name, env, {
-      ...o,
-      checking: true,
-      full: tier !== "inner" && !cheap(command),
-      noTurn: tier === "inner" || cheap(command),
-      hear,
-      waited,
-    }),
-  );
-}
-
-/** An agent's check script started by hand takes a check slot too, so all checks on the machine stay within its slots. Undefined: already in a slot or no project, just run. */
-export function ownSlot(command: string, cwd = process.cwd(), env = process.env): Promise<number> | undefined {
-  const name = env[SLOT_HELD] === undefined && agentTask(env) !== undefined && findProject(cwd, env); // the merge lane has no task: it holds its own turn
-  return name ? runInSlot(command, name, env, { cwd }) : undefined;
-}
-
-/** `lineclear slot <command>`: any heavy command, run in a check slot. */
-async function slot(command: string, out: (l: string) => void, env = process.env, o: CheckOptions = {}): Promise<number> {
-  const name = findProject(o.cwd ?? process.cwd(), env);
-  if (name === undefined) {
-    out("lineclear slot: this folder is not in a project, see 'lineclear project list'");
-    return 1;
-  }
-  return runInSlot(command, name, env, o);
-}
-
-/** The heavy commands of the project that holds this folder, for the pi extension. */
-function heavyCommands(cwd: string, env = process.env): string[] {
-  const name = findProject(cwd, env);
-  const s = name === undefined ? undefined : readSettings(name, env);
-  // a project added before the list existed has none: what it would get today
-  return typeof s === "object" ? (s.heavy ?? (s.repo ? detectHeavy(s.repo, s.check?.trim() ?? "") : [])).filter(Boolean) : [];
-}
-
-/** The check command of the project that holds this folder, for the pi extension. */
-function projectCheck(cwd: string, env = process.env): string | undefined {
-  const name = findProject(cwd, env);
-  const s = name === undefined ? undefined : readSettings(name, env);
-  return typeof s === "object" && s.check?.trim() ? s.check.trim() : undefined;
+  return checkTier(args, settings, out, env, cwd, (command, _tier, hear) => runChild(command, cwd, hear));
 }
 
 function usage(name: string): string {
@@ -467,7 +220,6 @@ function usage(name: string): string {
     wait: 'usage: lineclear wait <login|checks|browser> "<reason>" | lineclear wait owner --kind <login|money|outward> "<reason>" | lineclear wait until <time> "<reason>" | lineclear wait task <id> "<reason>"',
     resume: "usage: lineclear resume",
     check: "usage: lineclear check [--changed] [--tier inner|merge|heavy] [command] | lineclear check --release <test> | lineclear check --log",
-    slot: "usage: lineclear slot <command> | lineclear slot --list",
   }[name]!;
 }
 
@@ -492,13 +244,6 @@ export async function waitsMain(
     out(`lineclear ${name}: ${message}`);
     return code;
   };
-  if (name === "slot") {
-    if (args.length === 1 && args[0] === "--list") {
-      out(JSON.stringify({ heavy: heavyCommands(cwd, env), check: projectCheck(cwd, env) }));
-      return 0;
-    }
-    return args.length === 1 ? slot(args[0]!, out, env, { cwd }) : (out(usage(name)), 2);
-  }
   if (name === "check") return check(out, env, { cwd }, args);
   const task = findTask(cwd, env);
   if (task === undefined) return fail("cannot tell which task this is, run it inside a task's worktree");
