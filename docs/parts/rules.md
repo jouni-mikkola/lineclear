@@ -7,9 +7,7 @@ The rule loop, `lineclear run`: each tick it starts every step whose `after` is 
 - A step's locks are its `locks` and its `parts`: two open steps never hold the same one. A task with a declared wait is not nudged, and only a login, money or something that leaves the machine waits for the owner.
 - A machine that did not answer its last read shows its tasks as not reached since its last good read, never as waiting for the owner, and they still hold their slot and locks; after a day of silence the views drop them.
 - Machine news, load and quota never wake an agent; a tell to an agent says why (`resume` or `answer`).
-- A restart loses nothing: what a tick decided is on disk before it acts, and a held task's branch is pushed to origin before it moves. A step never starts twice: tasks on every machine and main are read again just before a start. A ready step with free locks, a free slot and an idle machine starts in the tick that first sees it ready.
-
-A `run` line in the decisions log names the machine a task did work on (its agent, step check or done proof).
+- A restart loses nothing: what a tick decided is on disk before it acts, and a held task's branch is pushed to origin before it moves. A step never starts twice: tasks on every machine and main are read again just before a start. A ready step with free locks, a free slot and an idle machine starts in the tick that first sees it ready. A `run` line in the decisions log names the machine a task did work on.
 
 ## Interface
 
