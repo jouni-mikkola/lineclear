@@ -624,6 +624,7 @@ test("a step's pass is stored in the check log under a hash of its test, the fil
     if (saved === undefined) delete process.env.LINECLEAR_CONFIG;
     else process.env.LINECLEAR_CONFIG = saved;
   }
+});
 
 test("a task started on machine B runs its agent, checks, review, step check and done proof on B and none on the main machine", async () => {
   const p = project();
