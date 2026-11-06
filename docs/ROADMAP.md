@@ -81,9 +81,9 @@ Result: A command's long output reaches the agent as its first and last lines an
 - files: pi/pack.ts, src/pack.ts, test/pack.test.ts
 
 ### L420 Compaction comes early
-Result: A task agent compacts its context near 60k tokens, keeping its brief, its files and its decisions.
-- why: compaction aims near 150k today, so a long task pays for its whole history again on every call.
-- done when: `pi/compaction.ts` sets the task agent's target to 60k tokens and the coordinator's to 100k; a test checks the reserve per model. Over 10 tasks measured by L416, no model call of a task agent has over 80k input tokens.
+Result: A task agent compacts its context near 50k tokens, keeping its brief, its files and its decisions.
+- why: compaction aims near 150k today and never fires: a task's largest call is 42k tokens in the median and up to 81k, and each call pays for the whole history again.
+- done when: `pi/compaction.ts` sets the task agent's target to 50k tokens and the coordinator's to 100k; a test checks the reserve per model. Over 10 tasks measured by L416, no model call of a task agent has over 60k input tokens.
 - parts: pi
 - locks: compaction
 - after: L416
