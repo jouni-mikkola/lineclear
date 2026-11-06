@@ -331,6 +331,18 @@ test("on two cores one heavy run holds a slot at a time, and the lane's check st
   expect(events.indexOf("start-lane")).toBeLessThan(Math.min(...[1, 2, 3].map((n) => events.indexOf(`start-${n}`))));
 });
 
+test("a light run takes a free slot without waiting for the full checks in line", async () => {
+  const p = project({ check: "true" });
+  const { env } = p;
+  writeFileSync(join(env.LINECLEAR_CONFIG ?? "", "machine.json"), JSON.stringify({ checkSlots: 2, loadPerCore: 1e6 }));
+  const go = join(env.LINECLEAR_CONFIG ?? "", "go");
+  const run = (tier: string, command: string) => check(() => {}, env, { cwd: p.repo, pollMs: 20 }, ["--tier", tier, command]);
+  const full = [run("merge", `while [ ! -e ${go} ]; do sleep 0.05; done`), run("merge", "true")];
+  while (checkLine(lineOf(p.repo, env), env).length < 2) await Bun.sleep(10);
+  expect(await run("inner", `touch ${go}`)).toBe(0);
+  expect(await Promise.all(full)).toEqual([0, 0]);
+});
+
 const quiet = () => [0, 0, 0];
 const outcomes = (codes: [number, string][]) => {
   let n = 0;

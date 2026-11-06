@@ -1,3 +1,4 @@
+import { cpus } from "node:os";
 import { afterAll, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { hostname, tmpdir } from "node:os";
@@ -59,7 +60,7 @@ function setup(o: Opts) {
   // `secrets import <space>` keeps what it was sent and the space, since the fake machine has no vault of its own
   script(join(home, ".local", "bin", "lineclear"), `[ "$1 $2" = "secrets import" ] && { echo "$3" > "$HOME/imported-space"; cat > "$HOME/imported"; exit 0; }`);
   mkdirSync(join(dir, "config", "check-slots", "farbox"), { recursive: true });
-  writeFileSync(join(dir, "config", "machine.json"), JSON.stringify({ loadPerCore: o.remoteLoadPerCore ?? 1e6, checkSlots: 2 }));
+  writeFileSync(join(dir, "config", "machine.json"), JSON.stringify({ loadPerCore: o.remoteLoadPerCore ?? 0.5, checkSlots: 2 }));
   for (let i = 0; i < (o.slotsBusy ?? 0); i++) writeFileSync(join(dir, "config", "check-slots", "farbox", `slot-${i}`), String(process.pid));
   // The one server's `room` and `task list` for farbox, and `task add --on farbox`, which lands in the second machine's log.
   writeFileSync(
@@ -198,6 +199,15 @@ test("this machine goes first when it has room", () => {
   expect(d[0]?.reason).not.toContain("on farbox");
   expect(t.local()).toContain("task add A Title A");
   expect(t.remote()).toBe("");
+});
+
+test("a loaded home sends a new step to the second machine, which has more room", () => {
+  const t = setup({ steps: [step("A")], localMax: 2 });
+  const d = t.doTick(false, { load: () => cpus().length * 0.9 });
+  expect(d[0]?.kind).toBe("start");
+  expect(d[0]?.reason).toContain("on farbox");
+  expect(t.remote()).toContain("task add A Title A");
+  expect(t.local()).toBe("");
 });
 
 test("a step whose lock a task on the second machine holds does not start, and no step starts twice", () => {

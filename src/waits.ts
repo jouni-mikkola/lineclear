@@ -152,7 +152,7 @@ function slotCost(command: string): number {
   return /playwright|ui:test|ui:record|test:e2e|\be2e\b|chromium|cypress|puppeteer/i.test(command) ? 2 : 1;
 }
 
-/** A command named on the command line that is quick: the types, or a few test files. It takes no turn and no slot. */
+/** A command named on the command line that is quick: the types, or a few test files. It takes a slot but no full-check turn. */
 export function isCheap(command: string): boolean {
   return /^\s*(bun run types|bunx? tsc( --noEmit)?|bun test( [\w./-]+\.(ts|tsx|js|jsx)){1,5})\s*$/.test(command);
 }
@@ -160,12 +160,12 @@ export function isCheap(command: string): boolean {
 export interface CheckOptions {
   cwd?: string;
   pollMs?: number;
+  /** A light run (the inner tier) takes a slot but is not refused while the merge lane runs. */
+  noTurn?: boolean;
   /** A full check: one at a time in its repo's line, which merges wait in too, and holding a check slot while it runs. */
   full?: boolean;
   /** `lineclear check`, not `lineclear slot`: an agent's own check is refused while the merge lane is in the line. */
   checking?: boolean;
-  /** A light run (the inner tier) waits for no turn and holds no slot. */
-  noTurn?: boolean;
   /** Hears the command's output as it comes, which still goes to this process's own output too. */
   hear?: (text: string) => void;
   /** Hears how long the run waited for its turn and a slot, in ms, when it starts. */
@@ -196,10 +196,21 @@ function waitReason(w: { full: boolean; noSlot: boolean; behindCheck: boolean; a
 }
 
 const SLOT_HELD = "LINECLEAR_SLOT_HELD"; // set in a slot's command: a check script it starts takes no second slot
-/** Runs the command (niced, so the board and herdr keep the CPU) in a process group of its own (the check's), its output on ours (and heard, when asked); `started` gets the process. */
+/** A heavy job runs at the lowest CPU and disk priority, so the board, the chats and herdr keep the machine. */
+export const lowPriority = (command: string, ionice = Bun.which("ionice") !== null): string[] => [
+  "nice",
+  "-n",
+  "19",
+  ...(ionice ? ["ionice", "-c", "3"] : []),
+  "sh",
+  "-c",
+  command,
+];
+
+/** Runs the command (at low priority) in a process group of its own (the check's), its output on ours (and heard, when asked); `started` gets the process. */
 async function runChild(command: string, cwd: string, hear: CheckOptions["hear"], started: (c: ReturnType<typeof Bun.spawn>) => void): Promise<number> {
   const io = hear ? "pipe" : "inherit";
-  const child = Bun.spawn(["nice", "-n", "15", "sh", "-c", command], {
+  const child = Bun.spawn(lowPriority(command), {
     cwd,
     stdin: "ignore",
     stdout: io,
@@ -252,12 +263,13 @@ async function runInSlot(command: string, name: string, env = process.env, o: Ch
       if (!noSlot) Q.startTurn(turn, env);
       return noSlot ? 1 : 0;
     }
-    behindCheck = checksBefore() > 0;
+    // a light run is quick: it waits for a slot, never for the full checks in line
+    behindCheck = !o.noTurn && checksBefore() > 0;
     if (behindCheck) return 1;
     slot = Q.takeSlots(cost, env, { yieldToLane: task !== undefined });
     if (slot === undefined) return 1;
     // a check from before this run joined the line meanwhile: it counted this slot as held, or this run lets go
-    if (checksBefore() > 0) {
+    if (!o.noTurn && checksBefore() > 0) {
       for (const f of slot) rmSync(f, { force: true });
       slot = undefined;
       behindCheck = true;
@@ -283,7 +295,7 @@ async function runInSlot(command: string, name: string, env = process.env, o: Ch
     mine = true;
     said = reason;
   };
-  let n = o.noTurn ? 0 : before();
+  let n = before();
   if (n > 0) say(n);
   const dropWait = () => {
     if (mine && task !== undefined) clearWait(task, env);

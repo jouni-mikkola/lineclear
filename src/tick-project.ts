@@ -15,7 +15,7 @@ import type { Settings } from "./project.ts";
 import { checkRoadmap, closedSteps, doneIds, isFrozen, resultFlag, stepOfTask, stepStatuses, type Task } from "./roadmap.ts";
 import { mergedSteps, stepInputs } from "./task-steps.ts";
 import type { Decision, State } from "./rules.ts";
-import { askMachines, type Room, roomLack } from "./spread.ts";
+import { askMachines, type Candidate, localSlotsFree, mostRoom, type Room, roomLack } from "./spread.ts";
 import { routineWorker } from "./routine.ts";
 import { askKey, availability, revertLast, reviewerFor, serviceStalls } from "./stalls.ts";
 import { bindStarts, liveSteps, recordStart, lockWhy, reservedLocks, settleLockWaits } from "./starts.ts";
@@ -254,6 +254,8 @@ interface Capacity {
   free: number;
   /** Slots left on each other machine, in the order the settings list them. */
   remoteFree: Map<string, number>;
+  /** Tasks started here in this tick: each counts as a load of 1 before the load average shows it. */
+  startedHere: number;
   remoteLack: string[];
 }
 
@@ -285,6 +287,7 @@ function capacityOf(t: Tick, tasks: Task[], waits: Wait[], rooms: Map<string, Ro
     overloadNote: `load average is above the limit of ${limit}, no new task starts`,
     free,
     remoteFree,
+    startedHere: 0,
     remoteLack,
   };
 }
@@ -407,9 +410,18 @@ function startStep(s: Starting, step: Step): boolean {
   const worker = cheap ?? (s.picked().worker as string);
   const reviewer = reviewerFor(worker, settings, world, s.offered(), env);
   if (!reviewer) return (note("skip", `no reviewer model that pi offers has room`, step.id), false);
-  // The local machine first; another only when this one has no room.
+  // The machine with the most free room, this one and the linked ones alike.
   const localRoom = !cap.offHere && !cap.overloaded && cap.max !== undefined && cap.free > 0;
-  const host = localRoom ? undefined : [...cap.remoteFree].find(([, n]) => n > 0)?.[0];
+  const candidates: Candidate[] = [
+    ...(localRoom ? [{ host: undefined, load: world.load() + cap.startedHere, loadLimit: limit, free: cap.free, slotsFree: localSlotsFree(env) }] : []),
+    ...[...cap.remoteFree]
+      .filter(([, n]) => n > 0)
+      .flatMap(([h, n]) => {
+        const r = s.rooms.get(h);
+        return r ? [{ host: h, load: r.load, loadLimit: r.loadLimit, free: n, slotsFree: r.slots - r.slotsBusy }] : [];
+      }),
+  ];
+  const host = mostRoom(candidates)?.host;
   const remoteRoom = host === undefined ? undefined : s.rooms.get(host);
   const where =
     remoteRoom === undefined
@@ -436,8 +448,11 @@ function startStep(s: Starting, step: Step): boolean {
     const on = `${cheap ? `routine step on the cheap worker model ${cheap}; ` : ""}${startAccountNote(s.picked().workers, worker, env, world.now())}`;
     note("start", `ready, locks free, slot free${where}; ${on}, reviewer ${reviewer}${same}`, step.id);
   }
-  if (host === undefined) cap.free -= 1;
-  else {
+  if (host === undefined) {
+    cap.free -= 1;
+    cap.startedHere += 1;
+  } else {
+    if (remoteRoom) remoteRoom.load += 1;
     cap.remoteFree.set(host, (cap.remoteFree.get(host) ?? 0) - 1);
     // Remembered at once: if that machine is down next tick, its new task still holds its step and locks.
     state.remoteSeen ??= {};
