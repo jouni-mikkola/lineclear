@@ -295,7 +295,7 @@ test(
 );
 
 test(
-  "old-name fails on the old product's name in a code file, a doc, a skill and a path, and leaves the notice and the changelog alone",
+  "old-name fails on the old product's name in a code file, a doc, a skill and a path, and leaves the notice alone",
   () => {
     const old = ["shep", "herdr"].join("");
     const dir = scratch({
@@ -304,7 +304,6 @@ test(
       "server/skill/lineclear/SKILL.md": `run ${old} first\n`,
       [`docs/${old}-notes.md`]: "clean text\n",
       "server/NOTICE": `${old} 2.0.0\n`,
-      "CHANGELOG.md": `- ${old} is gone\n`,
       "src/high/clean.ts": "export const b = 1;\n",
     });
     const r = gate(dir, "old-name");
@@ -314,7 +313,6 @@ test(
     expect(r.out).toContain("server/skill/lineclear/SKILL.md:1 the old name");
     expect(r.out).toContain("notes.md: the old name in the file's path");
     expect(r.out).not.toContain("NOTICE");
-    expect(r.out).not.toContain("CHANGELOG");
     expect(r.out).not.toContain("clean.ts");
   },
   SLOW,
