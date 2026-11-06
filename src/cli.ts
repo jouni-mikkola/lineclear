@@ -37,6 +37,7 @@ import { boardMain, isBoardJob, serveMain } from "./serve.ts";
 import { waitsMain } from "./waits.ts";
 import { realRemover, uninstall } from "./uninstall.ts";
 import { gitText } from "./git.ts";
+import { recordReviewCall } from "./task-work.ts";
 
 export const commands: Record<string, string> = {
   export: "Print what this machine holds as JSON, for the machine that shows all of them",
@@ -144,6 +145,7 @@ export async function main(args: string[], out: (line: string) => void = console
 
 async function dispatch(args: string[], out: (line: string) => void = console.log, ask: Ask = defaultAsk()): Promise<number> {
   const [name, ...rest] = args;
+  recordReviewCall();
   if (name === undefined || name === "help" || name === "--help" || name === "-h") {
     out(helpText());
     return 0;

@@ -32,6 +32,17 @@ export function recordWork(task: string, work: Work, env: Env = process.env, mac
   appendFileSync(file, `${JSON.stringify(line)}\n`);
 }
 
+const REVIEW_SPAN_MS = 30 * 60_000;
+
+/** A reviewer's first `lineclear` call in half an hour is the review running on this machine: the chat identity `<task>/Reviewer` names the task. */
+export function recordReviewCall(env: Env = process.env, now = Date.now()): void {
+  const task = /^([\w.-]+)\/Reviewer$/.exec(env.LINECLEAR_CHAT ?? "")?.[1];
+  if (!task) return;
+  const here = machineOf(env);
+  if (readWork(env).some((w) => w.work === "review" && w.step === task && w.machine === here && now - Date.parse(w.time) < REVIEW_SPAN_MS)) return;
+  recordWork(task, "review", env);
+}
+
 export function readWork(env: Env = process.env): WorkLine[] {
   let text = "";
   try {
