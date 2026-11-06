@@ -9,13 +9,15 @@ The rule loop, `lineclear run`: each tick it starts every step whose `after` is 
 - Machine news, load and quota never wake an agent; a tell to an agent says why (`resume` or `answer`).
 - A restart loses nothing: what a tick decided is on disk before it acts, and a held task's branch is pushed to origin before it moves. A step never starts twice: tasks on every machine and main are read again just before a start. A ready step with free locks, a free slot and an idle machine starts in the tick that first sees it ready.
 
+A `run` line in the decisions log names the machine a task did work on (its agent, step check or done proof).
+
 ## Interface
 
 `lineclear run`, `lineclear wait`, `lineclear resume`, `lineclear check` and `slot`, the waits folder, and these names:
 
 - `src/waits.ts`: `writeWait`, `clearWait`, `waitsMain`, `readWaits`, `waitsForOwner`, `Wait`, `findProject`, `findTask`, `loadLimit`, `limitOf`, `checkLines`, `WaitGroup`, `waitGroups`, `ownSlot`
 - `src/remotes.ts`: `fetchExportSync`, `Export`, `relationOf`, `Relation`, `remoteExports`, `refreshRemotes`, `staleRemotes`
-- `src/rules.ts`: `Decision` (its `kind` includes `run`: work a task did on a machine, `src/task-work.ts`), `decisionsPath`, `runMain`, `realWorld`, `World`, `TICK_MS`
+- `src/rules.ts`: `Decision`, `decisionsPath`, `runMain`, `realWorld`, `World`, `TICK_MS`
 - `src/waste-watch.ts`: `wasteLines`, `noteTokens`
 - `src/herdr-health.ts`: `herdrLines`
 - `src/loop-guard.ts`: `fillSetup`
