@@ -64,6 +64,7 @@ test("uninstall --all removes the settings too, and leaves a link that is not Li
 
 test("uninstall removes a release install: the builds, the link and the extension that point into them", () => {
   const w = world();
+  expect(w.paths.builds.startsWith(w.paths.app.slice(0, w.paths.app.indexOf("/.local")))).toBe(true);
   const current = join(w.paths.builds, "current");
   mkdirSync(join(w.paths.builds, "0.0.1", "bin"), { recursive: true });
   symlinkSync(join(w.paths.builds, "0.0.1"), current);

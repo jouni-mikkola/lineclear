@@ -39,7 +39,7 @@ export function pathsFor(env: Record<string, string | undefined> = process.env):
   const piDir = env.PI_CODING_AGENT_DIR || join(home, ".pi", "agent");
   return {
     app: join(data, "lineclear"),
-    builds: join(dataDir(env), "builds"),
+    builds: join(env.LINECLEAR_HOME ?? join(home, ".lineclear"), "builds"),
     binLink: join(home, ".local", "bin", "lineclear"),
     unit: join(config, "systemd", "user", SERVICE),
     extension: join(piDir, "extensions", "lineclear.ts"),
