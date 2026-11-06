@@ -16,6 +16,7 @@ import {
   refusedMergeBranches,
   runLog,
 } from "../../src/check-runs.ts";
+import { recordPassed, splitCached } from "../../scripts/result-cache.ts";
 import { checkTier } from "../../src/check-tier.ts";
 import { proveStep } from "../../src/doneproof-run.ts";
 import { checkRoadmap, type Step } from "../../src/roadmap.ts";
@@ -590,4 +591,36 @@ test("a fixed log counts runs per machine and finds none of a task's runs away f
   const home = (key: string) => ({ "work/1-a": "boxb", "LIN-1": "boxb", "work/2-b": "main" })[key];
   expect(strayRuns(runs, work, home)).toEqual([]);
   expect(strayRuns([...runs, run("work/1-a", "main")], work, home)).toEqual(["merge check of work/1-a ran on main, its task is on boxb"]);
+});
+
+test("a step's pass is stored in the check log under a hash of its test, the files it loads, the lock file and the bun version", () => {
+  const root = tmp("pass-cache");
+  const dir = join(root, "log");
+  const saved = process.env.LINECLEAR_CONFIG;
+  process.env.LINECLEAR_CONFIG = dir;
+  try {
+    writeFileSync(join(root, "bun.lock"), "lock1");
+    writeFileSync(join(root, "a.test.ts"), "test a");
+    writeFileSync(join(root, "lib.ts"), "v1");
+    const map = { "a.test.ts": ["lib.ts"] };
+    const again = (salt = "bun1") => splitCached(root, ["./a.test.ts"], map, salt);
+    const first = again();
+    recordPassed(root, first.keys, first.run);
+    expect(readFileSync(join(dir, "check-runs.jsonl"), "utf8")).toContain(`"a.test.ts":"${first.keys["./a.test.ts"]}"`);
+    expect(again().cached).toEqual(["./a.test.ts"]);
+    for (const [file, text] of [
+      ["a.test.ts", "test b"],
+      ["lib.ts", "v2"],
+      ["bun.lock", "lock2"],
+    ] as const) {
+      const old = readFileSync(join(root, file), "utf8");
+      writeFileSync(join(root, file), text);
+      expect(again().run).toEqual(["./a.test.ts"]);
+      writeFileSync(join(root, file), old);
+    }
+    expect(again("bun2").run).toEqual(["./a.test.ts"]);
+  } finally {
+    if (saved === undefined) delete process.env.LINECLEAR_CONFIG;
+    else process.env.LINECLEAR_CONFIG = saved;
+  }
 });
