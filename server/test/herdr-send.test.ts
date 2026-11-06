@@ -12,6 +12,7 @@ process.env.HERDR_SOCKET_PATH = path
 const { rpc } = await import('../server/live/herdr.ts')
 
 let drops = 0
+let early = false
 let calls = 0
 const herdr = createServer((c) => {
   c.on('error', () => undefined)
@@ -19,7 +20,8 @@ const herdr = createServer((c) => {
     calls++
     if (drops > 0) {
       drops--
-      c.destroy()
+      if (early) c.end()
+      else c.destroy()
       return
     }
     c.write(`${JSON.stringify({ id: JSON.parse(String(d).trim()).id, result: 'ok' })}\n`)
@@ -40,4 +42,17 @@ test('a second close fails', async () => {
   calls = 0
   await expect(rpc('x')).rejects.toThrow('herdr closed the connection')
   expect(calls).toBe(2)
+})
+
+test('an early end is retried once, then fails', async () => {
+  early = true
+  drops = 1
+  calls = 0
+  expect(await rpc('x')).toBe('ok')
+  expect(calls).toBe(2)
+  drops = 2
+  calls = 0
+  await expect(rpc('x')).rejects.toThrow('herdr closed the connection')
+  expect(calls).toBe(2)
+  early = false
 })
