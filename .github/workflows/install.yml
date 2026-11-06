@@ -69,10 +69,10 @@ jobs:
 
       - name: A second install changes no file
         run: |
-          # the server writes reads-cache.json as it runs, whatever the installer does
+          # the server writes reads-cache.json and outbox.json as it runs, whatever the installer does
           snap() {
             find ~/.lineclear ~/.config/systemd/user ~/.local/bin/lineclear ~/.pi/agent/extensions/lineclear.ts \
-              -type f ! -name reads-cache.json -print0 | sort -z | xargs -0 sha256sum
+              -type f ! -name reads-cache.json ! -name outbox.json -print0 | sort -z | xargs -0 sha256sum
             find ~/.lineclear ~/.config/systemd/user ~/.local/bin/lineclear ~/.pi/agent/extensions/lineclear.ts \
               -type l -printf '%p %l\n' | sort
           }
