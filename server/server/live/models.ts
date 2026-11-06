@@ -48,6 +48,7 @@ let cache: Record<string, CliModels> = TEST ? {} : readJson('cli-models.json', {
 /** what the installed harnesses offer (src/models.ts), read again every few hours */
 let registry: ModelEntry[] = []
 let registryAt = 0
+let readEntries: () => ModelEntry[] = TEST ? () => [] : readRegistry
 const asking = new Set<string>()
 const looked = new Map<string, number>()
 
@@ -57,8 +58,8 @@ export function modelsOf(kind: string): CliModels | undefined {
   if (!levels) return undefined
   if (!TEST) {
     ask(kind)
-    askRegistry()
   }
+  askRegistry()
   // pi's models are the registry's, never an older cached read
   const c = kind === 'pi' ? undefined : cache[kind]
   const listed = fromRegistry(kind)
@@ -255,10 +256,14 @@ function readFromRegistry(kind: string): CliModels | undefined {
 
 function askRegistry() {
   if (Date.now() - registryAt < STALE) return
+  const first = registryAt === 0
   registryAt = Date.now()
-  setTimeout(() => {
-    registry = readRegistry()
-  }, 0)
+  // the first read is waited for: a fresh server must not answer "no models" to the first start
+  if (first) registry = readEntries()
+  else
+    setTimeout(() => {
+      registry = readEntries()
+    }, 0)
 }
 
 /** why a CLI that lists its models won't start without one: no model is picked for it by default */
@@ -268,9 +273,17 @@ export function chooseModel(kind: string, model?: string): string | undefined {
   return `No model is set for ${kind}. Choose one of: ${c.models.map((m) => m.id).join(', ')}.`
 }
 
+/** for tests: how a fresh server reads the harnesses, before any read happened */
+export function setRegistryReader(read: () => ModelEntry[]) {
+  readEntries = read
+  registry = []
+  registryAt = 0
+}
+
 /** for tests: what the harnesses offered */
 export function setRegistry(entries: ModelEntry[]) {
   registry = entries
+  registryAt = Date.now()
 }
 
 /** for tests: what the CLIs said */
