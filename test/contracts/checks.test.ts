@@ -22,7 +22,7 @@ import { checkTier } from "../../src/check-tier.ts";
 import { proveStep } from "../../src/doneproof-run.ts";
 import { checkRoadmap, type Step } from "../../src/roadmap.ts";
 import { checkSteps } from "../../src/stepcheck.ts";
-import { machineRunLine, readWork, recordWork, runsPerMachine, strayRuns } from "../../src/task-work.ts";
+import { machineRunLine, readWork, recordReviewCall, recordWork, runsPerMachine, strayRuns } from "../../src/task-work.ts";
 import { checkLine, inTurn, laneInLine, lineOf, machineOf } from "../../server/server/live/engine/check-queue.ts";
 import { check } from "../../src/waits.ts";
 import { changeSettings, proposeTiers, readSettings, type Settings, tiersOf } from "../../src/project.ts";
@@ -647,7 +647,9 @@ test("a task started on machine B runs its agent, checks, review, step check and
       ),
     ).toBe(0);
   }
-  recordWork("LIN-9", "review", env);
+  recordReviewCall({ ...env, LINECLEAR_CHAT: "LIN-9/Reviewer" });
+  recordReviewCall({ ...env, LINECLEAR_CHAT: "LIN-9/Reviewer" });
+  recordReviewCall({ ...env, LINECLEAR_CHAT: "LIN-9/Agent" });
 
   const pi = join(p.repo, "..", "pi");
   writeFileSync(pi, "#!/bin/sh\nprintf 'SAID: fine\\nGO\\n'\n");
