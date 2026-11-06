@@ -3,6 +3,7 @@ import { dataDir, piDir } from "./paths.ts";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { readTasksKept, type TaskLine } from "./kept-read.ts";
 import { join } from "node:path";
+import { checksMain } from "./check-failures.ts";
 import { piHarness } from "./harness-pi.ts";
 import { reviewerRound, type Usage } from "./session-text.ts";
 
@@ -142,4 +143,10 @@ export function priceFinder(store: any): (u: Usage) => Price | undefined {
     return undefined;
   };
   return (u) => find(u.provider, u.model) ?? find(undefined, u.model);
+}
+
+/** `lineclear measure checks [--days N]`: why GitHub's checks went red. */
+export function measureMain(args: string[], out: (l: string) => void): number {
+  if (args[0] === "checks") return checksMain(args.slice(1), out);
+  return (out("usage: lineclear measure checks [--days N]"), 2);
 }

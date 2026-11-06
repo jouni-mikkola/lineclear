@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { asksMain } from "./asks.ts";
+import { measureMain } from "./measure.ts";
 import { storeMain } from "./store-copies.ts";
 import { dispatcherMain, moveMain } from "./dispatcher.ts";
 import { doctor, herdrUnsaved, herdrVersions, realProbe, testedHerdr } from "./doctor.ts";
@@ -94,6 +95,7 @@ export const commands: Record<string, string> = {
   ask: "Put a question with choices in the Inbox, and wait for the answer (--kind login|outward); a card in a chat is card",
   card: 'Ask the chat a question with choices: card "<question>" --choice "<label>" ... (the board\'s old ask)',
   answer: 'Answer a choice card of a space\'s coordinator chat in words: answer <card id> "<answer>" --space <name>',
+  measure: "Measure the project: measure checks [--days N] sorts red GitHub checks by first cause",
   asks: "Count the last week's needs-you cards by kind and say which a rule answers",
   inbox: "List open items of every machine (--all adds closed ones of this one), or answer one: inbox answer <n> <choice>",
   resume: "End this task's declared wait",
@@ -225,6 +227,7 @@ const COMMANDS: Record<string, (rest: string[], out: Out) => number | Promise<nu
   dispatcher: dispatcherMain,
   ask: askMain,
   asks: (rest, out) => asksMain(rest, out),
+  measure: measureMain,
   inbox: inboxCommand,
   pack: packMain,
 };
