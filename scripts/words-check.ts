@@ -1,5 +1,5 @@
 // The words check: fails on a word that `docs/brand.md` under "Words" lists as not used for a thing (its last column).
-// It reads the views, the README, the films and the docs. `ROADMAP.md`, `backlog.md` and `brand.md` itself are left
+// It reads the views, the README and the docs. `ROADMAP.md`, `backlog.md` and `brand.md` itself are left
 // out: the roadmap and the backlog are working text, and brand.md names the words it forbids.
 import { readFileSync, readdirSync } from "node:fs";
 
@@ -34,8 +34,7 @@ export function wordFiles(root: string): string[] {
     .filter((f) => f.endsWith(".md") && !["ROADMAP.md", "backlog.md", "brand.md"].includes(f))
     .map((f) => `docs/${f}`);
   const views = [...walk(`${root}/ui/kit`, /\.(tsx?|css)$/), ...walk(`${root}/ui/web`, /\.(tsx?|html|webmanifest)$/)].map((f) => f.slice(root.length + 1));
-  const films = ["scripts/readme-film.ts", "scripts/readme-roles.ts", "docs/readme/line.svg", "docs/readme/roles.svg", "docs/readme/header.svg"];
-  return [...views, "README.md", ...docs, "docs/design/board.html", ...films];
+  return [...views, "README.md", ...docs, "docs/design/board.html"];
 }
 
 export function findWords(root: string): string[] {

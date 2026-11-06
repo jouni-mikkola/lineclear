@@ -1,5 +1,5 @@
 // The railway parts and motion tokens of Lineclear's picture language (docs/brand.md, "Picture language"). Every view
-// draws them through `ui/kit/rail.tsx`, and the README films draw them through `scripts/svg-motion.ts`, so a train,
+// draws them through `ui/kit/rail.tsx`, so a train,
 // a signal or a station looks the same everywhere. Each part is a list of plain SVG shapes around (0, 0), painted
 // by name: the views paint with the CSS tokens, the README with their hex values.
 
@@ -33,7 +33,7 @@ export interface Shape {
   kids?: Shape[];
 }
 
-// Motion tokens: written by `bun run media` from scripts/film/motion.json, the one source the film reads too.
+// Motion tokens.
 // Nothing moves linearly but the loading loop and a lamp's colour, which change at an even pace.
 export const EASE = {
   /** Something arrives or settles. */

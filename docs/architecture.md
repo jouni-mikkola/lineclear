@@ -20,7 +20,7 @@ imports count for the borders but not for cycles, since they are gone when the c
 | `web` | `ui/web/` | the pages `lineclear run` serves | `kit`, `brand`, `cli` |
 | `ui-test` | `ui/test/`, `ui/shots/`, `ui/budget/`, `playwright.config.ts`, `playwright.shots.config.ts`, `playwright.budget.config.ts` | the UI bar's browser tests and their fixture | `web`, `kit`, `brand`, `cli`, `pi` |
 | `gates` | `scripts/gates/` | the check's gates and their baselines | none |
-| `scripts` | `scripts/` | repo tools: the check, the smoke check and canary, measurements, film and icons | `cli`, `brand`, `gates`, `check-line` |
+| `scripts` | `scripts/` | repo tools: the check, the smoke check and canary, measurements | `cli`, `brand`, `gates`, `check-line` |
 | `tests` | `test/` | the bun tests, one file per command | `cli`, `pi`, `kit`, `web`, `brand`, `scripts`, `gates`, `ui-test`, `check-line`, `registry` |
 | `shared` | `server/shared/` | types and pure helpers the server shares | none |
 | `server` | `server/server/` | the server: the live source, agents, chats, the engine and the merge lane | `shared`, `generated`, `check-line`, `registry`, `timer-rule` |
@@ -47,8 +47,8 @@ floor in `scripts/gates/baseline/coverage.json` fails. `bun run coverage --raise
 never lowers one. It is slower than the check allows, so the heavy run and a release run it, not `bun run check`.
 The run gives each test 60 s, since coverage slows it and a timed-out test leaves its lines out of the count.
 A source file no test loads counts as uncovered only under `src/`, `bin/`, `pi/`, `ui/brand/` and `ui/kit/`: the server, Playwright, the repo's own drivers and the eval run under other runners. A module the root tests do not reach has no floor.
-`bunfig.toml` leaves out `scripts/media.ts`, `scripts/budget.ts` and `scripts/smoke.ts`: they drive Blender, Chromium and a live
-service, so only a run of the tool itself reaches them (`bun run media`, the budget step, the smoke check).
+`bunfig.toml` leaves out `scripts/budget.ts` and `scripts/smoke.ts`: they drive Chromium and a live
+service, so only a run of the tool itself reaches them (the budget step, the smoke check).
 
 ## Parts
 
@@ -74,7 +74,7 @@ names it under Debts until it lands.
 | `measure` | `lineclear measure`: asks, wait, cost, savings and part health | [measure](parts/measure.md) |
 | `checks` | the check tiers, the check log, flake quarantine | [checks](parts/checks.md) |
 | `install` | install, doctor, uninstall, migrate, machines, projects, secrets | [install](parts/install.md) |
-| `ui` | the web pages, the kit, the brand, the web API, the README and its film | [ui](parts/ui.md) |
+| `ui` | the web pages, the kit, the brand, the web API, the README | [ui](parts/ui.md) |
 | `pi` | the pi extension and the token pack | [pi](parts/pi.md) |
 | `gates` | `bun run check`, the code gates and the parts check | [gates](parts/gates.md) |
 | `server` | the herdr-projects 2.0 fork that runs the agents | [server](parts/server.md) |

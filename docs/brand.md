@@ -209,8 +209,7 @@ a part loads), the same for the views and the README's films. Under reduced moti
 state and nothing moves.
 
 The parts are data in `ui/brand/rail.ts` (track, station, train, signal, main line, siding, engine, signal box).
-`ui/kit/rail.tsx` draws them in the views, `scripts/film/line.py` in the README's film (in 3D, in Blender). The
-README's chart of who does what (`scripts/readme-roles.ts`) uses the role icons and the same station for main.
+`ui/kit/rail.tsx` draws them in the views, and the role icons share its station for main.
 Green is clear, amber is only what waits for you, red is only a broken main.
 
 ## Files
@@ -226,29 +225,9 @@ All in `ui/brand/`. There is one theme only, the dark graphite one. U2 added siz
 | `favicon.svg` | The mark on a graphite tile, heavier and with the lamp filling the bezel (no gap), so it holds at 16 px on light tab bars too. |
 | `tokens.css` | The tokens: colours, type, spacing and corners. |
 
-## Pictures: one source, rendered
+## Pictures
 
-`bun run media` renders every picture outside the app from `ui/brand`, so none needs drawing by hand. It writes
-into `docs/readme/` (so far only `roles.svg` is rendered; the rest follow in U68):
-
-| File | Made from | How |
-|---|---|---|
-| `film.webp`, `film.png` | `scripts/film/` (the scene, `story.json`, `motion.json`), the tokens, `rail.ts` | Blender renders `line.py`; the browser sets the captions in Geist; sharp lays them over and loops it. The PNG is its poster. |
-| `home.png`, `roadmap.png`, `inbox.png` | the running app on its sample data (`?state=filled`) | Playwright, `ui/test/media.pw.ts`, at 1440 by 900. |
-| `roles.svg` | `scripts/readme-roles.ts`, the role marks | written as SVG with Geist inside it. |
-| `social.png` | the wordmark, the tagline of `story.json`, the film's poster | Playwright, 1280 by 640, for GitHub's social preview. |
-
-`scripts/film/motion.json` is the one source of the motion curves: the film reads it, and `bun run media` writes it
-into the motion tokens of `ui/brand/rail.ts`, which the views use. Each file carries the version it was made from in
-its metadata, and `docs/readme/media.json` records it with a hash of each file and of everything it was made from.
-`bun run check` fails when a picture is older than its sources, was changed by hand, or uses a colour or font that is
-not in `tokens.css`, and names the command that fixes it. A kind not made yet is held to nothing, but the README
-may show only what `bun run media` made. The older SVG film of `scripts/readme-film.ts` and the hand-drawn header
-are held to neither the drift check nor the tokens until U68 replaces them.
-GitHub's social preview is uploaded by hand in the repository's settings, from `docs/readme/social.png`.
-
-A release's notes follow `docs/releases/TEMPLATE.md`: `bun run media release <version> <view path>...` writes them
-with a picture of each view that changed, made the same way as the README's stills.
+The README shows stills from `bun run shots`. The hand-drawn brand pictures stay in `docs/brand/`.
 
 ## Home: The line
 
@@ -269,4 +248,4 @@ These are drawings of the three directions, not screenshots of the app. The app'
 ![Direction: Signal box](brand/home/direction-box.png)
 ![Direction: Timetable](brand/home/direction-board.png)
 
-The chosen one is the Home of the app. Its empty, loading, error, long text and 200 items states at 1440 and 390 px are the screenshot tests `ui/test/screens/home-<state>-<width>.png` (`empty`, `loading`, `error`, `long`, `many`). Its task starting and finishing are the recordings `docs/design/motion/home-task-start.webm` and `home-task-finish.webm`, and `bun run ui:test` holds their 60 fps, instant click and reduced-motion bars.
+The chosen one is the Home of the app. Its empty, loading, error, long text and 200 items states at 1440 and 390 px are the screenshot tests `ui/test/screens/home-<state>-<width>.png` (`empty`, `loading`, `error`, `long`, `many`). `bun run ui:test` holds its task starting and finishing to their 60 fps, instant click and reduced-motion bars.

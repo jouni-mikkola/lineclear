@@ -4,8 +4,6 @@
 
 Lineclear is your own software team on your own machines. You talk to one contact and decide only what a human must.
 
-<p align="center"><img src="docs/readme/line.svg" alt="How Lineclear works, in three beats drawn as a railway. 1, the problem: you run several AI agents and you are the bottleneck. They wait, stall and ask what is next. Without rules the median wait from ready to start was 143.3 minutes. 2, how it works: the roadmap is a line of stations. Rules start each step when the one before has merged. A worker builds it, a reviewer from another company checks it, and it merges to main. Only a real decision reaches you, as a button on your phone. 3, the result: the line keeps moving while you sleep, with a median wait from ready to start of 1.3 minutes, and you answer a few questions a day." width="680"></p>
-
 ## How it works
 
 - **You** say what you want and answer only what a human must.

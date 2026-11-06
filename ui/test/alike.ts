@@ -1,6 +1,6 @@
 // The app and the board move alike, read frame by frame. The app plays a key motion (`KEY` in ui/brand/rail.ts) on the
 // design page, the board (docs/design/board.html) plays the same motion in its demo, and both are stopped at the same
-// instants: the start, every 50 ms, the end. `alike.pw.ts` compares them; `bun run ui:record` keeps the frames.
+// instants: the start, every 50 ms, the end. `alike.pw.ts` compares them.
 import type { Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -81,13 +81,13 @@ export const PAIRS: Pair[] = [
 ];
 
 /** The instants to read: the start, every 50 ms and the end. */
-export function instants(ms: number): number[] {
+function instants(ms: number): number[] {
   const out: number[] = [];
   for (let t = 0; t < ms; t += 50) out.push(t);
   return [...out, ms];
 }
 
-export type Reading = Record<Channel, number>;
+type Reading = Record<Channel, number>;
 
 /** Holds the app's motion of the pair, started and stopped at its start. */
 export async function holdApp(page: Page, pair: Pair): Promise<void> {
@@ -129,7 +129,7 @@ export async function holdBoard(page: Page, pair: Pair): Promise<void> {
 }
 
 /** A held motion `t` ms into itself, where `from` is the ms its motion begins in the animation: what its element holds now. */
-export function at(page: Page, from: number, t: number): Promise<Reading> {
+function at(page: Page, from: number, t: number): Promise<Reading> {
   return page.evaluate(
     ([from, t]) => {
       const held = (window as unknown as { __alike: Animation }).__alike;
