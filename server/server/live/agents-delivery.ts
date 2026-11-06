@@ -74,6 +74,7 @@ export class AgentsDelivery extends AgentsState {
     if (this.timer) clearInterval(this.timer)
     if (this.retryTimer) clearTimeout(this.retryTimer)
     this.terminalClock.stop()
+    this.paste.stop()
     if (this.soon) clearTimeout(this.soon)
     this.hookWatch?.close()
     this.sub.stop()

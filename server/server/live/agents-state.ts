@@ -10,13 +10,14 @@ import type { AgentHerdr, TermScreen } from '../../shared/types.ts'
 import { herdr, type Subscription, type AgentInfo, type AgentStatus } from './herdr.ts'
 import { ClaudeSessions, Reviewers, screenBackground, sessionBackground, type Background } from './readers/background.ts'
 import { claudeLogPath, findClaudeLog, findCodexLog, findPiLog, mainCodexLog } from './readers/find.ts'
+import { PasteWatch } from './paste-watch.ts'
 import { TerminalClock } from './terminal-clock.ts'
 import { machineNews } from './quiet.ts'
 import { HookLogs, type Said } from './readers/hooks.ts'
 import { mirrored } from './mfs.ts'
 import { agentEnv, BOX, helperDir, run } from './box.ts'
 import { ROOT } from '../root.ts'
-import { inputHoldsText, leftAtPrompt, showsPaste } from './commands.ts'
+import { inputHoldsText, leftAtPrompt } from './commands.ts'
 import { capturedTranscript, privateRuntimePath } from './autopilot-sandbox.ts'
 import { SecretAccess } from './secret-access.ts'
 import { isAgentProcess } from './agent-process.ts'
@@ -44,9 +45,9 @@ export class AgentsState extends Emitter<Events> {
   protected listed: AgentInfo[] = []
   /** agents whose status changed since their screen was read: the screen is read only for these */
   protected screenDue = new Set<string>()
-  /** agents whose status changed since their pane was looked at, and those whose pane showed the pasted brief then */
+  /** agents whose status changed since their pane was looked at for the pasted brief */
   protected pasteDue = new Set<string>()
-  protected pasted = new Set<string>()
+  protected paste = new PasteWatch()
   /** when the last event or session read changed the list of agents */
   protected heardAt = 0
   /** where each agent's CLI was last bound to a route, and whether it took */
@@ -163,16 +164,7 @@ export class AgentsState extends Emitter<Events> {
   herdrView(key: string): AgentHerdr | undefined {
     const a = this.info(key)
     const s = a?.agent_session
-    return a && { status: a.agent_status, ...(s?.kind === 'path' ? { session: s.value } : {}), pasted: this.pasted.has(key), at: this.heardAt }
-  }
-
-  /** a pane just started is looked at once for the pasted brief, when its status changes; later it cannot hold one */
-  protected async lookForPaste(key: string) {
-    const pane = this.info(key)?.pane_id
-    const fresh = Date.now() - (this.records[key]?.started ?? 0) < 120_000
-    const shows = !!pane && fresh && showsPaste(await herdr.visible(pane).catch(() => ''))
-    if (shows) this.pasted.add(key)
-    else this.pasted.delete(key)
+    return a && { status: a.agent_status, ...(s?.kind === 'path' ? { session: s.value } : {}), pasted: this.paste.has(key), at: this.heardAt }
   }
 
   status(key: string): AgentStatus | 'gone' {
@@ -311,7 +303,7 @@ export class AgentsState extends Emitter<Events> {
       const r = this.records[key]
       const st = this.status(key)
       const pane = this.info(key)?.pane_id
-      if (this.pasteDue.delete(key)) await this.lookForPaste(key)
+      if (this.pasteDue.delete(key)) void this.paste.look(key, r?.started ?? 0, () => this.info(key)?.pane_id)
       const reads =
         r?.kind === 'claude' &&
         !r.isolation &&
