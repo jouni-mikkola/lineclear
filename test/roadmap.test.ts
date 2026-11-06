@@ -36,11 +36,11 @@ function repoWith(text: string, commits: string[]): string {
 }
 
 /** Records, as the rules do, which step each task was started for. */
-function recordSteps(repo: string, taskSteps: Record<string, string>): void {
+function recordSteps(repo: string, taskSteps: Record<string, string>, more: object = {}): void {
   const dir = join(scratch, "cfg", "projects", "p");
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, "settings.json"), JSON.stringify({ repo }));
-  writeFileSync(join(dir, "state.json"), JSON.stringify({ taskSteps }));
+  writeFileSync(join(dir, "state.json"), JSON.stringify({ taskSteps, ...more }));
 }
 const run = (args: string[], tasks: { id?: string; title: string; status: string }[] = []) => {
   const out: string[] = [];
@@ -118,6 +118,14 @@ test("status covers all five states", () => {
   expect(r.code).toBe(0);
   const states = Object.fromEntries((JSON.parse(r.out.join("\n")) as { id: string; state: string }[]).map((s) => [s.id, s.state]));
   expect(states).toEqual({ L1: "done", L2: "done", L10: "work", L3: "ready", L4: "waiting", L5: "dropped", L6: "ready", L7: "waiting" });
+});
+
+test("a step the rule loop closed is done for the CLI too, and so is the step after it ready", () => {
+  const dir = repoWith(doc(step("L1", "none"), step("L2", "L1")), ["x"]);
+  recordSteps(dir, {}, { closedSteps: { L1: "LIN-3" } });
+  const r = run(["status", dir, "--space", "s", "--json"]);
+  const states = Object.fromEntries((JSON.parse(r.out.join("\n")) as { id: string; state: string }[]).map((s) => [s.id, s.state]));
+  expect(states).toEqual({ L1: "done", L2: "ready" });
 });
 
 test("a task titled with a step's id that the rules did not start for it is not work", () => {

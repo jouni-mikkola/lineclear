@@ -14,9 +14,9 @@ interface Ask {
 }
 
 /** Owner-only steps whose Inbox item the owner answered Done: they count as merged, so the steps after them start. */
-export function ownerStepsDone(a: Ask, steps: Step[]): string[] {
-  const items = readItems(a.env);
-  return steps.filter((s) => s.ownerOnly && items.some((i) => i.n === a.state.ownerItems?.[s.id] && i.answer === "Done")).map((s) => s.id);
+export function ownerStepsDone(env: NodeJS.ProcessEnv, state: Pick<State, "ownerItems">, steps: Step[]): string[] {
+  const items = readItems(env);
+  return steps.filter((s) => s.ownerOnly && items.some((i) => i.n === state.ownerItems?.[s.id] && i.answer === "Done")).map((s) => s.id);
 }
 
 /** A ready owner-only step is never a task: it becomes one Inbox item with its done-when, once, until the owner marks it done. */

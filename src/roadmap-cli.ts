@@ -1,7 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { writeAtomic } from "../pi/atomic.ts";
 import { join } from "node:path";
-import { unprovenOf } from "./doneproof.ts";
 import { lineOfRoadmap } from "./roadmap-view.ts";
 import { lineclearTasks } from "./roadmap-source.ts";
 import { statusesOf } from "./task-steps.ts";
@@ -111,8 +110,7 @@ export function roadmapMain(
   if (typeof commits === "string") return fail(out, commits);
   const tasks = tasksOf(space as string);
   if (typeof tasks === "string") return fail(out, tasks);
-  const done = doneIds(commits, new Set(parsed.steps.map((s) => s.id)));
-  const status = statusesOf(parsed.steps, done, tasks, repo, env, unprovenOf(repo, env));
+  const status = statusesOf(parsed.steps, commits, tasks, repo, env);
   if (sub === "locks") return locksMain(parsed.steps, status, out);
   // the same line the roadmap view and Home show
   const line = lineOfRoadmap(repo, space as string, tasks, env, now);

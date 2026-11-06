@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { DEFAULT_ROUNDS, fill, stepBrief, template } from "./brief.ts";
 import { CHECKS_PER_TICK, type ProveTools, missingItem, needsProof, testOf } from "./doneproof.ts";
 import { type FixSpec, fileFix } from "./self-fix.ts";
-import { ownerStepItem, ownerStepsDone } from "./owner-steps.ts";
+import { ownerStepItem } from "./owner-steps.ts";
 import { overStartLimit, recordStepStart, START_LIMIT, startsInDay } from "./start-limit.ts";
 import { placeHeld } from "./held.ts";
 import { criticalSteps, firstByRoom } from "./pace.ts";
@@ -13,6 +13,7 @@ import { stepHeld } from "./parts.ts";
 import { company } from "./company.ts";
 import type { Settings } from "./project.ts";
 import { checkRoadmap, closedSteps, doneIds, isFrozen, resultFlag, stepOfTask, stepStatuses, type Task } from "./roadmap.ts";
+import { mergedSteps, stepInputs } from "./task-steps.ts";
 import type { Decision, State } from "./rules.ts";
 import { askMachines, type Room, roomLack } from "./spread.ts";
 import { routineWorker } from "./routine.ts";
@@ -215,8 +216,7 @@ function proveMerged(t: Tick, steps: Step[], merged: Set<string>, head: string):
 
 /** Each step's state from main, the tasks and the other machines, and the locks the working steps hold. */
 function stepStates(t: Tick, steps: Step[], main: MainInfo, tasks: Task[], remote: Task[], restarted: Set<string>, facts: TickFacts) {
-  const { state, dryRun, note } = t;
-  const byStep = new Set(steps.map((s) => s.id));
+  const { state, dryRun, note, settings, env } = t;
   const closed = state.closedSteps ?? {};
   for (const [step, task] of closedSteps(steps, tasks, state.taskSteps, remote)) {
     if (closed[step] !== undefined) continue;
@@ -227,11 +227,10 @@ function stepStates(t: Tick, steps: Step[], main: MainInfo, tasks: Task[], remot
     }
     closed[step] = task;
   }
-  const mergedIds = doneIds(main.commits, byStep);
-  for (const step of Object.keys(closed)) if (byStep.has(step)) mergedIds.add(step);
-  const unproven = proveMerged(t, steps, new Set([...mergedIds, ...closedSteps(steps, tasks, state.taskSteps, remote).keys()]), main.head);
-  for (const id of ownerStepsDone(t, steps)) mergedIds.add(id);
-  const status = stepStatuses(steps, mergedIds, tasks, state.taskSteps, remote, unproven).map((s) =>
+  const closedHere = closedSteps(steps, tasks, state.taskSteps, remote).keys();
+  const proven = proveMerged(t, steps, new Set([...mergedSteps(steps, main.commits, closed), ...closedHere]), main.head);
+  const inputs = stepInputs(steps, main.commits, { local: tasks, remote }, settings.repo, env, { state: { ...state, closedSteps: closed }, unproven: proven });
+  const status = stepStatuses(steps, inputs.merged, inputs.tasks, inputs.taskSteps, inputs.remote, inputs.unproven).map((s) =>
     restarted.has(s.id) ? { ...s, state: "work" as const } : s,
   );
   const byId = new Map(steps.map((s) => [s.id, s]));

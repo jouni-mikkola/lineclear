@@ -3,10 +3,9 @@ import { stopsOfSpace } from "./home-waits.ts";
 import { readSettings } from "./project.ts";
 import { stepParts } from "./parts.ts";
 import { countSteps, currentPhase, lineOf, type Plan, readPlan, type RoadmapLine } from "./progress.ts";
-import { unprovenOf } from "./doneproof.ts";
 import { roadmapSource, lineclearTasks } from "./roadmap-source.ts";
 import { checkRoadmap, doneIds, resultOf, type State, type Task } from "./roadmap.ts";
-import { statusesOf, taskOfStep, titledByStep } from "./task-steps.ts";
+import { planInputs, statusesOf, taskOfStep, titledByStep } from "./task-steps.ts";
 
 /** What the Roadmap view draws for one project: its steps with their states, tasks and commits, and its merges. */
 export interface RoadmapData {
@@ -72,7 +71,8 @@ export function lineOfRoadmap(repo: string, space: string, tasks: Task[], env: E
       env,
     ),
   );
-  return lineOf(source.text, source.commits, marks, stopsOfSpace(space, repo, env), now, 0, unprovenOf(repo, env)).line;
+  const { merged, unproven } = planInputs(source.text, source.commits, repo, env);
+  return lineOf(source.text, source.commits, marks, stopsOfSpace(space, repo, env), now, 0, unproven, merged).line;
 }
 
 /** A roadmap of Now, Next and Later lists: each list a phase, each item a step with no task or dependency. */
@@ -148,12 +148,10 @@ export function roadmapData(
 
   const ids = new Set(parsed.steps.map((s) => s.id));
   const marks = commits.map((c) => ({ c, steps: [...doneIds([c], ids)] }));
-  const done = doneIds(commits, ids);
 
   const read = tasksOf(settings.space);
   const tasks = typeof read === "string" ? [] : read;
-  const unproven = unprovenOf(settings.repo, env);
-  const states = statusesOf(parsed.steps, done, tasks, settings.repo, env, unproven);
+  const states = statusesOf(parsed.steps, commits, tasks, settings.repo, env);
   const taskOf = taskOfStep(parsed.steps, tasks, settings.repo, env);
   const phases = [...new Set(parsed.steps.map((s) => s.phase))];
   const steps = parsed.steps.map((s, i): RoadmapStep => {
@@ -191,7 +189,8 @@ export function roadmapData(
     .filter((m) => m.steps.length)
     .flatMap(({ c, steps }) => steps.map((step) => ({ step, at: c.at, commit: c.commit, subject: c.subject })))
     .slice(0, HISTORY);
-  const plan = readPlan(text, commits, unproven);
+  const inputs = planInputs(text, commits, settings.repo, env);
+  const plan = readPlan(text, commits, inputs.unproven, inputs.merged);
   return {
     ok: {
       project,

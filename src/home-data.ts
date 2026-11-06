@@ -1,6 +1,5 @@
 import { readJson } from "../pi/config.ts";
 import { questionIn } from "./cards.ts";
-import { unprovenOf } from "./doneproof.ts";
 import { dataDir } from "./paths.ts";
 import type { ReleaseState } from "./release.ts";
 import { existsSync, readdirSync } from "node:fs";
@@ -8,7 +7,7 @@ import { hostname } from "node:os";
 import { join } from "node:path";
 import { type Blocker, countSteps, lineOf, readPlan, type RoadmapLine, type Where } from "./progress.ts";
 import { roadmapSource, lineclearAllTasks } from "./roadmap-source.ts";
-import { titledByStep } from "./task-steps.ts";
+import { planInputs, titledByStep } from "./task-steps.ts";
 import { keptBy, readJsonKept, readTasksKept, refsKey } from "./kept-read.ts";
 import { spaceStops, waitBlocker, waitingOf } from "./home-waits.ts";
 import { notReached, remoteTasks } from "./spread.ts";
@@ -215,10 +214,10 @@ function roadmapProgress(
 ): ({ done: number; total: number; line: RoadmapLine; titles: Map<string, string>; open: Set<string>; results: Map<string, string> } & Where) | undefined {
   const source = roadmapSource(repo);
   if (!source) return undefined;
-  const unproven = unprovenOf(repo, env);
-  const plan = readPlan(source.text, source.commits, unproven);
+  const { merged, unproven } = planInputs(source.text, source.commits, repo, env);
+  const plan = readPlan(source.text, source.commits, unproven, merged);
   if (plan.steps.length === 0) return undefined;
-  const { line, where } = lineOf(source.text, source.commits, marks, waits, now, merged7, unproven);
+  const { line, where } = lineOf(source.text, source.commits, marks, waits, now, merged7, unproven, merged);
   return {
     ...countSteps(plan),
     ...where,
