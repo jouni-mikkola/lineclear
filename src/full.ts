@@ -12,6 +12,8 @@ export interface Account {
   out?: boolean;
   /** When the limit ends (ISO time), if known: the account is back by itself after it. */
   resetAt?: string;
+  /** The provider's own error when it refused the account's access (auth, disabled): out until the owner clears it. */
+  dead?: string;
   /** Which limit is full. */
   window?: "session" | "week";
   /** What a subscription costs a month, in `currency`. Missing until the owner sets it. */
@@ -75,12 +77,27 @@ export function markFull(provider: string, until: Date, window: "session" | "wee
   writeAccounts(accounts, env);
 }
 
+/** An error that says the account itself is refused, not full: it will not work on a retry. */
+const DEAD =
+  /organization has disabled|subscription access|invalid (x-)?api[ _-]?key|authentication[_ ]error|\b40[13]\b|unauthorized|permission[_ ]denied|access (denied|revoked)/i;
+
+/** The provider's refusal in a failed call's text, or undefined when it is anything else. */
+export const readDead = (text: string): string | undefined => (DEAD.test(text) ? text.replace(/\s+/g, " ").trim().slice(0, 200) : undefined);
+
+/** Marks an account unusable with the provider's error; it has no reset, so only clearFull brings it back. */
+export function markDead(provider: string, error: string, env = process.env): void {
+  const accounts = readAccounts(env);
+  const { resetAt: _r, window: _w, ...old } = accounts[provider] ?? { kind: "subscription" as const };
+  accounts[provider] = { ...old, out: true, dead: error };
+  writeAccounts(accounts, env);
+}
+
 /** Marks an account usable again: its provider reports room in every window. */
 export function clearFull(provider: string, env = process.env): void {
   const accounts = readAccounts(env);
   const old = accounts[provider];
   if (!old?.out) return;
-  const { out: _o, resetAt: _r, window: _w, ...rest } = old;
+  const { out: _o, resetAt: _r, window: _w, dead: _d, ...rest } = old;
   accounts[provider] = rest;
   writeAccounts(accounts, env);
 }
