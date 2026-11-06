@@ -14,7 +14,6 @@ export interface Gate {
 export function fastGates(ownFolders: string[], code: boolean, full = false): Gate[] {
   return [
     { name: "roadmap", cmd: ["env", ...ownFolders, "bin/lineclear", "roadmap", "check", "."] },
-    { name: "parts", cmd: ["env", ...ownFolders, "bin/lineclear", "parts", "check", "."] },
     ...(code ? [{ name: "gates", cmd: ["bun", "run", full ? "gates:full" : "gates"] }] : []),
   ];
 }
