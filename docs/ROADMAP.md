@@ -45,41 +45,14 @@ live in git history: a step's id is in its commit subject. The rules read this f
 
 ## Open steps
 
-### L434 Check failures are measured
-Result: `lineclear measure checks --days 2` shows how often main and pull request checks went red, and the first cause of each.
-- why: no one counts why checks go red, so a flaky test, a real break and a gate look alike, and each costs the same rerun and wait.
-- done when: The command reads the project's GitHub check runs and the logs of the red ones (`gh run view --log-failed`) and sorts each red run by first cause: flaky test (it failed and passed on the same commit, or on main with no fix between), real break, gate, setup, or the job's time limit. It prints runs, green, red and cancelled for main and for pull requests, then each failing test with its runs, cause and longest time. A test on fixed logs gets each cause right. The table of the last 2 days is in `docs/numbers.md` under "Check failures".
-- parts: measure, checks
-- locks: check-measure
-- after: none
-- files: src/check-failures.ts, src/measure.ts, test/check-failures.test.ts, docs/numbers.md
-
-### L435 Two flaky tests fixed at cause
-Result: The needs-you card test and the box-share read test pass 50 runs in a row under load, by a fix of their cause.
-- why: on GitHub the card test fails after about 4 s with "got no worktree" though it waits up to 60 s for one, so a worktree is set and then cleared, maybe in the product; the box-share test's fake ssh races a commit against a read with a count of sleeps.
-- done when: The tests are "a task's question on its needs-you card in its space's chat > answered in the task chat instead" and "a read that began while a write ran is not shared once the write is done"; both names and their causes go in the commit message. The card test's cause is found and fixed where it is, in the engine or the fixture; the box-share test waits on the read it needs. No time limit is raised, no assertion dropped, no retry added. Each passes `bun test --rerun-each 50` while 4 copies of the server's suite run at once.
-- parts: server
-- locks: server-tests
-- after: none
-- files: server/test/source-fixture.ts, server/test/source-b.test.ts, server/test/box-share.test.ts, server/server/live/engine/worktrees.ts
-
 ### L436 Flaky tests quarantined
 Result: A test that flakes on GitHub stops blocking merges within one run and gets its own fix task; it leaves quarantine only once fixed.
 - why: the check reruns a failed test alone only in steps named `tests` (`scripts/check.ts`), so a server test that flakes is never rerun, and the quarantine of `src/check-runs.ts` reads only the machine's own log, which a GitHub runner lacks.
 - done when: The server suite's failures are rerun alone from `server/` like the others. A test that fails and then passes alone on the same commit is a flake: the server adds it to `test/quarantine.json` on main with its fix task's id and files that task (`flakeFixIn`, its brief asks for the cause and forbids a weaker test). The check, here and on GitHub, still runs a quarantined test and prints its result, but its failure alone does not fail the run; a quarantined test that also fails alone is a break and fails the check. The fix task's merge takes the test out. At most 5 tests are in quarantine; a 6th pauses the merge line and asks the owner. A test plants a flake that fails 10 runs in a row, a break and a 6th flake.
 - parts: checks, server, rules
 - locks: quarantine
-- after: L434
-- files: scripts/check.ts, scripts/flaky.ts, src/check-runs.ts, src/check-tier.ts, test/quarantine.json, test/check-runs.test.ts
-
-### L437 A fix never weakens a test
-Result: A commit that raises a test's time limit, adds a retry or drops an assertion fails the check unless it names the cause.
-- why: a flaky test made green by a longer wait or a retry hides its cause, which comes back as a slower check or a real bug that passes.
-- done when: A gate in `bun run gates` reads the branch's diff of test files and fails a raised time limit or sleep, a new retry (`--rerun`, `retry`, a loop around an assertion), a removed `expect` or a new `skip`, unless the commit message has a line `Cause: <test>: <what it waited on and what changed>`. A test plants each of the four and one with a cause line.
-- parts: checks
-- locks: gates
 - after: none
-- files: scripts/gates/test-strength.ts, test/test-strength.test.ts
+- files: scripts/check.ts, scripts/flaky.ts, src/check-runs.ts, src/check-tier.ts, test/quarantine.json, test/check-runs.test.ts
 
 ### L438 Tests hold under parallel load
 Result: Every test shard passes with 4 copies running at once on one GitHub runner, each test in its own folder and ports.
@@ -87,17 +60,8 @@ Result: Every test shard passes with 4 copies running at once on one GitHub runn
 - done when: One helper `waitFor(condition, what)` in `test/helpers.ts` (and its server twin `until`) waits on an event to a deadline and names what never came. A gate fails a test that binds a fixed port, writes outside its temp folder or polls with a fixed count of sleeps. A nightly job per shard runs 4 copies of that shard at once within the 5-minute job limit, untimed like the other GitHub jobs; every shard is green 5 nights in a row.
 - parts: checks, server
 - locks: server-tests, gates
-- after: L435
-- files: test/helpers.ts, server/test/source-fixture.ts, scripts/gates/, .github/workflows/check.yml
-
-### L416 Cost per phase is measured
-Result: `lineclear measure phases` shows, for the last 30 tasks on every machine, where tokens and minutes went in each phase of a task.
-- why: every step below promises fewer tokens or minutes, and only the same table before and after proves it. Task logs already hold each model call's tokens and time.
-- done when: `lineclear measure phases [--last N]` reads each task's pi session logs on every machine and prints one table: phase (start, reading, coding, tests, review, check wait, finishing), model calls, input tokens, cache writes, output tokens, wall minutes and CPU minutes, then per task the median and the largest call, input and minutes from start to ready. The CPU comes from the server, which adds up each tick the CPU time in `/proc` of the task's process tree (agent, model bridge, tests, servers it started) by kind and phase into the task's events. A test on two fixed session logs and a fixed process tree gets each phase's numbers exactly. `docs/numbers.md` is made with the table of the last 30 tasks under "Cost per phase".
-- parts: measure
-- locks: measure-phases
 - after: none
-- files: src/measure.ts, src/session-text.ts, server/server/live/engine/status.ts, test/measure-phases.test.ts, docs/numbers.md
+- files: test/helpers.ts, server/test/source-fixture.ts, scripts/gates/, .github/workflows/check.yml
 
 ### L417 A small start context
 Result: A task's agent starts with a short card of rules instead of two whole skills, and reads a skill only when a command sends it there.
@@ -105,7 +69,7 @@ Result: A task's agent starts with a short card of rules instead of two whole sk
 - done when: The launch prompt and the start card together are at most 3k tokens; a command that refuses names the skill section to read. The start context of 10 tasks, measured by L416, is under 3k tokens each.
 - parts: server, pi
 - locks: briefs, launch
-- after: L416
+- after: none
 - files: server/server/live/prompts.ts, server/server/live/engine/briefs.ts, server/server/live/engine/engine-launch.ts, server/skill/
 
 ### L418 A brief names its files
@@ -114,7 +78,7 @@ Result: Each task's brief lists the files to change and the few to read first, s
 - done when: `lineclear task add` and the planner put a `files` and a `read first` list in every brief, from the step's `files` line or the planner's split (L427). Over 10 tasks measured by L416, the median task makes at most 10 calls that only read.
 - parts: planner, server
 - locks: briefs
-- after: L416
+- after: none
 - files: src/plan-brief.ts, src/brief.ts, server/server/live/engine/briefs.ts
 
 ### L419 Tool output stays short
@@ -123,7 +87,7 @@ Result: A tool result reaches the agent as at most 8k characters, its head, its 
 - done when: `CAP` in `pi/parts/cut-output.ts` is 8000 characters and test output keeps its failures and summary within it; a test checks the cut on a 200 KB output. Over 10 tasks measured by L416, the median input per model call is under 15k tokens.
 - parts: pi
 - locks: pi-context
-- after: L416
+- after: none
 - files: pi/parts/cut-output.ts, test/pi-parts.test.ts
 
 ### L420 Compaction comes early
@@ -132,7 +96,7 @@ Result: A task agent compacts its context near 50k tokens, keeping its brief, it
 - done when: `pi/compaction.ts` sets the task agent's target to 50k tokens and the coordinator's to 100k; a test checks the reserve per model. Over 10 tasks measured by L416, no model call of a task agent has over 60k input tokens.
 - parts: pi
 - locks: pi-context
-- after: L416
+- after: none
 - files: pi/compaction.ts, test/pi-parts.test.ts
 
 ### L421 A small model for chores
@@ -141,7 +105,7 @@ Result: Mechanical work (a clean rebase, a merge retry, a ready report, a nudge)
 - done when: Setup has a fifth role, mechanic, with the smallest logged-in model as its default; the server starts it for a clean rebase, a merge retry and a nudge, and `decisions.jsonl` names its model; the reviewer stays from another company than the worker. Over 10 tasks measured by L416, 90 % of the calls for rebases, merge retries and nudges run on the mechanic.
 - parts: server, rules
 - locks: role-models, launch
-- after: L416, L423
+- after: none
 - files: src/setup.ts, src/models.ts, src/harness-pi.ts, server/server/live/engine/engine-launch.ts, test/models.test.ts
 
 ### L422 Review is one call on the diff
@@ -153,22 +117,13 @@ Result: A review is one model call that gets the brief, the diff and the repo's 
 - after: L421
 - files: src/candidate-check.ts, server/server/live/engine/engine-merge.ts, test/review-call.test.ts
 
-### L423 An agent ends at ready
-Result: A task's agent stops once it reports ready; the board merges it and wakes the agent only with a red check's failing lines.
-- why: agents wait for checks and merges themselves today, 20 % to 39 % of a task's wall time and 9 % of its tokens.
-- done when: After `lineclear ready` the agent's process ends; the merge line merges the branch and, on a red check, starts the agent again with the failing test's lines only. Over 10 tasks measured by L416, check wait is 0 % of tokens.
-- parts: server, rules
-- locks: merge-line
-- after: none
-- files: server/server/live/engine/engine-merge.ts, server/server/live/engine/lane.ts, server/skill/lineclear-agent/SKILL.md
-
 ### L424 Agents run with no pane
 Result: A task's agent runs as one headless process, and a live pane opens only while you watch it.
 - why: each agent holds a herdr pane and a shell besides its own processes, and old panes stay open after their task, which costs memory and herdr's CPU.
 - done when: The server starts a task agent without a herdr pane, keeps its state from the process itself and streams its log; opening the task's view attaches a pane, closing it detaches. A run of 3 agents per core is recorded in `docs/numbers.md`: no agent pane, load under the core count, and memory per agent no higher than the measured pi and model bridge.
 - parts: server, install
 - locks: headless, launch
-- after: L267, L423
+- after: L267
 - files: server/server/live/engine/engine-launch.ts, server/server/live/engine/worktrees.ts, src/herdr.ts
 
 ### L425 One install of dependencies
@@ -177,7 +132,7 @@ Result: A new worktree is ready in under 5 seconds and adds under 50 MB of disk,
 - done when: `docs/numbers.md` records the install seconds and new disk of 10 worktrees. When either is over its limit, a new worktree links `node_modules` from a store keyed by the hash of the lock file, and a changed lock file makes a new entry; a test checks the key and the link. 10 more worktrees then meet both limits.
 - parts: server
 - locks: deps
-- after: L416
+- after: none
 - files: server/server/live/engine/git.ts, server/server/live/engine/worktrees.ts, docs/numbers.md
 
 ### L426 The Dispatcher uses few tokens
@@ -186,7 +141,7 @@ Result: The Dispatcher answers each request from a fresh small context, so its d
 - done when: The Dispatcher starts each request with the request and the board's summary only, on the smallest model that keeps `bun run dispatcher:eval` at 95 % or more. On a day with 30 tasks or more it spends under 5M input tokens.
 - parts: dispatcher
 - locks: dispatcher
-- after: L416
+- after: none
 - files: src/dispatcher.ts, test/dispatcher-eval/
 
 ### L427 A goal splits by files
@@ -213,7 +168,7 @@ Result: A red batch or a red main finds the branch that broke it by itself, send
 - done when: A red batch checks its halves until one branch is left, returns it to its agent with the failing lines (L423) and merges the others; a red main pauses the line and Home names the cause until the fix merges. A test with 4 branches, one breaking, merges 3 and returns 1 in at most 3 check runs.
 - parts: server, checks, rules
 - locks: merge-line
-- after: L423, L428
+- after: L428
 - files: server/server/live/engine/lane.ts, server/server/live/engine/merge.ts, src/rules.ts
 
 ### L430 Needs you means a question
@@ -231,7 +186,7 @@ Result: One view lists every agent at work: its task, machine, phase, tokens so 
 - done when: Home's task table and `lineclear top` show, from one function in `src/agent-status.ts`, each running agent's task, machine, phase (L416's names), input tokens, minutes and wait; a test reads both on the same board and finds the same rows.
 - parts: ui, measure
 - locks: home
-- after: L416
+- after: none
 - files: src/agent-status.ts, src/home-data.ts, ui/web/
 
 ### L433 The biggest CPU user is cut
@@ -240,7 +195,7 @@ Result: Whatever uses the most CPU per task in L416's table (tests, servers or t
 - done when: `docs/numbers.md` names the kind with the most CPU minutes per task over 30 tasks, from L416. A change to that kind (a shared server per project, tests run only for changed files, or what the table points at) halves its median CPU minutes per task over 30 more tasks, recorded under "Cost per phase".
 - parts: measure, checks, server
 - locks: cpu-cut
-- after: L416, L252
+- after: L252
 - files: docs/numbers.md
 
 ### L432 Targets hold for a day
@@ -249,7 +204,7 @@ Result: A day of real work meets the targets: 400k tokens and 10 minutes per tas
 - done when: `docs/numbers.md` has a day of at least 30 tasks, measured by L416, with: median input under 400k tokens per task and the largest under 1.5M, a median under 10 minutes from start to ready on every machine, 3 agents per core with load under the core count, at most one GitHub run per 3 merged tasks, no task in Needs you without a question, under 5 % of main checks red (L434) and none red from a flaky test, and a run of 12 tasks on the measured machine held to 4 cores and 8 GB (a systemd slice with `AllowedCPUs` and `MemoryMax`) where all 12 reach ready with no out-of-memory kill and load under 4.
 - parts: measure
 - locks: numbers
-- after: L417, L419, L420, L422, L424, L425, L426, L429, L430, L431, L433, L437, L438
+- after: L417, L419, L420, L422, L424, L425, L426, L429, L430, L431, L433, L438
 - files: docs/numbers.md
 
 ### L267 The rule loop spawns no herdr
