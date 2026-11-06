@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { writeAtomic } from "../pi/atomic.ts";
 import { configDir, readJson } from "../pi/config.ts";
 import { type Settings, tiersOf } from "./project.ts";
-import { fullCheckWhy } from "./release.ts";
+import { bareLog, fullCheckWhy } from "./release.ts";
 
 /** A run that started this long ago and left no result is taken as dead. */
 const STALE_MS = 60 * 60_000;
@@ -99,12 +99,9 @@ const readRedRun: ReadRedRun = (repo) => {
   return { sha: last.headSha, log: String(log.stdout) };
 };
 
-/** A GitHub log line without the job, step and time GitHub puts before it. */
-const bare = (log: string) => log.replace(/^[^\t\n]*\t[^\t\n]*\t\S+ /gm, "").replace(/^\d{4}-\S+Z /gm, "");
-
 /** The fix task of a red heavy run on main: the failing tests, as a red release check names them, and the end of the log. */
 function redRunTask(r: RedRun): { title: string; brief: string } {
-  const log = bare(r.log);
+  const log = bareLog(r.log);
   return {
     title: `Fix heavy ${r.sha.slice(0, 7)}`,
     brief: `The heavy run on GitHub failed on main at ${r.sha.slice(0, 7)}: ${fullCheckWhy(log)}\n\nThe end of its log:\n\n\`\`\`\n${log.slice(-OUTPUT_TAIL).trim()}\n\`\`\`\n\nFind the cause and fix it; do not turn the check off or raise a baseline. Run the failing checks and the project's check before you merge. Both must pass.\nWhen the fix works, rebase on main and merge it yourself. Do not ask first.`,
