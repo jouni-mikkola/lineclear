@@ -61,13 +61,9 @@ or full until a time, with the moves.
 A model on a `key` is used only after you answered Allow to its Inbox question. The answer holds for that key.
 "Not now" is not asked again for a day.
 
-## A herdr that is unhealthy
-
-herdr runs every agent's terminal. Each tick (`src/herdr-health.ts`) reads the herdr servers. One that used over 90 % of a core for 6 ticks in a row, or runs outside `herdr.service`, is stopped and the service restarted, with one `wake` line in `decisions.jsonl`. A workspace of a done or closed task is closed with a `close` line. A service that is not active shows on Home with its failure count. Tests: `test/herdr-health.test.ts`, `test/herdr-health-tick.test.ts`.
-
 ## Tasks the rules left idle
 
-A task the rules started that shows Went wrong for 3 minutes, with a clean worktree (or a branch with no commit) and no declared wait, is closed. A task on Ready to merge for 15 minutes is told to run `lineclear ready` again (or merge, if its brief says so), at most once per 45 minutes and never after the owner wrote. Check runs start at nice 15. `bun run check` started by hand takes a check slot too (`ownSlot`, `test/own-slot.test.ts`) and prints "waiting for a check slot" while it waits, so checks of every repo on a machine stay within its slot count. herdr is restarted when it holds over 1500 MB for 3 ticks, as well as for the CPU rule above. Tests: `test/unstick.test.ts`, `test/herdr-health.test.ts`.
+A task the rules started that shows Went wrong for 3 minutes, with a clean worktree (or a branch with no commit) and no declared wait, is closed. A task on Ready to merge for 15 minutes is told to run `lineclear ready` again (or merge, if its brief says so), at most once per 45 minutes and never after the owner wrote. Check runs start at nice 15. `bun run check` started by hand takes a check slot too (`ownSlot`, `test/own-slot.test.ts`) and prints "waiting for a check slot" while it waits, so checks of every repo on a machine stay within its slot count. Tests: `test/unstick.test.ts`.
 
 ## A loop that fails
 
@@ -75,7 +71,7 @@ An install made before the first-run setup has no `setup.json`. `lineclear run -
 
 ## Starts
 
-A step starts once, and twice more after a real stop: 3 in 24 hours (`src/start-limit.ts`). The waste watch counts every `start` line of `decisions.jsonl` per step, and a Fix task is one: `fileStepFix` notes a `start`. The limit was checked only in `startStep`, after the Fix paths of `startReadySteps`. A reopened step whose task had merged after its Reopened line (`refileReopened`), or a ready step held for a fault (`holdForFault`), filed a Fix task past the limit without a count, a fourth start. That is how L65 reached 6 starts. A restart of an unproven step has its own cap of 3 and then one Fix task by design (`restartUnproven`); another machine and a lost `stepStarts` record are counted already (`test/start-limit.test.ts`). The old `decisions.jsonl` lines of L65 are rotated away, so this cause comes from the code paths and the planted test, not from those lines.
+A step starts once, and twice more after a real stop: 3 in 24 hours (`src/start-limit.ts`). The waste watch counts every `start` line of `decisions.jsonl` per step, and a Fix task is one: `fileStepFix` notes a `start`. The limit was checked only in `startStep`, after the Fix paths of `startReadySteps`. A reopened step whose task had merged after its Reopened line (`refileReopened`) filed a Fix task past the limit without a count, a fourth start. That is how L65 reached 6 starts. A restart of an unproven step has its own cap of 3 and then one Fix task by design (`restartUnproven`); another machine and a lost `stepStarts` record are counted already (`test/start-limit.test.ts`). The old `decisions.jsonl` lines of L65 are rotated away, so this cause comes from the code paths and the planted test, not from those lines.
 
 Fix: `startReadySteps` checks the limit before a reopened or ready step can file a Fix task. Over the limit the step puts one item in the Inbox and starts nothing. Test: `a reopened step started three times in a day gets no Fix task`.
 

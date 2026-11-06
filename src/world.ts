@@ -1,4 +1,3 @@
-import type { HerdrFacts } from "./herdr-health.ts";
 import type { Settings } from "./project.ts";
 import type { ProveTools, StepProof } from "./doneproof.ts";
 import type { Step, Task } from "./roadmap.ts";
@@ -74,12 +73,6 @@ export interface World {
   lastError(id: string): { text: string; at: number } | undefined;
   /** True when the owner wrote to the task in its chat after `since` (an ISO time). */
   ownerWrote(task: string, since: string): boolean;
-  /** What herdr and herdr.service are now, or undefined where Lineclear does not look after herdr (a test or demo instance). */
-  herdr?(): HerdrFacts | undefined;
-  /** Stops every herdr server and starts the one of herdr.service. Returns an error text, or undefined. */
-  restartHerdr?(): string | undefined;
-  /** Closes one herdr workspace. Returns an error text, or undefined. */
-  closeWorkspace?(id: string): string | undefined;
   /** True when the task's worktree has no changes and no commits beyond its base. */
   clean(task: string): boolean;
 }

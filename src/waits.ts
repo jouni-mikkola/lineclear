@@ -22,7 +22,7 @@ export interface Wait {
   task: string;
   project?: string;
   /** `start`: the rule loop gave up on a start whose agent never answered its brief ("start failed"). */
-  kind: (typeof waitKinds)[number] | "until" | "task" | "start" | "fault";
+  kind: (typeof waitKinds)[number] | "until" | "task" | "start";
   reason: string;
   since: string;
   /** For an `owner` wait: what it is for. */

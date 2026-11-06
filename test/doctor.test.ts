@@ -4,7 +4,7 @@ import { expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { removeFolders, testFolders, trimCache } from "../src/tmpdirs.ts";
+import { trimCache } from "../src/tmpdirs.ts";
 import { doctor, doctorChecks, herdrVersions, realProbe, testedHerdr, type Probe } from "../src/doctor.ts";
 import { cacheEnvFile, pathsFor } from "../src/paths.ts";
 import { isOpen, noticeTimers, readItems } from "../src/inbox.ts";
@@ -210,36 +210,6 @@ test("agents are told nothing about herdr-projects 2.0 or its plugin", () => {
   const brief = readFileSync(join(root, "server", "live", "prompts.ts"), "utf8");
   expect(brief).toContain("const SKILLS = join(OWN, 'skill')");
   for (const n of ["lineclear", "lineclear-agent", "lineclear-coordinator"]) expect(existsSync(join(root, "skill", n, "SKILL.md"))).toBe(true);
-});
-
-test("doctor names old test folders and --fix removes them", () => {
-  const dir = mkdtempSync(join(tmpdir(), "lineclear-doctor-tmp-"));
-  try {
-    const old = join(dir, "shep-repo-old");
-    const fresh = join(dir, "shep-repo-fresh");
-    const other = join(dir, "not-ours");
-    for (const d of [old, fresh, other]) mkdirSync(d);
-    const day = Date.now() / 1000 - 2 * 86_400;
-    utimesSync(old, day, day);
-    utimesSync(other, day, day);
-    expect(testFolders(dir)).toEqual([old]);
-    const p = probe({ oldTestFolders: testFolders(dir), removeTestFolders: removeFolders });
-    expect(doctorChecks(p).find((c) => c.name === "old test folders")?.problem).toContain("1 test folder");
-    const lines: string[] = [];
-    fixRetired(p, (l) => lines.push(l));
-    expect(lines.join("\n")).toContain("Removed 1 test folder");
-    expect(existsSync(old)).toBe(false);
-    expect(existsSync(fresh)).toBe(true);
-    expect(existsSync(other)).toBe(true);
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-test("doctor names a RAM /tmp over 2 GB as a stall", () => {
-  const find = (tmpRamBytes: number) => doctorChecks(probe({ tmpRamBytes })).find((c) => c.name === "temp folder size");
-  expect(find(1024 ** 3)?.problem).toBe("");
-  expect(find(3 * 1024 ** 3)?.problem).toContain("3.0 GB");
 });
 
 test("doctor checks lingering and names the one command that turns it on", () => {

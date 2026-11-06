@@ -1,7 +1,6 @@
 import { mkdtempSync, rmSync, statSync } from "node:fs";
 import { loadavg, tmpdir } from "node:os";
 import { join } from "node:path";
-import { herdrWorld, readServers } from "./herdr-world.ts";
 import { serverBin } from "./paths.ts";
 import { forgetTaskReads, readTasks } from "./task-read.ts";
 import { briefOf } from "./held.ts";
@@ -236,6 +235,5 @@ export function realWorld(env = process.env): World {
     ...gitWorld(refsOf),
     ...taskWorld(serverBin(env), io, env),
     ...agentWorld(io, env),
-    ...herdrWorld(run, env, () => readServers().map((s) => s.pid)),
   };
 }
