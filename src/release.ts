@@ -5,7 +5,7 @@
 import { KEPT_ENV } from "./herdr.ts";
 import { rollbackMain } from "./rollback.ts";
 import { spawnSync } from "node:child_process";
-import { closeSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { writeAtomic } from "../pi/atomic.ts";
 import { configDir, readJson } from "../pi/config.ts";
@@ -377,7 +377,7 @@ function testNext(app: string, dir: string, commit: string, env: Env): string {
   rmSync(built, { force: true });
   const broke = runSteps(steps, env);
   if (broke) return broke;
-  writeFileSync(built, `${commit}\n`);
+  writeAtomic(built, `${commit}\n`);
   // Checks are light and run on GitHub, never here: next goes out when the merged commit's GitHub check is green.
   const github = githubCheck(commit, dir, env);
   if (github) return github;
