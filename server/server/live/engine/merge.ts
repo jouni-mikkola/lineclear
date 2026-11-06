@@ -238,7 +238,7 @@ export class EngineLand extends EngineHandoff {
     if (!command) return undefined
     // a red main or a check the machine failed pauses the line; the task that fixes it goes first
     const repo = this.places.space(t.project)?.path ?? p.path
-    const paused = /^fix\b/i.test(t.title) ? undefined : Runs.lanePause(Runs.readRuns(repo, Date.now() - 86_400_000), base)
+    const paused = /^(fix\b|\S+ fix:)/i.test(t.title) ? undefined : Runs.lanePause(Runs.readRuns(repo, Date.now() - 86_400_000), base)
     if (paused) return { ok: false, error: `The merge line is paused: ${paused}. Nothing was merged. Run lineclear merge ${t.id} again in a few minutes.` }
     // one full check at a time in this repo; a real change by the task (not a message) makes it leave the line
     const c = await Lane.checkInTurn(t.id, repo, wt, base, command, {
