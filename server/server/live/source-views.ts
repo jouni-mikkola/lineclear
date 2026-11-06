@@ -104,6 +104,14 @@ export class LiveSourceViews extends LiveSourceState {
     return was && a.title.startsWith(was) ? { ...a, title: clip(name + a.title.slice(was.length), TITLE_MAX) } : a
   }
 
+  /** what each other machine runs itself, for the check that no two tasks share an id */
+  protected peerTasks() {
+    return (this.peers?.list() ?? []).map((l) => ({
+      machine: l.rec.machine,
+      tasks: (l.snap?.tasks ?? []).filter((t) => t.place?.startsWith(`p:${l.rec.machine}:`)),
+    }))
+  }
+
   /** another machine's task, as it last showed itself, for a task queued after it */
   protected peerTask(machine: string, id: string) {
     const l = this.peers?.list().find((x) => x.rec.machine.toLowerCase() === machine.toLowerCase())

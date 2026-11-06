@@ -1,4 +1,4 @@
-// Each machine owns its ID namespace. SQLite commits reservations before a task starts, so concurrent requests,
+// One id series per space; the machines compare ids and a duplicate is renamed (renameLater). SQLite commits reservations before a task starts, so concurrent requests,
 // restarts and deleted tasks cannot reuse an ID. Remote settings and creation are routed to that machine.
 import { Database } from 'bun:sqlite'
 import { mkdirSync } from 'node:fs'
@@ -29,6 +29,45 @@ export function taskIdsSection(level: string, machine: string, prefix: string, n
       { label: 'Next number', key: 'taskIds.next', value: String(next), text: true, hint: `Next task: ${prefix}-${next}. Numbers can only move forward.` },
     ],
   }
+}
+
+type Held = { id: string; aliases?: string[]; created: number }
+export type Owned = Held & { n: number; project: string }
+/** the ids of the tasks renamed, old to new */
+export type Renamed = { from: string; to: string }
+
+/** a task answers to its id and to the aliases a rename kept */
+export const answersTo = (t: { id: string; aliases?: string[] }, ref: string) => {
+  const r = ref.toUpperCase()
+  return t.id.toUpperCase() === r || !!t.aliases?.some((a) => a.toUpperCase() === r)
+}
+
+/** Two machines may each hold the same id. The later task gets a new id of its space's series and keeps the old one as
+ *  an alias naming this machine, so `show` and `close` still reach it by either form. */
+export function renameLater(
+  ids: TaskIds,
+  machine: string,
+  mine: Owned[],
+  others: { machine: string; tasks: Held[] }[],
+  movable: (t: Owned) => boolean = () => true,
+): Renamed[] {
+  const renamed: Renamed[] = []
+  const held = new Set(others.flatMap((o) => o.tasks.flatMap((x) => [x.id, ...(x.aliases ?? [])])).map((x) => x.toUpperCase()))
+  for (const t of mine) {
+    if (!movable(t)) continue
+    const earlier = others.some((o) =>
+      o.tasks.some((x) => x.id.toUpperCase() === t.id.toUpperCase() && (x.created < t.created || (x.created === t.created && o.machine < machine))),
+    )
+    if (!earlier) continue
+    let next = ids.allocate(t.project)
+    while (held.has(next.id.toUpperCase())) next = ids.allocate(t.project)
+    const from = t.id
+    t.aliases = [...(t.aliases ?? []), `${machine}:${t.id}`]
+    t.id = next.id
+    t.n = next.n
+    renamed.push({ from, to: t.id })
+  }
+  return renamed
 }
 
 type Sequence = { space: string; prefix: string; last: number }

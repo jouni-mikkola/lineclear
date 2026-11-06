@@ -154,7 +154,7 @@ function taskWorld(
   lineclear: string,
   io: Readers,
   env: NodeJS.ProcessEnv,
-): Pick<World, "tasks" | "maxTasks" | "reviewerSetting" | "briefOf" | "stopTask" | "tellTask" | "closeTask" | "addTask" | "addTaskOn"> {
+): Pick<World, "tasks" | "maxTasks" | "reviewerSetting" | "briefOf" | "stopTask" | "tellTask" | "closeTask" | "mergeTask" | "addTask" | "addTaskOn"> {
   // a done task has no pane: refused here, before the server and herdr are asked
   const doneTask = (id: string) =>
     taskStatus(run([lineclear, "task", "show", id, "--json"]).out) === "done" ? `${id} is Done already: it has no agent, so nothing is sent to it.` : undefined;
@@ -178,6 +178,17 @@ function taskWorld(
     // The mark tells the agent's log apart from a message of the owner (see ownerWrote), and a resume from other lines.
     tellTask: (id, text, kind) => doneTask(id) ?? failure(io.change([lineclear, "task", "tell", id, `${ownMark(kind)} ${text}`])),
     closeTask: (id) => failure(io.change([lineclear, "task", "close", id, "--force"])),
+
+    // the merge outlives the tick (it waits in the board's merge line); its outcome shows as the task's merge stopped text
+    mergeTask(id) {
+      try {
+        Bun.spawn([lineclear, "merge", id], { stdin: "ignore", stdout: "ignore", stderr: "ignore", timeout: HEALTH_TIMEOUT_MS }).unref();
+        forgetTaskReads();
+        return undefined;
+      } catch (e) {
+        return String(e);
+      }
+    },
     addTask: (space, title, brief, extra) => failure(io.change([lineclear, "task", "add", fitTitle(title), "--brief", brief, "--space", space, ...extra])),
     addTaskOn(host, settings, title, brief, extra, project) {
       const o = run(["git", "-C", settings.repo, "remote", "get-url", "origin"]);

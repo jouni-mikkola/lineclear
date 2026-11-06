@@ -494,5 +494,6 @@ function laneNote(task: { landing?: { step?: string; at?: number }; mergeStopped
     return step && quiet >= LANE_IDLE_MS ? `Stuck in "${step}" for ${minutes(quiet)} min` : undefined;
   }
   const released = /^Your merge hung in (.*?),? so the merge lane released it/.exec(task.mergeStopped ?? "");
-  return released?.[1] ? `Released from the merge line: hung in ${released[1]}` : undefined;
+  if (released?.[1]) return `Released from the merge line: hung in ${released[1]}`;
+  return task.mergeStopped ? `Merge stopped: ${task.mergeStopped}` : undefined;
 }

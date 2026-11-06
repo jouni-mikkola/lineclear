@@ -20,6 +20,8 @@ export interface TaskRec {
   /** Exact coordinator chat that requested this task, when known. */
   requester?: string
   created: number
+  /** former ids, `machine:ID`, kept when a duplicate id was renamed */
+  aliases?: string[]
   updated: number
   branch?: string
   worktree?: string

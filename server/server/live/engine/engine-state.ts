@@ -1,4 +1,4 @@
-import type { TaskIds } from '../task-ids.ts'
+import { answersTo, renameLater, type TaskIds } from '../task-ids.ts'
 import { trustWorktree } from '../trust.ts'
 import { existsSync } from '../mfs.ts'
 import { agentEnv, onMachine, type BoxInfo } from '../box.ts'
@@ -12,7 +12,7 @@ import { has } from '../../plugins.ts'
 import { browserEnv } from '../browser.ts'
 import { hidden, type Agents, type Spec } from '../agents.ts'
 import type { Chats } from '../chats.ts'
-import type { Places, Space } from '../places.ts'
+import { HOST, type Places, type Space } from '../places.ts'
 import { privatePrompt, taskFirst, taskPrompt } from '../prompts.ts'
 import type { Retry } from '../retry.ts'
 import { pastTimes } from '../estimates.ts'
@@ -117,8 +117,28 @@ export abstract class EngineState extends Emitter<Events> {
     return this.data.tasks
   }
 
+  /** ids other machines hold, so a new id skips them */
+  protected foreignIds = new Set<string>()
+
+  /** by id or alias; "this-machine:ID" names this machine's own task */
   task(id: string) {
-    return this.data.tasks.find((t) => t.id.toUpperCase() === id.toUpperCase())
+    const find = (ref: string) => this.data.tasks.find((t) => answersTo(t, ref))
+    const [machine, bare] = splitRef(id)
+    return find(id) ?? (machine || bare === id ? undefined : find(bare))
+  }
+
+  /** after another machine's tasks showed: renames this machine's tasks that share an id with an earlier one there */
+  unifyIds(others: { machine: string; tasks: { id: string; createdAt?: number; aliases?: string[] }[] }[]) {
+    const seen = others.map((o) => ({
+      machine: o.machine,
+      tasks: o.tasks.map((t) => ({ id: t.id, created: t.createdAt ?? Number.POSITIVE_INFINITY, aliases: t.aliases })),
+    }))
+    this.foreignIds = new Set(others.flatMap((o) => o.tasks.map((t) => t.id.toUpperCase())))
+    // a task at work keeps its id: its chat, branch and brief are keyed by it, and it is renamed once it ends
+    const renamed = renameLater(this.taskIds, HOST, this.data.tasks, seen, (t) => !(t as TaskRec).worktree || ended(t as TaskRec))
+    if (!renamed.length) return
+    for (const t of this.data.tasks) t.after = t.after?.map((a) => renamed.find((r) => r.from.toUpperCase() === a.toUpperCase())?.to ?? a)
+    this.save()
   }
 
   /** the tasks at work, and those ended in the last COLD_AFTER, written whole; older ones only when they change */
