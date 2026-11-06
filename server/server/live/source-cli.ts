@@ -236,6 +236,8 @@ export class LiveSourceCli extends LiveSourceSubcommands {
         if (r === 'ended') return `Noted. ${t.id} is Done already (${t.closed ? 'nothing to merge' : 'merged'}).`
         if (r === 'closed')
           return `Noted: ${t.branch} has no changes, so there is nothing to merge: ${t.id} is Done.${ctx.chat === `${t.id}/Agent` ? ' Your worktree, branch and herdr space close once this turn ends: do nothing more in them.' : ''}`
+        if (ctx.chat === `${t.id}/Agent` && this.engine.landAtReady(t.id))
+          return `Noted: ${t.id} shows as Ready. Lineclear merges it once this turn ends and starts you again only if the check fails: end your turn now and do nothing more.`
         return `Noted: ${t.id} shows as Ready to merge (not merged yet). Merge only when your brief or the human says so (lineclear merge ${t.id}).`
       }
       case 'todo': {
