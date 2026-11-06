@@ -96,8 +96,9 @@ export function markDead(provider: string, error: string, env = process.env): vo
 export function clearFull(provider: string, env = process.env): void {
   const accounts = readAccounts(env);
   const old = accounts[provider];
-  if (!old?.out) return;
-  const { out: _o, resetAt: _r, window: _w, dead: _d, ...rest } = old;
+  // A refused account stays out: a usage poll that sees room says nothing about its access.
+  if (!old?.out || old.dead) return;
+  const { out: _o, resetAt: _r, window: _w, ...rest } = old;
   accounts[provider] = rest;
   writeAccounts(accounts, env);
 }

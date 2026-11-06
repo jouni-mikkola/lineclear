@@ -226,7 +226,7 @@ const LEFT_WAITING = /^signed out/i;
 /** What the task list shows for a task in Needs you that asks nothing (the server's `NEED.reply`). */
 const SILENT_SUB = "Waits for your reply";
 /** A task on a provider error shows one of these while it works or sits on a refused account. */
-const runs = (t: Task) => t.status === "work" || (t.status === "need" && (t.sub === SILENT_SUB || /^provider error/i.test(t.sub ?? "")));
+const runs = (t: Task) => t.status === "work" || (t.status === "need" && (t.sub === SILENT_SUB || /^(provider error|provider refused)/i.test(t.sub ?? "")));
 const REMINDER =
   "You may be stuck: nothing has moved for a while. Say where you are with `lineclear status`, then carry on. If you wait for the owner, a login or a browser, declare it with `lineclear wait`.";
 const ESTIMATE = "You are past your time left. Say where you are with `lineclear status` and give a new estimate, then carry on.";
