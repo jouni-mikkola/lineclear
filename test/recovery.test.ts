@@ -21,7 +21,6 @@ test("no source file writes a state file in place", () => {
   const allowed = new Set(["atomic.ts", "browsers.ts"]);
   // Appends are for the logs only (a cut leaves at most one partial last line, which readers skip).
   const plain = /\b(writeFileSync|writeFile|Bun\.write|createWriteStream|appendFileSync|cpSync)\(/;
-  // `lineclear migrate` copies herdr-projects 2.0's files once, and can be run again, so a cut copy is copied again.
   const logs = new Set([
     "rules.ts",
     "full.ts",
@@ -44,12 +43,7 @@ test("no source file writes a state file in place", () => {
     readFileSync(join(src, f), "utf8")
       .split("\n")
       .forEach((l, i) => {
-        if (
-          plain.test(l) &&
-          !(logs.has(f) && l.includes("appendFileSync(")) &&
-          !((f === "migrate.ts" || f === "old-paths.ts" || f === "update.ts") && l.includes("cpSync("))
-        )
-          found.push(`${f}:${i + 1}: ${l.trim()}`);
+        if (plain.test(l) && !(logs.has(f) && l.includes("appendFileSync("))) found.push(`${f}:${i + 1}: ${l.trim()}`);
       });
   }
   expect(found).toEqual([]);

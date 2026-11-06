@@ -1,4 +1,3 @@
-import { OLD_NAME } from "../src/old-install.ts";
 import { tailnetName } from "../src/published.ts";
 import { expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
@@ -8,11 +7,10 @@ import { trimCache } from "../src/tmpdirs.ts";
 import { doctor, doctorChecks, herdrVersions, realProbe, testedHerdr, type Probe } from "../src/doctor.ts";
 import { cacheEnvFile, pathsFor } from "../src/paths.ts";
 import { isOpen, noticeTimers, readItems } from "../src/inbox.ts";
-import { fixRetired, onlyOldInstallLeft } from "../src/retire.ts";
+import { fixRetired } from "../src/retire.ts";
 
 const paths = pathsFor({ HOME: "/nonexistent-home" });
 const probe = (over: Partial<Probe> = {}): Probe => ({
-  oldDir: "/nonexistent-old",
   dataDir: "/nonexistent-home/data",
   paths,
   pathDirs: ["/nonexistent-home/.local/bin"],
@@ -26,17 +24,6 @@ test("a missing tool is one problem with its installer command", () => {
   const herdr = checks.find((c) => c.name === "herdr");
   expect(herdr?.problem).toBe("herdr is not installed");
   expect(herdr?.fix).toBe("curl -fsSL https://herdr.dev/install.sh | sh");
-});
-
-test("a running herdr-projects 2.0 is named, with the command that stops it", () => {
-  const dir = mkdtempSync(join(tmpdir(), "doctor-old-"));
-  writeFileSync(join(dir, "server.json"), JSON.stringify({ port: 7787, pid: 4242 }));
-  const running = doctorChecks(probe({ oldDir: dir, run: () => "" })).find((c) => c.name === "old install stopped");
-  expect(running?.problem).toContain("still running");
-  expect(running?.fix).toBe("herdr plugin disable herdr-projects");
-  const stopped = doctorChecks(probe({ oldDir: dir, run: () => null })).find((c) => c.name === "old install stopped");
-  expect(stopped?.problem).toBe("");
-  rmSync(dir, { recursive: true });
 });
 
 test("doctor does not ask for herdr-projects 2.0 to be installed", () => {
@@ -96,51 +83,24 @@ test("doctor warns when the server listens beyond 127.0.0.1, with the command th
   rmSync(dir, { recursive: true });
 });
 
-test("doctor names herdr-projects 2.0's plugin, skills, unmoved spaces and timers, and --fix removes the first, second and last", () => {
+test("doctor names coordinator timers, and --fix turns them off", () => {
   const timerSetting = process.env.LINECLEAR_COORDINATOR_TIMER;
   delete process.env.LINECLEAR_COORDINATOR_TIMER;
   const dir = mkdtempSync(join(tmpdir(), "doctor-retired-"));
-  const skills = join(dir, "skills");
   const data = join(dir, "data");
-  const old = join(dir, "old");
-  for (const n of [OLD_NAME, `${OLD_NAME}-agent`, "other"]) {
-    mkdirSync(join(skills, n), { recursive: true });
-    writeFileSync(join(skills, n, "SKILL.md"), `---\nname: ${n}\n---\n`);
-  }
   mkdirSync(data, { recursive: true });
-  mkdirSync(old, { recursive: true });
   writeFileSync(join(data, "modes.json"), JSON.stringify({ a: "autopilot", b: "regular" }));
-  writeFileSync(join(old, "spaces.json"), "[]");
-  const ran: string[][] = [];
-  let installed = true;
-  const p = probe({
-    oldDir: old,
-    dataDir: data,
-    skillRoots: [skills],
-    run: (cmd) => {
-      ran.push(cmd);
-      if (cmd.join(" ") === "herdr plugin list --json") return JSON.stringify({ result: { plugins: installed ? [{ plugin_id: "herdr-projects" }] : [] } });
-      if (cmd[2] === "uninstall") installed = false;
-      return "";
-    },
-  });
-  const mine = ["old install plugin removed", "old install skills removed", "spaces moved to Lineclear", "no coordinator on a timer"];
+  const p = probe({ dataDir: data });
+  const mine = ["no coordinator on a timer"];
   const bad = () =>
     doctorChecks(p)
       .filter((c) => mine.includes(c.name) && c.problem !== "")
       .map((c) => c.name);
-  expect(bad()).toEqual(["old install plugin removed", "old install skills removed", "spaces moved to Lineclear", "no coordinator on a timer"]);
+  expect(bad()).toEqual(["no coordinator on a timer"]);
   const out: string[] = [];
   fixRetired(p, (l) => out.push(l));
-  expect(out).toEqual([
-    "Removed the herdr plugin herdr-projects",
-    `Removed the skill ${join(skills, OLD_NAME)}`,
-    `Removed the skill ${join(skills, `${OLD_NAME}-agent`)}`,
-    "Turned off the timer of a",
-  ]);
-  expect(bad()).toEqual(["spaces moved to Lineclear"]);
-  expect(onlyOldInstallLeft(["ok     git", "FAILED spaces moved to Lineclear: x", "       fix: lineclear migrate"])).toBe(true);
-  expect(onlyOldInstallLeft(["FAILED service: x", "FAILED spaces moved to Lineclear: x"])).toBe(false);
+  expect(out).toEqual(["Turned off the timer of a"]);
+  expect(bad()).toEqual([]);
   writeFileSync(join(data, "modes.json"), JSON.stringify({ a: "autopilot" }));
   const live: string[] = [];
   const asked: string[] = [];
@@ -163,7 +123,6 @@ test("doctor names herdr-projects 2.0's plugin, skills, unmoved spaces and timer
   expect(live.at(-1)).toContain("did not take the change");
   writeFileSync(join(data, "modes.json"), JSON.stringify({ a: "regular", b: "regular" }));
   expect(JSON.parse(readFileSync(join(data, "modes.json"), "utf8"))).toEqual({ a: "regular", b: "regular" });
-  expect(existsSync(join(skills, "other"))).toBe(true);
   if (timerSetting !== undefined) process.env.LINECLEAR_COORDINATOR_TIMER = timerSetting;
   rmSync(dir, { recursive: true });
 });
@@ -173,7 +132,7 @@ test("heal never flips a mode: it shows the timer in the Inbox once, and honours
   const data = join(dir, "data");
   mkdirSync(data, { recursive: true });
   writeFileSync(join(data, "modes.json"), JSON.stringify({ a: "autopilot" }));
-  const p = probe({ oldDir: join(dir, "old"), dataDir: data });
+  const p = probe({ dataDir: data });
   const env = { ...process.env, HOME: dir, LINECLEAR_CONFIG: join(dir, "config"), LINECLEAR_COORDINATOR_TIMER: undefined };
   const out: string[] = [];
   const was = process.env.LINECLEAR_COORDINATOR_TIMER;
@@ -270,13 +229,6 @@ test("the tested herdr is the adapter's pin", () => {
   expect(testedHerdr()).toMatch(/^\d+\.\d+\.\d+$/);
 });
 
-test("doctor says the old folder is free only when no process still uses it", () => {
-  const free = doctorChecks(probe({ oldUsers: () => [] })).find((c) => c.name === "old folder free");
-  expect(free?.problem).toBe("");
-  const held = doctorChecks(probe({ oldUsers: () => ["42 bash"] })).find((c) => c.name === "old folder free");
-  expect(held?.problem).toContain("1 running process still use");
-});
-
 test("doctor shows the builds, names a roadmap stable cannot read, and says when another machine promotes", () => {
   const at = "2026-11-01T12:12:00Z";
   const release = {
@@ -335,27 +287,6 @@ test("doctor fails on an installed file or pi setting that points into a git che
   rmSync(dir, { recursive: true, force: true });
 });
 
-test("doctor --fix rewrites old paths when no server runs, and says to stop a running one", () => {
-  const dir = mkdtempSync(join(tmpdir(), "fixpaths-"));
-  const old = join(dir, "old");
-  const data = join(dir, "data");
-  mkdirSync(join(old, "browser", "T-1"), { recursive: true });
-  mkdirSync(data, { recursive: true });
-  writeFileSync(join(data, "agents.json"), JSON.stringify({ "T-1/Agent": { env: { AGENT_BROWSER_PROFILE: join(old, "browser", "T-1") } } }));
-  const p = probe({ oldDir: old, dataDir: data, run: () => null });
-  const bad = () => doctorChecks(p).find((c) => c.name === "records hold no old paths")?.problem;
-  expect(bad()).toContain("agents.json");
-  const busy: string[] = [];
-  expect(fixRetired({ ...p, running: () => true }, (l) => busy.push(l))).toBe(1);
-  expect(busy.join(" ")).toContain("stop it");
-  expect(bad()).toContain("agents.json");
-  const out: string[] = [];
-  expect(fixRetired({ ...p, running: () => false }, (l) => out.push(l))).toBe(0);
-  expect(out).toContain("Rewrote the old paths in agents.json");
-  expect(busy.join(" ")).toContain("Copied the browser profile of T-1");
-  expect(bad()).toBe("");
-});
-
 test("two board units on one store fail the one-server check", () => {
   const units = "lineclear-serve-7421.service loaded active running a\nlineclear-serve-7787.service loaded active running b\n";
   const two = doctorChecks(probe({ run: (c) => (c.includes("lineclear-serve-*.service") ? units : null) })).find((c) => c.name === "one server");
@@ -396,20 +327,6 @@ test("doctor fails when NODE_COMPILE_CACHE is not set where install sets it, and
   withManager = cacheEnvFile();
   expect(find()?.problem).toBe("");
   expect(doctorChecks(probe({ paths: own })).find((c) => c.name === "compile cache on disk")?.skip).toBe(true); // no systemd user services
-  rmSync(dir, { recursive: true });
-});
-
-test("a plugin config.json is named, with the command that removes it", () => {
-  const dir = mkdtempSync(join(tmpdir(), "doctor-plugin-"));
-  const problem = () => doctorChecks(probe({ dataDir: dir })).find((c) => c.name === "plugin config.json");
-  expect(problem()?.problem).toBe("");
-  writeFileSync(join(dir, "config.json"), JSON.stringify({ main: "box" }));
-  expect(problem()?.problem).toContain("config.json");
-  expect(problem()?.fix).toBe(`rm ${join(dir, "config.json")}`);
-  writeFileSync(join(dir, "config.json"), JSON.stringify({ main: "box", user: "Ann" }));
-  expect(problem()?.fix).toContain('remove the "main" key');
-  writeFileSync(join(dir, "config.json"), JSON.stringify({ user: "Ann" }));
-  expect(problem()?.problem).toBe("");
   rmSync(dir, { recursive: true });
 });
 
