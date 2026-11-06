@@ -39,11 +39,15 @@ export async function workedTask(name: string) {
     shell: '/bin/sh',
   })
   const p = await src.places.add(dir, name)
-  // no herdr is there, so a sampled machine reads as not ready and would hold the new task
+  // no herdr is there, so a sampled machine reads as not ready and would hold the new task; and the slots follow the
+  // machine's cores, so the tasks of earlier tests would hold it on a small one
   const machine = src.engine.machine
+  const room = src.engine.room
   src.engine.machine = () => undefined
+  src.engine.room = () => ({})
   const t = src.engine.add({ project: p.name, title: 'Worked', by: 'test' })
   src.engine.machine = machine
+  src.engine.room = room
   await until(() => !!t.worktree).catch(() => undefined)
   // never in the folder the tests run from
   if (!t.worktree) throw new Error(`${t.id} got no worktree: ${t.trouble}`)
