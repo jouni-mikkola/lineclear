@@ -271,12 +271,18 @@ function lineReader(onLine: (line: string) => unknown) {
   }
 }
 
+/** over an ssh bridge a close is a failed link, which the machine's own recovery handles */
+const bridged = () => {
+  const b = box()
+  return !!b && !b.socket
+}
+
 /** a closed socket means the request came late, not that herdr is down: ask once more, and fail plainly on a second close */
 async function send<T>(method: string, params: Record<string, unknown>, timeoutMs: number, path: string): Promise<T> {
   try {
     return await sendOnce<T>(method, params, timeoutMs, path)
   } catch (e) {
-    if (!(e instanceof HerdrError) || e.code !== 'closed') throw e
+    if (!(e instanceof HerdrError) || e.code !== 'closed' || bridged()) throw e
     return sendOnce<T>(method, params, timeoutMs, path)
   }
 }
