@@ -310,6 +310,6 @@ if (failed !== 0) {
   console.error("check: every step ran");
   finish(failed, record);
 }
-if (!recording && !sharded) recordPassed(passedKeys, ran);
+if (!recording && !sharded) recordPassed(".", passedKeys, ran);
 console.log(`check: passed in ${wall.toFixed(0)} s (budget 180 s on a machine that is not busy)`);
 finish(0, record);
