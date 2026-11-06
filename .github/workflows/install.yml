@@ -87,7 +87,8 @@ jobs:
       - name: Uninstall leaves none of Lineclear's files
         run: |
           lineclear uninstall --all
-          for p in ~/.lineclear ~/.config/lineclear ~/.local/bin/lineclear \
+          # ~/.lineclear holds the user's tasks and builds, and uninstall keeps it
+          for p in ~/.local/share/lineclear ~/.config/lineclear ~/.local/bin/lineclear \
             ~/.pi/agent/extensions/lineclear.ts ~/.config/systemd/user/lineclear.service; do
             if [ -e "$p" ] || [ -L "$p" ]; then echo "left behind: $p"; exit 1; fi
           done
