@@ -150,7 +150,10 @@ function readRuns(days: number, now = Date.now()): GhRun[] {
     });
 }
 
-/** A commit between two main commits has a subject that starts with "fix". */
+/** A merge line is `<task id>: <title> (#n)`: a fix is a title that starts with "Fix" or "Main green". */
+export const isFixSubject = (s: string): boolean => /^(fix\b|\S+:\s*(fix|main green)\b)/i.test(s);
+
+/** A commit between two main commits has a fixing subject. */
 function fixBetweenGit(from: string, to: string): boolean {
   const p = Bun.spawnSync(["git", "log", "--format=%s", `${from}..${to}`], { stdin: "ignore", stderr: "ignore" });
   return (
@@ -158,7 +161,7 @@ function fixBetweenGit(from: string, to: string): boolean {
     p.stdout
       .toString()
       .split("\n")
-      .some((s) => /^fix/i.test(s))
+      .some((s) => isFixSubject(s))
   );
 }
 

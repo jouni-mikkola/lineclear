@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { firstCause, renderReport, sortRuns, type GhRun } from "../src/check-failures.ts";
+import { firstCause, isFixSubject, renderReport, sortRuns, type GhRun } from "../src/check-failures.ts";
 
 const line = (job: string, step: string, text: string) => `${job}\t${step}\t2026-11-06T21:19:20.1785389Z ${text}`;
 const CHECK = "Run bun scripts/check.ts --changed --untimed";
@@ -54,4 +54,9 @@ test("the table names each count", () => {
   const text = renderReport(sortRuns([run({ conclusion: "failure", log: testLog("m") })]), 2).join("\n");
   expect(text).toContain("| main | 1 | 0 | 1 | 0 |");
   expect(text).toContain("| m | 1 | real break | 0.0 s |");
+});
+
+test("a fix is a subject that starts with Fix or Main green, after a task id or not", () => {
+  expect(["Fix the lock", "LIN-1185: Fix a race (#9)", "LE-10: Main green after LIN-1207 (#61)"].map(isFixSubject)).toEqual([true, true, true]);
+  expect(["LIN-1215: L423 An agent ends at ready (#66)", "Prefix the name"].map(isFixSubject)).toEqual([false, false]);
 });
