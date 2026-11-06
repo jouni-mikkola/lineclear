@@ -3,7 +3,7 @@ import { readJson } from "../pi/config.ts";
 import { listProjectNames, projectsDir, readSettings } from "./project.ts";
 import { unprovenOf } from "./doneproof.ts";
 import { ownerStepsDone } from "./owner-steps.ts";
-import { doneIds, type Step, type StepStatus, stepStatuses, type Task } from "./roadmap.ts";
+import { doneIds, parseRoadmap, type Step, type StepStatus, stepStatuses, type Task } from "./roadmap.ts";
 import type { State } from "./rules.ts";
 
 type Env = Record<string, string | undefined>;
@@ -90,4 +90,10 @@ export function stepInputs(
 export function statusesOf(steps: Step[], commits: Commits, tasks: Task[], repo: string, env: Env): StepStatus[] {
   const i = stepInputs(steps, commits, { local: tasks.filter((t) => !isRemote(t)), remote: tasks.filter(isRemote) }, repo, env);
   return stepStatuses(steps, i.merged, i.tasks, i.taskSteps, i.remote, i.unproven);
+}
+
+/** The merged steps and the unproven ones of a roadmap's text, for a reader that draws the plan and not the states. */
+export function planInputs(text: string, commits: Commits, repo: string, env: Env): { merged: Set<string>; unproven: ReadonlyMap<string, string> } {
+  const { merged, unproven } = stepInputs(parseRoadmap(text).steps, commits, { local: [], remote: [] }, repo, env);
+  return { merged, unproven };
 }

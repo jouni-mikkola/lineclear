@@ -79,10 +79,15 @@ function listPlan(text: string): Plan {
  * The steps of a roadmap file, either kind: ids with `after` (done from the commits on main) or lists under Now,
  * Next, Later and Done (done = under Done or marked done).
  */
-export function readPlan(text: string, commits: { subject: string; body: string }[], unproven: ReadonlyMap<string, string> = new Map()): Plan {
+export function readPlan(
+  text: string,
+  commits: { subject: string; body: string }[],
+  unproven: ReadonlyMap<string, string> = new Map(),
+  merged?: Set<string>,
+): Plan {
   const parsed = parseRoadmap(text).steps.filter((s) => !s.dropped);
   if (parsed.length === 0) return listPlan(text);
-  const done = doneIds(commits, new Set(parsed.map((s) => s.id)));
+  const done = merged ?? doneIds(commits, new Set(parsed.map((s) => s.id)));
   return {
     steps: parsed.map((s) => ({
       id: s.id,
@@ -246,8 +251,9 @@ export function lineOf(
   now: number,
   fallbackMerged7 = 0,
   unproven: ReadonlyMap<string, string> = new Map(),
+  merged?: Set<string>,
 ): { line: RoadmapLine; where: Where } {
-  const plan = readPlan(text, commits, unproven);
+  const plan = readPlan(text, commits, unproven, merged);
   const merged7 = stepsMerged7(text, commits, now) ?? fallbackMerged7;
   const where = whereTo(plan, stops, merged7, now);
   return { line: roadmapLine(plan, marks, where, merged7), where };
