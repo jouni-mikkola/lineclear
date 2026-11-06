@@ -44,9 +44,8 @@ export class AgentsState extends Emitter<Events> {
   protected listed: AgentInfo[] = []
   /** agents whose status changed since their screen was read: the screen is read only for these */
   protected screenDue = new Set<string>()
-  /** agents whose status changed since their pane was looked at for a pasted brief */
+  /** agents whose status changed since their pane was looked at, and those whose pane showed the pasted brief then */
   protected pasteDue = new Set<string>()
-  /** the agents whose pane showed the pasted brief when last looked at */
   protected pasted = new Set<string>()
   /** when the last event or session read changed the list of agents */
   protected heardAt = 0
