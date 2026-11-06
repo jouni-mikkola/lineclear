@@ -130,8 +130,6 @@ as sidings, then the agents at work, then tokens and cost. `test/board-usage.tes
 "Running low".
 
 A change in the files plays its motion: a task starting, moving or finishing on Home, an item arriving in the Inbox.
-Recordings: [Home task-start](design/motion/home-task-start.webm), [Home task-move](design/motion/home-task-move.webm),
-[Home task-finish](design/motion/home-task-finish.webm), [Inbox inbox-arrive](design/motion/inbox-inbox-arrive.webm).
 
 | State | Home 1440 px | Home 390 px | Inbox 1440 px | Inbox 390 px |
 |---|---|---|---|---|
@@ -170,8 +168,7 @@ it, with no lines between them. One click opens its why, done-when, task, review
 to one line, and the page opens on the first phase with open steps. The history lists recent merges, newest first.
 
 A step whose task starts glows once (`task-start`), and a merged step slides to done while its phase fills
-(`task-finish`). Recordings: [Roadmap task-start](design/motion/roadmap-task-start.webm),
-[Roadmap task-finish](design/motion/roadmap-task-finish.webm).
+(`task-finish`).
 
 | State | Roadmap 1440 px | Roadmap 390 px |
 |---|---|---|
@@ -197,8 +194,7 @@ and a box and a few keys type into it. The server takes input only for a session
 its own pages, and only as a click, text, a listed key or a scroll. `LINECLEAR_PLAYWRIGHT_CLI` sets the command.
 
 A session that opens grows in at its place (`browser-open`) and one that closes shrinks away (`browser-close`),
-while the other cards slide. Recordings: [browser-open](design/motion/browsers-browser-open.webm),
-[browser-close](design/motion/browsers-browser-close.webm).
+while the other cards slide.
 
 | State | Browsers 1440 px | Browsers 390 px |
 |---|---|---|
@@ -227,8 +223,6 @@ secrets by name only: a value never reaches a page.
 
 A machine that is added drops in at its place (`machine-add`), a machine's new state shape pops in
 (`machine-state`) and a model slides to its new place (`model-move`). A new load reading changes the bar at once.
-Recordings: [machine-add](design/motion/settings-machine-add.webm),
-[machine-state](design/motion/settings-machine-state.webm), [model-move](design/motion/settings-model-move.webm).
 
 | State | Settings 1440 px | Settings 390 px |
 |---|---|---|
@@ -259,8 +253,7 @@ is a link. Lineclear talks to the Dispatcher through Lineclear's own server on t
 
 Empty shows one line on what the Dispatcher does and three questions to tap. A message on its way says Sending; one
 that did not go says why with Try again. While the Dispatcher writes, three grey dots beat (`chat-typing`) with what
-it does now. Offline, a line says so and Send waits. A new message slides up into place (`chat-arrive`). Recordings:
-[chat-arrive](design/motion/chat-arrive.webm), [chat-typing](design/motion/chat-typing.webm).
+it does now. Offline, a line says so and Send waits. A new message slides up into place (`chat-arrive`).
 
 | State | Chat 1440 px | Chat 390 px |
 |---|---|---|
@@ -463,17 +456,6 @@ curve from `KEY` in `ui/brand/rail.ts`. `ui/test/alike.pw.ts` holds each motion 
 its start, every 50 ms and its end, and compares the share of its travel each has made (position, opacity, colour).
 Alike threshold: 5 %. A motion that differs from the board by more at any instant fails. The parts at rest are
 compared by their ink, pixel by pixel, in the app and on the board (`ui/test/alike-parts.pw.ts`). Parts threshold: 20 %.
-Before and after U41: [train](design/motion/alike/before-train.webm) to [train](design/motion/alike/after-train.webm), [lamp](design/motion/alike/before-lamp.webm) to [lamp](design/motion/alike/after-lamp.webm), [view](design/motion/alike/before-view.webm) to [view](design/motion/alike/after-view.webm), [track-lay](design/motion/alike/before-lay.webm) to [track-lay](design/motion/alike/after-lay.webm).
-
-Recordings: [task-start](design/motion/task-start.webm), [task-move](design/motion/task-move.webm),
-[task-finish](design/motion/task-finish.webm), [task-wait](design/motion/task-wait.webm), [inbox-clear](design/motion/inbox-clear.webm), [inbox-arrive](design/motion/inbox-arrive.webm),
-[view-change](design/motion/view-change.webm), [chat-open](design/motion/chat-open.webm), [browser-open](design/motion/browser-open.webm),
-[browser-close](design/motion/browser-close.webm), [machine-add](design/motion/machine-add.webm),
-[machine-state](design/motion/machine-state.webm), [model-move](design/motion/model-move.webm),
-[chat-arrive](design/motion/chat-arrive.webm), [chat-typing](design/motion/chat-typing.webm),
-[part-change](design/motion/part-change.webm), [value-change](design/motion/value-change.webm),
-[track-lay](design/motion/track-lay.webm), [request-run](design/motion/request-run.webm), [train-progress](design/motion/train-progress.webm),
-[load-shrink](design/motion/load-shrink.webm), [track-ahead](design/motion/track-ahead.webm), [engine-swap](design/motion/engine-swap.webm), and the whole line at [1440 px](design/motion/line-1440.webm) and [390 px](design/motion/line-390.webm).
 
 ## Say each thing once
 

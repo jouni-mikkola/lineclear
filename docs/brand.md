@@ -209,8 +209,7 @@ a part loads), the same for the views and the README's films. Under reduced moti
 state and nothing moves.
 
 The parts are data in `ui/brand/rail.ts` (track, station, train, signal, main line, siding, engine, signal box).
-`ui/kit/rail.tsx` draws them in the views, `scripts/film/line.py` in the README's film (in 3D, in Blender). The
-README's chart of who does what (`scripts/readme-roles.ts`) uses the role icons and the same station for main.
+`ui/kit/rail.tsx` draws them in the views, and the role icons share its station for main.
 Green is clear, amber is only what waits for you, red is only a broken main.
 
 ## Files
@@ -249,4 +248,4 @@ These are drawings of the three directions, not screenshots of the app. The app'
 ![Direction: Signal box](brand/home/direction-box.png)
 ![Direction: Timetable](brand/home/direction-board.png)
 
-The chosen one is the Home of the app. Its empty, loading, error, long text and 200 items states at 1440 and 390 px are the screenshot tests `ui/test/screens/home-<state>-<width>.png` (`empty`, `loading`, `error`, `long`, `many`). Its task starting and finishing are the recordings `docs/design/motion/home-task-start.webm` and `home-task-finish.webm`, and `bun run ui:test` holds their 60 fps, instant click and reduced-motion bars.
+The chosen one is the Home of the app. Its empty, loading, error, long text and 200 items states at 1440 and 390 px are the screenshot tests `ui/test/screens/home-<state>-<width>.png` (`empty`, `loading`, `error`, `long`, `many`). `bun run ui:test` holds its task starting and finishing to their 60 fps, instant click and reduced-motion bars.
