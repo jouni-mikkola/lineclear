@@ -1,6 +1,6 @@
 import type { WorkerHealth } from './recovery.ts'
 import { createHash } from 'node:crypto'
-import { existsSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import type { Action, Alert, Chat, Snapshot, TermScreen } from '../../shared/types.ts'
 import type { Overview } from '../source.ts'
@@ -122,12 +122,12 @@ export const machineHome = (label: string) => join(HOME, 'machines', dirOf(label
 export const dirOf = (label: string) => label.replace(/[^\w.-]+/g, '_')
 
 /** what every machine showed before this server started. A machine's tasks are read over the link, never kept here:
- *  the copies an earlier version wrote (tasks.json, the snapshot in last.json) are removed */
+ *  the snapshot an earlier version wrote into last.json is removed. (machines/<label>/tasks.json is not a copy: it is
+ *  the store of that machine's own worker, which runs from this folder) */
 export function kept(): Kept[] {
   const dir = join(HOME, 'machines')
   if (!existsSync(dir)) return []
   return readdirSync(dir).flatMap((d) => {
-    rmSync(join(dir, d, 'tasks.json'), { force: true })
     const k = readJson<(Kept & { snap?: unknown }) | null>(join('machines', d, 'last.json'), null)
     if (k && 'snap' in k) {
       delete k.snap
