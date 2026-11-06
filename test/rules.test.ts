@@ -584,3 +584,15 @@ test("locks: a task whose worktree is gone and whose agent is dead holds none, s
   recordTaskSteps(dead.config, { "LIN-1": "A" });
   expect(dead.doTick().map((x) => `${x.step}:${x.kind}`)).toEqual(["B:start"]);
 });
+
+test("stepStatuses is called only where its inputs come from stepInputs", () => {
+  const dir = join(import.meta.dir, "..", "src");
+  const callers = new Bun.Glob("*.ts").scanSync(dir);
+  const found: string[] = [];
+  for (const file of callers) {
+    const text = readFileSync(join(dir, file), "utf8");
+    if (/\bstepStatuses\(/.test(text) && file !== "roadmap.ts") found.push(file);
+    if (/\bstepStatuses\(/.test(text) && file !== "roadmap.ts") expect(text).toContain("stepInputs(");
+  }
+  expect(found.sort()).toEqual(["task-steps.ts", "tick-project.ts"]);
+});
