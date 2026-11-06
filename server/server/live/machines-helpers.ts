@@ -1,6 +1,6 @@
 import type { WorkerHealth } from './recovery.ts'
 import { createHash } from 'node:crypto'
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import type { Action, Alert, Chat, Snapshot, TermScreen } from '../../shared/types.ts'
 import type { Overview } from '../source.ts'
@@ -118,8 +118,27 @@ export function running(pid: number | undefined): Worker | undefined {
 /** a machine's own folder of records on this machine */
 export const machineHome = (label: string) => join(HOME, 'machines', dirOf(label))
 
+/** the folder of a machine's own worker and its store: tasks.json, server.json, worker.log. Nothing in it is a copy
+ *  of that machine's tasks kept by this server (machines/<label> holds only last.json) */
+export const workerHome = (label: string) => join(HOME, 'workers', dirOf(label))
+
 /** a machine's folder name under machines/ */
 export const dirOf = (label: string) => label.replace(/[^\w.-]+/g, '_')
+
+/** Older versions ran a machine's worker inside machines/<label>, so its tasks.json sat where a mirror would. The
+ *  worker is stopped and everything but last.json moves to workers/<label>: no tasks.json is left under machines/. */
+function moveOldStore(d: string) {
+  const from = join(HOME, 'machines', d)
+  const to = join(HOME, 'workers', d)
+  const files = readdirSync(from).filter((f) => f !== 'last.json')
+  if (!files.length) return
+  running(readJson<{ pid?: number }>(join('machines', d, 'server.json'), {}).pid)?.kill()
+  mkdirSync(to, { recursive: true })
+  for (const f of files) {
+    if (existsSync(join(to, f))) rmSync(join(from, f), { recursive: true, force: true })
+    else renameSync(join(from, f), join(to, f))
+  }
+}
 
 /** what every machine showed before this server started. A machine's tasks are read over the link, never kept here:
  *  the snapshot an earlier version wrote into last.json is removed. (machines/<label>/tasks.json is not a copy: it is
@@ -128,6 +147,7 @@ export function kept(): Kept[] {
   const dir = join(HOME, 'machines')
   if (!existsSync(dir)) return []
   return readdirSync(dir).flatMap((d) => {
+    moveOldStore(d)
     const k = readJson<(Kept & { snap?: unknown }) | null>(join('machines', d, 'last.json'), null)
     if (k && 'snap' in k) {
       delete k.snap

@@ -22,7 +22,7 @@ export class RequestedNewsMailbox {
   known(chat?: string): string | undefined {
     if (!chat || !/^p:[^:]+:[^/]+$/.test(chat)) return
     const homes = [this.root]
-    const machines = join(this.root, 'machines')
+    const machines = join(this.root, 'workers')
     if (existsSync(machines)) for (const name of readdirSync(machines)) homes.push(join(machines, name))
     for (const home of homes) {
       try {

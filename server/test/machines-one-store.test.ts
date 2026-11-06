@@ -39,7 +39,7 @@ async function linked() {
   return { m, l, far, poll, end: () => (m.stop(), far.server.stop(true)) }
 }
 
-test("no snapshot of another machine is kept: an update removes the old one, and the worker's own store stays", async () => {
+test("no tasks.json is left under machines/: an update removes the old snapshot and moves the worker's store out", async () => {
   const { HOME, writeJson } = await import('../server/store.ts')
   const { Machines } = await import('../server/live/machines.ts')
   const saved = { id: 'old', label: 'old', target: 'old.invalid', session: 'default', enabled: false }
@@ -50,7 +50,8 @@ test("no snapshot of another machine is kept: an update removes the old one, and
     async () => ({}),
   )
   m.stop()
-  expect(existsSync(join(HOME, 'machines', 'old', 'tasks.json'))).toBe(true)
+  expect(existsSync(join(HOME, 'machines', 'old', 'tasks.json'))).toBe(false)
+  expect(JSON.parse(readFileSync(join(HOME, 'workers', 'old', 'tasks.json'), 'utf8')).tasks).toHaveLength(1)
   expect(JSON.parse(readFileSync(join(HOME, 'machines', 'old', 'last.json'), 'utf8')).snap).toBeUndefined()
 })
 
@@ -65,7 +66,7 @@ test('a change on the remote machine shows in the next read, and nothing of it i
     m.stop()
     const dir = join(HOME, 'machines')
     const files = existsSync(dir) ? readdirSync(dir).flatMap((d) => readdirSync(join(dir, d)).map((f) => join(dir, d, f))) : []
-    expect(files.filter((f) => !f.endsWith('tasks.json') && readFileSync(f, 'utf8').includes('FAR-1'))).toEqual([])
+    expect(files.filter((f) => f.endsWith('tasks.json') || readFileSync(f, 'utf8').includes('FAR-1'))).toEqual([])
   } finally {
     end()
   }

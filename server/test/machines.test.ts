@@ -453,7 +453,7 @@ describe('a restart of the main server (an update)', () => {
       snap,
       chats: [{ key: 'p:far:web', cli: 'Claude Code', messages: [{ id: 'm1', who: 'agent', at: 1, text: 'Done.' }] }],
     })
-    writeJson('machines/far/server.json', { port: w.port, pid: w.pid, code: code || codeVersion() })
+    writeJson('workers/far/server.json', { port: w.port, pid: w.pid, code: code || codeVersion() })
     return { HOME, Machines, writeJson }
   }
 
@@ -501,7 +501,7 @@ describe('a restart of the main server (an update)', () => {
       expect(l.reachable).toBe(true)
       // the old worker stops, and a new one serves on another port, as the doctor leaves it
       process.kill(w.pid)
-      writeJson('machines/far/server.json', { port: next.port, pid: next.pid })
+      writeJson('workers/far/server.json', { port: next.port, pid: next.pid })
       for (let i = 0; i < 500 && !(l.reachable && l.rec.url.endsWith(`:${next.port}`)); i++) await Bun.sleep(20)
       expect(l.rec.url).toBe(`http://127.0.0.1:${next.port}`)
       expect(l.reachable).toBe(true)
