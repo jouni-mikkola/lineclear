@@ -74,6 +74,7 @@ export function world(herdr = fakeHerdr(), o: { boot?: string } = {}) {
     background: (key: string) => bg[key],
     said: (key: string) => said[key],
     record: (key: string) => records[key],
+    herdrView: () => undefined,
     info: (key: string) => (status[key] && status[key] !== 'gone' && panes[key] ? { pane_id: panes[key] } : undefined),
     waiting: (key: string) => outbox.filter((k) => k === key),
     finish: async (key: string) => {
