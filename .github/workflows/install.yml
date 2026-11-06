@@ -43,8 +43,6 @@ jobs:
           node -e 'for (const [n, v] of Object.entries(require("./pi/kit.json").packages)) console.log(`npm:${n}@${v}`)' |
             while read -r spec; do pi install "$spec"; done
           pi --version
-          # the update's smoke check starts a coordinator chat, and pi will not start an agent without a model set
-          node -e 'const f = process.env.HOME + "/.pi/agent/settings.json", s = require(f); s.defaultProvider = "claude-bridge"; s.defaultModel = "claude-sonnet-5-5"; require("fs").writeFileSync(f, JSON.stringify(s, null, 2))'
 
       # A user installs a release, so the test tags the commit as one, in the checked-out copy only.
       - name: Install the commit as a release
@@ -53,8 +51,10 @@ jobs:
           LINECLEAR_REF=v0.0.1 sh install.sh
           test "$(readlink ~/.lineclear/builds/current)" = "$HOME/.lineclear/builds/0.0.1"
 
+      # The update's smoke check starts a coordinator chat, and pi will not start an agent without a model set.
       - name: A newer release waits as a candidate
         run: |
+          lineclear set coordinator.model claude-bridge/claude-sonnet-5-5
           git tag v0.0.2 "$(git rev-parse HEAD)"
           LINECLEAR_REF=v0.0.2 sh < install.sh
           test -f ~/.lineclear/builds/0.0.2/.release
