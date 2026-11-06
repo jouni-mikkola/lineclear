@@ -3,7 +3,8 @@ import { writeAtomic } from "../pi/atomic.ts";
 import { cpus, hostname, loadavg } from "node:os";
 import { resolve } from "node:path";
 import { HOST, machinesFile, readMachines, type SavedMachine } from "./machine-list.ts";
-import { doctorChecks, realProbe } from "./doctor.ts";
+import { doctorChecks, herdrUnsaved, realProbe } from "./doctor.ts";
+import { herdrArgv } from "./herdr.ts";
 import { networkTrouble, type Trouble } from "./health.ts";
 import { relationOf, type Relation, remoteExports } from "./remotes.ts";
 import { LINECLEAR, quote, run, sshArgs } from "./ssh.ts";
@@ -104,6 +105,12 @@ export async function installMachine(host: string, env: Env = process.env, say: 
           : `install.sh failed (exit ${install.code}).`;
     done = { host, state: "failed", since, doctor: [why, ...install.lines.slice(-8)] };
   } else {
+    // the server places tasks only on machines herdr has saved; a test or demo run never reaches out
+    const listed = (c: string[]) => Bun.spawnSync(c, { stdin: "ignore", env: env as Record<string, string> }).stdout.toString() || null;
+    if (env.LINECLEAR_DOCTOR_FILE === undefined && Bun.which("herdr") && herdrUnsaved(listed, [host]).length > 0) {
+      const saved = await run(herdrArgv(["machine", "add", host]), undefined, 120_000, env);
+      say(saved.code === 0 ? `Saved ${host} in herdr` : `herdr could not save ${host}; run: herdr machine add ${host}`);
+    }
     say(`Fixing what is safe to fix on ${host}`);
     const fixed = await run(sshArgs(env, host, `${LINECLEAR} doctor --fix --here`), undefined, 120_000, env);
     for (const l of fixed.lines) say(`  ${l}`);

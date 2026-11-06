@@ -78,6 +78,8 @@ const ENDLESS = new Set(["--watch", "--watchAll", "-w", "--ui"]);
 /** a test runner's arguments: free when they pick some files or names, or watch; heavy for the whole suite */
 function testRun(args: string[], cwd?: string): ToolRun {
   const positional: string[] = [];
+  // parallel workers load every core even for a few files
+  if (args.some((a) => a === "--parallel" || a.startsWith("--parallel="))) return args.some((a) => ENDLESS.has(a)) ? "free" : "heavy";
   for (let i = 0; i < args.length; i++) {
     const a = args[i] ?? "";
     if (ENDLESS.has(a) || BY_NAME.test(a)) return "free";
@@ -97,7 +99,7 @@ function lintRun(args: string[]): ToolRun {
 }
 
 // builds, by their first word or two, and the test runners with how many words their arguments start after
-const BUILDS = new Set(["vite build", "next build", "cypress run", "svelte-check", "webpack"]);
+const BUILDS = new Set(["vite build", "next build", "cypress run", "svelte-check", "webpack", "tsc"]);
 const TESTS: Record<string, number> = { "playwright test": 2, "bun test": 2, "vitest run": 2, vitest: 1, jest: 1 };
 
 /** what one command does, or undefined when it runs no heavy tool */
