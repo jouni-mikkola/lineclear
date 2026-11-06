@@ -17,6 +17,8 @@ test("a passed test file is not run again until it or a file it loads changes", 
   recordPassed(root, first.keys, first.run);
   expect(readFileSync(join(config, "check-runs.jsonl"), "utf8")).toContain('"kind":"pass"');
   expect(splitCached(root, ["./a.test.ts", "./b.test.ts"], map, "bun1")).toMatchObject({ cached: ["./a.test.ts"], run: ["./b.test.ts"] });
+  writeFileSync(join(root, "other.ts"), "a main change the test does not load");
+  expect(splitCached(root, ["./a.test.ts"], map, "bun1").cached).toEqual(["./a.test.ts"]);
   writeFileSync(join(root, "lib.ts"), "v2");
   expect(splitCached(root, ["./a.test.ts"], map, "bun1").run).toEqual(["./a.test.ts"]);
   writeFileSync(join(root, "lib.ts"), "v1");
