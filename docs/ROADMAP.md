@@ -11,7 +11,8 @@ live in git history: a step's id is in its commit subject. The rules read this f
 - One server and one task store run every machine through herdr, and other machines need no Lineclear install (L95, L96).
 - A reboot, a killed service, a full disk or a power cut comes back with no loss and no manual step (L172).
 - The tests hold on a loaded machine, and the check stays fast (L116, L402 to L413).
-- A task costs under 400k input tokens and 10 minutes to ready, and a machine runs 3 agents per core (L416 to L433).
+- A check goes red only for a real break: a flaky test is fixed at its cause or quarantined with a fix task, never weakened (L434 to L438).
+- A task costs under 400k input tokens and 10 minutes to ready, and a machine runs 3 agents per core, 12 on 4 cores and 8 GB (L416 to L433).
 
 **How to read it.**
 
@@ -43,6 +44,51 @@ live in git history: a step's id is in its commit subject. The rules read this f
 - An `after` names only a step whose code the later step needs, so as many steps as possible are ready at once.
 
 ## Open steps
+
+### L434 Check failures are measured
+Result: `lineclear measure checks --days 2` shows how often main and pull request checks went red, and the first cause of each.
+- why: no one counts why checks go red, so a flaky test, a real break and a gate look alike, and each costs the same rerun and wait.
+- done when: The command reads the project's GitHub check runs and the logs of the red ones (`gh run view --log-failed`) and sorts each red run by first cause: flaky test (it failed and passed on the same commit, or on main with no fix between), real break, gate, setup, or the job's time limit. It prints runs, green, red and cancelled for main and for pull requests, then each failing test with its runs, cause and longest time. A test on fixed logs gets each cause right. The table of the last 2 days is in `docs/numbers.md` under "Check failures".
+- parts: measure, checks
+- locks: check-measure
+- after: none
+- files: src/check-failures.ts, src/measure.ts, test/check-failures.test.ts, docs/numbers.md
+
+### L435 Two flaky tests fixed at cause
+Result: The needs-you card test and the box-share read test pass 50 runs in a row under load, by a fix of what they wait on.
+- why: the card test waits at most 4 s for a task's worktree and then fails, up to its 60 s limit; the box-share test races a fake commit against a read. On a loaded machine both fail with no change to blame.
+- done when: The tests are "a task's question on its needs-you card in its space's chat > answered in the task chat instead" and "a read that began while a write ran is not shared once the write is done"; both names go in the commit message. Each waits on the event it needs, not on a count of sleeps. No time limit is raised, no assertion dropped, no retry added. Each passes `bun test --rerun-each 50` while 4 copies of the server's suite run at once.
+- parts: server
+- locks: server-tests
+- after: none
+- files: server/test/source-fixture.ts, server/test/source-b.test.ts, server/test/box-share.test.ts
+
+### L436 Flaky tests quarantined
+Result: A test that flakes on GitHub stops blocking merges within one run and gets its own fix task; it leaves quarantine only once fixed.
+- why: the rerun of `scripts/flaky.ts` and the quarantine of `src/check-runs.ts` read only the machine's own check log, so on GitHub a flaky test keeps main red run after run.
+- done when: When L434 finds a flaky test, the server adds it to `test/quarantine.json` on main with its fix task's id and files that task (`flakeFixIn`, its brief asks for the cause and forbids a weaker test). The check, here and on GitHub, still runs a test in that file and prints its result, but its failure alone does not fail the run. The fix task's merge takes the test out, and a test failing 3 runs in a row while quarantined is a break, not a flake, and fails the check. At most 5 tests are in quarantine; a 6th pauses the merge line and asks the owner. A test with a planted flake shows each case.
+- parts: checks, server, rules
+- locks: quarantine
+- after: L434
+- files: src/check-runs.ts, src/check-tier.ts, scripts/flaky.ts, scripts/check.ts, test/quarantine.json, test/check-runs.test.ts
+
+### L437 A fix never weakens a test
+Result: A commit that raises a test's time limit, adds a retry or drops an assertion fails the check unless it names the cause.
+- why: a flaky test made green by a longer wait or a retry hides its cause, which comes back as a slower check or a real bug that passes.
+- done when: A gate in `bun run gates` reads the branch's diff of test files and fails a raised time limit or sleep, a new retry (`--rerun`, `retry`, a loop around an assertion), a removed `expect` or a new `skip`, unless the commit message has a line `Cause: <test>: <what it waited on and what changed>`. A test plants each of the four and one with a cause line.
+- parts: checks
+- locks: gates
+- after: none
+- files: scripts/gates/test-strength.ts, test/test-strength.test.ts
+
+### L438 Tests hold under parallel load
+Result: The whole suite passes with 4 copies running at once on one GitHub runner, every test in its own folder, ports and time.
+- why: agents run several checks at once on one machine; a test that sleeps a fixed time, binds a fixed port or shares a path passes alone and fails then.
+- done when: One helper `waitFor(condition, what)` in `test/helpers.ts` (and its server twin) waits on an event to a deadline and names what never came. A gate fails a test that binds a fixed port, writes outside its temp folder or polls with a fixed count of sleeps. A GitHub job runs 4 copies of the full suite at once each night; it is green 5 nights in a row, and every test case stays under 2 s.
+- parts: checks, server
+- locks: server-tests, gates
+- after: L435
+- files: test/helpers.ts, server/test/source-fixture.ts, scripts/gates/, .github/workflows/check.yml
 
 ### L416 Cost per phase is measured
 Result: `lineclear measure phases` shows, for the last 30 tasks on every machine, where tokens and minutes went in each phase of a task.
@@ -154,11 +200,11 @@ Result: The planner turns a goal into tasks that touch separate files, so they r
 
 ### L428 Green branches merge together
 Result: Ready branches merge in batches under one check, so main gets one GitHub run per batch and none is cancelled.
-- why: each merge starts a GitHub check that the next merge cancels, and each branch pays a full check of its own.
+- why: each merge starts a GitHub check that the next merge cancels (17 of 53 main runs in one day), and each branch pays a full check of its own.
 - done when: The merge line takes up to 4 ready branches whose files do not overlap, merges them in order onto main as one candidate and runs one check. A test with 4 green branches makes one check run and 4 merges. Over a day, GitHub runs are at most one per 3 merged tasks, and none is cancelled.
 - parts: server, checks
 - locks: merge-line
-- after: L427
+- after: L427, L436
 - files: server/server/live/engine/lane.ts, server/server/live/engine/merge.ts, server/server/live/engine/check-queue.ts
 
 ### L429 A red main is bisected
@@ -198,12 +244,12 @@ Result: Whatever uses the most CPU per task in L416's table (tests, servers or t
 - files: docs/numbers.md
 
 ### L432 Targets hold for a day
-Result: A day of real work meets the targets: 400k input tokens and 10 minutes to ready per task, 3 agents per core, one GitHub run per 3 merges.
+Result: A day of real work meets the targets: 400k tokens and 10 minutes per task, 3 agents per core, 1 GitHub run per 3 merges.
 - why: each step above proves its own part; only a day of normal work shows they add up.
-- done when: `docs/numbers.md` has a day of at least 30 tasks, measured by L416, with: median input under 400k tokens per task and the largest under 1.5M, a median under 10 minutes from start to ready on every machine, 3 agents per core with load under the core count, at most one GitHub run per 3 merged tasks, and no task in Needs you without a question.
+- done when: `docs/numbers.md` has a day of at least 30 tasks, measured by L416, with: median input under 400k tokens per task and the largest under 1.5M, a median under 10 minutes from start to ready on every machine, 3 agents per core with load under the core count, at most one GitHub run per 3 merged tasks, no task in Needs you without a question, under 5 % of main checks red (L434) and none red from a flaky test, and 12 agents running on the least hardware named, 4 cores and 8 GB.
 - parts: measure
 - locks: numbers
-- after: L417, L419, L420, L422, L424, L425, L426, L429, L430, L431, L433
+- after: L417, L419, L420, L422, L424, L425, L426, L429, L430, L431, L433, L437, L438
 - files: docs/numbers.md
 
 ### L267 The rule loop spawns no herdr
