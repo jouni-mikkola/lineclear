@@ -24,6 +24,8 @@ fake.h.createTab = async () => {
   throw new Error('herdr is not here')
 }
 Object.assign(src.engine, { wt: new Worktrees(fake.h as never) })
+// no herdr is there, so a sampled machine reads as not ready and holds every new task; these tests start tasks regardless
+src.engine.machine = () => undefined
 export const stopSource = () => src.stop()
 
 /** what a test waits for has come true, however slow the machine (a timer, another process) */
