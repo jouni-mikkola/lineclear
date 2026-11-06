@@ -170,12 +170,12 @@ export function limitOf(machine: unknown, cores: number): number {
   return Math.round((per ?? 1) * cores * 100) / 100
 }
 
-/** The check slots of a machine: `checkSlots` when set, else one per 1 / slotsPerCore cores (slotsPerCore 0.5 if unset), at least 1. */
+/** The check slots of a machine: `checkSlots` when set, else one per 1 / slotsPerCore cores (slotsPerCore 0.25 if unset: cores / 4), at least 1. */
 function slotsOf(machine: unknown, cores: number): number {
   const set = positive((machine as { checkSlots?: unknown } | null)?.checkSlots)
   if (set !== undefined) return Math.floor(set) || 1
   const per = positive((machine as { slotsPerCore?: unknown } | null)?.slotsPerCore)
-  return Math.max(1, Math.floor((per ?? 0.5) * cores))
+  return Math.max(1, Math.floor((per ?? 0.25) * cores))
 }
 
 /** the machine's check slots and its load limit, from <config>/machine.json; LINECLEAR_CORES stands in for the core count (tests) */

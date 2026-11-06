@@ -87,6 +87,29 @@ export function askMachines(
   return { rooms, remote };
 }
 
+/** A machine that could take a new task now: `host` is undefined for this machine. */
+export interface Candidate {
+  host: string | undefined;
+  load: number;
+  loadLimit: number;
+  /** Task slots left, then check slots left. */
+  free: number;
+  slotsFree: number;
+}
+
+/** The candidate with the most room: the lowest load against its limit, then the most free task slots, then check slots. The first of equals wins, so this machine goes first. */
+export function mostRoom(candidates: Candidate[]): Candidate | undefined {
+  const used = (c: Candidate) => c.load / c.loadLimit;
+  const better = (c: Candidate, best: Candidate) => {
+    if (Math.abs(used(best) - used(c)) > 0.05) return used(c) < used(best);
+    return c.free !== best.free ? c.free > best.free : c.slotsFree > best.slotsFree;
+  };
+  return candidates.reduce<Candidate | undefined>((best, c) => (best === undefined || better(c, best) ? c : best), undefined);
+}
+
+/** Check slots free on this machine. */
+export const localSlotsFree = (env: Env = process.env) => machineLimits(env).slots - slotsHeld(env);
+
 /** Why the machine takes no new task now, or undefined when it has room. */
 export function roomLack(r: Room): string | undefined {
   if (r.max === undefined) return "cannot read its slots from the server";

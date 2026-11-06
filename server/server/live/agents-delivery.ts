@@ -12,6 +12,7 @@ import { mirrored } from './mfs.ts'
 import { agentEnv, BOX } from './box.ts'
 import { ROOT } from '../root.ts'
 import { privateRuntimePath } from './autopilot-sandbox.ts'
+import { isTaskAgent, lowerPriority } from './priority.ts'
 import { isolatedReady, isolatedShell, carryClaudeSession, holdFrom, canResume } from './agent-start.ts'
 import { type AgentRecord, type Spec, HOOKS_DIR, promptPath, hidden } from './agents-helpers.ts'
 import { addLog } from './log-list.ts'
@@ -379,6 +380,7 @@ export class AgentsDelivery extends AgentsState {
         await new Promise((res) => setTimeout(res, 750))
       }
     }
+    if (isTaskAgent(r.env)) lowerPriority((await herdr.processInfo(pane).catch(() => undefined))?.shell_pid)
     await this.refresh()
     if (r.isolation) {
       // agent.start only enqueues a terminal command. Never report a successful mode

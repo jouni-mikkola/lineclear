@@ -65,8 +65,9 @@ test("the line of a repo is named by its machine and real path; linesOf lists th
   expect(Q.linesOf(repo, otherEnv)).toEqual([other, line]);
 });
 
-test("check slots: a machine has one per 2 cores unless set, costs are taken together or not at all, and a gone holder's slot is taken over", () => {
-  expect(Q.machineLimits({ ...box("boxa").env, LINECLEAR_CORES: "8" }).slots).toBe(4);
+test("check slots: a machine has one per 4 cores unless set, costs are taken together or not at all, and a gone holder's slot is taken over", () => {
+  expect(Q.machineLimits({ ...box("boxa").env, LINECLEAR_CORES: "8" }).slots).toBe(2);
+  expect(Q.machineLimits({ ...box("boxa").env, LINECLEAR_CORES: "12" }).slots).toBe(3);
   expect(Q.machineLimits({ ...box("boxa").env, LINECLEAR_CORES: "1" }).slots).toBe(1);
   expect(Q.machineLimits({ ...box("boxa", { slotsPerCore: 1 }).env, LINECLEAR_CORES: "8" }).slots).toBe(8);
   // a load limit no machine reaches, so the test does not depend on how busy this one is
