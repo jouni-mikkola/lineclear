@@ -34,9 +34,6 @@ class Stub extends Emitter<SourceEvents> {
   async attachment(chat: string, path: string) {
     return chat === 'c' && path.startsWith('/inbox/') ? new Blob(['<svg onload="alert(1)"/>']) : null
   }
-  voice() {
-    return { audio() {}, end() {} }
-  }
   browser(task: string, ws: { send(d: string): void }) {
     ws.send(JSON.stringify({ type: 'state', task }))
     return { message: (d: string) => ws.send(d), end() {} }
@@ -208,31 +205,6 @@ describe('updates', () => {
     const later = await open()
     expect(later.got.find((m) => m.type === 'update')?.update).toEqual(failed)
     later.ws.close()
-  })
-  test('the updater stops new calls and sees the ones on in one step; a call arriving after that is turned away', async () => {
-    const drain = async (on: boolean) =>
-      ((await (await fetch(`http://127.0.0.1:${app.port}/api/drain`, { method: 'POST', body: JSON.stringify({ on }) })).json()) as { calls: number }).calls
-    const call = async () => {
-      const ws = new WebSocket(`ws://127.0.0.1:${app.port}/api/voice?chat=gtm`)
-      const got: { type: string; message?: string }[] = []
-      ws.onmessage = (e) => got.push(JSON.parse(String(e.data)))
-      await new Promise((r) => (ws.onopen = r))
-      await new Promise((r) => setTimeout(r, 50))
-      return { ws, got }
-    }
-    const on = await call()
-    expect(await drain(true)).toBe(1)
-    // the updater waits for it, letting calls start meanwhile
-    expect(await drain(false)).toBe(1)
-    on.ws.close()
-    await new Promise((r) => setTimeout(r, 50))
-    expect(await drain(true)).toBe(0)
-    // between that look and the restart, a new call can't start: it is told why
-    const late = await call()
-    expect(late.got).toEqual([{ type: 'error', message: 'Lineclear is updating. Call again in a moment.' }])
-    expect(late.ws.readyState).not.toBe(WebSocket.OPEN)
-    expect(await drain(true)).toBe(0)
-    expect(await drain(false)).toBe(0)
   })
 })
 

@@ -6,27 +6,6 @@ import { type Link, machineHome } from './machines-helpers.ts'
 import { MachinesLinks } from './machines-links.ts'
 
 export class MachinesActions extends MachinesLinks {
-  subscribeChat(l: Link, key: string, fn: (chat: Chat) => void) {
-    const keys = this.voiceWatches.get(l) ?? new Map<string, number>()
-    keys.set(key, (keys.get(key) ?? 0) + 1)
-    this.voiceWatches.set(l, keys)
-    const off = this.on('peerChat', (machine, k, chat) => {
-      if (machine === l.rec.machine && k === key) fn(chat)
-    })
-    this.watch(this.screenWatch.chats, this.screenWatch.term)
-    let active = true
-    return () => {
-      if (!active) return
-      active = false
-      off()
-      const count = keys.get(key) ?? 0
-      if (count <= 1) keys.delete(key)
-      else keys.set(key, count - 1)
-      if (!keys.size) this.voiceWatches.delete(l)
-      this.watch(this.screenWatch.chats, this.screenWatch.term)
-    }
-  }
-
   chat(key: string): Chat | undefined {
     return this.owner(key)?.chats.get(key)
   }

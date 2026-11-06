@@ -268,8 +268,6 @@ export class LiveSourceRestarts extends LiveSourceSpaces {
     const key = `${id}/Agent`
     const left = await this.engine.deleteTask(id, { force })
     rmSync(join(HOME, 'inbox', chatDir(key)), { recursive: true, force: true })
-    this.replyFns.delete(key)
-    this.lastAgentMsg.delete(key)
     this.emit('snapshot')
     return left
   }

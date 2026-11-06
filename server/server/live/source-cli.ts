@@ -508,14 +508,8 @@ export class LiveSourceCli extends LiveSourceSubcommands {
         const own = `${NAME} (this machine, the main one): herdr ${this.agents.reachable ? 'answers' : 'does not answer'}${this.browsers ? `; shared browser ${this.browsers.status().ready ? 'ready' : this.browsers.status().hint}` : ''}`
         return [own, ...this.pushWarnings().map((warning) => `Alerts: ${warning}`), ...((await this.peers?.doctor()) ?? [])].join('\n')
       }
-      case 'secret': {
-        if (a1 !== 'elevenlabs') return this.secretCommand(a1, rest, p, ctx)
-        if (!ctx.stdin?.trim()) throw new Error('echo "<key>" | lineclear secret elevenlabs')
-        const s = readJson<Record<string, string>>('secrets.json', {})
-        s.elevenlabs = ctx.stdin.trim()
-        writeJson('secrets.json', s)
-        return 'Saved. Voice calls use it from now on.'
-      }
+      case 'secret':
+        return this.secretCommand(a1, rest, p, ctx)
     }
     throw new Error(`No command ${a0}; lineclear help lists them`)
   }

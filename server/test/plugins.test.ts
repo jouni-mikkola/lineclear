@@ -78,7 +78,7 @@ describe('Settings → Plugins', () => {
     const page = pluginsPage(
       [
         { name: 'chat', from: 'base', on: true },
-        { name: 'voice', from: 'user', overrides: true, on: true },
+        { name: 'browser', from: 'user', overrides: true, on: true },
         { name: 'hello', from: 'user', on: true, broken: 'hello: no', kept: true },
         { name: 'bad', from: 'user', on: false, broken: 'bad: no' },
         { name: 'boom', from: 'user', on: true },
@@ -88,7 +88,7 @@ describe('Settings → Plugins', () => {
     )
     expect(page.rows.map((r) => [r.label, r.group, r.value])).toEqual([
       ['chat', 'Built in', 'off'],
-      ['voice', 'Yours', 'on'],
+      ['browser', 'Yours', 'on'],
       ['hello', 'Yours', 'on'],
       ['bad', 'Yours', 'on'],
       ['boom', 'Yours', 'on'],
@@ -96,16 +96,16 @@ describe('Settings → Plugins', () => {
     expect(page.rows.every((r) => r.key === `plugin.${r.label}` && r.options?.join() === 'on,off')).toBe(true)
     const row = (n: string) => page.rows.find((r) => r.label === n)!
     expect(row('chat').hint).toBe('Turning off: restarting')
-    expect(row('voice').hint).toBe('Replaces the built-in one')
+    expect(row('browser').hint).toBe('Replaces the built-in one')
     expect(row('hello').warn).toBe("Your latest change doesn't build, so its last good version runs:\nhello: no")
     expect(row('bad').warn).toBe("Skipped: it doesn't build:\nbad: no")
     expect(row('boom').warn).toContain('boom!')
   })
 
   test('a switch writes the human’s own list, never the repo’s', () => {
-    expect(setPluginOn('voice', false)).toEqual({ ok: true })
+    expect(setPluginOn('browser', false)).toEqual({ ok: true })
     expect(setPluginOn('chat', false)).toEqual({ ok: true })
-    expect(setPluginOn('voice', true)).toEqual({ ok: true })
+    expect(setPluginOn('browser', true)).toEqual({ ok: true })
     expect(JSON.parse(readFileSync(join(HOME, 'plugins.json'), 'utf8'))).toEqual({ off: ['chat'] })
     expect(setPluginOn('nothing-here', false).ok).toBe(false)
   })

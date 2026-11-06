@@ -144,7 +144,7 @@ type Row = {
 /** a level defaults are set at: Everywhere, this machine, or one of its spaces */
 export type LevelKind = 'all' | 'machine' | 'space'
 /** the levels a section's defaults may be set at (all three when none): a machine's capacity has no space level;
- *  alerts and voice are one for all */
+ *  alerts are one for all */
 export type Section = { name: string; about?: string; rows: Row[]; levels?: LevelKind[]; told?: boolean; prompt?: boolean }
 
 /** when this machine's tasks may start, and when its coordinator hears that the machine struggles (health.ts) */
@@ -307,13 +307,10 @@ export const CATALOG: Section[] = [
     rows: [{ label: 'Time zone', key: 'time.zone', value: OWN_ZONE, text: true }],
   },
   {
-    name: 'Alerts and voice',
+    name: 'Alerts',
     levels: ['all'],
     about: 'The same on every machine and space.',
-    rows: [
-      { label: 'Alerts on', key: 'alerts', value: 'No device yet', options: ['Add this device'] },
-      { label: 'Voice agent', key: 'voice.service', value: 'ElevenLabs', options: ['ElevenLabs'] },
-    ],
+    rows: [{ label: 'Alerts on', key: 'alerts', value: 'No device yet', options: ['Add this device'] }],
   },
 ]
 

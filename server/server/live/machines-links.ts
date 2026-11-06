@@ -424,7 +424,6 @@ export class MachinesLinks extends Emitter<Events> {
         l.chats.set(m.chat.key, m.chat)
         this.keep(l)
         this.emit('chat', m.chat.key, m.chat)
-        this.emit('peerChat', l.rec.machine, m.chat.key, m.chat)
       } else if (m.type === 'terminal') this.emit('terminal', m.chat, { ansi: m.ansi, cols: m.cols, rows: m.rows })
       else if (m.type === 'snapshot') {
         l.snap = m.snapshot
@@ -476,13 +475,12 @@ export class MachinesLinks extends Emitter<Events> {
     return r.json()
   }
 
-  protected voiceWatches = new Map<Link, Map<string, number>>()
   protected screenWatch: { chats: string[]; term: string | null } = { chats: [], term: null }
 
   watch(chats: string[], term: string | null) {
     this.screenWatch = { chats, term }
     for (const l of this.links.values()) {
-      const mine = [...new Set([...chats.filter((k) => this.owner(k) === l), ...(this.voiceWatches.get(l)?.keys() ?? [])])]
+      const mine = chats.filter((k) => this.owner(k) === l)
       const t = term && this.owner(term) === l ? term : null
       const next = { chats: mine, term: t }
       if (JSON.stringify(next) === JSON.stringify(l.watching)) continue

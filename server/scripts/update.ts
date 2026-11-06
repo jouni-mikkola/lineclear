@@ -63,7 +63,7 @@ export const releasesOf = (root: string) => join(root, '.releases')
 /**
  * Make a release of the commit the checkout is on: a frozen copy of that commit (with the checkout's plugin list and
  * the human's own plugins as they are now) in its own folder, installed, built and checked there. The checkout can
- * move on meanwhile, or while the release waits for a voice call to end: the release stays exactly the commit it says.
+ * move on meanwhile: the release stays exactly the commit it says.
  * `built` is the commit running now and `release` its folder; `skip` a commit that failed already (tried again only
  * when forced); `force` makes a release of the same commit (a plugin or a plugin list changed); `home` holds the
  * human's own plugins. Returns null when there is nothing to do.

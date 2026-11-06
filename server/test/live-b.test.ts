@@ -318,9 +318,9 @@ describe('settings', () => {
     expect(s.harness('task', 'web').kind).toBe('pi')
     expect(s.ways('web').review).toBe(true)
     expect(s.ways('api').review).toBe(false)
-    // a machine's capacity has no project level; alerts and voice are one for all
+    // a machine's capacity has no project level; alerts are one for all
     expect(s.set('machine.maxTasks', '2', { space: 'web' }).ok).toBe(false)
-    expect(s.set('voice.service', 'ElevenLabs', 'machine').ok).toBe(false)
+    expect(s.set('alerts', 'x', 'machine').ok).toBe(false)
     expect(readJson<Record<string, unknown>>('settings.json', {})).toEqual({
       everywhere: { 'brief.review': 'off' },
       machine: { 'machine.maxTasks': '8', 'task.agent': 'Codex' },

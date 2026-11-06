@@ -105,8 +105,6 @@ export class LiveSourceState extends Emitter<SourceEvents> {
   protected carded?: string
   protected terms: string[] = []
   protected timers: ReturnType<typeof setInterval>[] = []
-  protected replyFns = new Map<string, Set<(t: string) => void>>()
-  protected lastAgentMsg = new Map<string, string>()
   /** coordinators being started again in their own folder (reseat) */
   protected reseating = new Set<string>()
   /** agents that stopped or run on outdated files, started again by Lineclear (revive.ts) */

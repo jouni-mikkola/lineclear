@@ -1,5 +1,5 @@
-// What the supervisor decides: when to make a release, when to restart on it (only once no voice call is on, with new
-// calls stopped), and when to take a release back. scripts/supervise.ts wires it to the server process and watchers.
+// What the supervisor decides: when to make a release, when to restart on it, and when to take a release
+// back. scripts/supervise.ts wires it to the server process and watchers.
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
@@ -15,8 +15,6 @@ export interface SupervisorDeps {
   home?: string
   status: UpdateStatus | null
   save(s: UpdateStatus): void
-  /** stop new voice calls (or let them start again) and say how many are on, in one step at the server */
-  drain(on: boolean): Promise<number>
   /** stop the server; it comes back on `current` */
   restart(): void
   sleep(ms: number): Promise<void>
@@ -97,18 +95,8 @@ export class Supervisor {
       this.d.log(`update to ${r.commit.slice(0, 7)} failed; the running Lineclear stays as it was\n${r.error}`)
       return this.save({ ...r, release: this.current })
     }
-    // a restart would cut a voice call short: wait until none is on, with new ones stopped from that moment on
-    let waited = false
-    while ((await this.d.drain(true)) > 0) {
-      await this.d.drain(false)
-      if (!waited) this.d.log(`${r.commit.slice(0, 7)} is ready; restarting once the voice call ends`)
-      waited = true
-      await this.d.sleep(5000)
-      // newer news came in while waiting: make that release instead
-      if (this.again) return prune(this.d.root, [this.current, this.trial?.from.release])
-    }
     this.d.log(`updated to ${r.commit.slice(0, 7)} (${r.subject}): restarting`)
-    // screens hear it is an update, not an outage, before the server goes; new calls stay stopped until it does
+    // screens hear it is an update, not an outage, before the server goes
     this.save({ ...r, state: 'restarting' })
     await this.d.sleep(300)
     const previous = this.current

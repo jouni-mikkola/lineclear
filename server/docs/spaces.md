@@ -16,7 +16,7 @@ whole machine, any of them (none: everything), and the filter's words narrow wit
 pick; × takes one off and **+ Filter** adds a space or a machine from the sidebar's tree. The pin in their header keeps
 the chips while the middle changes (a task from them opens in the middle); unpinned, they follow again. Chips and pin
 are remembered on the device; a phone's scroll sideways. Every agent, coordinator or
-task agent, gets the same chat: replies, reactions, files, search, talk-to-type, voice calls and artifacts. A task's chat
+task agent, gets the same chat: replies, reactions, files, search, talk-to-type and artifacts. A task's chat
 also has a side panel: its live herdr terminal, its files, its diff against main and its pull request.
 
 - Every machine has at least one space: its **home space**, at its home folder (~), named `home`. It can be renamed

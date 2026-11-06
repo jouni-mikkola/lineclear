@@ -195,8 +195,8 @@ Settings and automations
   lineclear show [--space NAME]                the app's few settings (how tasks work, each agent's CLI, model and
                                                  effort, auto-archive, coordinator timer's heartbeat in words with its next
                                                  runs, the time zone, this machine's
-                                                 limits and numbers now, alerts,
-                                                 voice) as they are where it runs (its space, else this machine),
+                                                 limits and numbers now, alerts)
+                                                 as they are where it runs (its space, else this machine),
                                                  each with where it comes from, and the lines every brief ends with
   lineclear models [CLI]                         each CLI's models and the effort levels each takes, as the CLI says
   lineclear set <key> <value> [--machine | --space NAME]
@@ -231,7 +231,6 @@ Settings and automations
   lineclear automation list [--space NAME]     with each one's last run
 
 Setup
-  lineclear secret elevenlabs                    store the ElevenLabs key for voice calls (reads it from stdin)
   lineclear doctor                               check every machine saved in herdr; put its helper there again (main machine)
   lineclear status                               spaces, open tasks, herdr, and done tasks that kept work
                                                  (with a task's id: that task's progress, above)
