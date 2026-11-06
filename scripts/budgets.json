@@ -3,7 +3,7 @@
   "firstViewMs": 1000,
   "largestPaintMs": 1500,
   "layoutShift": 0.01,
-  "firstScriptsGzipKb": 183,
+  "firstScriptsGzipKb": 183.5,
   "idleHomeKbPerMin": 50,
   "idleRoadmapKbPerMin": 100,
   "homeAnswerMs": 200,

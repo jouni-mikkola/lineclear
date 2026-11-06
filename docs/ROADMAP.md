@@ -5235,7 +5235,7 @@ Result: You see one part's steps and its health on the roadmap at a glance.
     no extra text; the UI bar holds for it.
 - parts: ui
 - after: L101
-- files: src/roadmap-view.ts, ui/web/, ui/test/
+- files: src/roadmap-view.ts, ui/web/, ui/test/, docs/readme/, scripts/budgets.json
 
 ### L103 Parts for other projects
 Result: Another project gets its parts and their pages proposed from its code.

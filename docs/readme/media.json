@@ -55,12 +55,12 @@
     }
   },
   "stills": {
-    "version": "lineclear 0.0.0 (2ec91ba1)",
-    "at": "2026-11-06T07:59:18.647Z",
+    "version": "lineclear 0.0.0 (a004abe5)",
+    "at": "2026-11-06T12:17:13.658Z",
     "files": {
-      "docs/readme/home.png": "a3ec1fc09b45620549555100c5f46f01c31c07dc82fc7efb27203ea15214e015",
-      "docs/readme/roadmap.png": "6cbe705184784a9bde3f754f9e30f06d936b9107ba438717759a00b921d3f730",
-      "docs/readme/inbox.png": "a3fe4d7f46739295c08438ca30dafdb902ac8049d0a00f74210228e9630b2c51"
+      "docs/readme/home.png": "9a01eba887ba350a92102f1198ce677ec6732127a92cc45bd02ab9378705fc5a",
+      "docs/readme/roadmap.png": "82e9093c78b2bc6ebd5025318bd66e595c84fec5ec7b81422317bef5198da414",
+      "docs/readme/inbox.png": "4e90f505005843181c221159c37e1f7ef39ef7099505fe2960f2b5a92bc5500c"
     },
     "from": {
       "scripts/media-lib.ts": "e610f1be0fe63de0164ab332a70afea6642401f5dde479cc21864e2ca45ce9f5",
@@ -151,12 +151,12 @@
       "ui/web/public/manifest.webmanifest": "dcbfc4763d201d8297d76a11f83309e8d5a246d65bf69ebd46b4eed322608221",
       "ui/web/public/sw.js": "f93c387984d7a3b364febff4f7effd66728c932f65134a83eb86acce5189d702",
       "ui/web/real-samples.ts": "e4db2b4d9546c0140b308fa75143bb8b1c6954fc1bbd54d796fb96f49e4a68bb",
-      "ui/web/roadmap-samples.ts": "e3cd86822095fc32f7db92f9ab2fc9aa401ca9e48725a6ad01606bfb2b99816e",
+      "ui/web/roadmap-samples.ts": "5e771ce3831e324da62be4ca465f9f46501d3f3f30d18a1866c1e8c4a5210d71",
       "ui/web/roadmap/chain.tsx": "1a8ca8cd77a15cd57035b9c457f429ca7c9a8dd252ac2165bcd05d830a51c915",
       "ui/web/roadmap/common.tsx": "6c50d439654fc4d524ca01190eb6352ca27a33bcd466fbfd2d105caa31ae764d",
       "ui/web/roadmap/goals-print.ts": "9d8f55632356baf9fc20153f42b22608e743d71066717d31cef956c5bdab00c6",
       "ui/web/roadmap/goals.tsx": "b492605791466e869cf0aef80260ad86096f28adb7914c69c3eb808c258f8445",
-      "ui/web/roadmap/index.tsx": "cecf8f8818ba693163d8bd525dd4f05ee25ce9ff0872c3af59a81411ae9689fe",
+      "ui/web/roadmap/index.tsx": "92b7ff286d5bfdc9490c04a4675cef3623c133b31d1f92ddd6b4c778e904b109",
       "ui/web/roadmap/line.tsx": "f61a7ea5d64e6227f2e7a6a628538eea30af273195e550efc6791d34cc568b9b",
       "ui/web/roadmap/since-look.tsx": "f1cd1937337a358c683e27b974c0d39fb9cced5196497e32a23d43eed354ff2d",
       "ui/web/roadmap/since.tsx": "158177379224f58880add545986b5179c45dc1602f8526078ed5a99900228b12",
