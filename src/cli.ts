@@ -32,6 +32,7 @@ import { fileFixNow } from "./self-fix.ts";
 import { startWeb } from "./web.ts";
 import { secrets, totp } from "./secrets.ts";
 import { stallsMain } from "./stall-class.ts";
+import { measureMain } from "./measure-cmd.ts";
 import { trackMain } from "./track.ts";
 import { boardMain, isBoardJob, serveMain } from "./serve.ts";
 import { waitsMain } from "./waits.ts";
@@ -75,6 +76,7 @@ export const commands: Record<string, string> = {
   progress: 'A space\'s coordinator saves or reads its progress: progress ["<text>"]',
   checkpoint: "A space's coordinator commits its owned task's work: checkpoint \"<message>\"",
   complete: 'A space\'s coordinator proves its stopping goal and ends its run: complete "<evidence>"',
+  measure: "Where a task's tokens and minutes went: measure phases [--last N]",
   stalls: "Print the stalls of the last day by class with the minutes lost (--hours N, --json)",
   track: "Run the test track: a fixture project through the whole chain; pass, or the stall class that broke it (--after-update rolls back a broken update)",
   release:
@@ -198,6 +200,7 @@ function inboxCommand(rest: string[], out: Out): number | Promise<number> {
 
 /** The commands that are one call: each gets the words after its name. */
 const COMMANDS: Record<string, (rest: string[], out: Out) => number | Promise<number>> = {
+  measure: (rest, out) => measureMain(rest, out),
   stalls: (rest, out) => stallsMain(rest, out, decisionsPath()),
   track: trackMain,
   machine: (rest, out) => machineMain(rest, out, process.env, (evidence) => fileFixNow(realWorld(process.env), "command-failed", evidence)),
