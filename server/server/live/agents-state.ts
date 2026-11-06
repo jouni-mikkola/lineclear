@@ -163,17 +163,16 @@ export class AgentsState extends Emitter<Events> {
   /** herdr's word on the agent as the events and reads kept it, for the snapshot: nothing is asked of herdr */
   herdrView(key: string): AgentHerdr | undefined {
     const a = this.info(key)
-    if (!a) return undefined
-    const s = a.agent_session
-    return { status: a.agent_status, ...(s?.kind === 'path' ? { session: s.value } : {}), pasted: this.pasted.has(key), at: this.heardAt }
+    const s = a?.agent_session
+    return a && { status: a.agent_status, ...(s?.kind === 'path' ? { session: s.value } : {}), pasted: this.pasted.has(key), at: this.heardAt }
   }
 
   /** a pane just started is looked at once for the pasted brief, when its status changes; later it cannot hold one */
   protected async lookForPaste(key: string) {
     const pane = this.info(key)?.pane_id
     const fresh = Date.now() - (this.records[key]?.started ?? 0) < 120_000
-    if (!pane || !fresh) return void this.pasted.delete(key)
-    if (showsPaste(await herdr.visible(pane).catch(() => ''))) this.pasted.add(key)
+    const shows = !!pane && fresh && showsPaste(await herdr.visible(pane).catch(() => ''))
+    if (shows) this.pasted.add(key)
     else this.pasted.delete(key)
   }
 

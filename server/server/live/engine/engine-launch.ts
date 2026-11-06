@@ -80,7 +80,10 @@ export class EngineLaunch extends EngineStalls {
       mergeStopped: t.merged ? undefined : t.mergeStopped,
       pr: t.pr,
       plan: t.plan,
-      agent: rec || t.worktree ? { chat: key, role: 'Agent', cli, status, age: age(rec?.started ?? t.updated), note: sub, herdr: this.agents.herdrView(key) } : undefined,
+      agent:
+        rec || t.worktree
+          ? { chat: key, role: 'Agent', cli, status, age: age(rec?.started ?? t.updated), note: sub, herdr: this.agents.herdrView(key) }
+          : undefined,
       result: t.result,
       closed: t.closed || undefined,
       closedBy: t.closed ? t.closedBy : undefined,
