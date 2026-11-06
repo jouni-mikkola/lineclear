@@ -693,4 +693,17 @@ test("a task started on machine B runs its agent, checks, review, step check and
   const home = () => "boxb";
   expect(strayRuns(runs, work, home)).toEqual([]);
   expect(whereRun(p.repo, env).machine).toBe("boxb");
+
+  // the two files themselves name only B
+  const machinesIn = (file: string) =>
+    readFileSync(join(p.env.LINECLEAR_CONFIG ?? "", file), "utf8")
+      .trim()
+      .split("\n")
+      .map((l) => (JSON.parse(l) as { machine: string }).machine);
+  for (const file of ["check-runs.jsonl", "decisions.jsonl"]) {
+    const machines = machinesIn(file);
+    expect(machines.length).toBeGreaterThan(0);
+    expect(new Set(machines)).toEqual(new Set(["boxb"]));
+    expect(machines).not.toContain(main);
+  }
 });
