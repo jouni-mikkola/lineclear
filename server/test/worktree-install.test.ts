@@ -59,6 +59,11 @@ describe('install step of a new worktree', () => {
   })
 })
 
+function copyProject(from: string, to: string) {
+  mkdirSync(join(to, 'dep'))
+  for (const f of ['package.json', 'bun.lock', 'dep/package.json']) writeFileSync(join(to, f), readFileSync(join(from, f)))
+}
+
 describe('one install per lock file', () => {
   test('the key is the lock file hash: the same lock gives the same key, a changed one a new key', () => {
     expect(storeKey('a')).toBe(storeKey(Buffer.from('a')))
@@ -71,10 +76,8 @@ describe('one install per lock file', () => {
     const b = mkdtempSync(join(tmpdir(), 'shep-inst-'))
     const c = mkdtempSync(join(tmpdir(), 'shep-inst-'))
     await bunProject(a)
-    for (const d of [b, c]) {
-      mkdirSync(join(d, 'dep'))
-      for (const f of ['package.json', 'bun.lock', 'dep/package.json']) writeFileSync(join(d, f), readFileSync(join(a, f)))
-    }
+    copyProject(a, b)
+    copyProject(a, c)
     writeFileSync(join(c, 'bun.lock'), `${readFileSync(join(c, 'bun.lock'), 'utf8')}\n`)
     await install(a)
     expect(lstatSync(join(a, 'node_modules')).isSymbolicLink()).toBe(true)
@@ -98,6 +101,7 @@ describe('a task worktree made for a project', () => {
     const made = await wt.create({ repo: dir, name: 'p' }, 'work/1-x', 'main', 'lab')
     expect(existsSync(join(made.path, 'node_modules/dep/package.json'))).toBe(true)
     expect(existsSync(join(made.path, 'server/node_modules/dep/package.json'))).toBe(true)
+    expect(execSync('git status --short', { cwd: made.path }).toString()).toBe('')
   })
 
   test('a failed install step fails the start, saying so', async () => {

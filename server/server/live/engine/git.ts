@@ -243,7 +243,14 @@ export function storePath(dir: string, wt: string) {
 async function linkStore(dir: string, wt: string) {
   const store = storePath(dir, wt)
   const r = await sh(['/bin/sh', '-c', `[ -d "$1" ] && rm -rf "$2" && ln -s "$1" "$2"`, 'sh', store, join(dir, 'node_modules')], dir)
+  if (r.ok) await excludeLink(dir)
   return r.ok
+}
+
+/** A `node_modules/` line in a .gitignore matches folders only, not the link, so git would list the link as new work. */
+async function excludeLink(dir: string) {
+  const script = `f="$(git rev-parse --git-path info/exclude)" && mkdir -p "$(dirname "$f")" && { grep -qx node_modules "$f" 2>/dev/null || echo node_modules >> "$f"; }`
+  await sh(['/bin/sh', '-c', script], dir)
 }
 
 /** A fresh install moves into the store and is linked back, so the next worktree with this lock file links it. A failure here
@@ -252,7 +259,8 @@ async function keepStore(dir: string, wt: string) {
   const store = storePath(dir, wt)
   const own = join(dir, 'node_modules')
   const script = `mkdir -p "$(dirname "$1")" && t="$1.$$" && mv "$2" "$t" && { mv -T "$t" "$1" 2>/dev/null || rm -rf "$t"; } && ln -s "$1" "$2"`
-  await sh(['/bin/sh', '-c', script, 'sh', store, own], dir)
+  const r = await sh(['/bin/sh', '-c', script, 'sh', store, own], dir)
+  if (r.ok) await excludeLink(dir)
 }
 
 /**
