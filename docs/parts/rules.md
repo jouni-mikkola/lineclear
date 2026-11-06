@@ -15,7 +15,7 @@ The rule loop, `lineclear run`: each tick it starts every step whose `after` is 
 
 - `src/waits.ts`: `writeWait`, `clearWait`, `waitsMain`, `readWaits`, `waitsForOwner`, `Wait`, `findProject`, `findTask`, `loadLimit`, `limitOf`, `checkLines`, `WaitGroup`, `waitGroups`, `ownSlot`
 - `src/remotes.ts`: `fetchExportSync`, `Export`, `relationOf`, `Relation`, `remoteExports`, `refreshRemotes`, `staleRemotes`
-- `src/rules.ts`: `Decision`, `decisionsPath`, `runMain`, `realWorld`, `World`, `TICK_MS`
+- `src/rules.ts`: `Decision` (its `kind` includes `run`: work a task did on a machine, `src/task-work.ts`), `decisionsPath`, `runMain`, `realWorld`, `World`, `TICK_MS`
 - `src/waste-watch.ts`: `wasteLines`, `noteTokens`
 - `src/herdr-health.ts`: `herdrLines`
 - `src/loop-guard.ts`: `fillSetup`

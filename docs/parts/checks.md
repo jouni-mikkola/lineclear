@@ -16,6 +16,7 @@ The check tiers of each project and what keeps its checks honest: `lineclear che
 - A tier over its budget on an idle machine is a fault of the check, not of the change: the run says so, writes a `budget` line
   (tier, limit, time) to `check-runs.jsonl` for the rule loop, and its verdict stands. A busy machine's run is not counted.
 - Each run names the machine it ran on (`machine`, from `whereRun`): a task started on another machine checks there and waits in that machine's check line, never the main one.
+- Its agent, step check and done proof name their machine too: a `run` line in `decisions.jsonl` (`src/task-work.ts`); `lineclear measure` counts runs per machine.
 - The repo's own check (`bun run check`) runs only what the branch's change reaches, its independent steps side by side,
   and writes each step's time to the steps log `check-steps.jsonl`. A test over 2 s, a spec over 20 s or a run over
   180 s fails it by name, unless the file is in `scripts/gates/baseline/slow.json` (docs/numbers.md). `--full` runs

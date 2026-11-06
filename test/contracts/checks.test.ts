@@ -1,6 +1,6 @@
 // The contract of the check tiers: tiers with budgets, the check log and flake quarantine.
 import { expect, test } from "bun:test";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   type CheckRun,
@@ -17,6 +17,10 @@ import {
   runLog,
 } from "../../src/check-runs.ts";
 import { checkTier } from "../../src/check-tier.ts";
+import { proveStep } from "../../src/doneproof-run.ts";
+import { checkRoadmap, type Step } from "../../src/roadmap.ts";
+import { checkSteps } from "../../src/stepcheck.ts";
+import { machineRunLine, readWork, recordWork, runsPerMachine, strayRuns } from "../../src/task-work.ts";
 import { checkLine, inTurn, laneInLine, lineOf, machineOf } from "../../server/server/live/engine/check-queue.ts";
 import { check } from "../../src/waits.ts";
 import { changeSettings, proposeTiers, readSettings, type Settings, tiersOf } from "../../src/project.ts";
@@ -514,4 +518,76 @@ test("a check on machine B is recorded as run on B, so none is counted on the ma
   expect(runs.length).toBeGreaterThan(0);
   expect(runs.every((r) => r.machine === "boxb")).toBe(true);
   expect(runs.some((r) => r.machine === machineOf(p.env))).toBe(false);
+});
+
+test("a task on machine B has its step check and done proof run on B, none on the main machine", () => {
+  const p = project();
+  const env = { ...p.env, LINECLEAR_MACHINE: "boxb.local" };
+  const pi = join(p.repo, "..", "pi");
+  writeFileSync(pi, "#!/bin/sh\nprintf 'SAID: fine\\nGO\\n'\n");
+  chmodSync(pi, 0o755);
+  const after = "## P\n\n### A Title\n- why: because\n- done when:\n  - it works\n- locks: none\n- after: none\n- files: src/a.ts\n";
+  const verdict = checkSteps({
+    task: "LIN-7",
+    root: p.repo,
+    before: "## P\n\n",
+    after,
+    planner: undefined,
+    reviewers: ["openai/gpt-5"],
+    env: { ...env, PI_BIN: pi },
+  });
+  expect(verdict.kind).toBe("go");
+  const road =
+    "# Roadmap\n\n## P\n\n### R3 Release 0.1 tagged\n- why: because\n- done when:\n  - The release is tagged v0.1.0 on origin.\n- locks: none\n- after: none\n";
+  const step = checkRoadmap(road).parsed.steps[0] as Step;
+  proveStep({
+    repo: p.repo,
+    step,
+    ref: "origin/main",
+    head: "h",
+    reviewers: [],
+    env,
+    now: new Date(),
+    tools: { available: () => true },
+    run: () => ({ code: 0, out: "abc\trefs/tags/v0.1.0" }),
+  });
+  const work = readWork(env);
+  expect(work.map((w) => w.work).sort()).toEqual(["doneproof", "stepcheck"]);
+  expect(work.every((w) => w.machine === "boxb")).toBe(true);
+  expect(work.some((w) => w.machine === machineOf(p.env))).toBe(false);
+});
+
+test("a fixed log counts runs per machine and finds none of a task's runs away from its machine", () => {
+  const p = project();
+  const run = (branch: string, machine: string) =>
+    ({
+      kind: "run",
+      at: NOW,
+      repo: p.repo,
+      machine,
+      tier: "merge",
+      command: "c",
+      commit: "x",
+      branch,
+      dirty: false,
+      seconds: 1,
+      load: 0,
+      cores: 1,
+      ok: true,
+      failed: [],
+      group: "g",
+    }) as CheckRun;
+  const runs = [run("work/1-a", "boxb"), run("work/1-a", "boxb"), run("work/2-b", "main")];
+  recordWork("LIN-1", "agent", p.env, "boxb");
+  recordWork("LIN-1", "review", p.env, "boxb");
+  const work = readWork(p.env);
+  const counts = runsPerMachine(runs, work, "main");
+  expect(counts).toEqual([
+    ["boxb", 4],
+    ["main", 1],
+  ]);
+  expect(machineRunLine(counts)).toBe("runs per machine: boxb 4, main 1");
+  const home = (key: string) => ({ "work/1-a": "boxb", "LIN-1": "boxb", "work/2-b": "main" })[key];
+  expect(strayRuns(runs, work, home)).toEqual([]);
+  expect(strayRuns([...runs, run("work/1-a", "main")], work, home)).toEqual(["merge check of work/1-a ran on main, its task is on boxb"]);
 });

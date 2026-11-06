@@ -8,7 +8,7 @@ import { allNeedCards } from "./asks.ts";
 import { catchesOf } from "./catches.ts";
 import { DEFAULT_ROUNDS } from "./brief.ts";
 import { askKind } from "./cards.ts";
-import { laneDays, readRuns, redByCause, refusedMergeBranches } from "./check-runs.ts";
+import { laneDays, machineOf, readRuns, redByCause, refusedMergeBranches } from "./check-runs.ts";
 import { health, healthLines, writeHealth } from "./health-numbers.ts";
 import { type Item, readItems } from "./inbox.ts";
 import type { Raw } from "./measure-remote.ts";
@@ -43,6 +43,7 @@ import { roadmapReads, sessionParts, turnTimes, type Usage } from "./session-tex
 import { TICK_MS } from "./rules.ts";
 import { causeLine, causeTotals, unexplainedWaits } from "./wait-causes.ts";
 import { readDecisionsSince } from "./stall-class.ts";
+import { machineRunLine, readWork, runsPerMachine } from "./task-work.ts";
 import { allChecks, reviewRoundLines, type StepCheckNumbers, stepCheckLines, stepCheckNumbers } from "./step-check-cost.ts";
 import type { TaskLine } from "./kept-read.ts";
 import { git } from "./git.ts";
@@ -279,6 +280,7 @@ export function measureMain(args: string[], out: Out, env: Env = process.env): n
   }
 
   const lane = laneDays(readRuns(settings.repo, 0, env), from);
+  const perMachine = runsPerMachine(readRuns(settings.repo, from, env), readWork(env), machineOf(env));
   const red = redByCause(readRuns(settings.repo, from, env));
   const parts = partHealth(settings.repo, readParts(settings.repo), steps, tasks, taskSignals(files, tasks));
   if (args.includes("--json")) {
@@ -312,6 +314,7 @@ export function measureMain(args: string[], out: Out, env: Env = process.env): n
     stepCheck,
     roundLines,
     lane,
+    perMachine,
     red,
     catches: catchesOf(settings.repo, env, Number(env.LINECLEAR_NOW) || Date.now()),
     roundDollars: roundDollars(numbers),
@@ -348,6 +351,7 @@ type Printed = {
   stepCheck: StepCheckNumbers;
   roundLines: string[];
   lane: ReturnType<typeof laneDays>;
+  perMachine: ReturnType<typeof runsPerMachine>;
   red: ReturnType<typeof redByCause>;
   catches: string[];
   roundDollars: number;
@@ -357,7 +361,7 @@ type Printed = {
 function printNumbers(
   out: Out,
   env: Env,
-  { machines, numbers, taps, reads, healthy, parts, stepCheck, roundLines, lane, red, catches, roundDollars }: Printed,
+  { machines, numbers, taps, reads, healthy, parts, stepCheck, roundLines, lane, perMachine, red, catches, roundDollars }: Printed,
 ): void {
   if (machines.length > 0) out(`counted on this machine and ${machines.join(", ")}`);
   out("date        asks  wait (median min)  cost ($ per merged step)  tokens per merged step  ready to merged (median min)  turns (goal 0)");
@@ -387,6 +391,7 @@ function printNumbers(
     const wait = d.longestWait === null ? "-" : `${d.longestWait.toFixed(1)} min`;
     out(`merge line ${d.date}: ${d.merges} merges, ${d.perHour.toFixed(2)} per hour, longest wait of a turn ${wait}`);
   }
+  out(machineRunLine(perMachine));
   for (const x of numbers.parts) {
     const f = (v: PartSplit["on"]) => (v ? `$${v.perStep.toFixed(2)}, ${Math.round(v.tokens)} tokens (${v.steps} steps)` : "-");
     out(`token pack ${x.part}: on ${f(x.on)}, off ${f(x.off)} per merged step`);

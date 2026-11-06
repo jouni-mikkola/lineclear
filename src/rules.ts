@@ -37,7 +37,7 @@ export interface Decision {
   time: string;
   project: string;
   step?: string;
-  kind: "start" | "skip" | "stop" | "wake" | "stall" | "close";
+  kind: "start" | "skip" | "stop" | "wake" | "stall" | "close" | "run";
   reason: string;
   /** The stall class of a stop (src/stall-class.ts). */
   class?: string;
