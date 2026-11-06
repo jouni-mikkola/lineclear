@@ -247,3 +247,22 @@ test("as an agent in a task: its shell has no owner-only or other project name, 
   expect(r.out).toContain("pi-ran -p");
   expect(refusal(script.replace(bin, "lineclear"), alphaTask, env)).toBeUndefined();
 });
+
+test("adopt moves an old env tree into the vault: common to Everywhere, machine to this machine, a repo's file to its project, and prints no value", async () => {
+  const old = join(root, "old");
+  mkdirSync(join(old, "me"), { recursive: true });
+  mkdirSync(join(old, "machine"));
+  writeFileSync(join(old, "common.env"), "COMMON_ONE='c1'\n");
+  writeFileSync(join(old, "machine", "sudo.env"), "SUDO_X='s1'\n");
+  writeFileSync(join(old, "me", "alpha.env"), "# note\nALPHA_NEW='a1'\n");
+  writeFileSync(join(old, "me", "gone.env"), "GONE='g'\n");
+  const out: string[] = [];
+  expect(await secrets(["adopt", old], (l) => out.push(l), env)).toBe(0);
+  expect(out.join("\n")).not.toMatch(/c1|s1|a1/);
+  expect(out.join("\n")).toContain("skipped me/gone.env");
+  const e = (await run(["env"], root)).out;
+  expect(e).toContain("export COMMON_ONE='c1'");
+  expect(e).toContain("export SUDO_X='s1'");
+  expect(e).not.toContain("ALPHA_NEW");
+  expect((await run(["env"], alphaTask)).out).toContain("export ALPHA_NEW='a1'");
+});

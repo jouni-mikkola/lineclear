@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { hostname } from "node:os";
 import { join, resolve } from "node:path";
 import { writeAtomic } from "../pi/atomic.ts";
@@ -283,6 +283,35 @@ async function importSecrets(space: string, out: (l: string) => void, env: Env, 
   return 0;
 }
 
+/**
+ * `secrets adopt <dir>`: moves an old env tree into the vault, for the owner to run once. `common.env` goes Everywhere,
+ * `machine/*.env` to this machine, `<owner>/<repo>.env` to the space of the project named <repo>. Prints counts and the
+ * names of files with no project, never a value.
+ */
+function adoptTree(dir: string, out: (l: string) => void, env: Env): number {
+  const root = resolve(dir);
+  const files = (d: string) => (existsSync(d) ? readdirSync(d).filter((f) => f.endsWith(".env")) : []);
+  const projects = listProjectNames(env as NodeJS.ProcessEnv);
+  const jobs: { level: string; label: string; file: string }[] = [];
+  if (existsSync(join(root, "common.env"))) jobs.push({ level: "all", label: "Everywhere", file: join(root, "common.env") });
+  for (const f of files(join(root, "machine"))) jobs.push({ level: machineLevel(env), label: "this machine", file: join(root, "machine", f) });
+  for (const owner of existsSync(root) ? readdirSync(root, { withFileTypes: true }).filter((e) => e.isDirectory() && e.name !== "machine") : []) {
+    for (const f of files(join(root, owner.name))) {
+      const project = f.replace(/\.env$/, "");
+      const space = projects.includes(project) ? spaceOfProject(project, env) : undefined;
+      if (space === undefined) out(`skipped ${owner.name}/${f}: no project named '${project}'`);
+      else jobs.push({ level: spaceLevel(space, env), label: `'${project}'`, file: join(root, owner.name, f) });
+    }
+  }
+  for (const j of jobs) {
+    const values = readEnvFile(j.file);
+    const saved = saveToVault(j.level, values, env);
+    if (saved !== undefined) return fail(out, saved);
+    out(`saved ${Object.keys(values).length} secrets for ${j.label}`);
+  }
+  return 0;
+}
+
 export async function secrets(
   args: string[],
   out: (l: string) => void,
@@ -293,6 +322,7 @@ export async function secrets(
   const [sub, ...rest] = args;
   if (sub === "set") return setSecret(rest, out, env, readValue);
   if (sub === "import" && rest.length === 1) return importSecrets(rest[0] ?? "", out, env, readValue);
+  if (sub === "adopt" && rest.length === 1) return adoptTree(rest[0] ?? "", out, env);
   if (sub === "list" && rest.length === 1) {
     const project = rest[0]!;
     if (!listProjectNames(env as NodeJS.ProcessEnv).includes(project)) return fail(out, `no project named '${project}'`);
@@ -310,7 +340,7 @@ export async function secrets(
     return 0;
   }
   out(
-    "usage: lineclear secrets set <project> | --machine | --all | --owner <NAME> (value on stdin) | list <project> | env (import and deny are for Lineclear itself)",
+    "usage: lineclear secrets set <project> | --machine | --all | --owner <NAME> (value on stdin) | list <project> | env | adopt <old env folder> (import and deny are for Lineclear itself)",
   );
   return 2;
 }

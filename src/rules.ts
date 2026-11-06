@@ -5,6 +5,7 @@ import { configDir, decisionsPath } from "../pi/config.ts";
 import { routeAsks } from "./asks.ts";
 import { settlePlans } from "./autoplan.ts";
 import { startBackupIfDue } from "./backup.ts";
+import { watchMachine } from "./machine-alerts.ts";
 import { startBoard } from "./board.ts";
 import { herdrHealth } from "./herdr-health.ts";
 import { freshDecisions } from "./decision-dedupe.ts";
@@ -152,7 +153,7 @@ export function tick(world: World, dryRun: boolean, env = process.env): Decision
   world.newTick?.();
   // plans that wait from before their project let plans apply by themselves are settled under the rule
   if (!dryRun) {
-    for (const start of [startBackupIfDue, startReleaseIfDue, startPromoteIfDue]) start(env, world.now());
+    for (const start of [startBackupIfDue, watchMachine, startReleaseIfDue, startPromoteIfDue]) start(env, world.now());
     all.push(
       ...logDecisions(
         [...settlePlans(world.now(), env), ...closeSettledUpdates(world.now(), env), ...sweepOldTemp(world.now(), env)].map(

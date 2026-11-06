@@ -87,7 +87,8 @@ export const commands: Record<string, string> = {
   release:
     "Show the stable and next builds, the last promotion and why next is held (release status); release run tests main and promotes it when green, as the rule loop does every 2 minutes; release check <version> checks a candidate on its own (check, smoke, canary, store both ways); release promote <version> makes a checked candidate stable and leaves the Inbox item to read; release try [version] starts a test instance on a copy of the data, release try --stop ends it",
   store: "The local copies of the task store (store list, store copy, store restore <name>); the rule loop takes one an hour, an update one before it",
-  backup: "Back up Lineclear's data and secrets with restic (backup status, backup restore <dir> [--from <machine>]); the rule loop runs it hourly",
+  backup:
+    "Back up Lineclear's data and secrets with restic (backup status, backup drill, backup restore <dir> [--from <machine>]); the rule loop runs it hourly and the drill weekly",
   totp: "Print the current code of a stored login: totp NAME reads NAME_TOTP from this folder's secrets",
   status:
     'Show what stops each project and what each task waits for; --plan [<task>] shows the steps of a plan; a task\'s agent reports progress: status <id> "<line>" --done <0-100> [--left 5m]',

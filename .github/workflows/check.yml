@@ -10,6 +10,13 @@ on:
   merge_group:
   workflow_dispatch:
 
+# Tests that commit into a scratch repo need a git identity, which a runner has none of.
+env:
+  GIT_AUTHOR_NAME: ci
+  GIT_AUTHOR_EMAIL: ci@localhost
+  GIT_COMMITTER_NAME: ci
+  GIT_COMMITTER_EMAIL: ci@localhost
+
 concurrency:
   group: check-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
