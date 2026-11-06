@@ -444,7 +444,8 @@ export class MachinesLinks extends Emitter<Events> {
     const m = key.match(/^[mp]:([^:]+)/)
     if (m) return this.links.get(m[1])
     const task = key.split('/')[0]
-    for (const l of this.links.values()) if (l.snap?.tasks.some((t) => t.id === task)) return l
+    for (const l of this.links.values())
+      if (l.snap?.tasks.some((t) => t.id.toUpperCase() === task.toUpperCase() || t.aliases?.some((a) => a.toUpperCase() === task.toUpperCase()))) return l
     return undefined
   }
 

@@ -1,3 +1,4 @@
+import { storedTaskIds, taskIdsUnique } from "./doctor-task-ids.ts";
 import { existsSync, lstatSync, readFileSync, readlinkSync } from "node:fs";
 import { herdrArgv, herdrVersionOf } from "./herdr.ts";
 import { userInfo } from "node:os";
@@ -73,6 +74,8 @@ export interface Probe {
   tryInstance?: string[];
   /** The machine whose promotions this one takes, when another machine installed it. */
   follows?: string;
+  /** Every id and alias in the live task store. Without it the ids are not checked. */
+  taskIds?: () => string[];
   /** A CI runner: its checkout has no origin main to read. */
   ci?: boolean;
 }
@@ -99,6 +102,7 @@ export function realProbe(paths: Paths, env: Record<string, string | undefined> 
     release: readRelease(env),
     tryInstance: tryLines(env),
     follows: follows(env),
+    taskIds: () => storedTaskIds(dataDir(env)),
     ci: env.CI === "true",
     user: env.USER ?? userInfo().username,
     free: freeBytes,
@@ -401,6 +405,7 @@ export function doctorChecks(probe: Probe): Check[] {
       info: p.runBy ? `${p.runBy} runs this machine's tasks, so its task list is there (lineclear task list on ${p.runBy})` : undefined,
       skip: !p.runBy,
     },
+    taskIdsUnique(p),
     release(p),
   ];
 }

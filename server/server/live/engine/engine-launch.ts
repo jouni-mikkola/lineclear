@@ -70,6 +70,8 @@ export class EngineLaunch extends EngineStalls {
       status,
       place: t.project,
       machine: t.machine,
+      createdAt: t.created,
+      aliases: t.aliases,
       sub,
       age: age(t.archived ?? doneAt ?? (status === 'todo' ? t.created : t.updated)),
       doneAt,
@@ -309,7 +311,9 @@ export class EngineLaunch extends EngineStalls {
     const title = short(o.title)
     const space = placeId.space(p.name)
     this.taskIds.ensure(space, p.key)
-    const { id, n, prefix } = this.taskIds.allocate(space)
+    let next = this.taskIds.allocate(space)
+    while (this.foreignIds.has(next.id.toUpperCase())) next = this.taskIds.allocate(space)
+    const { id, n, prefix } = next
     p.key = prefix
     this.data.next[prefix] = n
     // its project's defaults: its own, else its machine's, else All machines'

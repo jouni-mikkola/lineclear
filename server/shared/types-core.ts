@@ -196,6 +196,9 @@ export interface Task {
   place: string
   /** the machine its worktree and agent are on; none: the server's own */
   machine?: string
+  /** when it was made (ms), and the former ids a rename kept, like `machine-b:OMA-91` */
+  createdAt?: number
+  aliases?: string[]
   /** second line in lists */
   sub?: string
   age: string
