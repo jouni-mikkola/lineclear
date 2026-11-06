@@ -65,6 +65,10 @@ const BOARD_COMMANDS = [
   "answer",
   "card",
   "alive",
+  "room",
+  "progress",
+  "checkpoint",
+  "complete",
 ];
 /** Words both have: the board's job is told by its own arguments, the rest is Lineclear's (`doctor` and a bare `status` are Lineclear's alone). */
 const SHARED_WORDS: Record<string, (rest: string[]) => boolean> = {
