@@ -10,6 +10,8 @@ import { EngineHandoff } from './engine-handoff.ts'
 
 /** how long a merge waits for a merge queue to run its check and merge the pull request */
 const QUEUE_WAIT_MS = 15 * 60_000
+/** how long a ready task's agent may finish its turn before the board merges without ending it */
+const TURN_END_WAIT_MS = 2 * 60_000
 
 export class EngineLand extends EngineHandoff {
   /**
@@ -21,8 +23,30 @@ export class EngineLand extends EngineHandoff {
     if (!t.landing || t.landing.nudged || (c.state !== 'pass' && c.state !== 'none') || this.agents.background(key)) return
     t.landing.nudged = true
     this.save()
+    // its process ended at ready (landAtReady): the board merges, there is no agent to tell
+    if (this.agents.record(key)?.finished) return void this.merge(t.id).catch(() => undefined)
     const text = `GitHub's checks passed on PR #${n}: merge ${t.id} now (lineclear merge ${t.id}), as your brief says.`
     await this.agents.send(key, hidden(text, 'github', { task: t.id, pr: String(n) }), { ensure: () => this.launch(t) }).catch(() => undefined)
+  }
+
+  /**
+   * Its agent reported ready and merging is the board's (Settings): once the agent's turn ends its process ends, and the
+   * board merges the branch. Only a refusal (a red check, a conflict) starts the agent again, through sendBack, with the
+   * failing lines. An agent that merges itself first, or works again, is left alone.
+   */
+  landAtReady(id: string): boolean {
+    const t = this.req(id)
+    if (t.askFirst || this.settings.ways(this.proj(t).name).merge === 'ask me first') return false
+    void this.endAndMerge(t).catch(() => undefined)
+    return true
+  }
+
+  private async endAndMerge(t: TaskRec) {
+    const key = this.key(t)
+    for (const end = Date.now() + TURN_END_WAIT_MS; this.agents.status(key) === 'working' && Date.now() < end; ) await Bun.sleep(500)
+    if (this.agents.status(key) === 'working' || !t.reported || ended(t) || t.landing || this.landings.has(t.id)) return
+    await this.agents.finish(key).catch(() => undefined)
+    await this.merge(t.id)
   }
 
   /**

@@ -70,7 +70,9 @@ build, check and review the work is your own judgment.
        --facts "PR #31 (or branch work/7-x) · commit 1a2b3c4 · checks passed (bun run test, GitHub) · review: 2 rounds,
        1 major fixed, 2 minor left (…) · decided: … · follow-ups: … · not proven: iOS Safari"
 
-7. **Merge** as the brief says: `lineclear merge <id>` (after `lineclear checks <id>` when it says to wait for GitHub's
+7. **Merge.** When Settings merge on their own, `lineclear ready` is your last command: end your turn. Lineclear ends
+   your process, merges the branch, and starts you again only when a check fails, with the failing lines. Fix it,
+   commit, run `lineclear ready` again. Otherwise merge as the brief says: `lineclear merge <id>` (after `lineclear checks <id>` when it says to wait for GitHub's
    checks), or ask first with `lineclear card "Merge <id>?" --choice "Merge" --choice "Not yet"`, end your turn and
    merge on the yes. Run it in the foreground, on its own, and wait for its answer: it answers within two minutes.
    Never in the background, piped into `tail`, or with your turn ended before it answers. No answer: do what it says.

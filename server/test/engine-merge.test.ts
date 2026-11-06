@@ -284,3 +284,30 @@ describe('closed with nothing to merge', () => {
     expect(t.cleaned).toBe(true)
   })
 })
+
+describe('an agent ends at ready', () => {
+  test('its process ends once its turn does, and the board merges the branch', async () => {
+    const w = world()
+    const dir = repo()
+    const { t, key } = await started(w, dir, 'ends-at-ready')
+    writeFileSync(join(t.worktree!, 'hello.txt'), 'hello\n')
+    sh('git add -A && git commit -qm "add hello"', t.worktree!)
+    await w.engine.done(t.id, 'Added hello.txt.')
+    expect(w.engine.landAtReady(t.id)).toBe(true)
+    w.agentIs(key, 'idle')
+    await until(() => !!t.merged)
+    expect(w.agents.record(key)?.finished).toBe(true)
+    expect(existsSync(join(dir, 'hello.txt'))).toBe(true)
+  })
+
+  test('is left to the human when merges ask first', async () => {
+    const w = world()
+    const { t } = await started(w, repo(), 'asks-first')
+    w.settings.set('brief.merge', 'ask me first')
+    try {
+      expect(w.engine.landAtReady(t.id)).toBe(false)
+    } finally {
+      w.settings.set('brief.merge', null)
+    }
+  })
+})
