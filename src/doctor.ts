@@ -60,7 +60,7 @@ export interface Probe {
   /** Where the web pages are published on the tailnet (task links open there), when tailscale is here. */
   published?: string;
   /** The herdr version the contract test passed with, and the one each machine runs (null when it cannot say). */
-  herdr?: { tested: string; machines: { machine: string; version: string | null }[] };
+  herdr?: { tested: string; machines: { machine: string; version: string | null }[]; unsaved?: string[] };
   /** What pi loads here and on each other machine (a null diff: it cannot be read), and what the release wants. */
   /** The machine whose board runs this machine's tasks ("" when this one does). */
   runBy?: string;
@@ -274,6 +274,26 @@ export function herdrVersions(run: Probe["run"], here: boolean): { machine: stri
   return out;
 }
 
+/** The machines of `hosts` that herdr has not saved: the server places a task only on a machine it knows by herdr's list. */
+export function herdrUnsaved(run: Probe["run"], hosts: string[]): string[] {
+  let saved: { id?: string; label?: string; target?: string }[] = [];
+  try {
+    saved = JSON.parse(run(herdrArgv(["machine", "list", "--json"])) ?? "[]");
+  } catch {
+    // an unreadable list counts as empty
+  }
+  return hosts.filter((h) => !saved.some((m) => [m.id, m.label, m.target].includes(h)));
+}
+
+/** A Lineclear machine that herdr does not know: `lineclear room <machine>` and placing tasks there fail until it is saved. */
+function herdrKnows(p: Probe): Check[] {
+  return (p.herdr?.unsaved ?? []).map((host) => ({
+    name: `herdr knows ${host}`,
+    problem: `herdr has not saved ${host}, so new tasks never start there and \`lineclear room ${host}\` says no machine`,
+    fix: `herdr machine add ${host}`,
+  }));
+}
+
 /** Every machine runs the herdr the contract test passed with: another version may have changed a call Lineclear makes. */
 function herdrPinned(p: Probe): Check[] {
   const tested = p.herdr?.tested ?? "";
@@ -395,6 +415,7 @@ export function doctorChecks(probe: Probe): Check[] {
     disk(p),
     ...machinesBehind(p),
     ...herdrPinned(p),
+    ...herdrKnows(p),
     listening(p),
     publishedPages(p),
     { name: "store", problem: p.store ?? "", fix: "lineclear store copy; lineclear store list; the rule loop takes a copy every hour" },

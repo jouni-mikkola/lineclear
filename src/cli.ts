@@ -4,7 +4,7 @@ import { createInterface } from "node:readline/promises";
 import { asksMain } from "./asks.ts";
 import { storeMain } from "./store-copies.ts";
 import { dispatcherMain, moveMain } from "./dispatcher.ts";
-import { doctor, herdrVersions, realProbe, testedHerdr } from "./doctor.ts";
+import { doctor, herdrUnsaved, herdrVersions, realProbe, testedHerdr } from "./doctor.ts";
 import { fixAll } from "./retire.ts";
 import { askMain } from "./inbox.ts";
 import { inboxMain } from "./inbox-answer.ts";
@@ -237,7 +237,7 @@ async function installCommand(name: "doctor" | "uninstall", rest: string[], out:
     }
     const here = rest.includes("--here");
     const hosts = here ? [] : readMachines().map((m) => m.host);
-    if (probe.which("herdr")) probe.herdr = { tested: testedHerdr(), machines: herdrVersions(probe.run, here) };
+    if (probe.which("herdr")) probe.herdr = { tested: testedHerdr(), machines: herdrVersions(probe.run, here), unsaved: herdrUnsaved(probe.run, hosts) };
     if (hosts.length > 0)
       probe.machines = {
         commit: codeCommit(),
