@@ -110,6 +110,52 @@ test("homeData reads projects and states from Lineclear's files", () => {
   expect(d.spend).toHaveLength(14);
 });
 
+test("a task whose turn ended with no question is not in Needs you", () => {
+  const root = tmp("home");
+  const dir = join(root, "lineclear");
+  mkdirSync(join(dir, "chatlog"), { recursive: true });
+  writeFileSync(
+    join(dir, "spaces.json"),
+    JSON.stringify([
+      { name: "alpha", key: "AL", path: join(root, "alpha") },
+      { name: "beta", key: "BE", path: join(root, "beta") },
+    ]),
+  );
+  writeFileSync(
+    join(dir, "tasks.json"),
+    JSON.stringify({
+      red: { [join(root, "beta")]: "abc" },
+      tasks: [
+        { id: "AL-1", title: "First", told: "done", merged: true, created: 1, doneAt: 2 },
+        { id: "AL-2", title: "Second", told: "work", created: 3 },
+        { id: "AL-3", title: "Dropped", told: "done", closed: true, created: 4 },
+        { id: "BE-1", title: "Waits", told: "queued", created: 5 },
+      ],
+    }),
+  );
+  // AL-2 works again after a card that asked for it; BE-1 waits, and says why on its last card
+  writeFileSync(
+    join(dir, "chatlog", "AL-2_Agent.json"),
+    JSON.stringify({ posted: [{ at: 9, card: { task: "AL-2", status: "need", text: "Waits for your reply" } }] }),
+  );
+  writeFileSync(
+    join(dir, "chatlog", "BE-1_Agent.json"),
+    JSON.stringify({ posted: [{ at: 9, card: { task: "BE-1", status: "work", text: "Waits for your reply" } }] }),
+  );
+  project(join(root, "config"), "alpha", "alpha");
+  project(join(root, "config"), "beta", "beta");
+  const bin = join(root, "task-list.sh");
+  const list = (space: string) =>
+    space === "alpha" ? [{ id: "AL-2", title: "Second", status: "work" }] : [{ id: "BE-1", title: "Waits", status: "need", sub: "Waits for your reply" }];
+  writeFileSync(
+    bin,
+    `#!/bin/sh\ncase "$*" in *"--space alpha"*) echo '${JSON.stringify(list("alpha"))}' ;; *"--space beta"*) echo '${JSON.stringify(list("beta"))}' ;; *) echo '${JSON.stringify([...list("alpha"), ...list("beta")])}' ;; esac\n`,
+    { mode: 0o755 },
+  );
+  const d = homeData({ LINECLEAR_HOME: dir, PI_CODING_AGENT_DIR: join(root, "pi"), LINECLEAR_CONFIG: join(root, "config"), LINECLEAR_SERVER_BIN: bin }, NOW);
+  expect(d.projects[1]?.tasks).toMatchObject([{ title: "Waits", state: "work" }]);
+});
+
 test("Home lists the projects, and an open task of a space with no project shows apart", () => {
   const root = tmp("loose");
   const dir = join(root, "lineclear");

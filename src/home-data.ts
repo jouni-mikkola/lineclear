@@ -1,5 +1,5 @@
 import { readJson } from "../pi/config.ts";
-import { questionIn } from "./cards.ts";
+import { IDLE_TEXT, questionIn } from "./cards.ts";
 import { dataDir } from "./paths.ts";
 import type { ReleaseState } from "./release.ts";
 import { existsSync, readdirSync } from "node:fs";
@@ -174,12 +174,14 @@ export function lastCards(files: Raw[]): Map<string, { at: number; text: string 
       const task = p?.card?.task;
       if (typeof task !== "string" || typeof p.at !== "number" || typeof p.card.text !== "string") continue;
       // a plain-text question of an agent shows as the card's line, not the status word
-      const asked = /^(?:needs you:\s*)?Waits for your reply$/i.test(p.card.text) ? questionIn(String(p.card.ask?.reply?.text ?? "")) : undefined;
+      const asked = IDLE_CARD.test(p.card.text) ? questionIn(String(p.card.ask?.reply?.text ?? "")) : undefined;
       if ((last.get(task)?.at ?? -1) <= p.at) last.set(task, { at: p.at, text: asked ?? p.card.text });
     }
   }
   return last;
 }
+
+const IDLE_CARD = /^(?:needs you:\s*)?Waits for your reply$/i;
 
 /** The head of main in a folder, or undefined when it has none. */
 const mainHead = (repo: string) => {
@@ -374,9 +376,17 @@ function spaceView(s: Raw, ctx: SpaceContext, owner?: { project: string; paused:
   const listed = typeof every === "string" ? every : [...every.filter((t) => String(t.id).startsWith(`${s.key}-`)), ...remoteTasks(s.name, env)];
   const lines = new Map(typeof listed === "string" ? [] : listed.flatMap((t) => (t.id && t.sub ? [[t.id, t.sub] as const] : [])));
   const status = new Map(typeof listed === "string" ? [] : listed.flatMap((t) => (t.id ? [[t.id, t.status] as const] : [])));
+  // a turn that ended with no question and no declared wait is not Needs you: the stall ladder resumes it
+  const quiet = (id: string, state: TaskState | undefined) =>
+    state === "need" &&
+    lines.get(id) === IDLE_TEXT &&
+    IDLE_CARD.test(ctx.cards.get(id)?.text ?? IDLE_TEXT) &&
+    !waits.some((w) => w.task === id && waitsForOwner(w))
+      ? "work"
+      : state;
   const own = ctx.tasks
     .filter((t) => String(t.id).startsWith(`${s.key}-`))
-    .map((t) => ({ t, state: taskState(t, status.get(t.id)) }))
+    .map((t) => ({ t, state: quiet(t.id, taskState(t, status.get(t.id))) }))
     .filter((x): x is { t: Raw; state: TaskState } => x.state !== undefined);
   const open = own.filter((x) => x.state !== "done");
   const done = own.filter((x) => x.state === "done").sort((a, b) => (b.t.doneAt ?? b.t.updated) - (a.t.doneAt ?? a.t.updated));
