@@ -135,7 +135,10 @@ async function runCheck(
   })
   if (again) return runCheck(repo, machine, wt, command, id, onPid, readLoad, true, slotWaitMin)
   const held = rerun && !r.ok && !passes && failed.length === 0 && !gate
-  return { ok: r.ok || passes, tail: `${held ? 'held, cause unnamed: it failed twice and named no test or gate\n' : ''}${((failed.length > 0 && Runs.failingLines(text)) || text).slice(-TAIL)}` }
+  return {
+    ok: r.ok || passes,
+    tail: `${held ? 'held, cause unnamed: it failed twice and named no test or gate\n' : ''}${((failed.length > 0 && Runs.failingLines(text)) || text).slice(-TAIL)}`,
+  }
 }
 
 /** A merge whose caller may have left (past the deadline) has nobody to hear its error: one not sent back to the agent yet is sent now. */

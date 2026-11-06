@@ -11,7 +11,11 @@ test("a red check's lines keep the failed test and its error, not the passing on
     "(pass) multiplies",
     " 2 pass",
     " 1 fail",
+    "check: outside the change: a.test.ts: subtracts",
   ].join("\n");
-  expect(failingLines(output)).toBe("error: expected 1 to be 2\n      at a.test.ts:9\n(fail) subtracts [1.00ms]");
+  expect(failingLines(output)).toBe(
+    "error: expected 1 to be 2\n      at a.test.ts:9\n(fail) subtracts [1.00ms]\ncheck: outside the change: a.test.ts: subtracts",
+  );
+  expect(failingLines("✘ one (1.0s)\ncheck: x")).toBe("");
   expect(failingLines("all fine")).toBe("");
 });
