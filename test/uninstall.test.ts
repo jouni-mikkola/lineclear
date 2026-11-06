@@ -1,9 +1,17 @@
 import { expect, test } from "bun:test";
-import { existsSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { cacheEnvFile, extensionFile, pathsFor } from "../src/paths.ts";
 import { realRemover, uninstall } from "../src/uninstall.ts";
 import { tmp } from "./helpers.ts";
+
+const lstatSyncOrNull = (p: string) => {
+  try {
+    return lstatSync(p);
+  } catch {
+    return null;
+  }
+};
 
 function world() {
   const home = tmp("uninstall");
@@ -52,6 +60,20 @@ test("uninstall --all removes the settings too, and leaves a link that is not Li
   expect(existsSync(w.paths.app)).toBe(false);
   expect(existsSync(w.paths.binLink)).toBe(true);
   expect(w.lines.some((l) => l.startsWith(`Left ${w.paths.binLink}`))).toBe(true);
+});
+
+test("uninstall removes a release install: the builds, the link and the extension that point into them", () => {
+  const w = world();
+  const current = join(w.paths.builds, "current");
+  mkdirSync(join(w.paths.builds, "0.0.1", "bin"), { recursive: true });
+  symlinkSync(join(w.paths.builds, "0.0.1"), current);
+  rmSync(w.paths.binLink);
+  symlinkSync(join(current, "bin", "lineclear"), w.paths.binLink);
+  writeFileSync(w.paths.extension, extensionFile(current));
+  uninstall(w.remover, false, w.out);
+  expect(existsSync(w.paths.builds)).toBe(false);
+  expect(existsSync(w.paths.extension)).toBe(false);
+  expect(lstatSyncOrNull(w.paths.binLink)).toBe(null);
 });
 
 test("the real remover ignores a command that cannot run", () => {
