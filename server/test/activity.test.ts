@@ -9,7 +9,7 @@ import { glance, jobsWords, rowsOf, say, testResult, took } from '../shared/acti
 import { activityOf, cutOutput, lineOf } from '../server/live/activity.ts'
 import { ClaudeReader, readerFor } from '../server/live/readers/index.ts'
 import { notices } from '../server/live/readers/claude.ts'
-import { claudeStep, codexItem, commandSay, commandWords } from '../server/live/readers/steps.ts'
+import { claudeStep, commandSay, commandWords } from '../server/live/readers/steps.ts'
 import type { Step } from '../shared/types.ts'
 import type { LogEvent } from '../server/live/readers/types.ts'
 
@@ -302,71 +302,7 @@ describe('claude reader: steps and background work', () => {
   })
 })
 
-const codexLine = (type: string, payload: object) => ({ timestamp: ts(), type, payload })
-
-describe('codex reader: steps and background work', () => {
-  test('items logged once over are steps; the call that ran them goes once over; subagents are jobs', () => {
-    const ev = readerFor('codex')!.parse(
-      [
-        codexLine('response_item', { type: 'custom_tool_call', call_id: 'c1', name: 'exec', input: 'text(await tools.exec_command({cmd:"cat src/a.ts"}))' }),
-        codexLine('event_msg', {
-          type: 'item_completed',
-          started_at_ms: 1000,
-          completed_at_ms: 1200,
-          item: {
-            type: 'CommandExecution',
-            id: 'exec-1',
-            command: ['/bin/bash', '-lc', 'cat src/a.ts'],
-            parsed_cmd: [{ type: 'read', cmd: 'cat src/a.ts', name: 'a.ts', path: 'src/a.ts' }],
-            status: 'completed',
-            exit_code: 0,
-          },
-        }),
-        codexLine('event_msg', {
-          type: 'item_completed',
-          item: {
-            type: 'CommandExecution',
-            id: 'exec-2',
-            command: ['/bin/bash', '-lc', 'bun test'],
-            parsed_cmd: [{ type: 'unknown', cmd: 'bun test' }],
-            status: 'completed',
-            exit_code: 1,
-          },
-        }),
-        codexLine('response_item', { type: 'custom_tool_call_output', call_id: 'c1', output: [{ type: 'input_text', text: 'done' }] }),
-        codexLine('event_msg', {
-          type: 'item_completed',
-          item: { type: 'SubAgentActivity', id: 'call_9', kind: 'started', agent_thread_id: 'th-1', agent_path: '/root/review_fix' },
-        }),
-        codexLine('event_msg', {
-          type: 'item_completed',
-          item: { type: 'SubAgentActivity', id: 'call_9', kind: 'completed', agent_thread_id: 'th-1', agent_path: '/root/review_fix' },
-        }),
-      ].map((o, i) => ({ text: JSON.stringify(o), offset: i * 100 })),
-      '/codex/r.jsonl',
-    )
-    const { turns, open, jobs } = activityOf(ev)
-    const steps = [...turns, ...(open ? [open] : [])].flatMap((t) => t.steps)
-    expect(steps.map((s) => [s.kind, s.title, !!s.failed])).toEqual([
-      ['read', 'Read a.ts', false],
-      ['run', 'Ran tests', true],
-      ['agent', 'Asked a subagent: review fix', false],
-    ])
-    expect(steps[0]).toMatchObject({ at: 1000, end: 1200, where: { file: '/codex/r.jsonl', offset: 100 } })
-    expect(ev.filter((e) => e.kind === 'job' || e.kind === 'job-end').map((e) => `${e.kind}:${e.id}`)).toEqual(['job:th-1', 'job-end:th-1'])
-    expect(jobs).toEqual([])
-    expect(codexItem({ type: 'FileChange', changes: { '/w/a.ts': { unified_diff: '@@\n-x\n+y\n+z' }, '/w/b.ts': {} } })).toMatchObject({
-      step: 'edit',
-      title: 'Edited 2 files: a.ts, b.ts',
-      added: 2,
-      removed: 1,
-    })
-    expect(codexItem({ type: 'CommandExecution', command: ['bash', '-lc', 'bun test'], aggregated_output: ' 3 pass\n 1 fail' })).toMatchObject({
-      title: 'Ran tests',
-      result: '1 failed, 3 passed',
-    })
-  })
-})
+const _codexLine = (type: string, payload: object) => ({ timestamp: ts(), type, payload })
 
 /* ---------- a chat built from a log ---------- */
 

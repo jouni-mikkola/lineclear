@@ -19,13 +19,11 @@
     "agent-browser": "0.39.4",
     "inter-ui": "4.1.1",
     "rrule": "2.8.1",
-    "web-push": "3.6.7",
-    "ws": "^8.22.0"
+    "web-push": "3.6.7"
   },
   "devDependencies": {
     "@types/bun": "1.4.4",
     "@types/web-push": "3.6.4",
-    "@types/ws": "^8.18.2",
     "typescript": "5.9.3"
   }
 }

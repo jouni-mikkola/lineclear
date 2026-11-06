@@ -2,7 +2,6 @@ import { chatProblem } from './readers/index.ts'
 import { randomUUID } from 'node:crypto'
 import { mkdirSync, watch } from 'node:fs'
 import { dirname, join } from 'node:path'
-import type { AgentRuntime } from '../../shared/types.ts'
 import { herdr, paneEvents, type AgentInfo, type AgentStatus, type HerdrEvent } from './herdr.ts'
 import { findLog, logKind } from './readers/find.ts'
 import { chooseModel, effortFor, modelArg } from './models.ts'
@@ -87,11 +86,6 @@ export class AgentsDelivery extends AgentsState {
   /** Private routing was bound to this session's actual CLI process. */
   routed(key: string) {
     return this.reachable && !!this.info(key)?.agent && !this.record(key)?.finished && this.routes.has(key)
-  }
-
-  runtime(key: string): AgentRuntime | undefined {
-    const state = this.codexState.get(key)
-    return this.info(key) && state && Date.now() - state.at < 10_000 ? state : undefined
   }
 
   /** Runtime fields reported by this launch's main Claude process, never its subagents. */
@@ -203,7 +197,6 @@ export class AgentsDelivery extends AgentsState {
         this.routes.delete(r.key)
       }
     }
-    void this.readRuntime()
     // Slow pane reads must not hold up transport health checks.
     if (!this.readingBackground) {
       this.readingBackground = true
@@ -327,7 +320,6 @@ export class AgentsDelivery extends AgentsState {
       r.effort = ''
     }
     applySpec(r, spec)
-    this.codexState.delete(spec.key)
     r.launch = randomUUID()
     if (fresh) this.outbox = this.outbox.filter((item) => item.key !== spec.key || item.cid || !item.text.startsWith('<lineclear>'))
     r.started = Date.now()

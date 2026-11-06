@@ -4,8 +4,6 @@ import { chmodSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSyn
 import { dirname, join } from "node:path";
 import type { Harness } from "../../src/harness.ts";
 import { claudeHarness } from "../../src/harness-claude.ts";
-import { codexHarness } from "../../src/harness-codex.ts";
-import { opencodeHarness } from "../../src/harness-opencode.ts";
 import { piHarness } from "../../src/harness-pi.ts";
 import type { Usage } from "../../src/session-text.ts";
 import { harnesses, readRegistry } from "../../src/models.ts";
@@ -63,47 +61,6 @@ const adapters: Adapter[] = [
             join(claudeHarness.sessionsRoot(home), w.replace(/[^a-zA-Z0-9]/g, "-"), "a.jsonl"),
             line({ type: "assistant", message: msg }) + line({ type: "assistant", message: msg }),
           ),
-      };
-    },
-  },
-  {
-    harness: codexHarness,
-    expected: { ...USAGE, provider: "openai" },
-    setup() {
-      const home = tmp("contract-codex");
-      return {
-        env: { CODEX_HOME: home },
-        plant: (w) =>
-          write(
-            join(codexHarness.sessionsRoot(home), "2026", "06", "01", `rollout-${w.replace(/\//g, "_")}.jsonl`),
-            line({ type: "session_meta", payload: { cwd: w } }) +
-              line({ type: "turn_context", payload: { model: "m" } }) +
-              line({
-                type: "event_msg",
-                payload: {
-                  type: "token_count",
-                  info: { total_token_usage: { input_tokens: 10 }, last_token_usage: { input_tokens: 10, cached_input_tokens: 0, output_tokens: 5 } },
-                },
-              }),
-          ),
-      };
-    },
-  },
-  {
-    harness: opencodeHarness,
-    expected: USAGE,
-    setup() {
-      const home = tmp("contract-opencode");
-      return {
-        env: { XDG_DATA_HOME: home },
-        plant(w) {
-          const root = join(home, "opencode", "storage");
-          write(join(root, "session", "global", "ses_1.json"), JSON.stringify({ id: "ses_1", directory: w }));
-          write(
-            join(root, "message", "ses_1", "msg_1.json"),
-            JSON.stringify({ id: "msg_1", role: "assistant", providerID: "p", modelID: "m", tokens: { input: 10, output: 5, cache: { read: 0, write: 0 } } }),
-          );
-        },
       };
     },
   },

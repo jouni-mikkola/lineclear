@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { readerFor } from '../server/live/readers/index.ts'
 import type { LogEvent } from '../server/live/readers/types.ts'
-import { parse, brief, base, ts, cuser, typed, cassistant, toolResult, line, cxmsg, sessionMeta, pimsg, STEPS, S, T } from './readers-fixture.ts'
+import { parse, brief, base, ts, cuser, typed, cassistant, toolResult, pimsg, STEPS, S } from './readers-fixture.ts'
 
 describe('claude reader', () => {
   // fails on ebb17d5 too; L20 fixes it
@@ -207,88 +207,6 @@ describe('claude reader', () => {
 })
 
 /* ---------- Codex ---------- */
-
-describe('codex reader', () => {
-  test('keeps typed text and replies; drops injected context, developer messages and tool steps', () => {
-    const ev = parse('codex', [
-      sessionMeta('/work/app'),
-      line('event_msg', { type: 'task_started', turn_id: 'turn-1', started_at: 1792927516 }),
-      cxmsg('msg_d1', 'developer', [{ type: 'input_text', text: '<permissions instructions>...' }], ['permissions.instructions']),
-      cxmsg(
-        'msg_u0',
-        'user',
-        [
-          { type: 'input_text', text: '# AGENTS.md instructions for /work/app\n\n<INSTRUCTIONS>\nbe nice\n</INSTRUCTIONS>' },
-          { type: 'input_text', text: '<environment_context>\n  <cwd>/work/app</cwd>\n</environment_context>' },
-        ],
-        ['agents_md.instructions', 'environments.environment_context'],
-      ),
-      cxmsg('msg_u1', 'user', [{ type: 'input_text', text: 'Add a dark mode' }], ['user.text']),
-      // an older log without content_item_kinds
-      cxmsg('msg_u2', 'user', [{ type: 'input_text', text: '<environment_context>\n  <cwd>/work/app</cwd>\n</environment_context>' }]),
-      line('response_item', { type: 'reasoning', id: 'rs_1', summary: [], encrypted_content: 'xx' }),
-      line('response_item', { type: 'custom_tool_call', status: 'completed', call_id: 'call_1', name: 'exec', input: 'ls' }),
-      line('response_item', { type: 'custom_tool_call_output', call_id: 'call_1', output: 'src' }),
-      line('event_msg', { type: 'token_count', info: null }),
-      cxmsg('msg_a1', 'assistant', [{ type: 'output_text', text: 'Looking at the styles.', annotations: [] }]),
-      cxmsg('msg_a2', 'assistant', [{ type: 'output_text', text: 'Dark mode is in.', annotations: [] }]),
-      line('event_msg', { type: 'task_complete', turn_id: 'turn-1', last_agent_message: 'Dark mode is in.', duration_ms: 1000 }),
-      cxmsg('msg_u3', 'user', [{ type: 'input_text', text: 'Now stop' }], ['user.text']),
-      line('event_msg', { type: 'turn_aborted', turn_id: 'turn-2', reason: 'interrupted' }),
-    ])
-    expect(brief(ev)).toEqual([
-      `session:session-${T}`,
-      'user:Add a dark mode',
-      'agent:Looking at the styles.',
-      'agent:Dark mode is in.',
-      'turn-end:turn-turn-1',
-      'user:Now stop',
-      'turn-end:turn-turn-2',
-    ])
-    expect(ev.find((e) => e.kind === 'user')!.id).toBe('msg_u1')
-  })
-
-  test('request_user_input: a question, answered by its output; the async one by the next prompt', () => {
-    const ev = parse('codex', [
-      sessionMeta('/work/app'),
-      line('response_item', {
-        type: 'function_call',
-        id: 'fc_1',
-        name: 'request_user_input',
-        arguments: JSON.stringify({
-          questions: [
-            {
-              id: 'scope',
-              header: 'Scope',
-              question: 'Which pages?',
-              options: [
-                { label: 'All', description: 'Every page' },
-                { label: 'Home', description: 'Only the home page' },
-              ],
-            },
-          ],
-        }),
-        call_id: 'call_sync',
-      }),
-      line('response_item', { type: 'function_call_output', call_id: 'call_sync', output: '{"answers":{"scope":{"answers":["All"]}}}' }),
-      line('response_item', {
-        type: 'function_call',
-        id: 'fc_2',
-        name: 'request_user_input_async',
-        arguments: JSON.stringify({ questions: [{ title: 'What is the site called?' }] }),
-        call_id: 'call_async',
-      }),
-      line('response_item', { type: 'function_call_output', call_id: 'call_async', output: '{"accepted":true}' }),
-      cxmsg('msg_u1', 'user', [{ type: 'input_text', text: 'It is called Example' }], ['user.text']),
-    ])
-    expect(brief(ev).slice(1)).toEqual(['question:call_sync', 'answered:call_sync', 'question:call_async', 'answered:call_async', 'user:It is called Example'])
-    expect(ev[1]).toMatchObject({
-      tool: 'request_user_input',
-      items: [{ header: 'Scope', question: 'Which pages?', multiSelect: false, allowCustom: true, options: [{ label: 'All' }, { label: 'Home' }] }],
-    })
-    expect(ev[3]).toMatchObject({ tool: 'request_user_input_async', items: [{ question: 'What is the site called?', options: [], allowCustom: true }] })
-  })
-})
 
 /* ---------- pi ---------- */
 

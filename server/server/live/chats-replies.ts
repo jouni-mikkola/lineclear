@@ -299,7 +299,6 @@ export class ChatsReplies extends ChatsLogs {
           ? r.logs.find((f) => f.endsWith(`${r.sessionId}.jsonl`))
           : r?.logs.at(-1)
     let runtime = sessionRuntime(ev, file, r?.started ?? 0)
-    if (st !== 'working' || !runtime) runtime = this.agents.runtime(key) ?? runtime
     const hook = this.agents.runtimeHook(key)
     if (hook)
       runtime =

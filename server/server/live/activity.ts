@@ -7,7 +7,7 @@ import { glance, rowsOf } from '../../shared/activity.ts'
 import type { Job, Step, TurnActivity } from '../../shared/types.ts'
 import type { Headless } from './readers/background.ts'
 import { claudeHome, claudeProjectDir, codexHome } from './readers/find.ts'
-import { ClaudeReader, CodexReader, LogTail } from './readers/index.ts'
+import { ClaudeReader, LogTail } from './readers/index.ts'
 import type { LogEvent, OutputAt } from './readers/types.ts'
 
 export type StepRec = Step & { where?: OutputAt }
@@ -296,7 +296,7 @@ export class JobLogs {
   private read(file: string): LogEvent[] {
     let l = this.logs.get(file)
     if (!l) {
-      const reader = file.includes('/subagents/') ? new ClaudeReader(true) : file.startsWith(codexHome()) ? new CodexReader() : new ClaudeReader(true)
+      const reader = new ClaudeReader(true)
       l = { tail: new LogTail(file, reader), ev: [], used: 0 }
       this.logs.set(file, l)
       // a few logs at a time: the oldest read goes
