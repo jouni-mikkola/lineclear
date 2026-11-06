@@ -130,7 +130,7 @@ describe('closing from the command', () => {
     })
     const p = await src.places.add(dir, name)
     const t = src.engine.add({ project: p.name, title: 'Answer', by: 'test' })
-    for (let i = 0; !t.worktree && i < 200; i++) await Bun.sleep(20)
+    await until(() => !!t.worktree).catch(() => undefined)
     if (!t.worktree) throw new Error(`${t.id} got no worktree: ${t.trouble}`)
     return { t, dir, place: placeId.space(p.name) }
   }

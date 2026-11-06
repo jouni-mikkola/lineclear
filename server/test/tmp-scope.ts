@@ -14,7 +14,8 @@ const scope = mkdtempSync(join(root, 'lc-test-'))
 process.env.TMPDIR = scope
 const remove = () => rmSync(scope, { force: true, recursive: true })
 // bun test ends without an exit event, so the end of the tests is what clears it (exit stays for plain bun runs)
-afterAll(remove)
+// (--rerun-each runs the file's afterAll after every run, and the next run still needs the folder: it goes with the process then)
+if (!process.env.LINECLEAR_TEST_RERUN) afterAll(remove)
 process.on('exit', remove)
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const)
   process.on(signal, () => {

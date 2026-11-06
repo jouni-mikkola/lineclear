@@ -190,7 +190,11 @@ const cmd = [
 ]
 if (files) console.log(`${files.length} test file${files.length === 1 ? '' : 's'}: ${files.map((f) => f.replace(/^test\//, '')).join(' ')}`)
 const t0 = Date.now()
-const env: Record<string, string | undefined> = { ...process.env, LINECLEAR_TEST_RUNNER: '1' }
+const env: Record<string, string | undefined> = {
+  ...process.env,
+  LINECLEAR_TEST_RUNNER: '1',
+  ...(flags.some((f) => f.startsWith('--rerun-each')) ? { LINECLEAR_TEST_RERUN: '1' } : {}),
+}
 
 const p = Bun.spawn(cmd, { cwd: root, stdout: 'inherit', stderr: 'pipe', stdin: 'inherit', env })
 // bun test reports on stderr: pass it on, and keep its closing lines
