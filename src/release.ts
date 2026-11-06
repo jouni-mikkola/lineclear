@@ -344,7 +344,25 @@ export function githubCheck(commit: string, dir: string, env: Env): string {
   if (!r.ok) return `GitHub check: cannot read it: ${tail(r.out)}`;
   const states = r.out.split(",").filter(Boolean);
   if (states.length === 0 || states.includes("pending")) return `${CHECK_PENDING} at ${commit.slice(0, 7)}`;
-  return states.every((c) => c === "success") ? "" : `GitHub check: ${states.join(",")} at ${commit.slice(0, 7)}`;
+  if (states.every((c) => c === "success")) return "";
+  const named = fullCheckWhy(bareLog(failedLog(commit, dir, env)));
+  return `GitHub check: ${states.join(",")} at ${commit.slice(0, 7)}${named ? `: ${named}` : ""}`;
+}
+
+/** A GitHub log line without the job, step and time GitHub puts before it. */
+export const bareLog = (log: string) => log.replace(/^[^\t\n]*\t[^\t\n]*\t\S+ /gm, "").replace(/^\d{4}-\S+Z /gm, "");
+
+/** The failed steps' log of the newest failed run on `commit`; "" when GitHub does not give it. */
+function failedLog(commit: string, dir: string, env: Env): string {
+  const list = run(
+    ["gh", "run", "list", "--commit", commit, "--status", "failure", "--limit", "1", "--json", "databaseId", "--jq", ".[0].databaseId"],
+    dir,
+    env,
+    60_000,
+  );
+  if (!list.ok || !/^\d+$/.test(list.out)) return "";
+  const log = run(["gh", "run", "view", list.out, "--log-failed"], dir, env, 60_000);
+  return log.ok ? log.out : "";
 }
 
 /** Builds next at `commit` and runs its smoke check and canary, then stable's format check on what next wrote. */
