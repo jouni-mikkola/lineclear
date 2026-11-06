@@ -44,6 +44,9 @@ export function leftAtPrompt(screen: string, command: string): boolean {
   return input.replace(/^\s*[❯›>]\s*/, '').startsWith(name)
 }
 
+/** does the screen still show a pasted block that was not sent */
+export const showsPaste = (screen: string): boolean => /\[(paste #\d+|pasted )/i.test(screen)
+
 /** does the CLI's input still hold text that was put in and not sent: a pasted block, or words after the prompt mark */
 export function inputHoldsText(screen: string): boolean {
   const lines = screen
@@ -51,7 +54,7 @@ export function inputHoldsText(screen: string): boolean {
     .map((l) => l.replace(/\s+$/, ''))
     .filter(Boolean)
     .slice(-25)
-  if (lines.some((l) => /\[(paste #\d+|pasted )/i.test(l))) return true
+  if (lines.some(showsPaste)) return true
   const input = lines.findLast((l) => /^\s*[❯›>](\s|$)/.test(l))
   return !!input && input.replace(/^\s*[❯›>]\s*/, '').length > 0
 }

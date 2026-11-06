@@ -6,10 +6,11 @@ import { Emitter } from '../source.ts'
 import { readJson, writeJson } from '../store.ts'
 import { ColdAgents } from './engine/cold.ts'
 import { addLog } from './log-list.ts'
-import type { TermScreen } from '../../shared/types.ts'
+import type { AgentHerdr, TermScreen } from '../../shared/types.ts'
 import { herdr, type Subscription, type AgentInfo, type AgentStatus } from './herdr.ts'
 import { ClaudeSessions, Reviewers, screenBackground, sessionBackground, type Background } from './readers/background.ts'
 import { claudeLogPath, findClaudeLog, findCodexLog, findPiLog, mainCodexLog } from './readers/find.ts'
+import { PasteWatch } from './paste-watch.ts'
 import { TerminalClock } from './terminal-clock.ts'
 import { machineNews } from './quiet.ts'
 import { HookLogs, type Said } from './readers/hooks.ts'
@@ -44,6 +45,11 @@ export class AgentsState extends Emitter<Events> {
   protected listed: AgentInfo[] = []
   /** agents whose status changed since their screen was read: the screen is read only for these */
   protected screenDue = new Set<string>()
+  /** agents whose status changed since their pane was looked at for the pasted brief */
+  protected pasteDue = new Set<string>()
+  protected paste = new PasteWatch()
+  /** when the last event or session read changed the list of agents */
+  protected heardAt = 0
   /** where each agent's CLI was last bound to a route, and whether it took */
   protected routeTried = new Map<string, { pane: string; at: number; ok: boolean }>()
   protected stopped = false
@@ -152,6 +158,13 @@ export class AgentsState extends Emitter<Events> {
   info(key: string) {
     const r = this.records[key]
     return r ? this.live.get(r.name) : undefined
+  }
+
+  /** herdr's word on the agent as the events and reads kept it, for the snapshot: nothing is asked of herdr */
+  herdrView(key: string): AgentHerdr | undefined {
+    const a = this.info(key)
+    const s = a?.agent_session
+    return a && { status: a.agent_status, ...(s?.kind === 'path' ? { session: s.value } : {}), pasted: this.paste.has(key), at: this.heardAt }
   }
 
   status(key: string): AgentStatus | 'gone' {
@@ -290,6 +303,7 @@ export class AgentsState extends Emitter<Events> {
       const r = this.records[key]
       const st = this.status(key)
       const pane = this.info(key)?.pane_id
+      if (this.pasteDue.delete(key)) void this.paste.look(key, r?.started ?? 0, () => this.info(key)?.pane_id)
       const reads =
         r?.kind === 'claude' &&
         !r.isolation &&
