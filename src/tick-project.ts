@@ -8,7 +8,6 @@ import { ownerStepItem, ownerStepsDone } from "./owner-steps.ts";
 import { overStartLimit, recordStepStart, startsInDay } from "./start-limit.ts";
 import { LIMITS } from "./waste.ts";
 import { placeHeld } from "./held.ts";
-import { heavyTasks } from "./heavy-run.ts";
 import { criticalSteps, firstByRoom } from "./pace.ts";
 import { noWorkerNote, startAccountNote } from "./quota.ts";
 import { stepHeld } from "./parts.ts";
@@ -548,7 +547,6 @@ export function tickProject(
 
   const overloaded = world.load() > limit;
   checkHealth(t, main, overloaded);
-  if (!overloaded && !dryRun && main.checkedOut === main.head) heavyTasks(name, settings, main.head, tasks, world, env, note);
   // The list of offered models costs seconds of CPU: read it only when a stall or a start needs it, once per tick.
   let list: { set: Set<string> | undefined } | undefined;
   const offered = () => {

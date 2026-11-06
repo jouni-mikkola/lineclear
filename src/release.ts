@@ -350,7 +350,7 @@ export function githubCheck(commit: string, dir: string, env: Env): string {
 }
 
 /** A GitHub log line without the job, step and time GitHub puts before it. */
-export const bareLog = (log: string) => log.replace(/^[^\t\n]*\t[^\t\n]*\t\S+ /gm, "").replace(/^\d{4}-\S+Z /gm, "");
+const bareLog = (log: string) => log.replace(/^[^\t\n]*\t[^\t\n]*\t\S+ /gm, "").replace(/^\d{4}-\S+Z /gm, "");
 
 /** The failed steps' log of the newest failed run on `commit`; "" when GitHub does not give it. */
 function failedLog(commit: string, dir: string, env: Env): string {

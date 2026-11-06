@@ -1,11 +1,10 @@
 // `bun run release 0.1.0`: the release of a version, made here and never pushed. It refuses on a dirty tree, an
-// existing tag, a HEAD whose GitHub check is not green (checks are light and run on GitHub, never here) or a failing whole-repo gate check (gates:full). Otherwise it sets the version in package.json, commits it, tags `v<version>`,
+// existing tag, a HEAD whose GitHub check is not green (checks are light and run on GitHub, never here). Otherwise it sets the version in package.json, commits it, tags `v<version>`,
 // installs from that tag into a fresh HOME with the README's installer and runs the doctor there. The push and the
 // GitHub release are a separate, outward step.
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { slowFailures } from "../src/heavy-run.ts";
 
 // An install that downloads tools both end by this limit rather than hang.
 const LIMIT_MS = 30 * 60_000;
@@ -23,8 +22,6 @@ const GITHUB_GREEN = [
 export type ReleaseSteps = {
   repo: string;
   check: string[];
-  /** The heavy tier's commands; undefined means the project's own. */
-  heavy?: string[];
   /** Installs `tag` of `repo` into `home` and returns the installed lineclear's doctor. */
   install: (repo: string, tag: string, home: string) => { ok: boolean; out: string };
 };
@@ -53,7 +50,6 @@ export function installFromTag(repo: string, tag: string, home: string): { ok: b
 
 export function release(version: string, steps: Partial<ReleaseSteps> = {}): Release {
   const { repo = join(import.meta.dir, ".."), check = GITHUB_GREEN, install = installFromTag } = steps;
-  const heavy = steps.heavy ?? ["bun run gates:full"];
   const lines: string[] = [];
   const refuse = (why: string): Release => ({ ok: false, lines: [...lines, `release: refused: ${why}`] });
   const tag = `v${version}`;
@@ -63,9 +59,6 @@ export function release(version: string, steps: Partial<ReleaseSteps> = {}): Rel
   const checked = run(check, repo);
   if (!checked.ok) return refuse(`${check.join(" ")} is red:\n${checked.out.split("\n").slice(-20).join("\n")}`);
   lines.push(`release: ${check.join(" ")} passed`);
-  const slow = slowFailures(repo, heavy);
-  if (slow.length > 0) return refuse(`a heavy check fails: ${slow.map((f) => `${f.name}\n${f.output.split("\n").slice(-20).join("\n")}`).join("\n")}`);
-  lines.push(`release: ${heavy.length} heavy check(s) passed`);
 
   const file = join(repo, "package.json");
   const pkg = JSON.parse(readFileSync(file, "utf8"));

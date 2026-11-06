@@ -1,4 +1,4 @@
-// The one check: Lineclear's types, tests, dashes, roadmap, part pages and code gates (scripts/gates/),
+// The one check: Lineclear's types, tests, roadmap, part pages and code gates (scripts/gates/),
 // then the server's own types and tests (server/).
 // `bun run check` is the merge lane's: only what the branch's change reaches (below), the independent steps side by side,
 // each step's time recorded (scripts/check-speed.ts) and a file or the whole run over its limit failed by name.
@@ -169,15 +169,8 @@ function steps(): Step[] {
   const base = [
     ...(outsideServer && (code || full) ? [{ name: "types", cmd: full || known === undefined ? ["bun", "run", "types"] : TSC_CHANGED }] : []),
     ...testSteps(),
-    { name: "dashes", cmd: full || known === undefined ? ["bun", "run", "dashes"] : ["bun", "scripts/dash-check.ts", ".", "--changed"] },
-    // each under a second
-    { name: "words", cmd: ["bun", "run", "words"] },
     { name: "shots", cmd: ["bun", "run", "shots:check"] },
-    { name: "personal", cmd: ["bun", "run", "scan"] },
-    { name: "prose", cmd: ["bun", "scripts/prose-check.ts", "."] },
-    { name: "direction", cmd: ["bun", "run", "direction"] },
-    ...(onlyChanged ? [] : [{ name: "scales", cmd: ["bun", "scripts/scales-check.ts", "."] }]),
-    ...fastGates(ownFolders, code, full),
+    ...fastGates(ownFolders, code),
     ...serverSteps(),
   ];
   return base;

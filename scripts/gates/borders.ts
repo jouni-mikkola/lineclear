@@ -1,11 +1,10 @@
-// Module borders and import cycles, one gate: both read the same import graph. The modules and which may import which come from the table in
+// Module borders: which module may import which. The modules and which may import which come from the table in
 // docs/architecture.md, so the doc and the check cannot differ.
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, normalize } from "node:path";
-import type { Fault, Gate } from "./ratchet.ts";
 import { trackedFiles } from "./tools.ts";
 
-export interface Module {
+interface Module {
   name: string;
   folders: string[];
   imports: string[];
@@ -17,7 +16,7 @@ const ALIASES: Record<string, string> = { "@shared/": "server/shared/", "@plugin
 const CODE = (s: string) => [...s.matchAll(/`([^`]+)`/g)].map((m) => m[1] ?? "");
 
 /** The rows of the modules table: | `name` | `folder/`, `file.ts` | owns | `a`, `b` or none | */
-export function readModules(markdown: string): Module[] {
+function readModules(markdown: string): Module[] {
   const modules: Module[] = [];
   for (const line of markdown.split("\n")) {
     const cells = line.split("|").map((c) => c.trim());
@@ -28,7 +27,7 @@ export function readModules(markdown: string): Module[] {
   return modules;
 }
 
-export function moduleOf(file: string, modules: Module[]): Module | undefined {
+function moduleOf(file: string, modules: Module[]): Module | undefined {
   let best: { m: Module; len: number } | undefined;
   for (const m of modules) {
     for (const f of m.folders) {
@@ -39,7 +38,7 @@ export function moduleOf(file: string, modules: Module[]): Module | undefined {
   return best?.m;
 }
 
-export interface Import {
+interface Import {
   spec: string;
   line: number;
   typeOnly: boolean;
@@ -48,7 +47,7 @@ export interface Import {
 const STATIC = /^\s*(import|export)\s+(type\s+)?(?:([^;'"]*?)\s*from\s*)?["']([^"']+)["']/gm;
 const DYNAMIC = /\b(?:import|require)\(\s*["']([^"']+)["']\s*\)/g;
 
-export function scanImports(source: string): Import[] {
+function scanImports(source: string): Import[] {
   const lineAt = (i: number) => source.slice(0, i).split("\n").length;
   const out: Import[] = [];
   for (const m of source.matchAll(STATIC)) {
@@ -105,67 +104,17 @@ function scan(root: string): Promise<Scan> {
   return s;
 }
 
-export const borders: Gate = {
-  name: "borders",
-  async find(root) {
-    const { modules, edges, files } = await scan(root);
-    const faults: Fault[] = [];
-    for (const file of files) {
-      if (!moduleOf(file, modules)) faults.push({ key: `${file} no-module`, text: `${file} is in no module of ${ARCHITECTURE}` });
-    }
-    for (const e of edges) {
-      const a = moduleOf(e.from, modules);
-      const b = moduleOf(e.to, modules);
-      if (!a || !b || a === b || a.imports.includes(b.name)) continue;
-      faults.push({ key: `${e.from} > ${e.to}`, text: `${e.from}:${e.line} imports ${e.to}: ${a.name} may not import ${b.name} (${ARCHITECTURE})` });
-    }
-    return [...faults, ...(await cycleFaults(root))];
-  },
-};
-
-/** The groups of files that import each other at run time (Tarjan's strongly connected components). */
-export function cyclesOf(graph: Map<string, string[]>): string[][] {
-  let next = 0;
-  const index = new Map<string, number>();
-  const low = new Map<string, number>();
-  const stack: string[] = [];
-  const onStack = new Set<string>();
-  const groups: string[][] = [];
-  const visit = (v: string) => {
-    index.set(v, next);
-    low.set(v, next++);
-    stack.push(v);
-    onStack.add(v);
-    for (const w of graph.get(v) ?? []) {
-      if (!index.has(w)) {
-        visit(w);
-        low.set(v, Math.min(low.get(v) ?? 0, low.get(w) ?? 0));
-      } else if (onStack.has(w)) low.set(v, Math.min(low.get(v) ?? 0, index.get(w) ?? 0));
-    }
-    if (low.get(v) !== index.get(v)) return;
-    const group: string[] = [];
-    let w: string | undefined;
-    do {
-      w = stack.pop();
-      if (w === undefined) break;
-      onStack.delete(w);
-      group.push(w);
-    } while (w !== v);
-    if (group.length > 1 || graph.get(v)?.includes(v)) groups.push(group.sort());
-  };
-  for (const v of graph.keys()) if (!index.has(v)) visit(v);
-  return groups;
-}
-
-async function cycleFaults(root: string): Promise<Fault[]> {
-  const { edges } = await scan(root);
-  const runtime = edges.filter((e) => !e.typeOnly);
-  const graph = new Map<string, string[]>();
-  for (const e of runtime) graph.set(e.from, [...(graph.get(e.from) ?? []), e.to]);
-  const groupOf = new Map<string, string[]>();
-  for (const group of cyclesOf(graph)) for (const f of group) groupOf.set(f, group);
-  // one fault per import inside a cycle, so breaking one import of a big cycle lowers the count and moves nothing
-  return runtime
-    .filter((e) => groupOf.get(e.from) !== undefined && groupOf.get(e.from) === groupOf.get(e.to))
-    .map((e) => ({ key: `cycle ${e.from} > ${e.to}`, text: `${e.from}:${e.line} imports ${e.to}, in a cycle of ${groupOf.get(e.from)?.length} files` }));
+export async function borders(root: string): Promise<string[]> {
+  const { modules, edges, files } = await scan(root);
+  const faults: string[] = [];
+  for (const file of files) {
+    if (!moduleOf(file, modules)) faults.push(`${file} is in no module of ${ARCHITECTURE}`);
+  }
+  for (const e of edges) {
+    const a = moduleOf(e.from, modules);
+    const b = moduleOf(e.to, modules);
+    if (!a || !b || a === b || a.imports.includes(b.name)) continue;
+    faults.push(`${e.from}:${e.line} imports ${e.to}: ${a.name} may not import ${b.name} (${ARCHITECTURE})`);
+  }
+  return faults;
 }

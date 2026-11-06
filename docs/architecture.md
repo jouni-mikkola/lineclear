@@ -19,7 +19,7 @@ imports count for the borders but not for cycles, since they are gone when the c
 | `kit` | `ui/kit/` | the design system's parts and motion | `brand`, `cli` |
 | `web` | `ui/web/` | the pages `lineclear run` serves | `kit`, `brand`, `cli` |
 | `ui-test` | `ui/test/`, `ui/shots/`, `ui/budget/`, `playwright.config.ts`, `playwright.shots.config.ts`, `playwright.budget.config.ts` | the UI bar's browser tests and their fixture | `web`, `kit`, `brand`, `cli`, `pi` |
-| `gates` | `scripts/gates/` | the check's gates and their baselines | none |
+| `gates` | `scripts/gates/` | the check's gates | none |
 | `scripts` | `scripts/` | repo tools: the check, the smoke check and canary, measurements | `cli`, `brand`, `gates`, `check-line` |
 | `tests` | `test/` | the bun tests, one file per command | `cli`, `pi`, `kit`, `web`, `brand`, `scripts`, `gates`, `ui-test`, `check-line`, `registry` |
 | `shared` | `server/shared/` | types and pure helpers the server shares | none |
@@ -38,14 +38,39 @@ imports count for the borders but not for cycles, since they are gone when the c
 - Code that two modules share lives in the lower one. `shared` holds what the server's parts both need.
 - `generated` is written by `server/scripts/build-plugins.ts`: it imports every plugin, and only `server` reads it. That is how the server loads plugins that use the server's own parts.
 - Tests may import what they test, never the other way round.
-- An import across a border that is not allowed fails the gate. `scripts/gates/baseline/borders.json` stays empty.
+- An import across a border that is not allowed fails the gate.
 
-## Coverage floors
+## Parts
 
-`bun run coverage` runs the root tests and measures line coverage per module of the table above. A module below its
-floor in `scripts/gates/baseline/coverage.json` fails. `bun run coverage --raise` lifts floors to what is measured and
-never lowers one. It is slower than the check allows, so the heavy run and a release run it, not `bun run check`.
-The run gives each test 60 s, since coverage slows it and a timed-out test leaves its lines out of the count.
-A source file no test loads counts as uncovered only under `src/`, `bin/`, `pi/`, `ui/brand/` and `ui/kit/`: the server, Playwright, the repo's own drivers and the eval run under other runners. A module the root tests do not reach has no floor.
-`bunfig.toml` leaves out `scripts/budget.ts` and `scripts/smoke.ts`: they drive Chromium and a live
-service, so only a run of the tool itself reaches them (the budget step, the smoke check).
+A module is where code sits and what it may import. A part is what one keeper looks after over time: its purpose,
+what must stay true, its interface to the other parts, its files, its tests and its debts. A part may span modules
+(the planner has code in `src/` and words in `templates/`), and every file of the repo is in exactly one part, the
+one whose page lists the longest path that holds it.
+
+Each part has one page, `docs/parts/<part>.md`, at most 45 lines. A step names its parts (`- parts:` in
+`docs/ROADMAP.md`), its `files` fall inside them, and its worker's brief carries their pages. Parts are locks too:
+two open steps never hold the same part. `lineclear parts check` keeps the pages true: every file in one part, every
+name another part's code imports listed under the provider's Interface, an interface changed since main changes its
+page in the same change, and each part with an interface has its contract test `test/contracts/<part>.test.ts`, or
+names it under Debts until it lands.
+
+| Part | What it keeps | Page |
+| --- | --- | --- |
+| `core` | the CLI's frame, data paths, settings, safe writes, the repo's rules and map | [core](parts/core.md) |
+| `rules` | the rule loop: starts, locks, slots, stalls, waits, limits | [rules](parts/rules.md) |
+| `planner` | the roadmap's format and check, plans and their rule checks, a step's brief | [planner](parts/planner.md) |
+| `dispatcher` | the owner's chat, requests to the planner, roadmap moves | [dispatcher](parts/dispatcher.md) |
+| `inbox` | the six kinds of item, routing asks, pushes to the phone | [inbox](parts/inbox.md) |
+| `measure` | `lineclear measure`: asks, wait, cost, savings and part health | [measure](parts/measure.md) |
+| `checks` | the check tiers, the check log, flake quarantine | [checks](parts/checks.md) |
+| `install` | install, doctor, uninstall, migrate, machines, projects, secrets | [install](parts/install.md) |
+| `ui` | the web pages, the kit, the brand, the web API, the README and its film | [ui](parts/ui.md) |
+| `pi` | the pi extension and the token pack | [pi](parts/pi.md) |
+| `gates` | `bun run check`, the code gates and the parts check | [gates](parts/gates.md) |
+| `server` | the herdr-projects 2.0 fork that runs the agents | [server](parts/server.md) |
+
+**Health.** `lineclear measure` gives each part a health score, higher is worse: 3 for each file over the size limit,
+1 for each 50 lines copied (the copies baseline), 1 for each open debt on its page, 1 for each 5 points (rounded up) its line coverage is under the floors of its modules
+(`bun run coverage` records the last measure; none recorded, none counted), 2 for each stall and 2 for each
+flaky test in the tasks of steps that touched it, and 1 for each review finding those tasks reported. The planner
+keeps about one step in five for the part with the worst score: a step whose parts line tags it, `rules (health)`.

@@ -202,7 +202,7 @@ function heavyScripts(repo: string, check: string): string[] {
 /** A script light enough to run on every change: types, or a lint or test marked fast (also in Finnish: nopea, kevyt). */
 const FAST_SCRIPT = /^(types|typecheck|tsc|(lint|test|unit|types):(fast|quick|changed|nopea|kevyt)|[\w-]+:(fast|quick|changed|nopea|kevyt))$/;
 /** A script for the heavy run, by its name: coverage, browser suites, mutation tests, duplication scans, whole-repo verifies. */
-const SLOW_SCRIPT = /(coverage|kattavuus|e2e|playwright|cypress|mutation|mutaatio|stryker|jscpd|verify|bench|:full$|ui:test|cold-start|one-name)/;
+const SLOW_SCRIPT = /(coverage|kattavuus|e2e|playwright|cypress|mutation|mutaatio|stryker|jscpd|verify|bench|:full$|ui:test)/;
 
 /**
  * The tiers a repo's package.json suggests. A repo that names them (`check:inner`, `check:heavy`)

@@ -20,14 +20,14 @@ test("no workflow runs a browser, a coverage run or a UI suite, and none runs ov
   for (const f of workflows) {
     const text = read(".github", "workflows", f);
     if (f !== "install.yml") {
-      expect(text, f).not.toMatch(/playwright|chromium|ui:test|run coverage|cold-start/);
+      expect(text, f).not.toMatch(/playwright|chromium|ui:test|run coverage/);
       expect(Math.max(0, ...timeouts(text)), f).toBeLessThanOrEqual(10);
     }
   }
 });
 
 test("no code path runs the full check or a browser suite on a machine of the owner's", () => {
-  const code = ["src/release.ts", "src/candidate-check.ts", "scripts/release-tag.ts", "scripts/heavy.ts"];
+  const code = ["src/release.ts", "src/candidate-check.ts", "scripts/release-tag.ts"];
   for (const f of code) expect(read(f), f).not.toMatch(/check\.ts["', ]+--full|runFullCheck|playwright test|ui:test/);
 });
 

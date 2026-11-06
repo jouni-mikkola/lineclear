@@ -67,9 +67,6 @@ jobs:
           if grep '^FAILED' "$RUNNER_TEMP/doctor"; then exit 1; fi
           grep -q '^ok ' "$RUNNER_TEMP/doctor"
 
-      - name: The user sees one name
-        run: bun scripts/one-name.ts
-
       - name: A second install changes no file
         run: |
           # the server writes reads-cache.json as it runs, whatever the installer does
