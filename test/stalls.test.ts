@@ -1,23 +1,20 @@
 import { afterAll, expect, test } from "bun:test";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { inboxMain } from "../src/inbox-answer.ts";
 import { readItems } from "../src/inbox.ts";
 import { decisionsPath } from "../pi/config.ts";
 import { reviewerFor } from "../src/stalls.ts";
 import { tick } from "../src/rules.ts";
 import { availability, parseReset, readAccounts, stallCards } from "../src/stalls.ts";
-import { readLimit, readMoves } from "../src/full.ts";
+import { readLimit } from "../src/full.ts";
 import { usageLimits } from "../src/limits.ts";
-import { readWaits, writeWait } from "../src/waits.ts";
 import type { StartState } from "../src/starts.ts";
-import { waitingForYou } from "../src/waiting.ts";
 import { demoConfig, idleWorld } from "./demo-world.ts";
 import { recordTaskSteps, tmp } from "./helpers.ts";
 
 const dirs: string[] = [];
 // the ladder's own lines, not the stall records of src/stall-class.ts beside them
-const ladder = (d: { kind: string; event?: string }) => d.kind === "stall" && d.event !== "stall" && d.event !== "end";
+const _ladder = (d: { kind: string; event?: string }) => d.kind === "stall" && d.event !== "stall" && d.event !== "end";
 afterAll(() => dirs.forEach((d) => rmSync(d, { recursive: true, force: true })));
 
 interface Opts {
@@ -84,197 +81,6 @@ test("a card is read from a chat file", () => {
   expect(stallCards(late)).toEqual([{ id: "c1", task: "LIN-5", at: 5, late: true }]);
 });
 
-test("each stall card moves the task one rung: reminder, restart, next model, Inbox", () => {
-  const t = setup({ tasks: [{ id: "LIN-5", title: "A Alpha", status: "need", sub: "Waits for your reply" }] });
-  t.tick(); // sets the time from which cards count
-  const rungs: string[] = [];
-  for (const id of ["c1", "c2", "c3", "c4"]) {
-    t.stall(id);
-    t.clock.at = new Date(t.clock.at.getTime() + 60_000);
-    rungs.push(
-      ...t
-        .tick()
-        .filter(ladder)
-        .map((d) => d.reason.split(":")[0]!),
-    );
-  }
-  expect(rungs).toEqual(["rung 1", "rung 2", "rung 3", "rung 4"]);
-  expect(t.log[0]).toStartWith("tell LIN-5 You may be stuck");
-  expect(t.log.slice(1, 3)).toEqual(["stop LIN-5", expect.stringContaining("tell LIN-5 Your agent was r")]);
-  expect(t.log[3]).toBe("close LIN-5");
-  expect(t.adds).toHaveLength(1);
-  const [title, brief, ...extra] = t.adds[0]!;
-  expect(title).toBe("A Alpha");
-  expect(brief).toContain("work/5-LIN-5");
-  expect(extra[extra.indexOf("--model") + 1]).toBe("openai-codex/gpt-6.1-sol");
-  expect(readItems(t.env).map((i) => i.kind)).toEqual(["stuck"]);
-  expect(t.decisions().filter(ladder)).toHaveLength(4); // each rung is in decisions.jsonl
-});
-
-test("a working task silent for 20 minutes is stopped with an Inbox report and a wait, never reminded", () => {
-  const t = setup();
-  t.tick();
-  t.stall("c1");
-  t.clock.at = new Date(t.clock.at.getTime() + 60_000);
-  t.tick();
-  expect(t.log).toEqual(["stop LIN-5"]);
-  expect(readItems(t.env).map((i) => i.kind)).toEqual(["stuck"]);
-  expect(readWaits(t.env)).toMatchObject([{ task: "LIN-5", kind: "owner" }]);
-});
-
-test("a task at work past its wall-time limit is stopped with a report", () => {
-  const t = setup();
-  t.tick();
-  t.clock.at = new Date(t.clock.at.getTime() + 121 * 60_000);
-  t.tick();
-  expect(t.log).toContain("stop LIN-5");
-  expect(readItems(t.env)[0]?.question).toContain("wall-time limit");
-});
-
-test("a late card asks for a new estimate once and climbs only when a second one comes", () => {
-  const t = setup();
-  t.tick();
-  t.lateStall("l1");
-  t.clock.at = new Date(t.clock.at.getTime() + 60_000);
-  const first = t.tick().filter(ladder);
-  expect(first.map((d) => [d.class, d.reason.split(":")[0]])).toEqual([["late", "asked LIN-5 for a new estimate"]]);
-  expect(t.log).toEqual([expect.stringContaining("tell LIN-5 You are past your time left")]);
-  t.lateStall("l2");
-  t.clock.at = new Date(t.clock.at.getTime() + 60_000);
-  const second = t.tick().filter(ladder);
-  expect(second.map((d) => [d.class, d.reason.split(":")[0]])).toEqual([["no-sign-of-life", "rung 1"]]);
-});
-
-test("a late card after a status is asked for a new estimate again, not climbed", () => {
-  const t = setup();
-  t.tick();
-  t.lateStall("l1");
-  t.clock.at = new Date(t.clock.at.getTime() + 60_000);
-  t.tick();
-  t.chat.push({ id: "s1", task: "LIN-5", at: t.clock.at.getTime() + 1_000, text: "Working on it" });
-  t.lateStall("l2");
-  t.clock.at = new Date(t.clock.at.getTime() + 60_000);
-  expect(
-    t
-      .tick()
-      .filter(ladder)
-      .map((d) => d.reason.split(":")[0]),
-  ).toEqual(["asked LIN-5 for a new estimate"]);
-});
-
-test("a quiet card climbs with no sign of life and records no late stall", () => {
-  const t = setup();
-  t.tick();
-  t.stall("q1");
-  t.clock.at = new Date(t.clock.at.getTime() + 60_000);
-  const d = t.tick().filter(ladder);
-  expect(d.map((x) => x.class)).toEqual(["no-sign-of-life"]);
-  expect(d[0]?.reason).toContain("no sign of life for 20 minutes");
-});
-
-test("the handover is one start: the same tick does not start the step again", () => {
-  const t = setup();
-  t.tick();
-  // the task list still shows the closed task as work, and then as done, as Lineclear would
-  for (const id of ["c1", "c2", "c3"]) {
-    t.stall(id);
-    t.clock.at = new Date(t.clock.at.getTime() + 60_000);
-    if (id === "c3") {
-      t.tasks.list = [{ id: "LIN-5", title: "A Alpha", status: "done" }];
-      t.world.tasks = () => t.tasks.list;
-    }
-    t.tick();
-  }
-  expect(t.adds).toHaveLength(1);
-  t.tasks.list = [
-    { id: "LIN-5", title: "A Alpha", status: "done" },
-    { id: "LIN-6", title: "A Alpha", status: "work" },
-  ];
-  t.tick();
-  expect(t.adds).toHaveLength(1);
-});
-
-test("a silent Needs you climbs the ladder one rung per card; a question, a plan or a login never does", () => {
-  const climbs = (sub: string) => {
-    const t = setup({ tasks: [{ id: "LIN-5", title: "A Alpha", status: "need", sub }] });
-    t.tick();
-    const rungs: string[] = [];
-    for (const id of ["c1", "c2"]) {
-      t.stall(id);
-      t.clock.at = new Date(t.clock.at.getTime() + 60_000);
-      rungs.push(
-        ...t
-          .tick()
-          .filter(ladder)
-          .map((d) => d.reason.split(":")[0] ?? ""),
-      );
-    }
-    return rungs;
-  };
-  expect(climbs("Waits for your reply")).toEqual(["rung 1", "rung 2"]);
-  for (const sub of ["Question for you", "Plan to approve", "Asks permission", "Use the paid key?"]) expect(climbs(sub)).toEqual([]);
-});
-
-test("a task with a declared wait is not moved up", () => {
-  const t = setup();
-  t.tick();
-  writeWait({ task: "LIN-5", kind: "owner", reason: "asked: a thing", since: t.clock.at.toISOString() }, t.env);
-  t.stall("c1");
-  t.clock.at = new Date(t.clock.at.getTime() + 60_000);
-  const d = t.tick();
-  expect(d.some((x) => x.kind === "stall")).toBe(false);
-  expect(t.log).toEqual([]);
-});
-
-test("old cards from before the loop knew the task are ignored", () => {
-  const t = setup();
-  t.world.stallCards = () => [{ id: "old", task: "LIN-5", at: t.clock.at.getTime() - 3_600_000 }];
-  t.tick();
-  expect(t.log).toEqual([]);
-});
-
-test("a full subscription goes straight to rung 3 with no wait", () => {
-  const t = setup({ accounts: { anthropic: { kind: "subscription", out: true } } });
-  t.tick();
-  expect(t.log).toEqual(["close LIN-5"]);
-  expect(t.adds).toHaveLength(1);
-  expect(t.adds[0]!.join(" ")).toContain("--model openai-codex/gpt-6.1-sol");
-  expect(t.decisions().find((d) => d.kind === "stall").reason).toContain("account of anthropic/claude-sonnet-5-5 is out");
-});
-
-test("an ended free account goes straight to rung 3", () => {
-  const t = setup({ accounts: { anthropic: { kind: "free", out: true } } });
-  t.tick();
-  expect(t.log).toEqual(["close LIN-5"]);
-  expect(t.adds).toHaveLength(1);
-});
-
-test("a task Lineclear left waiting for a login goes straight to rung 3", () => {
-  const t = setup({ tasks: [{ id: "LIN-5", title: "A Alpha", status: "need", sub: "Signed out" }] });
-  t.tick();
-  expect(t.log).toEqual(["close LIN-5"]);
-  expect(t.adds).toHaveLength(1);
-});
-
-test("a paid key that is not allowed asks in the Inbox, and is used after the answer", () => {
-  const t = setup({ accounts: { anthropic: { kind: "subscription", out: true }, "openai-codex": { kind: "key" } } });
-  t.tick();
-  // no handover yet: the next model is on a key
-  expect(t.adds).toHaveLength(0);
-  expect(t.log.filter((l) => l.startsWith("close"))).toEqual([]);
-  const keyItems = () => readItems(t.env).filter((i) => i.kind === "outward");
-  expect(keyItems()).toHaveLength(1);
-  expect(keyItems()[0]!.question).toContain("paid API key");
-  t.tick();
-  expect(keyItems()).toHaveLength(1); // asked once while open
-  const out: string[] = [];
-  expect(inboxMain(["answer", String(keyItems()[0]!.n), "Allow"], (l) => out.push(l), t.env)).toBe(0);
-  t.tick();
-  expect(t.adds).toHaveLength(1);
-  expect(t.adds[0]!.join(" ")).toContain("--model openai-codex/gpt-6.1-sol");
-  expect(keyItems()).toHaveLength(1); // the allow holds, nothing asks again
-});
-
 test("a start passes over a full account and does not ask about a key nothing needs", () => {
   const t = setup({
     tasks: [],
@@ -287,105 +93,6 @@ test("a start passes over a full account and does not ask about a key nothing ne
   expect(asks).toHaveLength(1);
   t.tick();
   expect(readItems(t.env).filter((i) => i.kind === "outward")).toHaveLength(1);
-});
-
-test("a dry run changes nothing", () => {
-  const t = setup({ accounts: { anthropic: { kind: "subscription", out: true } } });
-  const d = t.tick(true);
-  expect(d.some((x) => x.kind === "stall" && x.reason.includes("would hand"))).toBe(true);
-  expect(t.log).toEqual([]);
-  expect(t.adds).toEqual([]);
-});
-
-test("a start with no agent behind it is nudged, restarted, then marked start failed, never an owner question", () => {
-  // the planted fault: herdr says "agent_not_ready: not an active named agent" and the task shows Working
-  const t = setup();
-  t.starts.set("LIN-5", { kind: "gone" });
-  const at = (ms: number) => {
-    t.clock.at = new Date(t.clock.at.getTime() + ms);
-    return t
-      .tick()
-      .filter(ladder)
-      .map((d) => d.reason);
-  };
-  expect(at(0)).toEqual([]); // first seen
-  expect(at(60_000)).toEqual([]);
-  expect(at(61_000)).toEqual(["typed its brief nudge into the pane of LIN-5: herdr has no agent for it"]);
-  expect(at(120_000)).toEqual(["restarted LIN-5: herdr has no agent for it"]);
-  expect(at(120_000)).toEqual(["marked start failed for LIN-5: herdr has no agent for it"]);
-  expect(at(600_000)).toEqual([]);
-  expect(t.log).toEqual([
-    "nudge LIN-5 [lineclear:resume] Your brief is above b",
-    "stop LIN-5",
-    expect.stringContaining("tell LIN-5 Your agent was restarted because it never started"),
-    "stop LIN-5",
-  ]);
-  expect(readWaits(t.env).map((w) => [w.task, w.kind])).toEqual([["LIN-5", "start"]]);
-  // the task stopped and now shows as needing attention: still not a question for the owner
-  t.tasks.list = [{ id: "LIN-5", title: "A Alpha", status: "need" }];
-  expect(waitingForYou(t.env, [], [{ name: "demo", tasks: [{ id: "LIN-5", title: "A Alpha", state: "need", text: "Waits for you" }] } as never]).tasks).toEqual(
-    [],
-  );
-  // restarted by hand, its agent answers: start failed ends and the task is an ordinary one again
-  t.starts.set("LIN-5", { kind: "acted" });
-  expect(at(60_000)).toEqual(["cleared start failed of LIN-5: its agent answered"]);
-  expect(readWaits(t.env)).toEqual([]);
-});
-
-test("a nudge or restart that fails is logged as failed, never as done", () => {
-  const t = setup();
-  t.starts.set("LIN-5", { kind: "gone" });
-  t.world.nudge = () => "no pane";
-  t.tick();
-  t.clock.at = new Date(t.clock.at.getTime() + 121_000);
-  const d = t.tick();
-  expect(d.filter(ladder)).toEqual([]);
-  expect(d.some((x) => x.kind === "skip" && x.reason === "LIN-5: herdr has no agent for it, but the nudge failed: no pane")).toBe(true);
-});
-
-test("an agent that answered and later vanishes is the stall ladder's, never a failed start", () => {
-  const t = setup();
-  t.starts.set("LIN-5", { kind: "acted" });
-  t.tick();
-  t.starts.set("LIN-5", { kind: "gone" });
-  for (let i = 0; i < 5; i++) {
-    t.clock.at = new Date(t.clock.at.getTime() + 121_000);
-    t.tick();
-  }
-  expect(t.log).toEqual([]);
-  expect(readWaits(t.env)).toEqual([]);
-});
-
-test("a start that answers ends its ladder; a silent one that answers after the nudge is left alone", () => {
-  const t = setup();
-  t.starts.set("LIN-5", { kind: "silent" });
-  t.tick();
-  t.clock.at = new Date(t.clock.at.getTime() + 121_000);
-  t.tick();
-  t.starts.set("LIN-5", { kind: "acted" });
-  t.clock.at = new Date(t.clock.at.getTime() + 600_000);
-  t.tick();
-  expect(t.log).toEqual(["nudge LIN-5 [lineclear:resume] Your brief is above b"]);
-  expect(readWaits(t.env)).toEqual([]);
-});
-
-test("a first turn herdr sees working holds the ladder for 6 minutes; a declared wait holds it for good", () => {
-  const t = setup();
-  t.tick();
-  t.clock.at = new Date(t.clock.at.getTime() + 300_000);
-  t.tick();
-  expect(t.log).toEqual([]);
-  // the planted fault: herdr says working, but the session never gets an answer
-  t.clock.at = new Date(t.clock.at.getTime() + 61_000);
-  t.tick();
-  expect(t.log).toEqual(["nudge LIN-5 [lineclear:resume] Your brief is above b"]);
-  t.log.length = 0;
-  t.starts.set("LIN-5", { kind: "silent" });
-  writeWait({ task: "LIN-5", kind: "owner", reason: "x", since: t.clock.at.toISOString() }, t.env);
-  t.tick();
-  t.clock.at = new Date(t.clock.at.getTime() + 600_000);
-  t.tick();
-  expect(t.log).toEqual([]);
 });
 
 test("the reviewer comes from Settings first, skips an out provider, then the project list", () => {
@@ -482,32 +189,6 @@ test("a reset time is read in its own zone, and a message without one gets the w
   expect(readLimit(night, new Date("2026-10-25T21:36:02Z"))?.until).toEqual(new Date("2026-10-25T22:30:00Z"));
 });
 
-test("a failed call on a full session moves the task in the same tick, before any stall rung", () => {
-  const t = setup();
-  t.world.lastError = () => ({ text: SESSION, at: t.clock.at.getTime() - 1000 });
-  const d = t.tick();
-  expect(t.log).toEqual(["close LIN-5"]);
-  expect(t.adds[0]!.join(" ")).toContain("--model openai-codex/gpt-6.1-sol");
-  expect(d.filter((x) => x.kind === "stall").map((x) => x.reason)).toEqual([
-    expect.stringMatching(/^anthropic is full until 2026-06-01T17:00:00.000Z/),
-    expect.stringMatching(/^rung 3/),
-  ]);
-  expect(readAccounts(t.env).anthropic).toMatchObject({ out: true, window: "session", resetAt: "2026-06-01T17:00:00.000Z" });
-  expect(readMoves(t.env)).toMatchObject([{ task: "LIN-5", step: "A", from: "anthropic/claude-sonnet-5-5", to: "openai-codex/gpt-6.1-sol" }]);
-});
-
-test("a refused account is unusable, not waiting for a reply: the task restarts on the next account with the plain error", () => {
-  const t = setup({ tasks: [{ id: "LIN-5", title: "A Alpha", status: "need", sub: "Waits for your reply" }] });
-  const refusal = "Your organization has disabled Claude subscription access for Claude Code";
-  t.world.lastError = () => ({ text: refusal, at: t.clock.at.getTime() - 1000 });
-  const d = t.tick();
-  expect(t.log).toEqual(["close LIN-5"]);
-  expect(t.adds[0]!.join(" ")).toContain("--model openai-codex/gpt-6.1-sol");
-  expect(readAccounts(t.env).anthropic).toMatchObject({ out: true, dead: refusal });
-  expect(readAccounts(t.env).anthropic?.resetAt).toBeUndefined();
-  expect(d.some((x) => x.reason.includes(`the anthropic account is unusable: ${refusal}`))).toBe(true);
-});
-
 test("a full week marks the account until its reset for the reviewers too, then the mark clears by itself", () => {
   const t = setup();
   t.world.lastError = () => ({ text: WEEK, at: t.clock.at.getTime() });
@@ -533,27 +214,6 @@ test("an error the task got past is not read again", () => {
   t.tick();
   expect(t.log).toEqual([]);
   expect(readAccounts(t.env)).toEqual({});
-});
-
-test("a role whose last model is full waits until the reset", () => {
-  const t = setup({ worker: ["anthropic/claude-sonnet-5-5"] });
-  // the wait spans hours: the wall-time limit is not what this test is about
-  const file = join(t.env.LINECLEAR_CONFIG!, "projects", "demo", "settings.json");
-  writeFileSync(file, JSON.stringify({ ...JSON.parse(readFileSync(file, "utf8")), taskLimitMin: 100_000 }));
-  t.world.lastError = () => ({ text: SESSION, at: t.clock.at.getTime() });
-  t.tick();
-  expect(t.adds).toHaveLength(0);
-  expect(readItems(t.env)).toEqual([]);
-  const w = readWaits(t.env);
-  expect(w).toMatchObject([{ task: "LIN-5", kind: "until", until: "2026-06-01T17:00:00.000Z" }]);
-  t.world.lastError = () => undefined;
-  t.clock.at = new Date("2026-06-01T12:00:00Z");
-  t.tick();
-  expect(t.log).toEqual(["stop LIN-5"]);
-  t.clock.at = new Date("2026-06-01T17:00:01Z");
-  t.tick();
-  expect(readWaits(t.env)).toEqual([]);
-  expect(t.log.some((l) => l.startsWith("tell LIN-5 Your wait until"))).toBe(true);
 });
 
 test("Usage reads each account as free or full until a time", () => {

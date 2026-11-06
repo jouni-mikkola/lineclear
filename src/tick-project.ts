@@ -12,14 +12,13 @@ import { noWorkerNote, startAccountNote } from "./quota.ts";
 import { stepHeld } from "./parts.ts";
 import { company } from "./company.ts";
 import type { Settings } from "./project.ts";
-import { checkRoadmap, closedSteps, doneIds, isFrozen, resultFlag, stepOfTask, type StepStatus, type Task } from "./roadmap.ts";
+import { checkRoadmap, closedSteps, doneIds, isFrozen, resultFlag, type StepStatus, type Task } from "./roadmap.ts";
 import { mergedSteps, statusesFrom, stepInputs } from "./task-steps.ts";
 import type { Decision, State } from "./rules.ts";
 import { askMachines, type Candidate, localSlotsFree, mostRoom, type Room, roomLack } from "./spread.ts";
 import { routineWorker } from "./routine.ts";
-import { askKey, availability, revertLast, reviewerFor, serviceStalls } from "./stalls.ts";
+import { askKey, availability, revertLast, reviewerFor, serviceAccounts } from "./stalls.ts";
 import { bindStarts, liveSteps, recordStart, lockWhy, reservedLocks, settleLockWaits } from "./starts.ts";
-import type { TickFacts } from "./stall-ladder.ts";
 import type { Wait } from "./waits.ts";
 import type { World } from "./world.ts";
 
@@ -215,7 +214,7 @@ function proveMerged(t: Tick, steps: Step[], merged: Set<string>, head: string):
 }
 
 /** Each step's state from main, the tasks and the other machines, and the locks the working steps hold. */
-function stepStates(t: Tick, steps: Step[], main: MainInfo, tasks: Task[], remote: Task[], restarted: Set<string>, facts: TickFacts) {
+function stepStates(t: Tick, steps: Step[], main: MainInfo, tasks: Task[], remote: Task[]) {
   const { state, dryRun, note, settings, env } = t;
   const closed = state.closedSteps ?? {};
   for (const [step, task] of closedSteps(steps, tasks, state.taskSteps, remote)) {
@@ -230,13 +229,10 @@ function stepStates(t: Tick, steps: Step[], main: MainInfo, tasks: Task[], remot
   const closedHere = closedSteps(steps, tasks, state.taskSteps, remote).keys();
   const proven = proveMerged(t, steps, new Set([...mergedSteps(steps, main.commits, closed), ...closedHere]), main.head);
   const inputs = stepInputs(steps, main.commits, { local: tasks, remote }, settings.repo, env, { state: { ...state, closedSteps: closed }, unproven: proven });
-  const status = statusesFrom(steps, inputs).map((s) => (restarted.has(s.id) ? { ...s, state: "work" as const } : s));
+  const status = statusesFrom(steps, inputs);
   const byId = new Map(steps.map((s) => [s.id, s]));
-  facts.tasks = tasks;
-  facts.done = new Set(status.filter((s) => s.state === "done").map((s) => s.id));
-  facts.stepOf = (task) => stepOfTask(steps, task, state.taskSteps)?.id;
   const held = new Map<string, string>();
-  const live = liveSteps(steps, [...tasks, ...remote], remote, state.taskSteps, restarted);
+  const live = liveSteps(steps, [...tasks, ...remote], remote, state.taskSteps);
   for (const s of status) if (s.state === "work" && live.has(s.id)) for (const l of stepHeld(byId.get(s.id) as Step)) held.set(l, s.id);
   return { status, byId, held };
 }
@@ -543,7 +539,6 @@ export function tickProject(
   waits: Wait[] = [],
   limit = cpus().length,
   env = process.env,
-  facts: TickFacts = {},
 ): Decision[] {
   const out: Decision[] = [];
   const time = world.now().toISOString();
@@ -572,8 +567,8 @@ export function tickProject(
     (host, why) => note("skip", why, `machine:${host}`),
   );
   bindStarts(state, tasks);
-  const restarted = serviceStalls({ project: name, settings, world, state, dryRun, waits, tasks, steps: parsed.steps, offered, note, env });
-  const { status, byId, held } = stepStates(t, parsed.steps, main, tasks, remote, restarted, facts);
+  serviceAccounts({ project: name, settings, world, state, dryRun, waits, tasks, steps: parsed.steps, offered, note, env });
+  const { status, byId, held } = stepStates(t, parsed.steps, main, tasks, remote);
 
   if (settings.paused) {
     note("skip", "the project is paused, no step starts");

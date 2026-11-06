@@ -1,12 +1,11 @@
 import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { readItems } from "../src/inbox.ts";
-import { fillSetup, tickGuard } from "../src/loop-guard.ts";
+import { fillSetup } from "../src/fill-setup.ts";
 import { readSetup, setupGate } from "../src/project.ts";
 import { tmp } from "./helpers.ts";
 
-const dir = tmp("loop-guard");
+const dir = tmp("fill-setup");
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 const envOf = (name: string) => ({ ...process.env, LINECLEAR_CONFIG: join(dir, name) });
 
@@ -36,24 +35,4 @@ test("a choice already made is kept, and a machine with no project is left as it
   const bare = envOf("bare");
   fillSetup(bare);
   expect(readSetup(bare)).toEqual({});
-});
-
-test("the third failed tick in a row puts one card in the Inbox; a good tick starts the count again", () => {
-  const env = envOf("guard");
-  const guard = tickGuard(env);
-  const boom = new Error("no model chosen");
-  guard(boom);
-  guard(boom);
-  guard();
-  guard(boom);
-  guard(boom);
-  expect(readItems(env)).toEqual([]);
-  guard(boom);
-  guard(boom);
-  guard(boom);
-  guard(boom);
-  const items = readItems(env);
-  expect(items).toHaveLength(1);
-  expect(items[0]).toMatchObject({ kind: "stuck", alert: "The rule loop is failing" });
-  expect(items[0]?.question).toContain("no model chosen");
 });

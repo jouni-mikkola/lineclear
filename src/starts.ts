@@ -3,8 +3,7 @@ import { herdrArgv } from "./herdr.ts";
 import { join } from "node:path";
 import { fileClash, stepHeld, stepNeeds } from "./parts.ts";
 import { fitTitle, type Step, stepOfTask, type Task } from "./roadmap.ts";
-import type { Decision, State, World } from "./rules.ts";
-import { clearWait, type Wait, writeWait } from "./waits.ts";
+import type { State } from "./rules.ts";
 
 type Run = (cmd: string[]) => { code: number; out: string; err?: string };
 
@@ -69,88 +68,6 @@ export function nudgePane(id: string, text: string, run: Run, dir: string | unde
   return sent.code === 0 ? undefined : (sent.err || sent.out).trim() || `exit ${sent.code}`;
 }
 
-const START_NUDGE = "[lineclear:resume] Your brief is above but you have not started. Read it and begin your task.";
-const RESTART = "Your agent was restarted because it never started. Read your brief and begin your task.";
-/** Each rung waits this long after the start was first seen without an answer. */
-const START_RUNG_MS = 2 * 60_000;
-
-interface Args {
-  project: string;
-  world: World;
-  state: State;
-  dryRun: boolean;
-  tasks: Task[];
-  /** Tasks with a declared wait other than `start`, and tasks the stall ladder moved on this tick: both are left alone. */
-  skip: Set<string>;
-  /** Tasks marked start failed: their wait ends once their agent answers. */
-  failed: Set<string>;
-  note: (kind: Decision["kind"], reason: string, step?: string) => void;
-  env: NodeJS.ProcessEnv;
-}
-
-/**
- * A start counts only when its agent answered. One that did not within 2 minutes gets its brief typed into its pane,
- * after 4 a restart, after 6 it is stopped with a `start` wait: "start failed", never a question for the owner.
- */
-export function serviceStarts(a: Args): void {
-  const now = a.world.now().getTime();
-  a.state.starts ??= {};
-  const starts = a.state.starts;
-  for (const t of a.tasks) {
-    const id = t.id;
-    if (id === undefined || a.skip.has(id) || starts[id]?.acted || (t.status !== "need" && t.status !== "work")) continue;
-    const s = a.world.started(id);
-    if (s.kind === "acted") answered(a, starts, id, now);
-    // A stopped agent of a task that waits for you is gone too; only a "Working" one with no agent is a lost start.
-    else if (!a.failed.has(id) && (s.kind !== "gone" || t.status === "work")) step(a, starts, id, s.kind, now);
-  }
-  for (const id of Object.keys(starts)) if (!a.tasks.some((t) => t.id === id)) delete starts[id];
-}
-
-type Starts = NonNullable<State["starts"]>;
-
-/** Once started, an agent that goes quiet or vanishes is the stall ladder's, never a failed start. */
-function answered(a: Args, starts: Starts, id: string, now: number): void {
-  starts[id] = { since: now, rung: 0, acted: true };
-  if (!a.failed.has(id)) return;
-  if (!a.dryRun) clearWait(id, a.env);
-  a.note("stall", `${a.dryRun ? "would clear" : "cleared"} start failed of ${id}: its agent answered`, id);
-}
-
-/** A start with no answer yet climbs one rung once its time has come. */
-function step(a: Args, starts: Starts, id: string, kind: StartState["kind"], now: number): void {
-  starts[id] ??= { since: now, rung: 0 };
-  const u = starts[id];
-  // A long first turn holds the ladder, but not past the time the whole ladder would take.
-  if (kind === "busy" && now - u.since < START_RUNG_MS * 3) return;
-  if (u.rung >= 3 || now - (u.at ?? u.since) < START_RUNG_MS) return;
-  u.rung += 1;
-  u.at = now;
-  climb(a, id, u.rung, kind === "gone" ? "herdr has no agent for it" : kind === "busy" ? "its first turn never answered" : "its agent never answered");
-}
-
-/** One rung of the start ladder: the nudge, the restart, then the `start` wait. */
-function climb(a: Args, id: string, rung: number, why: string): void {
-  const { world, note } = a;
-  const how = rung === 1 ? "typed its brief nudge into the pane of" : rung === 2 ? "restarted" : "marked start failed for";
-  if (a.dryRun) {
-    note("stall", `would have ${how} ${id}: ${why}`, id);
-    return;
-  }
-  let err: string | undefined;
-  if (rung === 3) {
-    // Marked failed even when the stop fails: the start did not happen either way.
-    err = world.stopTask(id);
-    const wait: Wait = { task: id, project: a.project, kind: "start", reason: `start failed: ${why} after two tries`, since: world.now().toISOString() };
-    writeWait(wait, a.env);
-  } else {
-    err = rung === 1 ? world.nudge(id, START_NUDGE) : world.stopTask(id);
-    if (rung === 2) err = world.tellTask(id, RESTART, "resume") ?? err;
-  }
-  if (err && rung < 3) note("skip", `${id}: ${why}, but the ${rung === 1 ? "nudge" : "restart"} failed: ${err}`, id);
-  else note("stall", `${how} ${id}: ${why}${err ? ` (its stop failed: ${err})` : ""}`, id);
-}
-
 /** What the rules keep of the tasks they start: the step of each task by id, and the titles no task has taken yet. */
 export interface StartRecord {
   taskSteps?: Record<string, string>;
@@ -175,9 +92,9 @@ export function bindStarts(state: StartRecord, tasks: Task[]) {
   }
 }
 
-/** The steps with a task that still runs for them (an orphaned task holds no locks), and the steps just restarted. */
-export function liveSteps(steps: Step[], tasks: Task[], remote: Task[], taskSteps: Record<string, string> | undefined, restarted: Set<string>): Set<string> {
-  const live = new Set(restarted);
+/** The steps with a task that still runs for them (an orphaned task holds no locks). */
+export function liveSteps(steps: Step[], tasks: Task[], remote: Task[], taskSteps: Record<string, string> | undefined): Set<string> {
+  const live = new Set<string>();
   for (const t of tasks) {
     const id = t.status === "done" || t.orphaned ? undefined : stepOfTask(steps, t, remote.includes(t) ? undefined : taskSteps)?.id;
     if (id !== undefined) live.add(id);

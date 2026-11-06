@@ -1,5 +1,5 @@
 import { zonedInstant, zoneOffset } from "./zone.ts";
-import { appendFileSync, existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { writeAtomic } from "../pi/atomic.ts";
 import { join } from "node:path";
 import { configDir, readJson } from "../pi/config.ts";
@@ -146,8 +146,6 @@ export interface Move {
 }
 
 const movesPath = (env: NodeJS.ProcessEnv) => join(configDir(env), "moves.jsonl");
-
-export const recordMove = (m: Move, env = process.env) => appendFileSync(movesPath(env), `${JSON.stringify(m)}\n`);
 
 /** The moves, newest first. */
 export function readMoves(env = process.env, limit = 20): Move[] {

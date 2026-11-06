@@ -15,12 +15,9 @@ import { realWorld } from "./real-world.ts";
 import { startPromoteIfDue } from "./promote-step.ts";
 import { startReleaseIfDue } from "./release.ts";
 import type { Task } from "./roadmap.ts";
-import type { StallEntry } from "./stall-class.ts";
-import { afterTick, stallsOf, type TickFacts } from "./stall-ladder.ts";
-import { restartTask } from "./stalls.ts";
+import { cutDecisionsDaily, type StallEntry } from "./stall-class.ts";
 import type { StartRecord } from "./starts.ts";
 import { tickProject } from "./tick-project.ts";
-import { tickGuard } from "./loop-guard.ts";
 import { sweepOldTemp } from "./tmpdirs.ts";
 import { unstick } from "./unstick.ts";
 import { holdWorld } from "./hold.ts";
@@ -169,19 +166,17 @@ export function tick(world: World, dryRun: boolean, env = process.env): Decision
     const state = readState(name, env);
     const held = holdWorld(world, settings);
     const answer = (space: string, id: string, text: string) => answerCard({ space, id }, text, env);
-    const ops = { clean: (t: string) => world.clean(t), close: (t: string) => world.closeTask(t), restart: (t: string) => restartTask(held, t) };
+    const ops = { clean: (t: string) => world.clean(t), close: (t: string) => world.closeTask(t) };
     const routed = routeAsks(name, settings.space, (task, text) => held.tellTask(task, text, "answer"), world.now(), dryRun, env, ops, answer).map(
       (reason): Decision => ({ time: world.now().toISOString(), project: name, kind: "wake", reason }),
     );
-    const facts: TickFacts = {};
     const decisions = [
       ...routed,
       ...closeOver(name, settings, world, dryRun, env),
       ...unstick({ project: name, settings, world: held, state, waits: readWaits(env), dryRun }),
       ...serviceWaits(name, held, dryRun, env),
-      ...tickProject(name, settings, held, state, dryRun, readWaits(env), loadLimit(env), env, facts),
+      ...tickProject(name, settings, held, state, dryRun, readWaits(env), loadLimit(env), env),
     ];
-    decisions.push(...stallsOf(name, settings, held, state, decisions, facts, dryRun, env));
     if (dryRun) {
       all.push(...decisions);
       continue;
@@ -190,7 +185,7 @@ export function tick(world: World, dryRun: boolean, env = process.env): Decision
     writeAtomic(statePath(name, env), `${JSON.stringify(state, null, 2)}\n`);
     all.push(...logDecisions(fresh, env));
   }
-  if (!dryRun) all.push(...afterTick(world, all, env));
+  if (!dryRun) cutDecisionsDaily(decisionsPath(env), world.now());
   return all;
 }
 
@@ -240,15 +235,6 @@ export async function runMain(args: string[], out: (l: string) => void, world: W
   }
   // a tick that is still running is not started again, and a stop waits for it
   let ticking: Promise<void> | undefined;
-  const guard = tickGuard();
-  // the guard writes a file: its failure must not leave `ticking` set and stop the loop
-  const report = (e?: unknown) => {
-    try {
-      guard(e);
-    } catch (g) {
-      console.error(`lineclear run: loop guard failed: ${g instanceof Error ? g.message : g}`);
-    }
-  };
   const safely = () => {
     if (ticking) return;
     const tickOnce = async () => {
@@ -257,10 +243,8 @@ export async function runMain(args: string[], out: (l: string) => void, world: W
         else await Promise.all([refreshQuota().catch(() => {}), tickAway(out)]);
       } catch (e) {
         console.error(`lineclear run: tick failed: ${e instanceof Error ? e.message : e}`);
-        report(e);
         return;
       }
-      report();
     };
     const mine = (ticking = tickOnce().then(() => {
       if (ticking === mine) ticking = undefined;

@@ -383,16 +383,6 @@ test("a step started on the second machine still holds its step and lock when th
   expect(t.remote().match(/ADD/g)).toHaveLength(1);
 });
 
-test("a silent Needs you climbs the ladder in a space that also uses the second machine", () => {
-  const t = setup({ steps: [step("A")], localMax: 1, localTasks: [{ id: "LIN-9", title: "A Title A", status: "need", sub: "Waits for your reply" }] });
-  const cards: { id: string; task: string; at: number }[] = [];
-  const world = { ...realWorld(t.vars), load: () => 0, stallCards: () => cards };
-  tick(world, false, t.vars); // sets the time from which cards count
-  cards.push({ id: "c1", task: "LIN-9", at: Date.now() + 60_000 });
-  const d = tick(world, false, t.vars);
-  expect(d.filter((x) => x.kind === "stall" && x.event !== "stall" && x.event !== "end").map((x) => x.reason.split(":")[0])).toEqual(["rung 1"]);
-});
-
 const held = { id: "LIN-9", title: "Hand made", status: "queued", sub: "Waiting for a free slot" };
 
 test("a held hand-made task starts on the second machine when this one is full, and closes here", () => {

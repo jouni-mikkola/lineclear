@@ -20,7 +20,7 @@ import { codeCommit, pathsFor } from "./paths.ts";
 import { candidateMain } from "./candidate-check.ts";
 import { promoteMain } from "./promote-cmd.ts";
 import { readRelease, releaseMain, releaseTry } from "./release.ts";
-import { fillSetup } from "./loop-guard.ts";
+import { fillSetup } from "./fill-setup.ts";
 import { type Ask, setupGate } from "./project.ts";
 import { setupMain } from "./setup.ts";
 import { project } from "./project-cli.ts";
