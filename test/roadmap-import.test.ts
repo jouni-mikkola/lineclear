@@ -33,6 +33,8 @@ function repo(): string {
   const d = dir();
   const git = (...a: string[]) => Bun.spawnSync(["git", "-C", d, "-c", "user.name=t", "-c", "user.email=t@t", ...a]);
   git("init", "-q");
+  git("config", "user.name", "t");
+  git("config", "user.email", "t@t");
   git("commit", "-q", "--allow-empty", "-m", "start");
   return d;
 }
