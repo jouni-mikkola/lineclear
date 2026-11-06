@@ -3,8 +3,9 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { decisionsPath, tick, type Decision, type State } from "../src/rules.ts";
 import { CLASS_INFO, classify, stallsMain, summarize, watchStalls, type Observation } from "../src/stall-class.ts";
-import { DAY_CAP, fileFixes, fileFixNow, readFixes } from "../src/self-fix.ts";
-import { readSettings } from "../src/project.ts";
+import { DAY_CAP, fileFix, fileFixes, fileFixNow, readFixes, type FixSpec } from "../src/self-fix.ts";
+import { closeItem, isOpen, readItems } from "../src/inbox.ts";
+import { readSettings, type Settings } from "../src/project.ts";
 import { stepStatuses, type Step, type Task } from "../src/roadmap.ts";
 import { stallsOf } from "../src/stall-ladder.ts";
 import { recordTaskSteps } from "./helpers.ts";
@@ -420,4 +421,35 @@ test("a step's task holds its locks by the rules' record, never by a title", () 
 test("an unproven step is no stall: the done-when text gets no class", () => {
   const reason = `L13 is merged, unproven: Lineclear's checkStalls posts a "may be stuck" card after 20 min with no sign of life.`;
   expect(classify({ kind: "skip", reason })).toBeUndefined();
+});
+
+test("a step's fix tasks that end twice with no merge get no third, one fix-loop stall files one planning fix, a merged fix starts again", () => {
+  const t = setup([]);
+  const settings = { repo: "", space: "demo", check: "true" } as Settings;
+  const spec = (title: string): FixSpec => ({ key: "demo:A:closed", title, project: { name: "demo", settings }, brief: "b", evidence: ["e"] });
+  const end = (title: string, extra: object) => {
+    t.tasks.list = [...t.tasks.list.filter((x) => x.title !== title), { id: title, title, status: "closed", ...extra } as never];
+    // seen ended now (held for a day), then a day passes
+    fileFix(t.world, spec("A Fix: held"), t.env);
+    for (const i of readItems(t.env)) if (isOpen(i)) closeItem(i, "seen", t.clock.at, t.env);
+    t.clock.at = new Date(t.clock.at.getTime() + 25 * 60 * MIN);
+  };
+  expect(fileFix(t.world, spec("A Fix: one"), t.env)).toEqual({ filed: true });
+  end("A Fix: one", {});
+  expect(fileFix(t.world, spec("A Fix: two"), t.env)).toEqual({ filed: true });
+  end("A Fix: two", { status: "done", closed: true });
+  const held = fileFix(t.world, spec("A Fix: three"), t.env);
+  expect(held).toEqual({ filed: false, why: expect.stringContaining("fix loop: ") });
+  expect(t.adds.map((a) => a[0])).toEqual(["A Fix: one", "A Fix: two"]);
+  // the held skip is the one stall: its class files one planning fix with both tasks as evidence
+  const why = (held as { why: string }).why;
+  expect(classify({ kind: "skip", reason: `A: its fix task ended, and no closed fix task started: ${why}` })).toBe("fix-loop");
+  const out = stallOnce(t, "fix-loop", "A");
+  expect(out.map((d) => d.kind)).toEqual(["start"]);
+  expect(t.adds.at(-1)?.[0]).toBe("Plan: fix fix loop");
+  // a task taken up again is not an end until it ends again, and a merged end starts the count again
+  t.tasks.list = t.tasks.list.map((x) => (x.title === "A Fix: two" ? { ...x, status: "work" } : x));
+  fileFix(t.world, spec("A Fix: held"), t.env);
+  end("A Fix: two", { status: "done" });
+  expect(fileFix(t.world, spec("A Fix: five"), t.env)).toEqual({ filed: true });
 });

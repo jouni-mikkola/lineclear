@@ -168,7 +168,7 @@ export function fileFixes(world: World, decisionsFile: string, fresh: Decision[]
     if (f !== undefined && f.closed === undefined) continue;
     // only a stall of this tick can make a class cross its count, so nothing is filed or said twice
     if (!fresh.some((d) => isStall(d) && d.class === c)) continue;
-    if (ds.length < (c === "unknown" ? 1 : 2)) continue;
+    if (ds.length < (c === "unknown" || c === "fix-loop" ? 1 : 2)) continue;
     if (!self) {
       note("skip", `a fix for the stall class '${c}' waits: no project is Lineclear's own (set "self": true in its settings)`, c);
       continue;
@@ -215,6 +215,17 @@ function planningFlags(settings: Settings): string[] {
 }
 
 const endsPath = (env = process.env) => join(configDir(env), "fix-ends.json");
+const outcomesPath = (env = process.env) => join(configDir(env), "fix-outcomes.json");
+const OUTCOMES_KEPT = 30 * DAY;
+
+/** How a step's fix task ended: nothing merged, or merged. Oldest first in `Outcomes`, by when it was seen ended, kept for 30 days. */
+interface Outcome {
+  task: string;
+  title: string;
+  unmerged: boolean;
+  at: number;
+}
+type Outcomes = Record<string, Outcome[]>;
 
 /** The step a fix spec is for: its key is `<project>:<step>:<kind>` and its title starts with the step id. */
 function stepOfSpec(spec: FixSpec): string | undefined {
@@ -223,11 +234,12 @@ function stepOfSpec(spec: FixSpec): string | undefined {
 }
 
 /**
- * The step's fix tasks on every machine that are open or ended in the last 24 hours, or a reason it cannot tell.
+ * The step's fix tasks on every machine that are open or ended in the last 24 hours, as the reason each holds a new one.
+ * It also records how each end went (`fix-outcomes.json`), for `fixLoopReason`.
  * A local task is the step's by the rules' record, another machine's by its title, `Fix <id> <title>` or `<id> Fix: <title>`.
  * A task has no end time in the list, so it ends when it was first seen not open.
  */
-function stepFixHeld(world: World, spec: FixSpec, step: string, local: Task[], env: NodeJS.ProcessEnv): string | undefined {
+function stepFixHeld(world: World, spec: FixSpec, step: string, local: Task[], env: NodeJS.ProcessEnv): { open?: string; recent?: string } {
   const { settings, name } = { settings: spec.project.settings, name: spec.project.name };
   const recorded = (readJson(join(configDir(env), "projects", name, "state.json")) as { taskSteps?: Record<string, string> } | undefined)?.taskSteps ?? {};
   const titled = (t: Task) => t.title.startsWith(`${step} Fix`) || t.title.startsWith(`Fix ${step} `);
@@ -238,26 +250,47 @@ function stepFixHeld(world: World, spec: FixSpec, step: string, local: Task[], e
   const mine = [...local.filter((t) => titled(t) || (t.id !== undefined && recorded[t.id] === step && t.title.includes("Fix"))), ...remote.filter(titled)];
   const now = world.now().getTime();
   const ends = (readJson(endsPath(env)) as Record<string, number> | undefined) ?? {};
-  let held: string | undefined;
+  const held: { open?: string; recent?: string } = {};
+  const outcomes = (readJson(outcomesPath(env)) as Outcomes | undefined) ?? {};
+  const seenEnds = (outcomes[`${settings.space}:${step}`] ??= []);
+  let outcomesChanged = false;
   let changed = false;
   for (const t of mine) {
     const key = `${settings.space}:${t.id ?? t.title}`;
     if (t.status !== "done" && t.status !== "closed") {
-      held ??= `a fix task of ${step} is open: ${t.title}`;
+      held.open ??= `a fix task of ${step} is open: ${t.title}`;
       if (key in ends) delete ends[key], (changed = true);
+      // a task taken up again has not ended yet: its next end is the one that counts
+      const was = seenEnds.findIndex((o) => o.task === key);
+      if (was >= 0) seenEnds.splice(was, 1), (outcomesChanged = true);
       continue;
     }
     if (!(key in ends)) (ends[key] = now), (changed = true);
-    if (now - (ends[key] ?? 0) < DAY) held ??= `a fix task of ${step} ended in the last 24 hours: ${t.title}`;
+    if (!seenEnds.some((o) => o.task === key)) {
+      seenEnds.push({ task: key, title: t.title, unmerged: endedUnmerged(t, false), at: ends[key] ?? now });
+      seenEnds.sort((a, b) => a.at - b.at);
+      seenEnds.splice(0, seenEnds.filter((o) => now - o.at >= OUTCOMES_KEPT).length);
+      outcomesChanged = true;
+    }
+    if (now - (ends[key] ?? 0) < DAY) held.recent ??= `a fix task of ${step} ended in the last 24 hours: ${t.title}`;
   }
+  if (outcomesChanged) writeAtomic(outcomesPath(env), `${JSON.stringify(outcomes, null, 2)}\n`);
   const kept = Object.fromEntries(Object.entries(ends).filter(([, at]) => now - at < 2 * DAY));
   if (changed || Object.keys(kept).length !== Object.keys(ends).length) writeAtomic(endsPath(env), `${JSON.stringify(kept)}\n`);
   return held;
 }
 
+/** The step's last two fix tasks, when both ended with no merge and no fix of it merged between them: the loop's reason. */
+function fixLoopReason(step: string, space: string, env: NodeJS.ProcessEnv): string | undefined {
+  const last = ((readJson(outcomesPath(env)) as Outcomes | undefined)?.[`${space}:${step}`] ?? []).slice(-2);
+  const [a, b] = last;
+  if (!a || !b || !a.unmerged || !b.unmerged) return undefined;
+  return `fix loop: the fix tasks of ${step} "${a.title}" and "${b.title}" both ended without a merge, so no third is filed`;
+}
+
 /**
  * The one way to file a fix task. Not while the fix's task is open (the title is looked up in the task list), not
- * while the Inbox item for its last unmerged end waits, and not over DAY_CAP fixes in 24 hours, all kinds together.
+ * while the Inbox item for its last unmerged end waits, not for a step whose last two fix tasks both ended unmerged, and not over DAY_CAP fixes in 24 hours, all kinds together.
  */
 export function fileFix(world: World, spec: FixSpec, env = process.env): { filed: true } | { filed: false; why: string } {
   const fixes = readFixes(env);
@@ -267,8 +300,11 @@ export function fileFix(world: World, spec: FixSpec, env = process.env): { filed
   if (typeof tasks === "string") return { filed: false, why: tasks };
   if (isOpen(spec, tasks)) return { filed: false, why: `a fix is already open: ${spec.title}` };
   const step = stepOfSpec(spec);
-  const held = step === undefined ? undefined : stepFixHeld(world, spec, step, tasks, env);
-  if (held) return { filed: false, why: held };
+  const held = step === undefined ? {} : stepFixHeld(world, spec, step, tasks, env);
+  if (held.open) return { filed: false, why: held.open };
+  const loop = step === undefined ? undefined : fixLoopReason(step, settings.space, env);
+  if (loop) return { filed: false, why: loop };
+  if (held.recent) return { filed: false, why: held.recent };
   const prev = fixes[spec.key];
   if (spec.basis !== undefined && prev?.basis === spec.basis && prev.closed !== undefined)
     return { filed: false, why: "its last fix task ended and the cause is the same" };

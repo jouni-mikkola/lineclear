@@ -36,6 +36,7 @@ const STALL_CLASSES = [
   "head-of-line",
   "merge-lost",
   "coordinator-gone",
+  "fix-loop",
   "unknown",
 ] as const;
 export type StallClass = (typeof STALL_CLASSES)[number];
@@ -71,6 +72,7 @@ export const CLASS_INFO: Record<StallClass, ClassInfo> = {
   },
   "merge-lost": { label: "merge result lost", limit: 0, remedy: "tell the task to bring its branch up to date and merge again" },
   "coordinator-gone": { label: "coordinator gone", limit: 30, remedy: "file a fix: the project's coordinator does not run" },
+  "fix-loop": { label: "fix loop", limit: 0, remedy: "file a fix: a step's last two fix tasks ended with no merge, so no third is filed" },
   unknown: { label: "unknown", limit: 60, remedy: "file a fix: no class names it" },
 };
 
@@ -78,6 +80,7 @@ export const CLASS_INFO: Record<StallClass, ClassInfo> = {
 const OWNER = /paid key|waits for your answer|declared wait|is paused|^would |^rung 4: would/;
 
 const PATTERNS: [RegExp, StallClass][] = [
+  [/no \w+ fix task started: fix loop: /, "fix-loop"],
   [/signed out/i, "signed-out"],
   [/outdated settings|couldn.t start it again|revive loop/i, "revive-loop"],
   [
