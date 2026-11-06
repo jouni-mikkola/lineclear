@@ -73,3 +73,10 @@ test("logs kept from GitHub runs give the right first cause", async () => {
   expect(report.main.causes["flaky test"]).toBe(1);
   expect(report.tests[0]).toMatchObject({ cause: "flaky test", runs: 1 });
 });
+
+test("a gate fails the run from a GitHub log, on a pull request", async () => {
+  const log = await fixture("gate.log");
+  expect(firstCause(log)).toEqual({ kind: "gate", tests: [] });
+  const report = sortRuns([run({ event: "pull_request", branch: "w/9", conclusion: "failure", log })]);
+  expect(report.pullRequests.causes.gate).toBe(1);
+});
