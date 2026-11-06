@@ -123,8 +123,8 @@ export function readyTimeout(message: string, seen: { status?: string; sub?: str
   return `${message}: ${seen ? `${seen.status} ${seen.sub}` : "no task seen"}\nagent log tail:\n${tail || "(empty)"}`;
 }
 
-async function until<T>(what: string, seconds: number, probe: () => T | undefined | Promise<T | undefined>): Promise<T> {
-  const limit = Math.round(seconds * loadFactor());
+async function until<T>(what: string, seconds: number, probe: () => T | undefined | Promise<T | undefined>, cap = Infinity): Promise<T> {
+  const limit = Math.min(cap, Math.round(seconds * loadFactor()));
   const end = Date.now() + limit * 1000;
   let last = "";
   while (Date.now() < end) {
@@ -199,10 +199,15 @@ async function steps(w: World, say: (l: string) => void) {
   await until(`${id}'s branch has no change`, 60, () => existsSync(join(t, "canary.txt")) && git(t, "log", "-1", "--format=%s") === "Canary change");
   say(`ok   change: ${id} committed canary.txt on its branch`);
   let seen: Task | undefined;
-  await until(`${id} did not show ready`, 180, () => {
-    seen = task(w);
-    return seen?.status === "ready";
-  }).catch((e) => {
+  await until(
+    `${id} did not show ready`,
+    60,
+    () => {
+      seen = task(w);
+      return seen?.status === "ready";
+    },
+    60,
+  ).catch((e) => {
     throw new Error(readyTimeout((e as Error).message, seen, agentLogs(w)));
   });
   say(`ok   check: ${id} shows ready to merge`);
