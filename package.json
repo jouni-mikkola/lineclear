@@ -17,13 +17,6 @@
     "dispatcher:eval": "bun test/dispatcher-eval/run.ts",
     "shots:check": "bun scripts/shots-check.ts",
     "gates": "bun scripts/gates/run.ts",
-<<<<<<< HEAD
-    "coverage": "bun scripts/coverage.ts",
-    "heavy": "bun scripts/heavy.ts",
-    "gates:full": "bun scripts/gates/run.ts --full",
-=======
-    "media": "bun scripts/media.ts",
->>>>>>> 274b08397 (LIN-1170: Gates down to lint and types)
     "check": "bun scripts/check.ts",
     "release": "bun scripts/release-tag.ts"
   },

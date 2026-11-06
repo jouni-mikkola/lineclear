@@ -19,13 +19,8 @@ imports count for the borders but not for cycles, since they are gone when the c
 | `kit` | `ui/kit/` | the design system's parts and motion | `brand`, `cli` |
 | `web` | `ui/web/` | the pages `lineclear run` serves | `kit`, `brand`, `cli` |
 | `ui-test` | `ui/test/`, `ui/shots/`, `ui/budget/`, `playwright.config.ts`, `playwright.shots.config.ts`, `playwright.budget.config.ts` | the UI bar's browser tests and their fixture | `web`, `kit`, `brand`, `cli`, `pi` |
-<<<<<<< HEAD
-| `gates` | `scripts/gates/` | the check's gates and their baselines | none |
-| `scripts` | `scripts/` | repo tools: the check, the smoke check and canary, measurements | `cli`, `brand`, `gates`, `check-line` |
-=======
 | `gates` | `scripts/gates/` | the check's gates | none |
-| `scripts` | `scripts/` | repo tools: the check, the smoke check and canary, measurements, film and icons | `cli`, `brand`, `gates`, `check-line` |
->>>>>>> 274b08397 (LIN-1170: Gates down to lint and types)
+| `scripts` | `scripts/` | repo tools: the check, the smoke check and canary, measurements | `cli`, `brand`, `gates`, `check-line` |
 | `tests` | `test/` | the bun tests, one file per command | `cli`, `pi`, `kit`, `web`, `brand`, `scripts`, `gates`, `ui-test`, `check-line`, `registry` |
 | `shared` | `server/shared/` | types and pure helpers the server shares | none |
 | `server` | `server/server/` | the server: the live source, agents, chats, the engine and the merge lane | `shared`, `generated`, `check-line`, `registry`, `timer-rule` |
@@ -43,19 +38,6 @@ imports count for the borders but not for cycles, since they are gone when the c
 - Code that two modules share lives in the lower one. `shared` holds what the server's parts both need.
 - `generated` is written by `server/scripts/build-plugins.ts`: it imports every plugin, and only `server` reads it. That is how the server loads plugins that use the server's own parts.
 - Tests may import what they test, never the other way round.
-<<<<<<< HEAD
-- An import across a border that is not allowed fails the gate. `scripts/gates/baseline/borders.json` stays empty.
-
-## Coverage floors
-
-`bun run coverage` runs the root tests and measures line coverage per module of the table above. A module below its
-floor in `scripts/gates/baseline/coverage.json` fails. `bun run coverage --raise` lifts floors to what is measured and
-never lowers one. It is slower than the check allows, so the heavy run and a release run it, not `bun run check`.
-The run gives each test 60 s, since coverage slows it and a timed-out test leaves its lines out of the count.
-A source file no test loads counts as uncovered only under `src/`, `bin/`, `pi/`, `ui/brand/` and `ui/kit/`: the server, Playwright, the repo's own drivers and the eval run under other runners. A module the root tests do not reach has no floor.
-`bunfig.toml` leaves out `scripts/budget.ts` and `scripts/smoke.ts`: they drive Chromium and a live
-service, so only a run of the tool itself reaches them (the budget step, the smoke check).
-=======
 - An import across a border that is not allowed fails the gate.
 
 ## Parts
@@ -92,4 +74,3 @@ names it under Debts until it lands.
 (`bun run coverage` records the last measure; none recorded, none counted), 2 for each stall and 2 for each
 flaky test in the tasks of steps that touched it, and 1 for each review finding those tasks reported. The planner
 keeps about one step in five for the part with the worst score: a step whose parts line tags it, `rules (health)`.
->>>>>>> 274b08397 (LIN-1170: Gates down to lint and types)

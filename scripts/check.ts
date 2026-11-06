@@ -1,10 +1,5 @@
-<<<<<<< HEAD
-// The one check: Lineclear's types, tests, dashes, roadmap, part pages and code gates (scripts/gates/),
+// The one check: Lineclear's types, tests, roadmap, part pages and code gates (scripts/gates/),
 // then the server's own types and tests (server/).
-=======
-// The one check: Lineclear's types, tests, roadmap, part pages and code gates (scripts/gates/) and README pictures
-// (bun run media check), then the server's own types and tests (server/).
->>>>>>> 274b08397 (LIN-1170: Gates down to lint and types)
 // `bun run check` is the merge lane's: only what the branch's change reaches (below), the independent steps side by side,
 // each step's time recorded (scripts/check-speed.ts) and a file or the whole run over its limit failed by name.
 // `--full` runs everything the light check has, never a browser: checks are light and run on GitHub (docs/numbers.md). `--changed`
