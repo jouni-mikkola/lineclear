@@ -1,6 +1,6 @@
 // Each CLI's models and effort levels, as read from the CLI itself (models.ts): what its output looks like here
 import { describe, expect, test } from 'bun:test'
-import { chooseModel, findModel, modelsOf, nearest, parseClaude, parseCodex, setRegistry } from '../server/live/models.ts'
+import { chooseModel, findModel, modelsOf, nearest, parseClaude, parseCodex, setRegistry, setRegistryReader } from '../server/live/models.ts'
 import { seedModels } from './model-fixture.ts'
 
 describe('reading what each CLI takes', () => {
@@ -69,6 +69,16 @@ describe('reading what each CLI takes', () => {
     }
     expect(modelsOf('pi')!.models).toEqual([])
     expect(chooseModel('pi')).toBeUndefined()
+  })
+  test('a fresh server reads the registry before it answers the first time', () => {
+    setRegistryReader(() => [{ harness: 'pi', provider: 'fakeco', name: 'zeta-1' }])
+    try {
+      expect(findModel('pi', 'zeta-1')?.id).toBe('fakeco/zeta-1')
+      expect(chooseModel('pi', 'zeta-1')).toBeUndefined()
+    } finally {
+      setRegistryReader(() => [])
+      setRegistry([])
+    }
   })
   test('a level a model lacks becomes the nearest it has, a tie going lower', () => {
     expect(nearest(['low', 'medium', 'high'], 'max')).toBe('high')
