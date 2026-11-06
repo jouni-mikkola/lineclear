@@ -147,8 +147,8 @@ function moveOldStore(d: string) {
 }
 
 /** what every machine showed before this server started. A machine's tasks are read over the link, never kept here:
- *  the snapshot an earlier version wrote into last.json is removed. (machines/<label>/tasks.json is not a copy: it is
- *  the store of that machine's own worker, which runs from this folder) */
+ *  the snapshot an earlier version wrote into last.json is removed, and a tasks.json left under machines/<label> moves
+ *  to workers/<label> (see moveOldStore) */
 export function kept(): Kept[] {
   const dir = join(HOME, 'machines')
   if (!existsSync(dir)) return []
