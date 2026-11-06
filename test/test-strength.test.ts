@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { testStrengthFaults } from "../scripts/gates/test-strength.ts";
 
 const diff = (removed: string[], added: string[], file = "test/x.test.ts"): string =>
@@ -39,5 +42,43 @@ describe("test strength gate", () => {
   });
   test("a cause line needs a test and a reason", () => {
     expect(testStrengthFaults(diff([], ["test.skip('a', () => {"]), ["Cause: nothing"])).not.toEqual([]);
+  });
+});
+
+const GATES = join(import.meta.dir, "..", "scripts", "gates", "run.ts");
+const git = (cwd: string, ...args: string[]): void => {
+  const p = Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd, stdout: "ignore", stderr: "pipe" });
+  if (p.exitCode !== 0) throw new Error(`git ${args.join(" ")}: ${p.stderr}`);
+};
+
+/** A repo with a passing test on main, then a branch commit that rewrites it with `after` and `message`; the gate's exit code. */
+function gateOnBranch(after: string, message: string): number {
+  const dir = mkdtempSync(join(tmpdir(), "lc-strength-"));
+  try {
+    git(dir, "init", "-q", "-b", "main");
+    mkdirSync(join(dir, "test"));
+    writeFileSync(join(dir, "test/x.test.ts"), "test('x', async () => {\n  await Bun.sleep(100);\n  expect(a).toBe(1);\n  expect(b).toBe(2);\n});\n");
+    git(dir, "add", "-A");
+    git(dir, "commit", "-q", "-m", "base");
+    git(dir, "checkout", "-q", "-b", "fix");
+    writeFileSync(join(dir, "test/x.test.ts"), after);
+    git(dir, "commit", "-qam", message);
+    return Bun.spawnSync(["bun", GATES, "--root", dir, "test-strength"], { stdout: "ignore", stderr: "ignore" }).exitCode;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+const body = (middle: string): string => `test('x', async () => {\n${middle}  expect(a).toBe(1);\n  expect(b).toBe(2);\n});\n`;
+
+describe("test strength gate on a real branch", () => {
+  const sleep = body("  await Bun.sleep(900);\n");
+  test("fails a raised sleep", () => expect(gateOnBranch(sleep, "Fix x")).toBe(1));
+  test("fails a new retry", () => expect(gateOnBranch(body("  await Bun.sleep(100);\n  await retry(() => 1);\n"), "Fix x")).toBe(1));
+  test("fails a removed expect", () => expect(gateOnBranch("test('x', async () => {\n  await Bun.sleep(100);\n  expect(a).toBe(1);\n});\n", "Fix x")).toBe(1));
+  test("fails a new skip", () =>
+    expect(gateOnBranch("test.skip('x', async () => {\n  await Bun.sleep(100);\n  expect(a).toBe(1);\n  expect(b).toBe(2);\n});\n", "Fix x")).toBe(1));
+  test("passes with a cause line", () => {
+    expect(gateOnBranch(sleep, "Fix x\n\nCause: x: waited on the socket before it listened, now waits for the listen event")).toBe(0);
   });
 });
