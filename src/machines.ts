@@ -160,7 +160,8 @@ async function updateMachines(hosts: string[], env: Env, out: (l: string) => voi
       out(`${host} is up to date.`);
       continue;
     }
-    const why = m.doctor?.[0] ?? "doctor failed";
+    // the doctor lists passing checks too: the reason is the first failed line
+    const why = m.doctor?.find((l) => l.startsWith("FAILED")) ?? m.doctor?.[0] ?? "doctor failed";
     out(`${host} is not ready: ${why}`);
     // a machine whose build did not change has nothing to go back from
     const after = await buildOn(host, env);
