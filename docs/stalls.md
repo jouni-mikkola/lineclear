@@ -63,7 +63,7 @@ A model on a `key` is used only after you answered Allow to its Inbox question. 
 
 ## Tasks the rules left idle
 
-A task the rules started that shows Went wrong for 3 minutes, with a clean worktree (or a branch with no commit) and no declared wait, is closed. A task on Ready to merge for 15 minutes is told to run `lineclear ready` again (or merge, if its brief says so), at most once per 45 minutes and never after the owner wrote. Check runs start at nice 15. `bun run check` started by hand takes a check slot too (`ownSlot`, `test/own-slot.test.ts`) and prints "waiting for a check slot" while it waits, so checks of every repo on a machine stay within its slot count. Tests: `test/unstick.test.ts`.
+A task the rules started that shows Went wrong for 3 minutes, with a clean worktree (or a branch with no commit) and no declared wait, is closed. A task on Ready to merge for 15 minutes is told to run `lineclear ready` again (or merge, if its brief says so), at most once per 45 minutes and never after the owner wrote. Check runs start at nice 19 and idle disk priority (ionice), and a task's agent runs at nice 10. `bun run check` started by hand takes a check slot too (`ownSlot`, `test/own-slot.test.ts`) and prints "waiting for a check slot" while it waits, so checks of every repo on a machine stay within its slot count. Tests: `test/unstick.test.ts`.
 
 ## A loop that fails
 

@@ -261,12 +261,13 @@ async function runInSlot(command: string, name: string, env = process.env, o: Ch
       if (!noSlot) Q.startTurn(turn, env);
       return noSlot ? 1 : 0;
     }
-    behindCheck = checksBefore() > 0;
+    // a light run is quick: it waits for a slot, never for the full checks in line
+    behindCheck = !o.noTurn && checksBefore() > 0;
     if (behindCheck) return 1;
     slot = Q.takeSlots(cost, env, { yieldToLane: task !== undefined });
     if (slot === undefined) return 1;
     // a check from before this run joined the line meanwhile: it counted this slot as held, or this run lets go
-    if (checksBefore() > 0) {
+    if (!o.noTurn && checksBefore() > 0) {
       for (const f of slot) rmSync(f, { force: true });
       slot = undefined;
       behindCheck = true;
