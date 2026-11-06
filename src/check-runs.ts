@@ -339,6 +339,23 @@ export function failedTests(output: string): string[] {
   return [...names];
 }
 
+/**
+ * Only the lines of the failed tests: each failing line with the error lines printed before it, back to the previous
+ * test's result line. Empty when the output names no failed test.
+ */
+export function failingLines(output: string): string {
+  const out: string[] = [];
+  let block: string[] = [];
+  for (const line of output.split("\n")) {
+    if (NAMED_FAIL.some((re) => re.test(line))) {
+      out.push(...block, line);
+      block = [];
+    } else if (/^\(pass\) |^\(skip\) /.test(line)) block = [];
+    else block.push(line);
+  }
+  return out.join("\n");
+}
+
 /** The first step of a check that failed and is not a test step, from the line scripts/check.ts prints for it: `check: <step> failed: <first line>`. */
 export function failedGate(output: string): FailedGate | undefined {
   for (const line of output.split("\n")) {
