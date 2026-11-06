@@ -212,6 +212,24 @@ test("install.sh marks a machine another one installs as its follower", () => {
   expect(readFileSync(join(root, "config", "release-follows"), "utf8")).toBe("desk\n");
 });
 
+test("a red test that main has moved past files no fix task", () => {
+  let head = B;
+  const { deps, did } = world(() => head, new Set([B, C]));
+  const test = deps.test;
+  deps.test = (c) => {
+    head = C;
+    return test(c);
+  };
+  const s = releaseStep(deps, env, at(0));
+  expect(s.next).toMatchObject({ commit: B, result: "red" });
+  expect(did.tasks).toEqual([]);
+  expect(s.filed).toBeUndefined();
+  // deferred, not dropped: the next run tests the new head and files for it when it is red too
+  deps.test = test;
+  releaseStep(deps, env, at(40));
+  expect(did.tasks).toEqual(["Fix next ccccccc"]);
+});
+
 test("a newer red main tells the open Fix next task and files no second one", () => {
   let head = B;
   const { deps, did, close } = world(() => head, new Set([B, C]));
