@@ -14,7 +14,6 @@ import { held, measureLoop, profileLoop, startLoopLag } from './live/loop-lag.ts
 type Sock =
   /** visible: the screen is on; push: its push subscription, which gets no alerts while the screen is on */
   | { kind: 'live'; chats: string[]; term: string | null; visible: boolean; push: string | null; link?: boolean }
-  | { kind: 'voice'; chat: string; bridge?: ReturnType<NonNullable<Source['voice']>> }
   | { kind: 'browser'; task: string; bridge?: ReturnType<NonNullable<Source['browser']>> }
 
 const FONT = join(import.meta.dir, '..', 'node_modules', 'inter-ui', 'variable', 'InterVariable.woff2')
@@ -37,9 +36,6 @@ export function startApp({ source, push, port, host = '127.0.0.1', updates, log 
   const live = new Set<ServerWebSocket<Sock>>()
   const send = (ws: ServerWebSocket<Sock>, e: ServerEvent) => ws.send(JSON.stringify(e))
 
-  const calls = new Set<ServerWebSocket<Sock>>()
-  /** about to restart for an update: no new voice call starts, so none is cut short */
-  let draining = false
   let update = updates ? readUpdate(updates) : null
   if (updates) {
     mkdirSync(dirname(updates), { recursive: true })
@@ -127,8 +123,6 @@ export function startApp({ source, push, port, host = '127.0.0.1', updates, log 
           return srv.upgrade(req, { data: { kind: 'live', chats: [], term: null, visible: false, push: null } })
             ? undefined
             : new Response('upgrade failed', { status: 400 })
-        if (path === '/api/voice')
-          return srv.upgrade(req, { data: { kind: 'voice', chat: q.get('chat') ?? '' } }) ? undefined : new Response('upgrade failed', { status: 400 })
         if (path === '/api/browser') {
           if (!source.browser) return new Response('no browser here', { status: 404 })
           return srv.upgrade(req, { data: { kind: 'browser', task: q.get('task') ?? '' } }) ? undefined : new Response('upgrade failed', { status: 400 })
@@ -146,12 +140,6 @@ export function startApp({ source, push, port, host = '127.0.0.1', updates, log 
           if (path === '/api/loop-profile') return json(await profileLoop(windowOf(q)))
           // which Lineclear answers: a start from another plugin folder or version stops it (scripts/plugin.ts)
           if (path === '/api/version') return json(running())
-          // the updater restarts the server only once it has stopped new calls and none is on; both at once, so no call
-          // can start in between. It lifts the stop again while it waits for a call to end.
-          if (path === '/api/drain' && req.method === 'POST') {
-            draining = !!((await req.json()) as { on?: boolean }).on
-            return json({ calls: calls.size })
-          }
           if (path === '/api/folders') {
             if (!source.folders) return json({ error: 'Adding spaces is not possible here.' }, 404)
             return json(await source.folders(q.get('machine') ?? '', q.get('path') ?? '~'))
@@ -281,12 +269,6 @@ export function startApp({ source, push, port, host = '127.0.0.1', updates, log 
           live.add(ws)
           send(ws, { type: 'snapshot', snapshot: source.snapshot() })
           send(ws, { type: 'update', update })
-        } else if (ws.data.kind === 'voice' && draining) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Lineclear is updating. Call again in a moment.' }))
-          ws.close()
-        } else if (ws.data.kind === 'voice' && source.voice) {
-          calls.add(ws)
-          ws.data.bridge = source.voice(ws.data.chat, { send: (d) => ws.send(d), close: () => ws.close() })
         } else if (ws.data.kind === 'browser' && source.browser) {
           ws.data.bridge = source.browser(ws.data.task, { send: (d) => ws.send(d), close: () => ws.close(), buffered: () => ws.getBufferedAmount() })
         }
@@ -312,8 +294,6 @@ export function startApp({ source, push, port, host = '127.0.0.1', updates, log 
             if (chat) send(ws, { type: 'chat', chat })
           }
           rewatch()
-        } else if (d.kind === 'voice') {
-          if (typeof msg !== 'string') d.bridge?.audio(msg.buffer.slice(msg.byteOffset, msg.byteOffset + msg.byteLength) as ArrayBuffer)
         } else if (d.kind === 'browser') {
           if (typeof msg === 'string') d.bridge?.message(msg)
         }
@@ -322,9 +302,6 @@ export function startApp({ source, push, port, host = '127.0.0.1', updates, log 
         if (ws.data.kind === 'live') {
           live.delete(ws)
           rewatch()
-        } else if (ws.data.kind === 'voice') {
-          calls.delete(ws)
-          ws.data.bridge?.end()
         } else if (ws.data.kind === 'browser') {
           ws.data.bridge?.end()
         }
@@ -381,7 +358,6 @@ function sameSite(req: Request, path: string): boolean {
     site === 'cross-site' &&
     (writes ||
       path === '/api/ws' ||
-      path === '/api/voice' ||
       path === '/api/browser' ||
       path === '/api/file' ||
       path === '/api/folders' ||

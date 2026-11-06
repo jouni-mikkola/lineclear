@@ -1,6 +1,6 @@
 # Plugins
 
-Everything is a plugin: places, coordinators, tasks, chat, reactions, artifacts, terminal, worktree, browser, voice,
+Everything is a plugin: places, coordinators, tasks, chat, reactions, artifacts, terminal, worktree, browser,
 health, alerts, keyboard, autopilot are the base ones, in `plugins/<name>/` and named in [plugins.json](../plugins.json).
 A task's side panel takes its items from plugins too (`taskPanel`: Terminal from terminal; Files, Diff and Pull request
 from worktree; Browser from browser). A plugin is a `server.ts`.

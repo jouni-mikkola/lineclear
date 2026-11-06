@@ -32,14 +32,14 @@ return to Lineclear, `herdr plugin install eliasstravik/herdr-projects --yes`.
 
 Lineclear keeps itself up to date. When its own checkout moves to a new commit (a task merged into main), it makes a
 release of that commit in `.releases/`: a frozen copy, with `bun install` run only when the lockfile changed, built and
-checked there. Once no voice call is on, it stops new calls and restarts on the release. The server always runs from a
+checked there. It then restarts on the release. The server always runs from a
 release, never from the checkout, so a later merge can't change what runs; a release that stops as it starts is taken
 back. Every open screen then reloads itself to the new version: what you were typing and the files you attached come
-back, and it waits until you stop typing, finish a voice call or stop talking to type. A screen reloads only when the
+back, and it waits until you stop typing, or stop talking to type. A screen reloads only when the
 screen itself changed. If an update fails, Lineclear keeps running the last version, says so at the top of every screen
 (tap Why for the error) and tries again on the next commit. It follows the checkout herdr links, so a merge on GitHub
 arrives once that checkout pulls it; `lineclear merge` pulls main there itself after merging a pull request. A change to
 the updater itself (`scripts/supervise.ts` and what it imports) starts it again on the new code, with the server, once
-that release is past its trial and no voice call is on.
+that release is past its trial.
 
 By hand: `bun run build && bun server/main.ts` serves on `http://127.0.0.1:7421` (`LINECLEAR_PORT` to change it).

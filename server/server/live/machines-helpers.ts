@@ -15,7 +15,6 @@ export interface MachineRec {
 }
 
 export type Events = {
-  peerChat: [machine: string, key: string, chat: Chat]
   snapshot: []
   chat: [key: string, chat: Chat]
   terminal: [key: string, screen: TermScreen]

@@ -19,22 +19,11 @@ let stopping = false
 /** the code this supervisor runs, as it started */
 const CODE = codeOf(import.meta.path)
 
-/** stop new voice calls (or let them start again) and say how many are on; a server that doesn't answer has none */
-async function drain(on: boolean) {
-  try {
-    const r = await fetch(`http://127.0.0.1:${PORT}/api/drain`, { method: 'POST', body: JSON.stringify({ on }), signal: AbortSignal.timeout(2000) })
-    return ((await r.json()) as { calls: number }).calls
-  } catch {
-    return 0
-  }
-}
-
 const sup = new Supervisor({
   root: ROOT,
   home: HOME,
   status: readJson<UpdateStatus | null>('update.json', null),
   save: (s) => writeJson('update.json', s),
-  drain,
   restart: () => child?.kill('SIGTERM'),
   sleep: (ms) => Bun.sleep(ms),
   log: (m) => console.log(m),
@@ -82,14 +71,12 @@ async function renew() {
   const now = codeOf(import.meta.path)
   if (renewing || stopping || now === CODE || now === broken || state() !== 'ok') return
   renewing = true
-  while (state() !== 'ok' || sup.onTrial || sup.working || (await drain(true)) > 0) {
-    await drain(false)
+  while (state() !== 'ok' || sup.onTrial || sup.working) {
     if (state() === 'failed') return void (renewing = false)
     await Bun.sleep(5000)
   }
   if (!(await loads())) {
     broken = now
-    await drain(false)
     return void (renewing = false)
   }
   console.log("the supervisor's own code changed: starting it again on it")

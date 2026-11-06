@@ -52,15 +52,6 @@ no icon count, so the window title says it: `(3) Lineclear`. On Android, Mac Chr
 card's first two choices as buttons that answer it at once (never one that needs a note). Alerts buzz only while the
 app is closed or in the background.
 
-## Voice
-
-Calls go through an ElevenLabs voice agent (Lineclear makes one for you, with no recording and no retention). Give it
-your key once, on the main machine:
-
-```sh
-echo "<your ElevenLabs API key>" | lineclear secret elevenlabs
-```
-
 ## Next
 
 - [Upgrading and updates](upgrading.md): coming from herdr-projects, going back, and how Lineclear keeps itself up to date.

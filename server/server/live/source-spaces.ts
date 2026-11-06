@@ -6,7 +6,7 @@ import type { PilotRun } from './autopilot.ts'
 import { killSandbox } from './autopilot-sandbox.ts'
 import { hidden } from './agents.ts'
 import { one, type Parsed } from './args.ts'
-import { excerpt, line } from './chatlines.ts'
+import { line } from './chatlines.ts'
 import { ended } from './engine/engine.ts'
 import { fitStatus } from './engine/status-line.ts'
 import { listFolders, makeRepo, resolveInHome } from './folders.ts'
@@ -79,16 +79,6 @@ export class LiveSourceSpaces extends LiveSourceViews {
       // what runs in the background shows live too, though its agent writes nothing meanwhile
       const jobs = this.chats.jobsChanged(k)
       if (pulled || menu || reply || jobs) this.emit('chat', k)
-    }
-    // replies a voice call reads out
-    for (const [k, fns] of this.replyFns) {
-      if (!fns.size) continue
-      this.chats.pull(k)
-      const last = this.chats.lastReply(k)
-      if (last && last !== this.lastAgentMsg.get(k)) {
-        if (this.lastAgentMsg.has(k)) fns.forEach((f) => f(excerpt(last, 600)))
-        this.lastAgentMsg.set(k, last)
-      }
     }
   }
 

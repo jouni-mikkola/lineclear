@@ -110,31 +110,23 @@ describe('a release', () => {
   })
 })
 
-/** a supervisor on a fixture; `calls` are the voice calls the server says are on, each time it is asked */
-function setup(calls: number[] = []) {
+/** a supervisor on a fixture */
+function setup() {
   const f = fixture()
   const log: string[] = []
   const saved: UpdateStatus[] = []
   let t = 1_000_000
-  let onWait = async () => {}
   const sup = new Supervisor({
     root: f.repo,
     status: null,
     save: (s) => void saved.push(s),
-    drain: async (on) => {
-      log.push(on ? 'stop calls' : 'calls again')
-      return on ? (calls.shift() ?? 0) : 0
-    },
     restart: () => void log.push('restart'),
-    sleep: async (ms) => {
-      t += ms
-      if (ms === 5000) await onWait()
-    },
+    sleep: async (ms) => void (t += ms),
     log: () => undefined,
     now: () => t,
   })
   const running = () => readFileSync(join(sup.dir(), 'dist', 'index.html'), 'utf8')
-  return { ...f, sup, log, saved, running, waiting: (fn: () => Promise<void>) => (onWait = fn), tick: (ms: number) => (t += ms) }
+  return { ...f, sup, log, saved, running, tick: (ms: number) => (t += ms) }
 }
 
 describe('the supervisor code', () => {
@@ -164,47 +156,9 @@ describe('the supervisor', () => {
     const s = setup()
     s.commit('v1')
     await s.sup.check()
-    expect(s.log).toEqual(['stop calls', 'restart'])
+    expect(s.log).toEqual(['restart'])
     expect(s.running()).toBe('v1')
     expect(s.saved.at(-1)?.state).toBe('ok')
-  })
-
-  test('it waits for a voice call to end, letting calls start meanwhile, then stops new calls and restarts at once', async () => {
-    const s = setup([1, 1, 0])
-    s.commit('v1')
-    await s.sup.check()
-    // the last word before the restart stops new calls: none can start between that look and the restart
-    expect(s.log).toEqual(['stop calls', 'calls again', 'stop calls', 'calls again', 'stop calls', 'restart'])
-  })
-
-  test('a merge during the wait for a call: it restarts once, on the newer commit', async () => {
-    const s = setup([1])
-    s.commit('v1')
-    s.waiting(async () => {
-      s.commit('v2')
-      await s.sup.check()
-    })
-    await s.sup.check()
-    expect(s.log.filter((l) => l === 'restart').length).toBe(1)
-    expect(s.running()).toBe('v2')
-    expect(s.saved.at(-1)?.subject).toBe('v2')
-  })
-
-  test("a broken merge during the wait for a call doesn't touch what runs", async () => {
-    const s = setup([0, 1])
-    s.commit('v1')
-    await s.sup.check()
-    const running = s.sup.dir()
-    s.commit('v2')
-    s.waiting(async () => {
-      s.commit('v3', { server: "import './nowhere.ts'\n" })
-      await s.sup.check()
-    })
-    await s.sup.check()
-    expect(s.log.filter((l) => l === 'restart').length).toBe(1)
-    expect(s.sup.dir()).toBe(running)
-    expect(s.running()).toBe('v1')
-    expect(s.saved.at(-1)).toMatchObject({ state: 'failed', subject: 'v3' })
   })
 
   test('a new release that stops as it starts is taken back', async () => {
@@ -254,12 +208,12 @@ describe("the human's own plugins", () => {
   let first: Omit<UpdateStatus, 'at'> | null = null
   test('a release takes them in from outside the repo, with their off list', async () => {
     plugin('hello', 'hello v1')
-    writeFileSync(join(home, 'plugins.json'), JSON.stringify({ off: ['voice'] }))
+    writeFileSync(join(home, 'plugins.json'), JSON.stringify({ off: ['browser'] }))
     commit('v1', { build })
     first = await update(repo, { built: null, home })
     expect(first?.state).toBe('ok')
     expect(readFileSync(at(first?.release, 'user-plugins', 'hello', 'server.ts'), 'utf8')).toBe('hello v1')
-    expect(staged(first?.release)).toEqual({ off: ['voice'], broken: {} })
+    expect(staged(first?.release)).toEqual({ off: ['browser'], broken: {} })
   })
 
   test("one that doesn't build is set aside: its last good version, or else left out; the update goes on", async () => {

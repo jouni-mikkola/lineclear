@@ -57,8 +57,6 @@ export interface Source extends Emitter<SourceEvents> {
   worktree?(ask: WorktreeAsk): Promise<unknown>
   /** a chat's activity: a turn's steps, a step's raw output, a background job's steps or output */
   activity?(ask: ActivityAsk): Promise<ActivityAnswer>
-  /** a voice call's audio bridge (live) */
-  voice?(chat: string, ws: { send(d: ArrayBuffer | string): void; close(): void }): { audio(d: ArrayBuffer): void; end(): void }
   /** a Browser panel's link to a task's shared browser (live, with the browser plugin) */
   browser?(task: string, ws: { send(d: string): void; close(): void; buffered?(): number }): { message(d: string): void; end(): void }
   /** before it stops: what must not be cut halfway (a merge) finishes; true when it waited for something */
