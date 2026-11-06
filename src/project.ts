@@ -159,7 +159,7 @@ const ENDLESS = /(^|:)(watch|dev|serve|start|preview)($|:)/;
  * The check command and the scripts of package.json that test, build or lint the whole project (or a Makefile test
  * target): each runs in a check slot.
  */
-export function detectHeavy(repo: string, check: string): string[] {
+function detectHeavy(repo: string, check: string): string[] {
   const list = [check, ...heavyScripts(repo, check)];
   const make = join(repo, "Makefile");
   if (existsSync(make) && /^test\s*:/m.test(readFileSync(make, "utf8"))) list.push("make test");

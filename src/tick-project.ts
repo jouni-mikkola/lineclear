@@ -15,7 +15,7 @@ import type { Settings } from "./project.ts";
 import { checkRoadmap, closedSteps, doneIds, isFrozen, resultFlag, type StepStatus, type Task } from "./roadmap.ts";
 import { mergedSteps, statusesFrom, stepInputs } from "./task-steps.ts";
 import type { Decision, State } from "./rules.ts";
-import { askMachines, type Candidate, localSlotsFree, mostRoom, type Room, roomLack } from "./spread.ts";
+import { askMachines, type Candidate, mostRoom, type Room, roomLack } from "./spread.ts";
 import { routineWorker } from "./routine.ts";
 import { askKey, availability, revertLast, reviewerFor, serviceAccounts } from "./stalls.ts";
 import { bindStarts, liveSteps, recordStart, lockWhy, reservedLocks, settleLockWaits } from "./starts.ts";
@@ -407,12 +407,12 @@ function startStep(s: Starting, step: Step): boolean {
   // The machine with the most free room, this one and the linked ones alike.
   const localRoom = !cap.offHere && !cap.overloaded && cap.max !== undefined && cap.free > 0;
   const candidates: Candidate[] = [
-    ...(localRoom ? [{ host: undefined, load: world.load() + cap.startedHere, loadLimit: limit, free: cap.free, slotsFree: localSlotsFree(env) }] : []),
+    ...(localRoom ? [{ host: undefined, load: world.load() + cap.startedHere, loadLimit: limit, free: cap.free }] : []),
     ...[...cap.remoteFree]
       .filter(([, n]) => n > 0)
       .flatMap(([h, n]) => {
         const r = s.rooms.get(h);
-        return r ? [{ host: h, load: r.load, loadLimit: r.loadLimit, free: n, slotsFree: r.slots - r.slotsBusy }] : [];
+        return r ? [{ host: h, load: r.load, loadLimit: r.loadLimit, free: n }] : [];
       }),
   ];
   const host = mostRoom(candidates)?.host;

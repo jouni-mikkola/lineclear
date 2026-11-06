@@ -4,7 +4,6 @@ import type { Space } from '../places.ts'
 import * as G from './git.ts'
 import * as GH from './github.ts'
 import * as Lane from './lane.ts'
-import * as Runs from '../../../../src/check-runs.ts'
 import { type TaskRec, ended, ANSWER_GRACE, CHECKS_EVERY } from './engine-helpers.ts'
 import { EngineHandoff } from './engine-handoff.ts'
 
@@ -69,7 +68,7 @@ export class EngineLand extends EngineHandoff {
         .then(() => this.head(t, repo, !!opts.self))
         // stopped short with nothing more to wait for (failed checks, GitHub refused): Ready again, or back at work
         .then(async (r) => {
-          if (!r.ok && ['queue', 'check', 'merge'].includes(t.landing?.step ?? '')) this.land(t)
+          if (!r.ok && t.landing?.step === 'merge') this.land(t)
           // what task show says when the caller never heard
           t.mergeStopped = r.ok ? undefined : (r.error ?? 'Merge failed.').slice(0, 300)
           this.save()
@@ -185,12 +184,10 @@ export class EngineLand extends EngineHandoff {
         ok: false,
         error: `Can't merge ${t.id}: ${marked.join(', ')} still ${marked.length === 1 ? 'has' : 'have'} conflict markers (<<<<<<<, =======, >>>>>>>). Solve them, commit, then merge again.`,
       }
-    const gated =
-      (await this.lane(t, p, self)) ??
-      (await Lane.smokeGate(t.worktree, t.base, async (m) => {
-        this.land(t)
-        return this.sendBackOrTell(t, self, m.replace('{id}', t.id))
-      }))
+    const gated = await Lane.smokeGate(t.worktree, t.base, async (m) => {
+      this.land(t)
+      return this.sendBackOrTell(t, self, m.replace('{id}', t.id))
+    })
     if (gated) return gated
     const g = await this.hub(p)
     if (g) return this.mergeOnGitHub(t, p, g, self)
@@ -241,59 +238,6 @@ export class EngineLand extends EngineHandoff {
       self,
       `Conflict with ${t.base}: rebase ${t.branch} on ${t.base} by hand, commit, then run lineclear merge ${t.id} again. Conflicting files: ${files.join(', ')}.`,
     )
-  }
-
-  /**
-   * The merge lane's rule, the same for every merge: the branch is rebased on main and the project's full check runs on
-   * that merged result, once (workers run only the check of what they changed). A conflict or a failed check goes back
-   * to the task's agent with the files or the output. Undefined means it may go in.
-   */
-  protected async lane(t: TaskRec, p: Space, self: boolean): Promise<{ ok: false; error: string } | undefined> {
-    const [wt, base] = [t.worktree!, t.base!]
-    if ((await G.aheadCount(wt, base)) === 0 || (await G.landed(wt, 'HEAD', base))) return undefined
-    const command = Lane.projectCheck(p.path)
-    // the full check runs on GitHub, on the pull request (mergeOnGitHub waits for it): nothing runs here
-    if (this.settings.ways(p.name).checkWhere === 'github') {
-      if (await this.hub(p)) return undefined
-      return {
-        ok: false,
-        error: `Setting Full check runs is github, but ${p.name} has no GitHub remote gh can use here (gh auth login). Nothing was merged.`,
-      }
-    }
-    // no check set for the project: nothing is assumed about its tools, and the merge goes on as before
-    if (!command) return undefined
-    // a red main or a check the machine failed pauses the line; the task that fixes it goes first
-    const repo = this.places.space(t.project)?.path ?? p.path
-    const paused = /^(fix\b|\S+ fix:)/i.test(t.title) ? undefined : Runs.lanePause(Runs.readRuns(repo, Date.now() - 86_400_000), base)
-    if (paused) return { ok: false, error: `The merge line is paused: ${paused}. Nothing was merged. Run lineclear merge ${t.id} again in a few minutes.` }
-    // one full check at a time in this repo; a real change by the task (not a message) makes it leave the line
-    const c = await Lane.checkInTurn(t.id, repo, wt, base, command, {
-      slotMachine: t.machine,
-      gone: () => (!t.landing ? 'its merge was cancelled' : ended(t) ? 'it is ended' : this.task(t.id) !== t ? 'its record was replaced' : undefined),
-      waiting: (n, noSlot) => t.landing && this.land(t, n || noSlot ? 'queue' : 'check', undefined, n),
-    })
-    if (c.step === 'conflict') return this.conflict(t, self, (await Lane.conflictFiles(wt, base)) ?? (await Lane.sharedFiles(wt, base)))
-    // back at work before its turn (its branch not touched), or while the check ran (its edits kept, rebased on main)
-    if (c.step === 'left' && t.landing) this.land(t)
-    if (c.step === 'left' || !t.landing)
-      return {
-        ok: false,
-        error: `${t.id} went back to work while its merge waited for the check slot (${c.step === 'left' ? c.why : 'its merge was cancelled'}), so nothing was merged: run lineclear merge ${t.id} again when it is ready.`,
-      }
-    this.land(t, 'merge')
-    if (!c.ok) {
-      // back where it was, so the next merge rebases and checks again
-      await G.git(wt, 'reset', '--hard', c.before)
-      this.land(t)
-      return this.sendBackOrTell(
-        t,
-        self,
-        `the full check (${command}) ran on ${t.branch} rebased on ${base}, and it failed:\n${c.tail}\nRebase on ${base}, fix it, commit, then run lineclear merge ${t.id} again.`,
-      )
-    }
-    // a check that rewrote tracked files (a formatter, a lockfile) must not make the rebase that follows refuse
-    await G.git(wt, 'reset', '--hard', 'HEAD')
-    return undefined
   }
 
   /**
@@ -360,12 +304,7 @@ export class EngineLand extends EngineHandoff {
       if (pr.isDraft) await GH.readyPr(g, wt, pr.number)
     }
     const n = t.pr!.number
-    const ways = this.settings.ways(p.name)
-    const wait = ways.checkWhere === 'github' || (t.waitChecks ?? ways.waitChecks)
-    // not waited for (Settings): its own quick checks passed, and GitHub's run on, here and then on main
-    // (watchMain); only a failure GitHub already shows at this very commit stops it
-    const now = wait || pushing ? undefined : await GH.prChecks(g, wt, n)
-    const c = wait ? await this.checksOf(t, g, n, 0) : now?.state === 'fail' ? now : { state: 'pass' as const, passed: 0, failed: [] }
+    const c = await this.checksOf(t, g, n, 0)
     if (c.state === 'pending') {
       this.land(t, 'checks', await this.checksDue(t, p, g, head))
       return {
@@ -405,7 +344,7 @@ export class EngineLand extends EngineHandoff {
       }
     }
     await G.git(p.path, 'push', '--quiet', 'origin', '--delete', t.branch!)
-    return this.mergedOnGitHub(t, p, `merged PR #${n} on GitHub${wait ? '' : ', not waiting for its checks'}`)
+    return this.mergedOnGitHub(t, p, `merged PR #${n} on GitHub`)
   }
 
   /** main here comes up to GitHub's, so the merge is here too (and Lineclear's own update sees it), then it is marked */
@@ -443,9 +382,6 @@ export class EngineLand extends EngineHandoff {
     // writing to an archived task brings it back: you talk to it again
     if (t.archived) this.unarchive(t.id)
     if (ended(t)) return
-    // a merge waiting for the check slot or running its check is cancelled only by a real change (HEAD moved, worktree
-    // dirty: the lane checks), never by words: nudges and notes reach the task while it waits
-    if (t.landing && (t.landing.step === 'queue' || t.landing.step === 'check')) return
     t.reported = false
     t.landing = undefined
     t.stopped = undefined

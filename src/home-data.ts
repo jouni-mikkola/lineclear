@@ -394,7 +394,7 @@ function spaceView(s: Raw, ctx: SpaceContext, owner?: { project: string; paused:
   const roadmap = existsSync(s.path)
     ? roadmapProgress(
         s.path,
-        spaceStops(s.key, s.path, waits, env),
+        spaceStops(s.key, waits),
         stepMarks(
           titledByStep(
             s.path,

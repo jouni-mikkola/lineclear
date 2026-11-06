@@ -1,6 +1,6 @@
 // The contract of the check tiers: tiers with budgets, the check log and flake quarantine.
 import { expect, test } from "bun:test";
-import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   type CheckRun,
@@ -8,6 +8,7 @@ import {
   failedGate,
   failedTests,
   flakeFixDue,
+  machineOf,
   onlyQuarantined,
   quarantined,
   quarantineReport,
@@ -23,7 +24,6 @@ import { proveStep } from "../../src/doneproof-run.ts";
 import { checkRoadmap, type Step } from "../../src/roadmap.ts";
 import { checkSteps } from "../../src/stepcheck.ts";
 import { machineRunLine, readWork, recordReviewCall, recordWork, runsPerMachine, strayRuns } from "../../src/task-work.ts";
-import { checkLine, inTurn, laneInLine, lineOf, machineOf } from "../../server/server/live/engine/check-queue.ts";
 import { check } from "../../src/waits.ts";
 import { changeSettings, proposeTiers, readSettings, type Settings, tiersOf } from "../../src/project.ts";
 import { sh, tmp } from "../helpers.ts";
@@ -283,65 +283,6 @@ test("a run writes the load at its start to the log line", async () => {
   ).toBe(0);
   const line = readFileSync(join(p.env.LINECLEAR_CONFIG ?? "", "check-runs.jsonl"), "utf8").trim();
   expect(JSON.parse(line).loadAtStart).toBe(6);
-});
-
-test("a run that waited behind another on one slot logs its wait, and a run that did not logs 0", async () => {
-  const p = project({ check: "sleep 1" });
-  const { env } = p;
-  writeFileSync(join(env.LINECLEAR_CONFIG ?? "", "machine.json"), JSON.stringify({ checkSlots: 1, loadPerCore: 1e6 }));
-  // the first run says it holds the slot, so the second certainly arrives behind it however loaded the machine is
-  const held = join(env.LINECLEAR_CONFIG ?? "", "held");
-  const go = (command: string) => check(() => {}, env, { cwd: p.repo, pollMs: 50 }, ["--tier", "merge", command]);
-  const first = go(`touch ${held}; sleep 2`);
-  while (!existsSync(held)) await Bun.sleep(20);
-  expect(await Promise.all([first, go("sleep 0")])).toEqual([0, 0]);
-  const [a, b] = readRuns(p.repo, 0, env).sort((x, y) => x.at - y.at);
-  expect((a?.slotWaitMin ?? 1) * 60).toBeLessThan(1);
-  expect((b?.slotWaitMin ?? 0) * 60).toBeGreaterThan(0.3);
-  expect((b?.slotWaitMin ?? 0) * 60).toBeLessThanOrEqual((a?.seconds ?? 0) + 0.1);
-});
-
-test("on two cores one heavy run holds a slot at a time, and the lane's check starts before the agent checks still waiting", async () => {
-  const p = project({ check: "true" });
-  const env = { ...p.env, LINECLEAR_CORES: "2", LINECLEAR_TASK: "LIN-1" };
-  writeFileSync(join(env.LINECLEAR_CONFIG ?? "", "machine.json"), JSON.stringify({ loadPerCore: 1e6 }));
-  const log = join(env.LINECLEAR_CONFIG ?? "", "starts");
-  const go = join(env.LINECLEAR_CONFIG ?? "", "go");
-  // the first run holds its slot until the others are in line, so a slow machine cannot hand the slot to an agent before the lane waits for it
-  const agent = (n: number) =>
-    check(() => {}, env, { cwd: p.repo, pollMs: 20 }, [
-      "--tier",
-      "merge",
-      `echo start-${n} >> ${log}; while [ ! -e ${go} ]; do sleep 0.05; done; sleep 0.2; echo end-${n} >> ${log}`,
-    ]);
-  const until = async (ready: () => boolean) => {
-    while (!ready()) await Bun.sleep(10);
-  };
-  const first = agent(0);
-  await until(() => existsSync(log));
-  const waiting = [agent(1), agent(2), agent(3)];
-  await until(() => checkLine(lineOf(p.repo, env), env).length === 4);
-  const laneLine = `${machineOf(env)}@lane`;
-  const lane = inTurn("lane", laneLine, async () => appendFileSync(log, "start-lane\nend-lane\n"), { env, pollMs: 200 });
-  await until(() => laneInLine(laneLine, env));
-  writeFileSync(go, "");
-  expect(await Promise.all([first, ...waiting, lane])).toEqual([0, 0, 0, 0, undefined]);
-  const events = readFileSync(log, "utf8").trim().split("\n");
-  // each start is followed by its own end: no two runs overlap
-  for (let i = 0; i < events.length; i += 2) expect(events[i]?.replace("start", "end")).toBe(events[i + 1]);
-  expect(events.indexOf("start-lane")).toBeLessThan(Math.min(...[1, 2, 3].map((n) => events.indexOf(`start-${n}`))));
-});
-
-test("a light run takes a free slot without waiting for the full checks in line", async () => {
-  const p = project({ check: "true" });
-  const { env } = p;
-  writeFileSync(join(env.LINECLEAR_CONFIG ?? "", "machine.json"), JSON.stringify({ checkSlots: 2, loadPerCore: 1e6 }));
-  const go = join(env.LINECLEAR_CONFIG ?? "", "go");
-  const run = (tier: string, command: string) => check(() => {}, env, { cwd: p.repo, pollMs: 20 }, ["--tier", tier, command]);
-  const full = [run("merge", `while [ ! -e ${go} ]; do sleep 0.05; done`), run("merge", "true")];
-  while (checkLine(lineOf(p.repo, env), env).length < 2) await Bun.sleep(10);
-  expect(await run("inner", `touch ${go}`)).toBe(0);
-  expect(await Promise.all(full)).toEqual([0, 0]);
 });
 
 const quiet = () => [0, 0, 0];

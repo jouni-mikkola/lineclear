@@ -454,11 +454,11 @@ export class EngineHandoff extends EngineLaunch {
   }
 
   /** a ready task's next step into main (Merging), or none: Ready again, or back at work */
-  protected land(t: TaskRec, step?: Lane.Landing['step'], due?: number, ahead?: number) {
+  protected land(t: TaskRec, step?: Lane.Landing['step'], due?: number) {
     // a merge the lane released goes no further
     if (step && this.cut.has(this.inRun.getStore() ?? -1)) throw new Error(`${t.id}'s merge was released by the lane`)
     if (!t.reported || ended(t)) return
-    t.landing = step ? { step, at: Date.now(), due, ...(ahead ? { ahead } : {}) } : undefined
+    t.landing = step ? { step, at: Date.now(), due } : undefined
     this.save()
     this.settle(t)
   }

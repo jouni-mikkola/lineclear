@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { writeAtomic } from "../pi/atomic.ts";
 import { addItem, readItems } from "../src/inbox.ts";
-import { machineOf, readWaits, writeWait } from "../src/waits.ts";
+import { readWaits, writeWait } from "../src/waits.ts";
 import { decisionsPath } from "../pi/config.ts";
 import { webApi } from "../src/web.ts";
 import { networkTrouble } from "../src/health.ts";
@@ -140,10 +140,8 @@ for (const kind of ["a killed service", "a reboot"] as const) {
     first.kill("SIGKILL"); // no chance to clean up
     await first.exited;
     if (kind === "a reboot") {
-      // a reboot also leaves what a power cut leaves: a half-written temporary file, a dead holder's lock
+      // a reboot also leaves what a power cut leaves: a half-written temporary file
       writeFileSync(join(m.config, "waits", "LIN-9.json.1.0.tmp"), '{"task":"LIN-9","kind"');
-      mkdirSync(join(m.config, "check-slots", machineOf(m.vars)), { recursive: true });
-      writeFileSync(join(m.config, "check-slots", machineOf(m.vars), "slot-0"), "999999");
     }
     expect(m.state(false)).toBe(before);
     // the service may log a decision of its own before the kill, so the earlier ones must stay as the first lines

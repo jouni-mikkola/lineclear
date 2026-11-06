@@ -58,12 +58,6 @@ test("the brief says to use roadmap show instead of reading the whole file", () 
   expect(brief).toContain("Do not read the whole docs/ROADMAP.md");
 });
 
-test("the brief says a project script keeps no global lock of its own and wraps heavy tests in lineclear slot", () => {
-  const brief = stepBrief(stepOf("A1"), settings, "r/model", "w/model");
-  expect(brief).toContain("must not keep its own global lock");
-  expect(brief).toContain("`lineclear slot`");
-});
-
 test("the brief stays under its size however long the rules are", () => {
   const repo = repoWith("- a long rule line\n".repeat(5000));
   const brief = stepBrief(stepOf("A2"), settings, "r/model", "w/model", { repo, roadmap: ROADMAP });

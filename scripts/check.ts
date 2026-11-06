@@ -9,7 +9,6 @@
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { compileCacheDir, diskTmpRoot, trimCache } from "../src/tmpdirs.ts";
-import { ownSlot } from "../src/waits.ts";
 import { testsFor } from "./changed.ts";
 import { buildMap, readMap, saveMap } from "./load-map.ts";
 import { recordPassed, splitCached } from "./result-cache.ts";
@@ -34,10 +33,6 @@ import {
 import { fastGates } from "./fast-gates.ts";
 import { describeFailure, type Failure, outsideChange, parseFailures, settleFailures } from "./flaky.ts";
 import { changedSince } from "./gates/tools.ts";
-
-// A check started by hand waits for a check slot of the machine first (the same slots `lineclear check` takes).
-const inSlot = ownSlot(["bun", "scripts/check.ts", ...process.argv.slice(2)].map((a) => `'${a.replaceAll("'", "'\\''")}'`).join(" "));
-if (inSlot) process.exit(await inSlot);
 
 // Every step but the server's (below) runs with TMPDIR in a folder of this run, on disk. Each test process clears its own
 // folder inside it (tmp-scope.ts), so anything left in it when the steps end was left by a process that did not get

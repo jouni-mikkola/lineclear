@@ -31,8 +31,6 @@ export interface Ways {
   merge: string
   /** lineclear merge waits for GitHub's checks on the pull request; else the task's own quick checks are enough */
   waitChecks: boolean
-  /** where the project's full check runs before a task lands: here in the merge line, or on GitHub's pull request */
-  checkWhere?: 'local' | 'github'
 }
 
 /** the CLI, model and effort the brief suggests for its review; nothing for a CLI's own default */
@@ -110,10 +108,7 @@ export function settingsLines(id: string, t: Told): { said: Said; text: string }
   lines.push({ said: 'merge', text: `Merge: ${merge}` })
   lines.push({
     said: 'check',
-    text:
-      w.checkWhere === 'github'
-        ? 'Checks: GitHub runs the full check. While you work run only the tests of what you changed (lineclear check --changed); lineclear check hands your branch to GitHub and waits for its result.'
-        : 'Checks: the full check runs here. While you work run only the tests of what you changed (lineclear check --changed); lineclear check runs the full check.',
+    text: 'Checks: GitHub runs the full check. While you work run only the tests of what you changed (lineclear check --changed); lineclear check hands your branch to GitHub and waits for its result.',
   })
   if (t.agent) lines.push({ said: 'agent', text: `Agent: ${onWords(t.agent)}. Only so you know what you run on.` })
   return lines.map((l) => (t.by?.[l.said] ? { ...l, text: `${l.text} (${SET_BY[t.by[l.said]!]})` } : l))

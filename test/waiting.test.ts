@@ -218,7 +218,7 @@ test("a silent machine's tasks are not waiting, drop after a day with one note, 
     projectsData(world, Date.now(), [])
       .flatMap((p) => p.tasks)
       .find((t) => t.id === "WEB-9@box");
-  const room = { host: "box", tasks: [task], working: 1, max: 4, load: 0, loadLimit: 4, slotsBusy: 0, slots: 2 } satisfies Room;
+  const room = { host: "box", tasks: [task], working: 1, max: 4, load: 0, loadLimit: 4 } satisfies Room;
   const before = countWaiting(waitingForYou(world));
 
   ask(T0, room);

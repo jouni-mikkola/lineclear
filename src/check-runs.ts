@@ -100,7 +100,7 @@ const configDir = (env: Env) => env.LINECLEAR_CONFIG ?? join(homedir(), ".config
 const logPath = (env: Env) => join(configDir(env), "check-runs.jsonl");
 
 /** A name as a folder name. */
-export const folderName = (s: string) => s.replace(/[^A-Za-z0-9._-]+/g, "_");
+const folderName = (s: string) => s.replace(/[^A-Za-z0-9._-]+/g, "_");
 
 /** The machine a check runs on: LINECLEAR_MACHINE, else the host name. */
 export const machineOf = (env: Env = process.env) => folderName((env.LINECLEAR_MACHINE ?? "").split(".")[0] || hostname().split(".")[0] || "machine");

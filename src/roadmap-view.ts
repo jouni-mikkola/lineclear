@@ -72,7 +72,7 @@ export function lineOfRoadmap(repo: string, space: string, tasks: Task[], env: E
     ),
   );
   const { merged, unproven } = planInputs(source.text, source.commits, repo, env);
-  return lineOf(source.text, source.commits, marks, stopsOfSpace(space, repo, env), now, 0, unproven, merged).line;
+  return lineOf(source.text, source.commits, marks, stopsOfSpace(space, env), now, 0, unproven, merged).line;
 }
 
 /** A roadmap of Now, Next and Later lists: each list a phase, each item a step with no task or dependency. */

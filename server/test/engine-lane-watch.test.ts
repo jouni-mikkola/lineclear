@@ -3,7 +3,6 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { afterEach, expect, test } from 'bun:test'
-import * as Queue from '../server/live/engine/check-queue.ts'
 import { repo, sh, started, until, world } from './engine-world.ts'
 
 const configBefore = process.env.LINECLEAR_CONFIG
@@ -117,45 +116,4 @@ test('a head released twice in a row has its agent restarted', async () => {
       .filter((d) => d.kind === 'stall')
       .map((d) => d.reason.split(' ')[0]),
   ).toEqual(['released', 'restarted'])
-})
-
-/** a check that spins until `../stop` is there, so its processes use the CPU all the time */
-const spinning = 'touch ../started; while [ ! -e ../stop ]; do :; done'
-
-/** a merge whose check spins: looked at every `step` minutes up to `minutes`, while its CPU is used */
-async function spinFor(name: string, minutes: number, step: number, limit?: number) {
-  const w = world()
-  const dir = repo()
-  projects([{ dir, check: spinning, limit }])
-  const t = await ready(w, dir, name)
-  const wt = t.worktree ?? ''
-  const merging = w.engine.merge(t.id, { self: true })
-  await until(() => existsSync(join(wt, '..', 'started')))
-  const t0 = Date.now()
-  let released: Awaited<typeof merging> | undefined
-  merging.then((r) => (released = r))
-  for (let at = step; at <= minutes && !released; at += step) {
-    await Bun.sleep(150)
-    await w.engine.watchHeads(t0 + at * MIN)
-    await Bun.sleep(20)
-  }
-  const stopped = released
-  writeFileSync(join(wt, '..', 'stop'), '')
-  const r = await merging
-  return { r, released: stopped, t }
-}
-
-test('a check that keeps using the CPU for 40 minutes is not released', async () => {
-  const { r, released, t } = await spinFor('lane-spin-ok', 40, 5, 60)
-  expect(released).toBeUndefined()
-  expect(r.ok).toBe(true)
-  expect(t.merged).toBe(true)
-})
-
-test('a turn past its limit is released with "over the limit", even while it works', async () => {
-  const { released, t } = await spinFor('lane-spin-over', 40, 5)
-  expect(released?.ok).toBe(false)
-  expect(released?.error).toContain('over the limit')
-  expect(t.merged).toBeFalsy()
-  expect(Queue.checkLine(Queue.lineOf(t.worktree ? join(t.worktree, '..') : ''))).toEqual([])
 })

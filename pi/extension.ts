@@ -9,7 +9,6 @@ import { existsSync, mkdirSync, readFileSync, realpathSync } from "node:fs";
 import { writeAtomic } from "./atomic.ts";
 import { configDir, readJson } from "./config.ts";
 import pack from "./pack.ts";
-import { toolRun } from "./heavy-tool.ts";
 import { quietNudge } from "./nudge.ts";
 
 type Env = Record<string, string | undefined>;
@@ -71,46 +70,6 @@ export function refusal(command: string, cwd: string, env: Env = process.env): s
   const hit = deny(cwd, env).names.find((n) => word(n).test(command));
   if (hit !== undefined) return `Refused: ${hit} is a secret this task may not see (owner-only or another project's).`;
   return undefined;
-}
-
-/** The project's heavy commands and its check, asked of the lineclear command, which reads the project's settings. */
-function heavy(cwd: string, env: Env): { heavy: string[]; check?: string } {
-  try {
-    const text = execFileSync(env.LINECLEAR_BIN ?? "lineclear", ["slot", "--list"], {
-      cwd,
-      env: env as NodeJS.ProcessEnv,
-      stdio: ["ignore", "pipe", "ignore"],
-    }).toString();
-    const j = JSON.parse(text) as { heavy?: string[]; check?: string };
-    return { heavy: j.heavy ?? [], check: j.check };
-  } catch {
-    return { heavy: [] };
-  }
-}
-
-const quote = (text: string) => `'${text.replace(/'/g, `'\\''`)}'`;
-
-const escapeRegex = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-/**
- * A heavy tool run straight, in any project: a browser suite, a build, a linter of the whole tree, or a whole test run.
- * One test file, some tests by name, one linted file or a watch is a task's own quick run and stays free.
- */
-export const heavyTool = (command: string, cwd?: string): boolean => toolRun(command, cwd) === "heavy";
-
-/**
- * The command to run instead. A line that holds the project's check runs whole through `lineclear check`, so it waits
- * its turn: one full check at a time per machine. A line that holds another heavy command (the project's, or a heavy tool
- * run straight) runs through `lineclear slot`.
- */
-export function inSlot(command: string, cwd: string, env: Env = process.env): string | undefined {
-  const trimmed = command.trim();
-  if (/(^|[\s;&|(])(\S*\/)?lineclear\s+(slot|check)\b/.test(trimmed)) return undefined;
-  const has = (h: string) => new RegExp(`(^|[\\s;&|(])${escapeRegex(h)}($|[\\s;&|)])`).test(trimmed);
-  const p = heavy(cwd, env);
-  const bin = env.LINECLEAR_BIN ?? "lineclear";
-  if (p.check !== undefined && has(p.check)) return `${bin} check ${quote(trimmed)}`;
-  return p.heavy.some(has) || heavyTool(trimmed, cwd) ? `${bin} slot ${quote(trimmed)}` : undefined;
 }
 
 /** The same rule for a file an agent reads or writes. */
@@ -284,10 +243,6 @@ export default async function lineclearExtension(pi: Pi): Promise<void> {
     if (event.toolName === "bash" && typeof input.command === "string") why = refusal(input.command, cwd);
     else if (typeof input.path === "string") why = pathRefusal(input.path, cwd);
     if (why !== undefined) return { block: true, reason: why };
-    if (event.toolName === "bash" && typeof input.command === "string") {
-      const wrapped = inSlot(input.command, cwd);
-      if (wrapped !== undefined) input.command = wrapped;
-    }
     return undefined;
   });
   pi.on("after_provider_response", (event, ctx) => {
