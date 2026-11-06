@@ -10,6 +10,7 @@ import { availability } from "./stalls.ts";
 import type { Step } from "./roadmap.ts";
 import { configDir } from "../pi/config.ts";
 import { gitText } from "./git.ts";
+import { recordWork } from "./task-work.ts";
 
 /** What one step check may read and say, in tokens (counted as a quarter of the characters). */
 /** A planning task ends when its steps drew a no-go in this many rounds. */
@@ -189,6 +190,7 @@ export function checkSteps(i: StepCheckInput): StepVerdict {
   }
   const rest = i.reviewers.filter((m) => m !== model);
   const retryModel = pickChecker(i.planner, rest, (m) => availability(m, i.env) === "ok") ?? i.planner ?? model;
+  recordWork(i.task, "stepcheck", i.env);
   const record = readChecks(i.task, i.env);
   const round = record.rounds + 1;
   const agents = existsSync(join(i.root, "AGENTS.md")) ? readFileSync(join(i.root, "AGENTS.md"), "utf8") : "";

@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import * as Runs from '../../src/check-runs.ts'
+import { readWork } from '../../src/task-work.ts'
 import * as Lane from '../server/live/engine/lane.ts'
 import * as Queue from '../server/live/engine/check-queue.ts'
 import { repo, sh, started, until, world } from './engine-world.ts'
@@ -341,4 +342,16 @@ test('a task started on machine B: its merge check through the engine runs on B,
   expect(runs.length).toBeGreaterThan(0)
   expect(runs.every((r) => r.machine === 'boxb')).toBe(true)
   expect(runs.some((r) => r.machine === Runs.machineOf())).toBe(false)
+})
+
+test('a task started on machine B has its agent recorded as run on B, none on the main machine', async () => {
+  const w = world()
+  const dir = repo()
+  project(dir, 'true')
+  const p = await w.places.add(dir, 'lane-agent-b')
+  const t = w.engine.add({ project: p.name, title: 'Say hello', desc: 'Add hello.txt.', by: 'test', machine: 'boxb' })
+  await until(() => w.started.some((s) => s.key === `${t.id}/Agent`))
+  const lines = readWork().filter((l) => l.step === t.id)
+  expect(lines.map((l) => l.work)).toEqual(['agent'])
+  expect(lines.every((l) => l.machine === 'boxb')).toBe(true)
 })

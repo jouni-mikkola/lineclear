@@ -25,7 +25,7 @@ imports count for the borders but not for cycles, since they are gone when the c
 | `shared` | `server/shared/` | types and pure helpers the server shares | none |
 | `server` | `server/server/` | the server: the live source, agents, chats, the engine and the merge lane | `shared`, `generated`, `check-line`, `registry`, `timer-rule` |
 | `registry` | `src/models.ts` | the models every installed harness lists | none |
-| `check-line` | `server/server/live/engine/check-queue.ts`, `src/check-runs.ts`, `src/git.ts`, `src/time.ts` | one line of full checks per repo and machine, each machine's check slots, the stuck head and the log of every check run, files `lineclear check` and the merge lane share, and the one git helper and time constants | none |
+| `check-line` | `server/server/live/engine/check-queue.ts`, `src/check-runs.ts`, `src/task-work.ts`, `src/git.ts`, `src/time.ts` | one line of full checks per repo and machine, each machine's check slots, the stuck head and the log of every check run and of the work a task does on its machine, files `lineclear check` and the merge lane share, and the one git helper and time constants | none |
 | `timer-rule` | `server/server/live/timer-rule.ts` | whether a coordinator may wake on a timer, one rule for the server's refusal and the CLI's heal | none |
 | `generated` | `server/generated/` | the plugin registries the build writes | `plugins` |
 | `plugins` | `server/plugins/` | the server's plugins, each a server part | `server`, `shared` |
