@@ -97,7 +97,7 @@ test("starts here and on another machine share the cap", () => {
   let here = true;
   const remote: string[] = [];
   t.world.maxTasks = () => (here ? 3 : 0);
-  t.world.room = (host) => ({ host, tasks: [], working: 0, max: 3, load: 0, loadLimit: 1e6, slotsBusy: 0, slots: 3 });
+  t.world.room = (host) => ({ host, tasks: [], working: 0, max: 3, load: 0, loadLimit: 1e6, slotsBusy: 0, slots: 1 });
   t.world.load = () => 0;
   t.world.addTaskOn = (host, _s, title) => {
     remote.push(`${host} ${title}`);
