@@ -192,6 +192,12 @@ function red(s: ReleaseState, deps: ReleaseDeps, head: string, stable: string, w
   s.next = { ...(s.next as Build), result: "red", why };
   s.held = `next ${short(head)} failed: ${why}`;
   if (s.filed === head) return;
+  // the test can outlast a fix: main moved on, so this red may be fixed already and the next run tests the new head
+  try {
+    if (deps.head() !== head) return;
+  } catch {
+    // main unreadable: file as before
+  }
   // one fix task at a time: a newer red main goes to the open one as a message
   const open = deps.openFix();
   if (open) {
