@@ -148,12 +148,11 @@ export function roadmapData(
 
   const ids = new Set(parsed.steps.map((s) => s.id));
   const marks = commits.map((c) => ({ c, steps: [...doneIds([c], ids)] }));
-  const done = doneIds(commits, ids);
 
   const read = tasksOf(settings.space);
   const tasks = typeof read === "string" ? [] : read;
   const unproven = unprovenOf(settings.repo, env);
-  const states = statusesOf(parsed.steps, done, tasks, settings.repo, env, unproven);
+  const states = statusesOf(parsed.steps, commits, tasks, settings.repo, env);
   const taskOf = taskOfStep(parsed.steps, tasks, settings.repo, env);
   const phases = [...new Set(parsed.steps.map((s) => s.phase))];
   const steps = parsed.steps.map((s, i): RoadmapStep => {
