@@ -41,3 +41,10 @@ test('a second close fails', async () => {
   await expect(rpc('x')).rejects.toThrow('herdr closed the connection')
   expect(calls).toBe(2)
 })
+
+test('a call that types is not repeated', async () => {
+  drops = 1
+  calls = 0
+  await expect(rpc('pane.send_text')).rejects.toThrow('herdr closed the connection')
+  expect(calls).toBe(1)
+})
