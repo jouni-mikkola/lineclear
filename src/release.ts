@@ -378,8 +378,12 @@ function testNext(app: string, dir: string, commit: string, env: Env): string {
     ["web build", ["bun", "run", "web:build"], dir],
     ["server build", ["bun", "run", "build"], join(dir, "server")],
   ];
+  // install.sh copies next's build only when this marker names its commit, so a failed build is never reused
+  const built = join(dir, ".lineclear-built");
+  rmSync(built, { force: true });
   const broke = runSteps(steps, env);
   if (broke) return broke;
+  writeAtomic(built, `${commit}\n`);
   // Checks are light and run on GitHub, never here: next goes out when the merged commit's GitHub check is green.
   const github = githubCheck(commit, dir, env);
   if (github) return github;

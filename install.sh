@@ -104,12 +104,26 @@ install_tools() {
   have pi || die "pi did not install. See https://pi.dev"
 }
 
+# A promotion has just installed and built this commit in the cache's next clone (it says so in .lineclear-built): copy that
+# work when next is at $head and its lockfiles match, so the same commit is not built twice. Returns 1 (nothing copied) otherwise.
+reuse_next() {
+  next=${XDG_CACHE_HOME:-$HOME/.cache}/lineclear/next
+  [ "$next" != "$app" ] && [ -d "$next/ui/web/dist" ] && [ -d "$next/node_modules" ] && [ -d "$next/server/node_modules" ] || return 1
+  [ "$(git -C "$next" rev-parse HEAD 2>/dev/null || true)" = "$head" ] && [ "$(cat "$next/.lineclear-built" 2>/dev/null || true)" = "$head" ] || return 1
+  cmp -s "$next/bun.lock" "$app/bun.lock" && cmp -s "$next/server/bun.lock" "$app/server/bun.lock" || return 1
+  say "Lineclear: reusing the build of $(printf %.7s "$head")"
+  rm -rf "$app/node_modules" "$app/server/node_modules" "$app/ui/web/dist"
+  cp -a "$next/node_modules" "$app/node_modules" && cp -a "$next/server/node_modules" "$app/server/node_modules" \
+    && cp -a "$next/ui/web/dist" "$app/ui/web/dist" || { rm -rf "$app/node_modules" "$app/server/node_modules" "$app/ui/web/dist"; return 1; }
+}
+
 # Installs the dependencies and builds the web pages for the commit in $app, unless that was done for it already.
 # The stamp says which commit they were made for, so a failed install is tried again.
 build_deps() {
   stamp=$app/node_modules/.lineclear-installed
   head=$(git -C "$app" rev-parse HEAD)
   [ "$(cat "$stamp" 2>/dev/null || true)" != "$head" ] || return 0
+  if reuse_next; then printf '%s\n' "$head" >"$stamp"; changed=1; return 0; fi
   (cd "$app" && bun install --frozen-lockfile --silent) || return 1
   # the fork's push code, which sends the Inbox alerts, needs its own packages
   (cd "$app/server" && bun install --frozen-lockfile --silent) || return 1
