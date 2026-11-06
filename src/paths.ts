@@ -21,6 +21,8 @@ export const SERVICE = "lineclear.service";
 /** Where install puts each thing. It follows the XDG folders and pi's own folder variable. */
 export interface Paths {
   app: string;
+  /** The folder of release builds: a release install links the command and the pi extension into builds/current. */
+  builds: string;
   binLink: string;
   unit: string;
   extension: string;
@@ -37,6 +39,7 @@ export function pathsFor(env: Record<string, string | undefined> = process.env):
   const piDir = env.PI_CODING_AGENT_DIR || join(home, ".pi", "agent");
   return {
     app: join(data, "lineclear"),
+    builds: join(env.LINECLEAR_HOME ?? join(home, ".lineclear"), "builds"),
     binLink: join(home, ".local", "bin", "lineclear"),
     unit: join(config, "systemd", "user", SERVICE),
     extension: join(piDir, "extensions", "lineclear.ts"),

@@ -29,17 +29,18 @@ function exists(path: string): boolean {
 }
 
 /** The file install writes for pi, unchanged. */
-function ourExtension(path: string, app: string): boolean {
+function ourExtension(path: string, codes: string[]): boolean {
   try {
-    return readFileSync(path, "utf8") === extensionFile(app);
+    const text = readFileSync(path, "utf8");
+    return codes.some((code) => text === extensionFile(code));
   } catch {
     return false;
   }
 }
 
-function ours(link: string, app: string): boolean {
+function ours(link: string, folders: string[]): boolean {
   try {
-    return lstatSync(link).isSymbolicLink() && readlinkSync(link).startsWith(`${app}/`);
+    return lstatSync(link).isSymbolicLink() && folders.some((f) => readlinkSync(link).startsWith(`${f}/`));
   } catch {
     return false;
   }
@@ -75,15 +76,17 @@ export function uninstall(r: Remover, all: boolean, out: (line: string) => void)
     r.run(["systemctl", "--user", "unset-environment", "NODE_COMPILE_CACHE"]);
     out("Removed the NODE_COMPILE_CACHE setting");
   }
+  const codeFolders = [paths.app, paths.builds];
   const files: [string, string, boolean][] = [
     [paths.extension, "the pi extension", true],
     [paths.binLink, "the lineclear command", true],
     [paths.app, "the Lineclear files", false],
+    [paths.builds, "the release builds", false],
   ];
   if (all) files.push([paths.config, "the project settings and secrets", false]);
   for (const [path, what, isLink] of files) {
     if (!exists(path)) continue;
-    if (isLink && !ours(path, paths.app) && !(path === paths.extension && ourExtension(path, paths.app))) {
+    if (isLink && !ours(path, codeFolders) && !(path === paths.extension && ourExtension(path, [paths.app, join(paths.builds, "current")]))) {
       out(`Left ${path}, it is not a link to Lineclear`);
       continue;
     }

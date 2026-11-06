@@ -34,7 +34,7 @@ if (port)
     );
     if (html) seen.push([`page ${page}`, html]);
   }
-const units = run(["sh", "-c", `ls ${home}/.config/systemd/user | grep -i ${OLD_NAME}; cat ${home}/.config/systemd/user/${OLD_NAME}*.service`]);
+const units = run(["sh", "-c", `ls ${home}/.config/systemd/user | grep -i ${OLD_NAME}; cat ${home}/.config/systemd/user/${OLD_NAME}*.service 2>/dev/null`]);
 seen.push(["service units", units]);
 seen.push(["installed names", run(["sh", "-c", `ls ${home}/.local/bin ${home}/.pi/agent/extensions`])]);
 
