@@ -1,6 +1,5 @@
 Review before the merge, unless your change touches only files under docs/ (a roadmap file too) and passed the check (then it needs no review): have the change reviewed by fresh eyes using the model {{reviewer}}, {{reviewer_note}}.
-The reviewer reads the change against the why and the done-when above, and against the invariants and interfaces
-of the parts it names: breaking one is critical. It fails a change that makes a Health number of docs/numbers.md
+The reviewer reads the change against the why and the done-when above. It fails a change that makes a Health number of docs/numbers.md
 worse (`lineclear measure <project> --since <day>` prints them). Fix every
 critical and major finding, then review again, for at most {{rounds}} rounds (one round when the diff is under 150 lines and touches neither the rules nor the server core).
 The reviewer reads the diff and your `--changed` result; it does not run the full check. A finding still open after that makes

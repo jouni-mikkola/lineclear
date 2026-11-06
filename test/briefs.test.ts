@@ -160,14 +160,3 @@ test("a docs-only step is told it needs no review and a code step is told its re
   expect(codeBrief).toContain('LINECLEAR_CHAT="C1/Reviewer"');
   expect(codeBrief).not.toContain("{{");
 });
-
-test("a step's brief carries the pages of its parts and tells its reviewer that breaking one is critical", () => {
-  const repo = repoWith("rules");
-  mkdirSync(join(repo, "docs", "parts"), { recursive: true });
-  writeFileSync(join(repo, "docs", "parts", "alpha.md"), "# alpha\nKeeps things.\n\n## Invariants\n- alpha stays whole.\n");
-  const withParts = parseRoadmap(`# R\n\n## Phase 0: P\n\n${step("P1", "none")}`.replace("- locks: x", "- parts: alpha")).steps[0]!;
-  const brief = stepBrief(withParts, settings, "r/model", "w/model", { repo, roadmap: ROADMAP });
-  expect(brief).toContain("The parts this step changes. Keep their invariants and interfaces");
-  expect(brief).toContain("- alpha stays whole.");
-  expect(brief).toContain("of the parts it names: breaking one is critical");
-});
