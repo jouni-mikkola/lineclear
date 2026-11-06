@@ -47,5 +47,6 @@ test("a browser spec under ui/test/ is left out of the report", () => {
   const kept = withoutBrowserSpecs(report, arch);
   expect(kept).not.toContain("ui/test/");
   expect(linesPerModule(kept, arch)["ui-test"]).toBeUndefined();
+  expect(Object.keys(fileCoverage(report, arch, { pi: 90, cli: 30 }))).toEqual(["pi/a.ts", "src/b.ts", "src/c.ts"]);
   expect(Object.keys(fileCoverage(kept, arch, { pi: 90, cli: 30, "ui-test": 94 }))).not.toContain("ui/test/a.spec.ts");
 });
