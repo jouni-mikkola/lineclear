@@ -19,21 +19,17 @@ Every step has the same shape:
     - why: <one reason that holds for anyone>
     - done when:
       - <a test or a fact that anyone can check>
-    - parts: <the parts it changes, from docs/parts/>
-    - locks: <the real areas it changes, so steps on other areas of the same part run beside it; none holds each part whole>
+    - locks: <the real areas it changes, so steps on other areas run beside it; none if it touches no shared code>
     - after: <ids that must be merged first, or none>
     - files: <paths or folders it is likely to touch, at least one>
 
-Rules: one small step does one thing. Two steps that touch the same code share a part or a lock. In a repo with
-`docs/parts/`, every new step names its parts (a step with no `locks` holds each part whole, so name its real areas on `locks`), and one step in five
-is a health step for the part with the worst health in `lineclear measure`: write `<part> (health)` on its parts
-line. In a repo with no parts, leave the parts line out and write locks. A step with no `after` can
+Rules: one small step does one thing. Two steps that touch the same code share a lock. A step with no `after` can
 start at once, so give each step the ids it really needs. New ideas that are not part of the goal do not go in.
 
 Do not run `git push` and do not merge. When the file is ready:
 
 1. Run `lineclear roadmap check .` until it passes, then commit the change.
-2. Run `lineclear plan submit`. It runs the rule checks (form, parts, locks, `after`, the longest chain to U43 not
+2. Run `lineclear plan submit`. It runs the rule checks (form, locks, `after`, the longest chain to U43 not
    longer, every done-when kept as strict) and a fresh-eyes readiness check. A model from another company reads each new or changed step too and
    may send it back as unclear: make the step say what it needs. Three rounds with a no-go end this task. When both pass, the plan merges by itself and the
    owner can undo it with one tap. If one refuses, it prints why: fix that, commit and run it again. Make no commit after it passes.

@@ -26,6 +26,5 @@ test("a word of the list is a hit in any case, with its line number", () => {
 test("the working notes do not ship", () => {
   expect(isPublic("docs/numbers.md")).toBe(false);
   expect(isPublic("docs/u39/after/home.webp")).toBe(false);
-  expect(isPublic("docs/public-roadmap.md")).toBe(false);
   expect(isPublic("docs/idea.md")).toBe(true);
 });

@@ -309,7 +309,6 @@ test("a fixture of two days gives the hand counted numbers", async () => {
       { cause: "cacheRead", perStep: 1 / 6, share: 1 / 9 },
       { cause: "cacheWrite", perStep: 0, share: 0 },
     ],
-    partHealth: [],
     mergeLine: [],
     ownerTaps: { perStep: 0, steps: 6, taps: 0 },
     // by hand: S1, S2, S5, S6 before; S3, S4 with. Reverts name S2 only. Questions: S1 1, S2 1, S3 3.
@@ -364,18 +363,6 @@ test("the text form lists each day and names what it left out", async () => {
   expect(r.out).toContain("no price in pi's model data, steps not counted: p/nope");
   expect(r.out).toContain("1 merged step had no task, not counted: S6");
   expect(r.out).toContain("no session file found, steps not counted: LIN-4");
-});
-
-test("a repo with parts gets a line of health per part, its debts counted", async () => {
-  const repo = join(root, "repo");
-  mkdirSync(join(repo, "docs", "parts"), { recursive: true });
-  const page = (name: string, debts: string) =>
-    `# ${name}\n\nWhat it is for.\n\n## Invariants\n\n- it holds\n\n## Interface\n\nnone\n\n## Files\n\n- \`src/${name}.ts\`\n\n## Tests\n\n- none\n\n## Debts\n\n${debts}\n`;
-  writeFileSync(join(repo, "docs", "parts", "a.md"), page("a", "- one\n- two"));
-  writeFileSync(join(repo, "docs", "parts", "b.md"), page("b", "- none"));
-  const r = await run(["measure", "proj", "--since", "2026-01-01"]);
-  expect(r.out).toContain("part health (higher is worse): part  score");
-  expect(r.out).toMatch(/\n {2}a +2 +0 +0 +2 +0 +0 +0 +0\n {2}b +0 /);
 });
 
 test("the text form counts the step check before and with it", async () => {

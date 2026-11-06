@@ -463,7 +463,7 @@ interface AskLine {
 }
 
 const RULE_ANSWER = "a rule answers it";
-/** The number of the rule in docs/asks.md that answers a kind. */
+/** The number of the rule that answers a kind. */
 const ruleNumber: Partial<Record<AskKind, number>> = { allowance: 1, "merge-chat": 2, plan: 6, question: 5 };
 const answerOf = (kind: AskKind) => (askRoute[kind] === "rule" ? `rule ${ruleNumber[kind]}` : `Inbox: ${askRoute[kind]}`);
 

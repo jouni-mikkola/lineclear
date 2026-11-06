@@ -7,7 +7,7 @@ import { addItem, closeItem, isOpen, readItems, type Item } from "./inbox.ts";
 import { askBefore, readSettings } from "./project.ts";
 import { checkRoadmap, parseRoadmap, resultOf, stepResultProblems, type Step } from "./roadmap.ts";
 import { configDir } from "../pi/config.ts";
-import { HEALTH_TAG, holdsPartsWhole, type Part, stepLocks, stepPartFaults, stepParts } from "./parts.ts";
+import { stepLocks } from "./parts.ts";
 import { clearWait } from "./waits.ts";
 import { gitAsLineclear } from "./git.ts";
 
@@ -19,47 +19,6 @@ const lines = (s: Step, field: string) => {
   return f ? [f.value, ...f.more].map((l) => l.trim().replace(/^[-*]\s+/, "")).filter(Boolean) : [];
 };
 const lockSet = (s: Step) => new Set(stepLocks(s).map((l) => l.toLowerCase()));
-
-/** The repo's parts and the ones with the worst health, for the part rules of a plan. */
-export interface PartsContext {
-  parts: Part[];
-  worst: string[];
-}
-
-/**
- * The part rules of a plan: each new or changed step names its parts and its files fall inside them, a new health
- * step is for a part with the worst health, and the roadmap keeps one health step in five.
- */
-export function partProblems(old: Step[], next: Step[], ctx: PartsContext): string[] {
-  if (ctx.parts.length === 0) return [];
-  const problems: string[] = [];
-  const oldById = new Map(old.map((s) => [s.id, s]));
-  const same = (a: Step, b: Step) =>
-    a.title === b.title &&
-    JSON.stringify(Object.entries(a.fields).map(([k, f]) => [k, f.value, f.more])) ===
-      JSON.stringify(Object.entries(b.fields).map(([k, f]) => [k, f.value, f.more]));
-  for (const n of next) {
-    const o = oldById.get(n.id);
-    if (n.dropped || (o && same(o, n))) continue;
-    const { names, health } = stepParts(n);
-    if (names.length === 0) problems.push(`parts: step ${n.id} names no parts (one or more of ${ctx.parts.map((p) => p.name).join(", ")})`);
-    problems.push(...stepPartFaults(n, ctx.parts).map((f) => `parts: ${f}`));
-    const wasHealth = o ? stepParts(o).health : [];
-    const fresh = health.filter((h) => !wasHealth.includes(h) && !ctx.worst.includes(h));
-    if (fresh.length > 0 && ctx.worst.length > 0)
-      problems.push(`parts: step ${n.id} is a health step for ${fresh.join(", ")}, but the worst health is ${ctx.worst.join(", ")}`);
-  }
-  const live = (steps: Step[]) => steps.filter((s) => !s.dropped && stepParts(s).names.length > 0);
-  // one step in five of the steps that name parts is a health step
-  const short = (steps: Step[]) => Math.floor(live(steps).length / 5) - live(steps).filter((s) => stepParts(s).health.length > 0).length;
-  // a roadmap already short of health steps may not get shorter; one that was not may not start
-  if (short(next) > 0 && short(next) > Math.max(0, short(old))) {
-    problems.push(
-      `parts: keep one step in five a health step (${HEALTH_TAG} after a part on its parts line): add one for ${ctx.worst.join(", ") || "the part with the worst health"}`,
-    );
-  }
-  return problems;
-}
 
 /** The step the longest chain is counted to: U43, or else the last step that is not dropped. */
 function lastStep(steps: Step[]): string | undefined {
@@ -109,10 +68,6 @@ export function stepFormProblems(before: string, after: string): string[] {
     const unknown = s.after.filter((a) => a !== "none" && !known.has(a));
     if (unknown.length > 0) missing.push(`known ids in after (unknown: ${unknown.join(", ")})`);
     if (!lines(s, "files").some((l) => /[./]/.test(l))) missing.push("a files line that names at least one path");
-    if (holdsPartsWhole(s))
-      missing.push(
-        "locks that name the real areas it changes, or the part itself when the work needs all of it (a step with parts and no locks holds each part whole)",
-      );
     if (missing.length > 0) out.push(`step ${s.id} needs ${missing.join("; ")}`);
     out.push(...stepResultProblems(s));
   }

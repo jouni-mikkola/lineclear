@@ -45,11 +45,10 @@ test("doneIds reads `<TASK>: <id>` subjects; stepStatuses gives the states", () 
   expect(stepStatuses(steps, new Set(), [{ title: "A1 One", status: "work" }]).map((s) => s.state)).toEqual(["work", "waiting"]);
 });
 
-test("fitSections keeps the brief within BRIEF_MAX, the rules giving way before the part pages", () => {
-  const s = fitSections(BRIEF_MAX - 3000, ["src/a.ts"], "r".repeat(5000), "p".repeat(1000));
+test("fitSections keeps the brief within BRIEF_MAX, the rules giving way before the files", () => {
+  const s = fitSections(BRIEF_MAX - 3000, ["src/a.ts"], "r".repeat(5000));
   expect(s.files).toContain("src/a.ts");
-  expect(s.parts).toContain("p".repeat(1000));
-  expect(s.files.length + s.rules.length + s.parts.length).toBeLessThanOrEqual(3000);
+  expect(s.files.length + s.rules.length).toBeLessThanOrEqual(3000);
 });
 
 test("planProblems passes an unchanged roadmap and refuses a deleted step", () => {

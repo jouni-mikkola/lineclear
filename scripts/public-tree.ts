@@ -1,13 +1,12 @@
-// The files that go into the public repository: every tracked file but the owner's working notes (docs/public.md).
-// `bun scripts/public-tree.ts <dir>` copies them into an empty folder, with docs/public-roadmap.md as
-// its ROADMAP.md. It touches no git remote.
-import { copyFileSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, symlinkSync, writeFileSync } from "node:fs";
+// The files that go into the public repository: every tracked file but the owner's working notes.
+// `bun scripts/public-tree.ts <dir>` copies them into an empty folder. It touches no git remote.
+import { copyFileSync, lstatSync, mkdirSync, readdirSync, readlinkSync, symlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 /** Working notes, measurements and machine reports of the people who build Lineclear; they do not ship. */
-const PRIVATE = [/^docs\/(numbers|ROADMAP|backlog|simplify|kit|asks)\.md$/, /^docs\/(audit|research|u\d+)\//];
+const PRIVATE = [/^docs\/(numbers|ROADMAP|backlog|simplify)\.md$/, /^docs\/(audit|research|u\d+)\//];
 
-export const isPublic = (file: string) => file !== "docs/public-roadmap.md" && !PRIVATE.some((p) => p.test(file));
+export const isPublic = (file: string) => !PRIVATE.some((p) => p.test(file));
 
 /** The tracked files that ship, as the repository holds them. */
 export function publicFiles(root: string): string[] {
@@ -26,7 +25,6 @@ function exportTree(root: string, dest: string) {
     if (lstatSync(from).isSymbolicLink()) symlinkSync(readlinkSync(from), to);
     else copyFileSync(from, to);
   }
-  writeFileSync(join(dest, "docs", "ROADMAP.md"), readFileSync(join(root, "docs", "public-roadmap.md")));
 }
 
 if (import.meta.main) {

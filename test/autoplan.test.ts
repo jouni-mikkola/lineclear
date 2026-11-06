@@ -77,14 +77,3 @@ test("files must name a path, and a dropped step is left alone", () => {
 test("a changed old step is checked as well", () => {
   expect(stepFormProblems(base, base.replace("it works", "it works well"))[0]).toContain("step A1 needs a files line");
 });
-
-test("a step with parts must name its lock areas, or the part when it needs all of it", () => {
-  const text = (locks: string, files = "") => `${base}\n${step("B1", "A1", "it works", locks).replace("- locks", `- parts: ui\n${files}- locks`)}`;
-  expect(stepFormProblems(base, text("none"))[0]).toContain("name the real areas");
-  expect(stepFormProblems(base, text("none").replace("- locks: none\n", ""))[0]).toContain("the part itself when the work needs all of it");
-  expect(stepFormProblems(base, text("kit", "- files: src/b.ts\n"))).toEqual([]);
-  expect(stepFormProblems(base, text("ui", "- files: src/b.ts\n"))).toEqual([]);
-  expect(stepFormProblems(base, text("none", "- files: src/b.ts\n"))).toEqual([]);
-  const held = text("none");
-  expect(stepFormProblems(held, `${held}\n`)).toEqual([]);
-});

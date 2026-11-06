@@ -4,7 +4,7 @@ import type { Step } from "./roadmap.ts";
 import { company } from "./company.ts";
 import type { Settings } from "./project.ts";
 import { ownerDirection } from "./direction.ts";
-import { readParts, stepFiles, stepParts } from "./parts.ts";
+import { stepFiles } from "./parts.ts";
 import { mainRefs } from "./main-branch.ts";
 import { READER_ASK } from "./reader-ask.ts";
 import { gitText } from "./git.ts";
@@ -91,30 +91,18 @@ function briefRules(repo: string): string {
   return existsSync(file) ? readFileSync(file, "utf8").trim() : "";
 }
 
-/** The pages of the parts a step names: what its worker keeps true, like a team member who knows the part. */
-export function briefParts(repo: string, step: Step): string {
-  const names = stepParts(step).names;
-  return readParts(repo)
-    .filter((p) => names.includes(p.name))
-    .map((p) => p.text.trim())
-    .join("\n\n");
-}
-
 const cutTo = (text: string, room: number, note: string) =>
   text.length <= room ? text : room > 0 ? `${text.slice(0, room).replace(/\n[^\n]*$/, "")}\n(cut: ${note})` : "";
 
 /** The sections a brief adds to the step's own words, cut so that the whole brief fits `BRIEF_MAX`. */
-export function fitSections(base: number, files: string[], rules: string, parts = ""): { files: string; rules: string; parts: string } {
+export function fitSections(base: number, files: string[], rules: string): { files: string; rules: string } {
   const fileBlock = (list: string[]) => (list.length === 0 ? "" : `\nFiles this step is likely to touch:\n${list.map((f) => `- ${f}`).join("\n")}\n`);
   const ruleBlock = (r: string) => (r === "" ? "" : `\nThe project's rules (AGENTS.md):\n\n${r}\n`);
-  const partBlock = (r: string) =>
-    r === "" ? "" : `\nThe parts this step changes. Keep their invariants and interfaces; a change to one updates its page in the same change:\n\n${r}\n`;
   let list = files;
   let f = fileBlock(list);
   while (base + f.length > BRIEF_MAX && list.length > 0) f = fileBlock((list = list.slice(0, -1)));
-  const p = partBlock(cutTo(parts, BRIEF_MAX - base - f.length - 200, "read the pages in docs/parts/ for the rest"));
-  const cut = cutTo(rules, BRIEF_MAX - base - f.length - p.length - 80, "read AGENTS.md for the rest");
-  return { files: f, rules: ruleBlock(cut), parts: p };
+  const cut = cutTo(rules, BRIEF_MAX - base - f.length - 80, "read AGENTS.md for the rest");
+  return { files: f, rules: ruleBlock(cut) };
 }
 
 /** Review rounds when the project sets none. */
@@ -158,7 +146,6 @@ export function stepBrief(
     review: "",
     files: "",
     rules: "",
-    parts: "",
     reopened: unproven
       ? `\nThis step was merged, but the independent checker could not prove this item of its "done when": ${unproven}\nDo that item, and only that item. A tag, a release or a recorded run is proven by a command the checker runs (\`git ls-remote --tags origin\`, \`gh release view\`), not by text.\n`
       : step.reopened
@@ -168,6 +155,6 @@ export function stepBrief(
   values.review = reviewBlock(step, values);
   if (!ctx) return fill(template("brief.md", settings.repo), values);
   const base = fill(template("brief.md", settings.repo), values).length;
-  const sections = fitSections(base, briefFiles(ctx.repo, step, stepText(ctx.roadmap, step)), briefRules(ctx.repo), briefParts(ctx.repo, step));
+  const sections = fitSections(base, briefFiles(ctx.repo, step, stepText(ctx.roadmap, step)), briefRules(ctx.repo));
   return fill(template("brief.md", settings.repo), { ...values, ...sections });
 }

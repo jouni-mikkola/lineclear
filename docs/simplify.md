@@ -13,7 +13,7 @@ Columns: seconds and tokens per merged step, restarts, and what breaks without t
 - store seconds: one read of the file, from the config folder (`check-runs.jsonl`, `check-steps.jsonl`, `decisions.jsonl`) or `~/.lineclear` (the task store).
 - loop restarts: the `stall` lines of `decisions.jsonl`, each a task the loop's rules restarted or answered. A loop runs inside `lineclear.service`, so its time is in that row.
 - gate seconds: one timed run of `bun scripts/gates/run.ts <gate>` times the runs of the `gates` step in `check-steps.jsonl` per merged step. Restarts: runs in `check-runs.jsonl` that failed in the `gates` step.
-- tokens: none of these parts calls a model, so each is 0. The rules decide by code, never by a model (`docs/parts/rules.md`). Review and agent tokens are in `lineclear measure`.
+- tokens: none of these parts calls a model, so each is 0. The rules decide by code, never by a model. Review and agent tokens are in `lineclear measure`.
 
 A zero in restarts or gate failures can mean the log has no such line on this machine (`check-runs.jsonl` is written by `lineclear check`); the command prints the same zero.
 

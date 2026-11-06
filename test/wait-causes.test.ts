@@ -10,7 +10,7 @@ const line = (step: string, time: string, kind: string, reason: string) => ({ st
  * A merges at 10:00, so B, C and D are ready then. Counted by hand:
  * B starts 10:50: nothing recorded 10:00 to 10:10 (10), lock 10:10 to 10:40 (30), slot 10:40 to 10:50 (10).
  * C starts 11:00: nothing 10:00 to 10:05 (5), load 10:05 to 10:45 (40), nothing 10:45 to 11:00 (15).
- * D starts 10:45: a part held from 09:30, before it was ready, so 10:00 to 10:30 (30), then quota 10:30 to 10:45 (15).
+ * D starts 10:45: a file held from 09:30, before it was ready, so 10:00 to 10:30 (30), then quota 10:30 to 10:45 (15).
  */
 const fixture: Measured = {
   asks: [],
@@ -23,14 +23,13 @@ const fixture: Measured = {
   tasks: [task("B", "10:50"), task("C", "11:00"), task("D", "10:45")],
   usageOf: () => undefined,
   priceOf: () => undefined,
-  partNames: ["rules"],
   decisions: [
     line("B", "10:10", "skip", "lock 'measure-wait' is held by LINE-1"),
     line("B", "10:40", "skip", "no free slot in space 'p' (2 of 2 working)"),
     line("B", "10:50", "start", "ready, locks free, slot free"),
     line("C", "10:05", "skip", "load average is above the limit of 4, no new task starts"),
     line("C", "10:45", "wake", "no longer skipped: load average is above the limit of 4, no new task starts"),
-    line("D", "09:30", "skip", "lock 'rules' is held by LINE-2"),
+    line("D", "09:30", "skip", "lock 'file:src/rules.ts' is held by LINE-2"),
     line("D", "10:30", "skip", "every account is ahead of its weekly pace: only the critical path starts"),
   ],
 };
