@@ -15,6 +15,7 @@ import {
   recordRun,
   refusedMergeBranches,
   runLog,
+  whereRun,
 } from "../../src/check-runs.ts";
 import { recordPassed, splitCached } from "../../scripts/result-cache.ts";
 import { checkTier } from "../../src/check-tier.ts";
@@ -623,4 +624,49 @@ test("a step's pass is stored in the check log under a hash of its test, the fil
     if (saved === undefined) delete process.env.LINECLEAR_CONFIG;
     else process.env.LINECLEAR_CONFIG = saved;
   }
+
+test("a task started on machine B runs its agent, checks, review, step check and done proof on B and none on the main machine", async () => {
+  const p = project();
+  sh(["git", "-C", p.repo, "add", "-A"]);
+  sh(["git", "-C", p.repo, "-c", "user.email=a@b", "-c", "user.name=a", "commit", "-q", "--allow-empty", "-m", "x"]);
+  const env = { ...p.env, LINECLEAR_MACHINE: "boxb.local" };
+  const main = machineOf(p.env);
+  expect(main).not.toBe("boxb");
+
+  // the server starts the agent on the task's machine, then the agent checks, reviews and the lane checks there
+  recordWork("LIN-9", "agent", env, "boxb");
+  for (const tier of ["inner", "merge"]) {
+    expect(await checkTier(["--tier", tier], p.settings(), () => {}, env, p.repo, async () => 0)).toBe(0);
+  }
+  recordWork("LIN-9", "review", env);
+
+  const pi = join(p.repo, "..", "pi");
+  writeFileSync(pi, "#!/bin/sh\nprintf 'SAID: fine\\nGO\\n'\n");
+  chmodSync(pi, 0o755);
+  const after = "## P\n\n### A Title\n- why: because\n- done when:\n  - it works\n- locks: none\n- after: none\n- files: src/a.ts\n";
+  checkSteps({ task: "LIN-9", root: p.repo, before: "## P\n\n", after, planner: undefined, reviewers: ["openai/gpt-5"], env: { ...env, PI_BIN: pi } });
+  const road =
+    "# Roadmap\n\n## P\n\n### R3 Release 0.1 tagged\n- why: because\n- done when:\n  - The release is tagged v0.1.0 on origin.\n- locks: none\n- after: none\n";
+  proveStep({
+    repo: p.repo,
+    step: checkRoadmap(road).parsed.steps[0] as Step,
+    ref: "origin/main",
+    head: "h",
+    reviewers: [],
+    env,
+    now: new Date(),
+    tools: { available: () => true },
+    run: () => ({ code: 0, out: "abc\trefs/tags/v0.1.0" }),
+  });
+
+  const runs = readRuns(p.repo, 0, env);
+  const work = readWork(env);
+  expect([...new Set(runs.map((r) => r.tier))].sort()).toEqual(["inner", "merge"]);
+  expect(work.map((w) => w.work).sort()).toEqual(["agent", "doneproof", "review", "stepcheck"]);
+  expect(runs.every((r) => r.machine === "boxb")).toBe(true);
+  expect(work.every((w) => w.machine === "boxb")).toBe(true);
+  expect(runsPerMachine(runs, work, main).map(([m]) => m)).toEqual(["boxb"]);
+  const home = () => "boxb";
+  expect(strayRuns(runs, work, home)).toEqual([]);
+  expect(whereRun(p.repo, env).machine).toBe("boxb");
 });
