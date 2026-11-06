@@ -10,8 +10,8 @@ export interface DoctorProblem {
 
 type Vars = Record<string, string | undefined>;
 
-/** Home polls every 1.5 s and the doctor runs commands, so it looks again at most once a minute. */
-const EVERY_MS = 60_000;
+/** Home polls every 1.5 s and the doctor runs commands, so it looks again at most every five minutes. */
+const EVERY_MS = 5 * 60_000;
 const seen = new Map<string, { at: number; problems: DoctorProblem[] }>();
 
 /** The doctor's own output, read as the CLI prints it: a FAILED line and the fix line under it. */
