@@ -1,6 +1,6 @@
 import { writeAtomic } from "../pi/atomic.ts";
 import { join } from "node:path";
-import { shepherdrServer } from "./shepherdr-client.ts";
+import { lineclearServer } from "./lineclear-client.ts";
 
 type Out = (line: string) => void;
 type Env = Record<string, string | undefined>;
@@ -26,7 +26,7 @@ export async function measureServer(args: string[], out: Out, env: Env = process
     out(USAGE);
     return 2;
   }
-  const base = shepherdrServer(env);
+  const base = lineclearServer(env);
   if (!base) {
     out("lineclear measure: the server is not running");
     return 1;

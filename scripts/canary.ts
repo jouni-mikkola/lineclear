@@ -6,10 +6,11 @@
 // machine is run (LINECLEAR_CANARY), since herdr's machine list is shared by all its sessions.
 import { spawn, spawnSync } from "node:child_process";
 import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { cpus, homedir, loadavg } from "node:os";
+import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import { dataDir } from "../src/paths.ts";
 import { diskTmpRoot } from "../src/tmpdirs.ts";
+import { loadFactor as machineLoadFactor } from "./check-speed.ts";
 
 const next = join(import.meta.dir, "..");
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -113,8 +114,8 @@ function start(w: World, cmd: string[], name: string, env: Record<string, string
   return { p, log: () => `${name}: ${log.join("").trim().split("\n").slice(-3).join(" ")}` };
 }
 
-/** How many times longer a wait may take on a busy machine: the 1-minute load per core, between 1 and 8. */
-export const loadFactor = (load = loadavg()[0] ?? 0, cores = cpus().length || 1) => Math.min(8, Math.max(1, load / cores));
+/** How many times longer a wait may take on a busy machine: the machine load per core, between 1 and 8. */
+export const loadFactor = (load?: number, cores?: number) => Math.min(8, machineLoadFactor(load, cores));
 
 /** The text of a ready-wait timeout: what was seen, then the tail of the stub agent's log so the cause shows. */
 export function readyTimeout(message: string, seen: { status?: string; sub?: string } | undefined, agentLog: string): string {
@@ -138,14 +139,14 @@ async function until<T>(what: string, seconds: number, probe: () => T | undefine
   throw new Error(`${what} within ${limit} s${last ? ` (${last})` : ""}`);
 }
 
-function shepherdr(w: World, ...args: string[]): string {
+function lineclear(w: World, ...args: string[]): string {
   const r = spawnSync(join(next, "server", "bin", "lineclear"), ["--url", `http://127.0.0.1:${w.api}`, ...args], {
     cwd: w.repo,
     env: w.env,
     encoding: "utf8",
     timeout: Math.round(60_000 * loadFactor()),
   });
-  if (r.status !== 0) throw new Error(`shepherdr ${args.slice(0, 2).join(" ")}: ${(r.stdout + r.stderr).trim().split("\n")[0]}`);
+  if (r.status !== 0) throw new Error(`lineclear ${args.slice(0, 2).join(" ")}: ${(r.stdout + r.stderr).trim().split("\n")[0]}`);
   return r.stdout.trim();
 }
 
@@ -158,7 +159,7 @@ interface Task {
   sub?: string;
   branch?: string;
 }
-const task = (w: World): Task | undefined => (JSON.parse(shepherdr(w, "task", "list", "--space", "canary", "--json")) as Task[])[0];
+const task = (w: World): Task | undefined => (JSON.parse(lineclear(w, "task", "list", "--space", "canary", "--json")) as Task[])[0];
 
 /** The folder git has checked out `branch` in, if any. */
 function worktreeOf(w: World, branch?: string): string | undefined {
@@ -183,18 +184,18 @@ async function steps(w: World, say: (l: string) => void) {
   await until(`the server did not answer on ${w.api} (${server.log()})`, 60, async () => (await fetch(`http://127.0.0.1:${w.api}/api/snapshot`)).ok);
   start(w, [process.execPath, join(next, "bin", "lineclear"), "run"], "web", { LINECLEAR_PORT: String(w.web) });
   say(`ok   start: next's server answers on ${w.api}`);
-  shepherdr(w, "space", "add", w.repo, "--name", "canary");
+  lineclear(w, "space", "add", w.repo, "--name", "canary");
   const smoke = spawnSync(process.execPath, [join(next, "scripts", "smoke.ts"), "check", "-", "api"], {
     env: { ...w.env, LINECLEAR_PORT: String(w.web), LINECLEAR_SMOKE_SECONDS: String(Math.round(60 * loadFactor())) },
     encoding: "utf8",
   });
   if (smoke.status !== 0) throw new Error(`smoke: ${(smoke.stdout + smoke.stderr).trim().replace(/\n/g, "; ")}`);
   say(`ok   smoke: pages on ${w.web}, the API, a chat message`);
-  shepherdr(w, "task", "add", "Canary", "--brief", `${MARK}: write canary.txt and commit it`, "--space", "canary");
+  lineclear(w, "task", "add", "Canary", "--brief", `${MARK}: write canary.txt and commit it`, "--space", "canary");
   const id = (await until("the task was not added", 20, () => task(w))).id;
   await until(`${id}'s agent did not get its brief`, 120, () => agentLogs(w).includes(`in: ${MARK}`));
   say(`ok   brief: ${id}'s agent got its brief`);
-  const t = await until(`${id} has no worktree`, 30, () => worktreeOf(w, (JSON.parse(shepherdr(w, "task", "show", id, "--json")) as Task).branch));
+  const t = await until(`${id} has no worktree`, 30, () => worktreeOf(w, (JSON.parse(lineclear(w, "task", "show", id, "--json")) as Task).branch));
   await until(`${id}'s branch has no change`, 60, () => existsSync(join(t, "canary.txt")) && git(t, "log", "-1", "--format=%s") === "Canary change");
   say(`ok   change: ${id} committed canary.txt on its branch`);
   let seen: Task | undefined;
@@ -205,7 +206,7 @@ async function steps(w: World, say: (l: string) => void) {
     throw new Error(readyTimeout((e as Error).message, seen, agentLogs(w)));
   });
   say(`ok   check: ${id} shows ready to merge`);
-  shepherdr(w, "task", "close", id, "--summary", "canary done", "--discard");
+  lineclear(w, "task", "close", id, "--summary", "canary done", "--discard");
   await until(`${id} did not close`, 60, () => (task(w)?.status ?? "done") === "done");
   say(`ok   close: ${id} is closed`);
 }

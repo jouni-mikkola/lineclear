@@ -1,5 +1,5 @@
-// What each agent is told when Shepherdr starts it: its role, where the skills are, and how to report back. And the
-// Settings block Shepherdr adds to the end of every new task's brief.
+// What each agent is told when Lineclear starts it: its role, where the skills are, and how to report back. And the
+// Settings block Lineclear adds to the end of every new task's brief.
 import { join } from 'node:path'
 import { SET_BY, SETTINGS_HEAD, type SetBy } from '../../shared/brief.ts'
 import type { Mode } from '../../shared/types.ts'
@@ -7,7 +7,7 @@ import { ROOT } from '../root.ts'
 import { has } from '../plugins.ts'
 import { BOX, helperDir } from './box.ts'
 
-/** where an agent finds Shepherdr's files: its checkout here; on another machine the helper's copy (install.ts) */
+/** where an agent finds Lineclear's files: its checkout here; on another machine the helper's copy (install.ts) */
 const OWN = BOX ? helperDir(BOX.home) : ROOT
 
 /** Lineclear's skills, each in <name>/SKILL.md: lineclear (every agent), lineclear-coordinator (coordinators) and
@@ -31,6 +31,8 @@ export interface Ways {
   merge: string
   /** lineclear merge waits for GitHub's checks on the pull request; else the task's own quick checks are enough */
   waitChecks: boolean
+  /** where the project's full check runs before a task lands: here in the merge line, or on GitHub's pull request */
+  checkWhere?: 'local' | 'github'
 }
 
 /** the CLI, model and effort the brief suggests for its review; nothing for a CLI's own default */
@@ -57,7 +59,7 @@ export const SEVERITIES = ['critical', 'major', 'minor', 'trivial']
 export type Said = 'review' | 'reviewer' | 'mustFix' | 'rounds' | 'merge' | 'agent'
 
 /** what a brief's Settings block says: How tasks work, who reviews, the agent it runs on (only so it knows), and who
- *  set the lines that differ from Shepherdr's own */
+ *  set the lines that differ from Lineclear's own */
 export interface Told {
   ways: Ways
   reviewer?: Reviewer
@@ -110,7 +112,7 @@ export function settingsLines(id: string, t: Told): { said: Said; text: string }
   return lines.map((l) => (t.by?.[l.said] ? { ...l, text: `${l.text} (${SET_BY[t.by[l.said]!]})` } : l))
 }
 
-/** a brief split into the coordinator's words and the Settings block Shepherdr ended it with (empty when it has none) */
+/** a brief split into the coordinator's words and the Settings block Lineclear ended it with (empty when it has none) */
 export function splitBrief(desc: string): [work: string, how: string] {
   const i = desc.lastIndexOf(SETTINGS_HEAD)
   return i < 0 ? [desc, ''] : [desc.slice(0, i).trimEnd(), desc.slice(i)]
@@ -118,7 +120,7 @@ export function splitBrief(desc: string): [work: string, how: string] {
 
 /**
  * The Settings block that ends every new task's brief: the human's defaults from Settings, one line each, each marked
- * where it differs from Shepherdr's own and by whom; nothing on how to do the work. The coordinator's words come first
+ * where it differs from Lineclear's own and by whom; nothing on how to do the work. The coordinator's words come first
  * and win where they differ, so a wish for one task needs no setting changed.
  */
 export function settingsBlock(id: string, t: Told) {
@@ -140,7 +142,7 @@ export function coordinatorPrompt(place: { role: 'space' | 'home' | 'main'; name
         : `\n\nThis is the home space of the main machine, ${place.machine}: you also look after this machine (its health, load and disk news, its processes, adding spaces with lineclear space add), and you keep the overview of every machine: what needs the human across them all (lineclear task list shows every machine's tasks), which alerts reach the phone, and machine-wide alerts.`
   return `${base(who, 'lineclear-coordinator')}\n\n${commandLine(place.chat ?? place.name)}${duties}
 
-Coordinator timer is ${mode === 'autopilot' ? 'on' : 'off'} now. With the coordinator timer on you get a heartbeat while idle, on its trigger: lineclear heartbeat shows your complete Heartbeat and when it wakes. On an coordinator timer wake, inspect Shepherdr, act within the Heartbeat and runtime permission profile, then save progress/next step with lineclear progress.`
+Coordinator timer is ${mode === 'autopilot' ? 'on' : 'off'} now. With the coordinator timer on you get a heartbeat while idle, on its trigger: lineclear heartbeat shows your complete Heartbeat and when it wakes. On an coordinator timer wake, inspect Lineclear, act within the Heartbeat and runtime permission profile, then save progress/next step with lineclear progress.`
 }
 
 export function taskPrompt(t: { id: string; branch: string; base: string }, times = '') {
@@ -157,7 +159,7 @@ export function taskPrompt(t: { id: string; branch: string; base: string }, time
 
 /** the shared browser, in a task's instructions (the skill says more) */
 const browserLine = (id: string) => {
-  // by its full path: a shell's start-up files can put another agent-browser ahead of Shepherdr's bin on the PATH, and
+  // by its full path: a shell's start-up files can put another agent-browser ahead of Lineclear's bin on the PATH, and
   // two versions on one session keep restarting its daemon
   const ab = join(OWN, 'bin', 'agent-browser')
   return `Your shared browser (session ${id}, set in your environment) runs only by its full path, ${ab}: a plain agent-browser may be another version, and two versions on one session keep restarting it.`
@@ -190,9 +192,9 @@ export function restartLine(o: { from: string; to: string; chat: string; commits
 }
 
 /** what an agent started again on its own CLI is told, its session resumed (a model or an effort changed) */
-/** what an agent Shepherdr started again by itself is told, when it was at work as it stopped */
+/** what an agent Lineclear started again by itself is told, when it was at work as it stopped */
 export function relaunchedLine() {
-  return `Your agent had stopped (herdr restarted, or it ran on outdated settings): Shepherdr started you again, with your session as it was. Carry on where you left off; if there is nothing left to do, reply with only <no-reply>relaunched</no-reply>.`
+  return `Your agent had stopped (herdr restarted, or it ran on outdated settings): Lineclear started you again, with your session as it was. Carry on where you left off; if there is nothing left to do, reply with only <no-reply>relaunched</no-reply>.`
 }
 
 export function resumedLine(on: string) {
@@ -203,7 +205,7 @@ export function resumedLine(on: string) {
  *  it waits for changed */
 export function queuedLine(ids: string[], when: 'start' | 'later' | 'changed', id = '<id>') {
   const them = ids.length === 1 ? 'it is' : 'they are'
-  const rest = `Shepherdr tells you "Go: … start now." once ${them} done. A message from the human or the coordinator may be a go too: if it is, run lineclear task queue ${id} --after none and start.`
+  const rest = `Lineclear tells you "Go: … start now." once ${them} done. A message from the human or the coordinator may be a go too: if it is, run lineclear task queue ${id} --after none and start.`
   if (when === 'changed') return `You now wait for ${ids.join(', ')} instead. Don't start yet. ${rest}`
   if (when === 'later')
     return `Hold on: you are now queued after ${ids.join(', ')}. Stop at a clean point and don't go on with the work: reply in one line that you wait, and end your turn. ${rest}`

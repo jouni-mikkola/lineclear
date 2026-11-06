@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ago, Button, InboxChecks, type InboxItem, ReasonForm, reveal, SignalPic, Toast } from "../kit/index.ts";
+import { ago, Button, exact, InboxChecks, type InboxItem, ReasonForm, reveal, SignalPic, Toast } from "../kit/index.ts";
 
 // The strip at the top of Home: the first ask that waits for the owner, who asks, in which project and step, its
 // answers as buttons, and a count that opens the rest in place, grouped by project. The same ask shows in its task's open row.
@@ -162,7 +162,7 @@ function Ask({
         <span className="block truncate text-xs text-fg3" data-inbox-where title={where}>
           {where}
           <span data-inbox-who>{` · ${asker(item)}`}</span>
-          {item.since && <span data-inbox-age>{` · ${ago(Date.parse(item.since))} ago`}</span>}
+          {item.since && <span data-inbox-age title={exact(item.since)}>{` · ${ago(Date.parse(item.since))} ago`}</span>}
         </span>
         <span className="block break-words text-sm text-fg">{item.question}</span>
         <Extras item={item} />
@@ -212,7 +212,7 @@ function More({ items, onChoose }: { items: InboxItem[]; onChoose: (item: InboxI
               {asks.map((a) => (
                 <li key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5" data-inbox-ask={a.id}>
                   <span className="min-w-0 flex-1 basis-60">
-                    <span className="block truncate text-xs text-fg3">
+                    <span className="block truncate text-xs text-fg3" title={a.since ? exact(a.since) : undefined}>
                       {a.task && (a.title ? `${a.task} ${a.title}` : a.task)} · {asker(a)}
                       {a.since && ` · ${ago(Date.parse(a.since))} ago`}
                     </span>

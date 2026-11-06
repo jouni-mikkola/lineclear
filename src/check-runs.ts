@@ -6,6 +6,8 @@
 import { appendFileSync, closeSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, realpathSync, renameSync, writeSync } from "node:fs";
 import { cpus, homedir, hostname, loadavg } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { gitText } from "./git.ts";
+import { DAY } from "./time.ts";
 
 export interface FailedGate {
   step: string;
@@ -189,7 +191,6 @@ export interface Quarantined {
 const HEAL_AFTER = 10;
 /** Failures since the quarantine, with no clean run between, that show a test broken, not flaky. */
 const BROKEN_AFTER = 3;
-const DAY_MS = 24 * 3_600_000;
 
 /** A test as the log names it (`<file>: <name>`, or the name alone where the output named no file): the key `scripts/flaky.ts` records by file and name. */
 export const testKey = (file: string, name: string) => (file ? `${file}: ${name}` : name);
@@ -278,8 +279,8 @@ export const quarantined = (repo: string, env: Env = process.env): Map<string, Q
 export function flakeFixDue(repo: string, env: Env = process.env, now = Date.now()): { test: string; seen: number }[] {
   const { flakes, fixed } = scan(repo, env);
   return [...flakes]
-    .map(([test, times]) => ({ test, seen: times.filter((t) => now - t < DAY_MS).length, filedAt: fixed.get(test) }))
-    .filter((f) => f.seen >= 2 && (f.filedAt === undefined || now - f.filedAt >= DAY_MS))
+    .map(([test, times]) => ({ test, seen: times.filter((t) => now - t < DAY).length, filedAt: fixed.get(test) }))
+    .filter((f) => f.seen >= 2 && (f.filedAt === undefined || now - f.filedAt >= DAY))
     .map(({ test, seen }) => ({ test, seen }));
 }
 
@@ -345,7 +346,7 @@ export function redByCause(runs: CheckRun[]): { total: number; red: number; caus
   const red = merge.filter((r) => !r.ok && !r.quarantined);
   const count = new Map<string, number>();
   for (const r of red) {
-    // a run logged before L218 has no causes: its failed tests and gate say as much
+    // an older run has no causes: its failed tests and gate say as much
     const first = r.causes?.[0] ?? (r.gate ? `gate: ${r.gate.step}` : r.failed[0] ? "test" : undefined);
     const key = first === undefined ? "unnamed" : first.startsWith("gate: ") ? `gate ${first.slice(6).split(":")[0]}` : (first.split(/[: ]/)[0] ?? "unnamed");
     count.set(key, (count.get(key) ?? 0) + 1);
@@ -402,20 +403,15 @@ export function onlyQuarantined(command: string, output: string, code: number, f
 /** One command however it was spaced, so its runs are counted together. */
 export const sameCommand = (c: string) => c.trim().replace(/\s+/g, " ");
 
-const git = (cwd: string, ...args: string[]) => {
-  const p = Bun.spawnSync(["git", "-C", cwd, ...args], { stdin: "ignore", stderr: "ignore" });
-  return p.exitCode === 0 ? p.stdout.toString().trim() : "";
-};
-
 /** The project's main folder (for a worktree, the one that holds its .git), this machine, its commit, branch and whether it has edits. */
 export function whereRun(cwd: string, env: Env = process.env): { repo: string; machine: string; commit: string; branch: string; dirty: boolean } {
-  const common = git(cwd, "rev-parse", "--path-format=absolute", "--git-common-dir");
+  const common = gitText(cwd, "rev-parse", "--path-format=absolute", "--git-common-dir");
   return {
     repo: common ? dirname(common) : resolve(cwd),
     machine: machineOf(env),
-    commit: git(cwd, "rev-parse", "HEAD"),
-    branch: git(cwd, "rev-parse", "--abbrev-ref", "HEAD"),
-    dirty: git(cwd, "status", "--porcelain") !== "",
+    commit: gitText(cwd, "rev-parse", "HEAD") ?? "",
+    branch: gitText(cwd, "rev-parse", "--abbrev-ref", "HEAD") ?? "",
+    dirty: (gitText(cwd, "status", "--porcelain") ?? "") !== "",
   };
 }
 

@@ -1,10 +1,9 @@
 import { day } from "./progress.ts";
 import { doneIds, parseRoadmap, type State } from "./roadmap.ts";
+import { DAY } from "./time.ts";
 
 // The goals page of the Roadmap: each line of "Done means" (else each phase) as an outcome, with its progress, its
 // expected date and how sure that is. The rule is written in docs/design.md under "Roadmap for leaders".
-
-const DAY = 86_400_000;
 
 /** When `open` steps are done at the pace of `merged7` steps in 7 days, from the start of the hour. Absent with no pace or over a year. */
 function finishAt(open: number, merged7: number, now: number): number | undefined {

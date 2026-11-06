@@ -1,4 +1,4 @@
-// What a Claude Code agent reports of itself, from its own hooks. Every Claude Code Shepherdr starts gets a settings
+// What a Claude Code agent reports of itself, from its own hooks. Every Claude Code Lineclear starts gets a settings
 // file of its own (--settings: added to the human's settings for that one launch, which stay untouched) whose hooks
 // append each event, cut down to what matters, to a file per agent. Folded in order, those events say whether its
 // turn runs, ended (and what still runs in the background), or waits on a permission prompt, a question or a plan.
@@ -135,7 +135,7 @@ export function pickHook(input: any, at: number): HookEvent | undefined {
 const ROTATE_AT = 256 * 1024
 
 /** the recorder Claude Code runs for every hook: reads the event from stdin, appends one line */
-const recorderScript = () => `// Written by Shepherdr: records a Claude Code hook event (readers/hooks.ts).
+const recorderScript = () => `// Written by Lineclear: records a Claude Code hook event (readers/hooks.ts).
 const { appendFileSync, renameSync, statSync } = require('node:fs')
 const pickHook = ${pickHook.toString()}
 const file = process.argv[2]
@@ -165,7 +165,7 @@ export function hookSettings(dir: string, name: string, runtime = process.execPa
   task.rmSync(`${events}.1`, { force: true })
   let command: string
   if (BOX) {
-    // another machine has no Shepherdr to run the recorder: the helper's perl one appends the event as it came, with
+    // another machine has no Lineclear to run the recorder: the helper's perl one appends the event as it came, with
     // its time, and the main machine cuts it down as it reads the mirrored file (parseHookLines)
     command = `perl ${q(join(helperDir(BOX.home), 'hook.pl'))} ${q(events)}`
   } else {

@@ -84,7 +84,7 @@ export interface Snapshot {
   demo?: boolean
   /** where the human's name in chat lines comes from */
   user: string
-  /** when each chat (by its key) last had something new from its agent or Shepherdr (ms): it shows bold until read */
+  /** when each chat (by its key) last had something new from its agent or Lineclear (ms): it shows bold until read */
   last?: Record<string, number>
   /** how far you have read each chat (ms), the same on every device; '*': since when read marks are kept, so anything
    *  older counts as read */
@@ -177,7 +177,7 @@ export interface TermScreen {
   rows?: number
 }
 
-/** how Shepherdr's last update of itself went (update.json in its folder, written by the supervisor) */
+/** how Lineclear's last update of itself went (update.json in its folder, written by the supervisor) */
 export interface UpdateStatus {
   /** ok: running the newest commit; failed: kept the running version; restarting: about to come back on a new one */
   state: 'ok' | 'failed' | 'restarting'
@@ -197,8 +197,6 @@ export type ServerEvent =
   | { type: 'chat'; chat: Chat }
   | ({ type: 'terminal'; chat: string } & TermScreen)
   | { type: 'offline'; since: number }
-  /** the build of the screen the server serves: a screen on another build reloads */
-  | { type: 'build'; id: string }
   | { type: 'update'; update: UpdateStatus | null }
   /** the answer to a screen's ping: its link still works */
   | { type: 'pong' }

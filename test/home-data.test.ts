@@ -59,9 +59,9 @@ test("spendAndUsage: 14 days of $ and the accounts used in the last day", () => 
   expect(r.tokens).toBe(9); // the compaction card's 14 days, not the 30 days old one
 });
 
-test("homeData reads projects and states from Shepherdr's files", () => {
+test("homeData reads projects and states from Lineclear's files", () => {
   const root = tmp("home");
-  const dir = join(root, "shepherdr");
+  const dir = join(root, "lineclear");
   mkdirSync(join(dir, "chatlog"), { recursive: true });
   writeFileSync(
     join(dir, "spaces.json"),
@@ -97,7 +97,7 @@ test("homeData reads projects and states from Shepherdr's files", () => {
     `#!/bin/sh\ncase "$*" in *"--space alpha"*) echo '${JSON.stringify(list("alpha"))}' ;; *"--space beta"*) echo '${JSON.stringify(list("beta"))}' ;; *) echo '${JSON.stringify([...list("alpha"), ...list("beta")])}' ;; esac\n`,
     { mode: 0o755 },
   );
-  const d = homeData({ LINECLEAR_SHEPHERDR_DIR: dir, PI_CODING_AGENT_DIR: join(root, "pi"), LINECLEAR_CONFIG: join(root, "config"), SHEPHERDR_BIN: bin }, NOW);
+  const d = homeData({ LINECLEAR_HOME: dir, PI_CODING_AGENT_DIR: join(root, "pi"), LINECLEAR_CONFIG: join(root, "config"), LINECLEAR_SERVER_BIN: bin }, NOW);
   expect(d.projects.map((p) => [p.name, p.done, p.total, p.unit, p.broken])).toEqual([
     ["alpha", 1, 2, "tasks", false],
     ["beta", 0, 1, "tasks", false],
@@ -113,7 +113,7 @@ test("homeData reads projects and states from Shepherdr's files", () => {
 
 test("Home lists the projects, and an open task of a space with no project shows apart", () => {
   const root = tmp("loose");
-  const dir = join(root, "shepherdr");
+  const dir = join(root, "lineclear");
   mkdirSync(dir, { recursive: true });
   const names = ["one", "two", "three", "dispatcher", "retired"];
   writeFileSync(join(dir, "spaces.json"), JSON.stringify(names.map((name, i) => ({ name, key: `K${i}`, path: join(root, name) }))));
@@ -130,14 +130,14 @@ test("Home lists the projects, and an open task of a space with no project shows
   for (const n of names.slice(0, 3)) project(config, n, n);
   const bin = join(root, "task-list.sh");
   writeFileSync(bin, "#!/bin/sh\necho '[]'\n", { mode: 0o755 });
-  const d = homeData({ LINECLEAR_SHEPHERDR_DIR: dir, PI_CODING_AGENT_DIR: join(root, "pi"), LINECLEAR_CONFIG: config, SHEPHERDR_BIN: bin }, NOW);
+  const d = homeData({ LINECLEAR_HOME: dir, PI_CODING_AGENT_DIR: join(root, "pi"), LINECLEAR_CONFIG: config, LINECLEAR_SERVER_BIN: bin }, NOW);
   expect(d.projects.map((p) => p.name)).toEqual(["one", "two", "three"]);
   expect(d.loose).toMatchObject([{ id: "K4-1", space: "retired", state: "work" }]);
 });
 
 const setup = (red: (old: string, head: string) => string, roadmap?: string) => {
   const root = tmp("true");
-  const dir = join(root, "shepherdr");
+  const dir = join(root, "lineclear");
   mkdirSync(dir, { recursive: true });
   const path = repo(root, "old-folder", roadmap);
   writeFileSync(join(dir, "spaces.json"), JSON.stringify([{ name: "old-folder", key: "OF", path, github: "me/new-name" }]));
@@ -152,7 +152,7 @@ const setup = (red: (old: string, head: string) => string, roadmap?: string) => 
   mkdirSync(join(dir, "archive"), { recursive: true });
   writeFileSync(join(dir, "archive", "counts.json"), JSON.stringify({ OF: { merged: 2, closed: 1 }, XX: { merged: 9, closed: 0 } }));
   project(join(root, "cfg"), "old-folder", "old-folder");
-  const vars = { LINECLEAR_SHEPHERDR_DIR: dir, PI_CODING_AGENT_DIR: join(root, "pi"), LINECLEAR_CONFIG: join(root, "cfg") };
+  const vars = { LINECLEAR_HOME: dir, PI_CODING_AGENT_DIR: join(root, "pi"), LINECLEAR_CONFIG: join(root, "cfg") };
   return homeData(vars, NOW).projects[0]!;
 };
 
@@ -192,7 +192,7 @@ test("Home and the roadmap view give one roadmap the same numbers and the same p
     `## ${phase}\n\n### ${id} Step ${id}\n- why: w\n- done when: d\n- locks: x\n- after: none\n${extra}\n`;
   const text = `# Roadmap\n\n${step("A", "One")}${step("B", "Two")}${step("C", "One")}${step("D", "One", "- dropped: no longer wanted\n")}`;
   const root = tmp("agree");
-  const dir = join(root, "shepherdr");
+  const dir = join(root, "lineclear");
   mkdirSync(dir, { recursive: true });
   const path = repo(root, "proj", text);
   sh(path, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "--allow-empty", "-m", "OF-1: A done");
@@ -201,7 +201,7 @@ test("Home and the roadmap view give one roadmap the same numbers and the same p
   writeFileSync(join(dir, "tasks.json"), JSON.stringify({ tasks: [] }));
   mkdirSync(join(root, "cfg", "projects", "proj"), { recursive: true });
   writeFileSync(join(root, "cfg", "projects", "proj", "settings.json"), JSON.stringify({ repo: path, space: "proj" }));
-  const vars = { LINECLEAR_SHEPHERDR_DIR: dir, PI_CODING_AGENT_DIR: join(root, "pi"), LINECLEAR_CONFIG: join(root, "cfg"), SHEPHERDR_BIN: "true" };
+  const vars = { LINECLEAR_HOME: dir, PI_CODING_AGENT_DIR: join(root, "pi"), LINECLEAR_CONFIG: join(root, "cfg"), LINECLEAR_SERVER_BIN: "true" };
   const home = homeData(vars, NOW).projects[0]!;
   const view = roadmapData("proj", vars, () => []);
   if (!("ok" in view)) throw new Error("no roadmap data");
@@ -214,7 +214,7 @@ test("the CLI, the roadmap view and Home give one roadmap the same line: counts,
   const step = (id: string, after: string) => `## One\n\n### ${id} Step ${id}\n- why: w\n- done when: d\n- locks: x\n- after: ${after}\n\n`;
   const text = `# Roadmap\n\n${step("S1", "none")}${step("S2", "S1")}${step("S3", "S2")}${step("S4", "none")}`;
   const root = tmp("line-agree");
-  const dir = join(root, "shepherdr");
+  const dir = join(root, "lineclear");
   mkdirSync(dir, { recursive: true });
   const path = repo(root, "proj", text);
   sh(path, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "--allow-empty", "-m", "OF-1: S1 done\n\nStep: S1");
@@ -228,7 +228,7 @@ test("the CLI, the roadmap view and Home give one roadmap the same line: counts,
   mkdirSync(join(root, "cfg", "projects", "proj"), { recursive: true });
   writeFileSync(join(root, "cfg", "projects", "proj", "settings.json"), JSON.stringify({ repo: path, space: "proj" }));
   writeFileSync(join(root, "cfg", "projects", "proj", "state.json"), JSON.stringify({ taskSteps: { "OF-2": "S2", "OF-3": "S4" } }));
-  const vars = { LINECLEAR_SHEPHERDR_DIR: dir, PI_CODING_AGENT_DIR: join(root, "pi"), LINECLEAR_CONFIG: join(root, "cfg"), SHEPHERDR_BIN: "true" };
+  const vars = { LINECLEAR_HOME: dir, PI_CODING_AGENT_DIR: join(root, "pi"), LINECLEAR_CONFIG: join(root, "cfg"), LINECLEAR_SERVER_BIN: "true" };
   const now = Date.now();
   const listed = [
     { id: "OF-2", title: "S2 Step S2", status: "work" },
@@ -274,7 +274,7 @@ test("a task named after a step shows the step's full title, its stage, model an
   const text =
     "# Roadmap\n\n## One\n\n### U20 The line, drawn live on every page\n- why: w\n- done when: d\n- locks: x\n- after: none\n\n### U21 Next\n- why: w\n- done when: d\n- locks: x\n- after: none\n";
   const root = tmp("line");
-  const dir = join(root, "shepherdr");
+  const dir = join(root, "lineclear");
   mkdirSync(dir, { recursive: true });
   const path = repo(root, "proj", text);
   writeFileSync(join(dir, "spaces.json"), JSON.stringify([{ name: "proj", key: "PR", path }]));
@@ -307,7 +307,7 @@ test("a task named after a step shows the step's full title, its stage, model an
   const bin = join(root, "task-list.sh");
   writeFileSync(bin, `#!/bin/sh\necho '${JSON.stringify(list)}'\n`, { mode: 0o755 });
   project(join(root, "cfg"), "proj", "proj");
-  const vars = { LINECLEAR_SHEPHERDR_DIR: dir, PI_CODING_AGENT_DIR: join(root, "pi"), LINECLEAR_CONFIG: join(root, "cfg"), SHEPHERDR_BIN: bin };
+  const vars = { LINECLEAR_HOME: dir, PI_CODING_AGENT_DIR: join(root, "pi"), LINECLEAR_CONFIG: join(root, "cfg"), LINECLEAR_SERVER_BIN: bin };
   const tasks = homeData(vars, NOW).projects[0]!.tasks;
   expect(tasks.map((t) => [t.id, t.title, t.stage, t.step, t.model])).toEqual([
     ["PR-1", "U20 The line, drawn live on every page", "review", "U20", "anthropic/claude-opus"],
@@ -316,7 +316,7 @@ test("a task named after a step shows the step's full title, its stage, model an
     ["PR-4", "Quiet one", "work", undefined, undefined],
     ["PR-5", "Woke again", "work", undefined, undefined],
   ]);
-  // a stall that is over keeps its record in Shepherdr, but the task is not stalled
+  // a stall that is over keeps its record in Lineclear, but the task is not stalled
   expect(tasks.filter((t) => t.stalled).map((t) => t.id)).toEqual(["PR-4"]);
   expect(tasks.find((t) => t.id === "PR-3")?.since).toBe(3);
 });
@@ -324,4 +324,37 @@ test("a task named after a step shows the step's full title, its stage, model an
 test("no roadmap falls back to tasks, with no estimate", () => {
   const p = setup((old) => old);
   expect([p.unit, p.done, p.total, p.finish]).toEqual(["tasks", 4, 4, undefined]);
+});
+
+describe("the merge lane's stall on Home", () => {
+  const rows = (tasks: object[]) => {
+    const root = tmp("lane");
+    const dir = join(root, "lineclear");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "spaces.json"), JSON.stringify([{ name: "alpha", key: "AL", path: join(root, "alpha") }]));
+    writeFileSync(join(dir, "tasks.json"), JSON.stringify({ tasks }));
+    project(join(root, "config"), "alpha", "alpha");
+    const d = homeData({ LINECLEAR_HOME: dir, PI_CODING_AGENT_DIR: join(root, "pi"), LINECLEAR_CONFIG: join(root, "config") }, NOW);
+    return d.projects[0]?.tasks ?? [];
+  };
+  const hung = 'Your merge hung in "Rebasing on main" for 15 min (no progress for 15 min), so the merge lane released it and nothing was merged.';
+  const head = (landing: object) => ({ id: "AL-1", title: "Head", told: "merging", reported: true, created: 1, landing });
+
+  test("a head with no progress for 15 minutes is stuck in its step", () => {
+    const [stuck, fresh] = rows([head({ step: "rebase", at: NOW - 17 * 60_000 }), { ...head({ step: "rebase", at: NOW - 5 * 60_000 }), id: "AL-2" }]);
+    expect(stuck?.lane).toBe('Stuck in "Rebasing" for 17 min');
+    expect(fresh?.lane).toBeUndefined();
+  });
+  test("a released task says so until it joins the line again", () => {
+    const [t] = rows([{ id: "AL-1", title: "Head", told: "work", reported: true, created: 1, mergeStopped: hung }]);
+    expect(t?.lane).toBe('Released from the merge line: hung in "Rebasing on main" for 15 min (no progress for 15 min)');
+  });
+  test("a task that joined the line again, or merged, carries no release", () => {
+    const [back, done] = rows([
+      { ...head({ step: "queue", at: NOW - 1000 }), mergeStopped: hung },
+      { id: "AL-2", title: "Done", told: "done", merged: true, created: 1, mergeStopped: hung },
+    ]);
+    expect(back?.lane).toBeUndefined();
+    expect(done?.lane).toBeUndefined();
+  });
 });

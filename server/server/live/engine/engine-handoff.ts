@@ -182,7 +182,7 @@ export class EngineHandoff extends EngineLaunch {
     const gates = t.worktree && t.base && existsSync(t.worktree) ? await Lane.fastGatesFailure(t.worktree, t.base) : undefined
     if (gates)
       throw new Error(
-        `Not ready: the check's fast gates fail on this branch, so nothing was reported. Fix them, commit, then run shepherdr ready ${t.id} again.\n${gates}`,
+        `Not ready: the check's fast gates fail on this branch, so nothing was reported. Fix them, commit, then run lineclear ready ${t.id} again.\n${gates}`,
       )
     if (summary) t.said = summary
     if (facts) t.facts = facts
@@ -325,7 +325,7 @@ export class EngineHandoff extends EngineLaunch {
   /** the pull request's words: the agent's summary, the brief's gist, and the footer its CLI signs with */
   protected prBody(t: TaskRec) {
     const kind = this.agents.record(this.key(t))?.kind ?? t.agent?.kind ?? this.settings.harness('task', this.nameOf(t)).kind
-    // the coordinator's words, not the default way of working Shepherdr ended the brief with
+    // the coordinator's words, not the default way of working Lineclear ended the brief with
     const brief = (splitBrief(t.desc)[0] || t.title).trim()
     const gist = brief.length > 700 ? `${brief.slice(0, 700).replace(/\s+\S*$/, '')} …` : brief
     return [
@@ -426,7 +426,7 @@ export class EngineHandoff extends EngineLaunch {
   }
 
   /**
-   * GitHub's checks on the task's pull request, waited for while they run (up to `waitMs`). A commit Shepherdr just
+   * GitHub's checks on the task's pull request, waited for while they run (up to `waitMs`). A commit Lineclear just
    * pushed, in a repo with workflows that run on pull requests, shows none for a moment: that moment is waited out, never taken as passed (after
    * it, none is none: the repo's workflows may not run on pull requests). GitHub not answering three times running
    * is said, not waited on.
@@ -440,10 +440,17 @@ export class EngineHandoff extends EngineLaunch {
       const c = await GH.prChecks(g, t.worktree!, n)
       errors = c.state === 'error' ? errors + 1 : 0
       const early = c.state === 'none' && expect && t.pushed?.sha === head && Date.now() - t.pushed.at < CHECKS_SHOW
-      if ((c.state !== 'pending' && c.state !== 'error' && !early) || errors >= 3) return c
-      if (Date.now() - t0 + CHECKS_EVERY > waitMs) return early ? { ...c, state: 'pending' } : c
+      if ((c.state !== 'pending' && c.state !== 'error' && !early) || errors >= 3) return this.withTests(g, t.worktree!, c)
+      if (Date.now() - t0 + CHECKS_EVERY > waitMs) return early ? { ...c, state: 'pending' } : this.withTests(g, t.worktree!, c)
       await Bun.sleep(CHECKS_EVERY)
     }
+  }
+
+  /** failed checks with the names of the tests their job logs show as failed */
+  private async withTests(g: G.GitHub, cwd: string, c: GH.PrChecks): Promise<GH.PrChecks> {
+    if (c.state !== 'fail') return c
+    const failed = await Promise.all(c.failed.map(async (f) => (f.link ? { ...f, tests: await GH.failedTestNames(g, cwd, f.link) } : f)))
+    return { ...c, failed }
   }
 
   /** a ready task's next step into main (Merging), or none: Ready again, or back at work */
@@ -470,7 +477,8 @@ export class EngineHandoff extends EngineLaunch {
   /** which of GitHub's checks failed, and where to see why */
   protected checksFailed(n: number, c: GH.PrChecks) {
     const link = c.failed.find((f) => f.link)?.link
-    return `GitHub's checks failed on PR #${n}: ${c.failed.map((f) => f.name).join(', ')}.${link ? ` See ${link} (gh run view --log-failed shows why).` : ''}`
+    const tests = [...new Set(c.failed.flatMap((f) => f.tests ?? []))]
+    return `GitHub's checks failed on PR #${n}: ${c.failed.map((f) => f.name).join(', ')}.${tests.length ? ` Failing tests: ${tests.join(', ')}.` : ''}${link ? ` See ${link} (gh run view --log-failed shows why).` : ''}`
   }
 
   protected fixIt = (t: TaskRec) =>

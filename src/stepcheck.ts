@@ -9,6 +9,7 @@ import { company } from "./company.ts";
 import { availability } from "./stalls.ts";
 import type { Step } from "./roadmap.ts";
 import { configDir } from "../pi/config.ts";
+import { gitText } from "./git.ts";
 
 /** What one step check may read and say, in tokens (counted as a quarter of the characters). */
 /** A planning task ends when its steps drew a no-go in this many rounds. */
@@ -172,7 +173,7 @@ export interface StepCheckInput {
   env: NodeJS.ProcessEnv;
 }
 
-const trackedFiles = (root: string) => Bun.spawnSync(["git", "-C", root, "ls-files"], { stdin: "ignore" }).stdout.toString().trim().split("\n").filter(Boolean);
+const trackedFiles = (root: string) => (gitText(root, "ls-files") ?? "").split("\n").filter(Boolean);
 
 /**
  * Asks a model, from another company than the planner's when one has room, about each new or changed step that has no go yet. A no-go

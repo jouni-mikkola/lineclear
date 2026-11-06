@@ -25,7 +25,7 @@ const put = (path: string, value: unknown) => {
   writeFileSync(path, typeof value === "string" ? value : JSON.stringify(value));
 };
 
-/** A Shepherdr 2.0 folder with one space and one open task. */
+/** A herdr-projects 2.0 folder with one space and one open task. */
 const oldWorld = (dir: string, key: string, name: string) => {
   put(join(dir, "spaces.json"), [{ name, path: "/nowhere", key, base: "main" }]);
   put(join(dir, "tasks.json"), { next: { [key]: 2 }, tasks: [{ id: `${key}-1`, title: `${name} task`, told: "work", created: 1 }], red: {} });
@@ -193,13 +193,13 @@ test("doctor --fix runs on each machine, once, and says what each removed", asyn
   const fake = join(root, "ssh-fix");
   put(
     fake,
-    `#!/bin/sh\nwhile [ "$1" != "--" ]; do shift; done\nshift\nshift\necho "$1" >> '${join(root, "fix.log")}'\necho "Removed the skill /x/shepherdr"\n`,
+    `#!/bin/sh\nwhile [ "$1" != "--" ]; do shift; done\nshift\nshift\necho "$1" >> '${join(root, "fix.log")}'\necho "Removed the skill /x/lineclear"\n`,
   );
   chmodSync(fake, 0o755);
   const probe: Probe = { oldDir: join(root, "none"), paths: pathsFor({ HOME: "/nonexistent-home" }), pathDirs: [], which: () => null, run: () => null };
   const lines: string[] = [];
   await fixAll(probe, (l) => lines.push(l), { ...env, LINECLEAR_SSH: fake });
-  expect(lines).toEqual(["This machine", "  Nothing to remove.", "box", "  Removed the skill /x/shepherdr"]);
+  expect(lines).toEqual(["This machine", "  Nothing to remove.", "box", "  Removed the skill /x/lineclear"]);
   const sent = readFileSync(join(root, "fix.log"), "utf8").trim().split("\n");
   expect(sent).toHaveLength(1);
   expect(sent[0]).toContain("'doctor' '--fix' '--here'");
@@ -208,7 +208,7 @@ test("doctor --fix runs on each machine, once, and says what each removed", asyn
 test("after migrate --all, an agent on a remote machine reaches the server by the old and the new helper socket", async () => {
   sh(["rm", "-rf", join(root, "here"), join(root, "box")]);
   const { env, box } = world();
-  // an agent started under Shepherdr 2.0 there has its helper folder
+  // an agent started under herdr-projects 2.0 there has its helper folder
   mkdirSync(join(box.LINECLEAR_OLD_DIR, "helper"), { recursive: true });
   expect(await migrateAll(["--all"], () => {}, env)).toBe(0);
   // the server's tunnel on the remote machine opens the socket in the new folder

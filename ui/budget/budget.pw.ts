@@ -103,7 +103,7 @@ test("the budget run", async ({ browser }) => {
     times.push(performance.now() - at);
     gzipped["/api/home"] = res.headers.get("content-encoding") ?? "";
   }
-  for (const path of ["/api/inbox", "/api/settings", "/api/events", "/api/roadmap/web-shop", "/"]) {
+  for (const path of ["/api/inbox", "/api/settings", "/api/roadmap/web-shop", "/"]) {
     const res = await fetch(`${base}${path}`, { headers: { "accept-encoding": "gzip" } });
     await res.arrayBuffer();
     gzipped[path] = res.headers.get("content-encoding") ?? "";

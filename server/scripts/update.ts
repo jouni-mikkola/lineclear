@@ -1,4 +1,4 @@
-// Shepherdr updating itself: when its own checkout moves to a new commit (a task merged into main), it makes a release
+// Lineclear updating itself: when its own checkout moves to a new commit (a task merged into main), it makes a release
 // of that commit (.releases/<commit>-<time>): a frozen copy, installed if the lockfile changed, built and checked. The
 // server runs from the release, never from the checkout, so a later merge can't change what runs. Any step that
 // fails leaves the running release as it was. The supervisor restarts the server on a good release.
@@ -119,16 +119,16 @@ export async function update(
   return { state: 'ok', commit, subject, built: commit, release: name }
 }
 
-/** build the screen and check the server's code loads; why not, or null */
+/** build the plugin registry and check the server's code loads; why not, or null */
 export async function buildAndCheck(dir: string, bun: string): Promise<{ error: string; out: string } | null> {
   const b = await run([bun, 'run', 'build'], dir)
-  if (!b.ok || !existsSync(join(dir, 'dist', 'index.html'))) return { error: `the build failed:\n${tail(b.out)}`, out: b.out }
+  if (!b.ok) return { error: `the build failed:\n${tail(b.out)}`, out: b.out }
   return checkServer(dir, bun)
 }
 
 /** The server runs from source: check it and everything it imports still loads. */
 export async function checkServer(dir: string, bun: string): Promise<{ error: string; out: string } | null> {
-  const scratch = mkdtempSync(join(tmpdir(), 'shepherdr-check-'))
+  const scratch = mkdtempSync(join(tmpdir(), 'lineclear-check-'))
   const s = await run([bun, 'build', join(dir, 'server', 'main.ts'), '--target', 'bun', '--outdir', scratch], dir)
   rmSync(scratch, { recursive: true, force: true })
   return s.ok ? null : { error: `the server code doesn't load:\n${tail(s.out)}`, out: s.out }

@@ -18,8 +18,8 @@ export class EngineMerge extends EngineLand {
 
   /**
    * News on done tasks' pull requests: checks that failed, and what someone wrote on it (a review, a comment) since its
-   * agent reported done. Its agent hears each once, in <shepherdr> tags, which wakes it; what to do about it is its own
-   * call (the shepherdr-agent skill). Only an agent at rest is told: one at work, or at a prompt, hears it next time.
+   * agent reported done. Its agent hears each once, in <lineclear> tags, which wakes it; what to do about it is its own
+   * call (the lineclear-agent skill). Only an agent at rest is told: one at work, or at a prompt, hears it next time.
    */
   async watchPrs() {
     // a call during a look waits for it and looks again: a look begun before the caller's change would miss it
@@ -141,7 +141,7 @@ export class EngineMerge extends EngineLand {
   }
 
   /**
-   * Leftovers of finished tasks, put away: at startup and every hour, so none pile up. Only tasks Shepherdr made and
+   * Leftovers of finished tasks, put away: at startup and every hour, so none pile up. Only tasks Lineclear made and
    * merged or closed, never one whose agent is at work (or that you talk to again after its clean-up), and never what holds
    * unsaved or unmerged work. Nothing is touched while herdr does not answer.
    */

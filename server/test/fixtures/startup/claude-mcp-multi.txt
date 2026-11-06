@@ -5,8 +5,8 @@ For support and documentation, "ssh exe.dev" or visit https://exe.dev/
 
 Docker is installed and works; try "docker run --rm alpine:latest echo hello world"
 
-exedev@vm-stravik:/tmp/she234-proof/fresh-mcp$ unset CLAUDE_CODE_SANDBOXED; export CLAUDE_CONFIG_DIR=/tmp/she234-proof/claude
-exedev@vm-stravik:/tmp/she234-proof/fresh-mcp$ claude --session-id 4ac2b997-8f8a-448e-a3ca-88c324bb2d20 --settings /tmp/she234-proof/store-before/hooks/shep-startup-mcp-234.settings.json --append-system-prompt-file /tmp/she234-proof/store-before/prompts/shep-startup-mcp-234.md
+user@vm-stravik:/tmp/she234-proof/fresh-mcp$ unset CLAUDE_CODE_SANDBOXED; export CLAUDE_CONFIG_DIR=/tmp/she234-proof/claude
+user@vm-stravik:/tmp/she234-proof/fresh-mcp$ claude --session-id 4ac2b997-8f8a-448e-a3ca-88c324bb2d20 --settings /tmp/she234-proof/store-before/hooks/shep-startup-mcp-234.settings.json --append-system-prompt-file /tmp/she234-proof/store-before/prompts/shep-startup-mcp-234.md
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
   2 new MCP servers found in this project

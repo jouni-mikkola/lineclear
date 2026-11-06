@@ -3,12 +3,12 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { writeAtomic } from "../pi/atomic.ts";
 import { dataDir } from "./paths.ts";
+import { HOUR_MS } from "./time.ts";
 
 type Env = Record<string, string | undefined>;
 
 const HOURLY_KEEP = 48;
 const UPDATE_KEEP = 10;
-const HOUR_MS = 3_600_000;
 /** How old the newest copy may be before doctor calls the copies stale: the rule loop takes one an hour. */
 const FRESH_MS = 3 * HOUR_MS;
 

@@ -9,10 +9,9 @@ import { costOf, priceFinder, type Price } from "./measure.ts";
 import { piHarness } from "./harness-pi.ts";
 import { piDir } from "./paths.ts";
 import { sessionUsage, type Usage } from "./session-text.ts";
+import { DAY, HOUR_MS } from "./time.ts";
 
 type Env = Record<string, string | undefined>;
-const DAY = 86_400_000;
-const HOUR = 3_600_000;
 
 interface Money {
   amount: number;
@@ -135,7 +134,7 @@ function readFileMessages(path: string): Message[] {
     const at = Date.parse(line.match(/"timestamp":"([^"]+)"/)?.[1] ?? "");
     const [u] = sessionUsage(line);
     if (!u || Number.isNaN(at)) continue;
-    const hour = at - (at % HOUR);
+    const hour = at - (at % HOUR_MS);
     const key = `${hour}|${u.provider}|${u.model}`;
     const m = sums.get(key) ?? { at: hour, account: u.provider || "unknown", usage: { ...u, input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } };
     m.usage.input += u.input;

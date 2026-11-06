@@ -5,12 +5,12 @@ import { configDir } from "../pi/config.ts";
 import { readRuns } from "./check-runs.ts";
 import { planBrief } from "./plan-brief.ts";
 import type { World } from "./rules.ts";
-import { selfProject } from "./self-fix.ts";
+import { isOpen, selfProject } from "./self-fix.ts";
+import { DAY } from "./time.ts";
 
 // A test that goes red on a branch that does not reach it is no fault of the branch: the branch still goes back, and the
 // test gets one Fix task, however many branches it fails. The run record (check-runs.jsonl) names it in `outside`.
 
-const DAY_MS = 86_400_000;
 const TITLE_MAX = 32;
 
 interface Filed {
@@ -28,13 +28,11 @@ function readFiled(env: NodeJS.ProcessEnv): Record<string, Filed> {
   }
 }
 
-const isOpen = (f: Filed, tasks: { title: string; status: string }[]) => tasks.some((t) => t.title === f.title && t.status !== "done" && t.status !== "closed");
-
 /** Files a Fix task for each test the last day's runs name as red outside the change, unless a task for that test name is open. Returns what it filed. */
 export function fileOutsideFixes(world: World, env = process.env): string[] {
   const self = selfProject(env);
   if (!self) return [];
-  const names = new Set(readRuns(self.settings.repo, world.now().getTime() - DAY_MS, env).flatMap((r) => r.outside ?? []));
+  const names = new Set(readRuns(self.settings.repo, world.now().getTime() - DAY, env).flatMap((r) => r.outside ?? []));
   if (names.size === 0) return [];
   const tasks = world.tasks(self.settings.space);
   if (typeof tasks === "string") return [];

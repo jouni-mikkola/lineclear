@@ -53,11 +53,11 @@ export function refsKey(repo: string): string | undefined {
   return [...files, join(repo, "docs", "ROADMAP.md")].map(fileKey).join("|");
 }
 
-/** A task as Shepherdr's files keep it: its id, and what else the reader looks at. */
+/** A task as Lineclear's files keep it: its id, and what else the reader looks at. */
 export type TaskLine = { id: string } & Record<string, unknown>;
 
 /**
- * Shepherdr's tasks in `dir`: tasks.json, with the tasks that ended over a day ago from its append log
+ * Lineclear's tasks in `dir`: tasks.json, with the tasks that ended over a day ago from its append log
  * tasks-cold.jsonl (the last line of an id wins, `{"gone": id}` drops it, tasks.json wins over both).
  */
 export function readTasksKept(dir: string): { next?: Record<string, number>; tasks: TaskLine[]; red?: Record<string, string> } {

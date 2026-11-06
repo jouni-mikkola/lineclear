@@ -316,7 +316,7 @@ export class EngineLaunch extends EngineStalls {
     const reviewer = this.harness(o.reviewer, 'reviewer', p.name)
     const agent = this.harness(o.agent, 'task', p.name)
     const set = o.set && Object.keys(o.set).length ? o.set : undefined
-    // each line that differs from Shepherdr's own says who set it: the coordinator's flags, or a level of Settings
+    // each line that differs from Lineclear's own says who set it: the coordinator's flags, or a level of Settings
     const by = {
       ...this.settings.setBy(p.name, set),
       ...(Object.keys(o.reviewer ?? {}).length ? { reviewer: 'task' as const } : {}),

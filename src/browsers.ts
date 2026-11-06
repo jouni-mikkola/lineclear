@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { isOpen, readItems } from "./inbox.ts";
 import { readTasksKept } from "./kept-read.ts";
-import { shepherdrDir } from "./measure.ts";
+import { lineclearDir } from "./measure.ts";
 
 // The agents' live browsers: each open playwright-cli session, its task's plain title, a live picture, and the
 // owner's clicks and keys when they take one over. Everything goes through the `playwright-cli` command, so
@@ -78,9 +78,9 @@ export function taskOfSession(session: string, ids: string[]): { task: string; n
   return note ? { task: hit, note } : { task: hit };
 }
 
-/** Each Shepherdr task's plain title and project, from this machine's Shepherdr files. */
+/** Each Lineclear task's plain title and project, from this machine's Lineclear files. */
 function tasks(env: Env): Map<string, { title: string; project?: string; done: boolean }> {
-  const dir = shepherdrDir(env);
+  const dir = lineclearDir(env);
   const spaces: any[] = readJson(join(dir, "spaces.json")) ?? [];
   const list: any[] = readTasksKept(dir).tasks;
   const by = new Map<string, { title: string; project?: string; done: boolean }>();

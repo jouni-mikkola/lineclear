@@ -1,5 +1,5 @@
 // Shared containment for every adapter. Agents cannot see the host home, network, PID space, Herdr socket,
-// Shepherdr store, or gateway policy. Descendant processes remain in the same namespaces.
+// Lineclear store, or gateway policy. Descendant processes remain in the same namespaces.
 import { Transform } from 'node:stream'
 import { createHash } from 'node:crypto'
 import { createServer, type Server } from 'node:http'
@@ -68,33 +68,33 @@ export function sandboxArgs(o: {
   a.push('--dir', '/etc')
   for (const p of ['/etc/ssl', '/etc/pki', '/etc/ca-certificates', '/etc/nsswitch.conf', '/etc/passwd', '/etc/group', '/etc/hosts', '/etc/resolv.conf'])
     if (existsSync(p)) a.push('--ro-bind', p, p)
-  a.push('--proc', '/proc', '--dev', '/dev', '--tmpfs', '/tmp', '--dir', '/run', '--dir', '/run/shepherdr')
+  a.push('--proc', '/proc', '--dev', '/dev', '--tmpfs', '/tmp', '--dir', '/run', '--dir', '/run/lineclear')
   a.push('--bind', o.state, o.home, '--bind', o.state, o.state, '--ro-bind', o.control, o.control)
   if (o.repo !== o.cwd) a.push('--ro-bind', o.repo, o.repo)
   a.push(o.writable ? '--bind' : '--ro-bind', o.cwd, o.cwd)
   // Git metadata is host-owned. A worker saves a commit with the checked checkpoint broker operation.
   for (const p of o.git ?? []) a.push('--ro-bind', p, p)
-  a.push('--ro-bind', o.control, '/run/shepherdr', '--ro-bind', o.bun, '/run/shepherdr/bun')
+  a.push('--ro-bind', o.control, '/run/lineclear', '--ro-bind', o.bun, '/run/lineclear/bun')
   // Native Claude/Codex binaries, or pi's package (its script needs its relative modules).
   if (o.kind === 'pi') {
     const modules = o.binary.includes('/node_modules/') ? o.binary.slice(0, o.binary.indexOf('/node_modules/') + 14) : dirname(dirname(o.binary))
     a.push('--ro-bind', modules, modules)
   }
-  a.push('--ro-bind', o.binary, `/run/shepherdr/${o.kind}`)
+  a.push('--ro-bind', o.binary, `/run/lineclear/${o.kind}`)
   for (const [k, v] of Object.entries({
     HOME: o.home,
     USER: 'agent',
     TERM: 'xterm-256color',
-    PATH: '/run/shepherdr/bin:/usr/local/bin:/usr/bin:/bin',
+    PATH: '/run/lineclear/bin:/usr/local/bin:/usr/bin:/bin',
     LINECLEAR_CHAT: '',
     NODE_USE_ENV_PROXY: '1',
-    LINECLEAR_COMMAND: '/run/shepherdr/bin/lineclear',
+    LINECLEAR_COMMAND: '/run/lineclear/bin/lineclear',
     CODEX_HOME: join(o.home, '.codex'),
     PI_CODING_AGENT_DIR: join(o.home, '.pi/agent'),
     CLAUDE_CONFIG_DIR: join(o.home, '.claude'),
   }))
     a.push('--setenv', k, v)
-  a.push('--chdir', o.cwd, '/run/shepherdr/bun', '/run/shepherdr/bootstrap.ts', o.kind === 'pi' ? o.binary : `/run/shepherdr/${o.kind}`)
+  a.push('--chdir', o.cwd, '/run/lineclear/bun', '/run/lineclear/bootstrap.ts', o.kind === 'pi' ? o.binary : `/run/lineclear/${o.kind}`)
   return a
 }
 export function capturedTranscript(root: string, kind: string, file: string) {
@@ -236,10 +236,8 @@ export async function prepareSandbox(
   }
   // Scripts are copied once to the read-only control mount; worktree edits cannot change trusted broker code.
   copyFileSync(join(ROOT, 'helper/autopilot/bootstrap.ts'), join(control, 'bootstrap.ts'))
-  const result = await Bun.build({ entrypoints: [join(ROOT, 'server/cli.ts')], target: 'bun' })
-  if (!result.success) throw new Error('Could not prepare the isolated command helper.')
-  writeFileSync(join(control, 'cli.js'), await result.outputs[0].text(), { mode: 0o400 })
-  writeFileSync(join(control, 'bin/lineclear'), '#!/bin/sh\nexec /run/shepherdr/bun /run/shepherdr/cli.js "$@"\n', { mode: 0o500 })
+  copyFileSync(join(ROOT, 'helper/lineclear'), join(control, 'lineclear.pl'))
+  writeFileSync(join(control, 'bin/lineclear'), '#!/bin/sh\nexec perl /run/lineclear/lineclear.pl "$@"\n', { mode: 0o500 })
   const sockets = new Set<Socket>()
   const received = new Map<string, number>()
   const server: Server = createServer(async (req, res) => {
@@ -386,7 +384,7 @@ export async function prepareSandbox(
       git: [...new Set(git)].sort((a, b) => a.length - b.length),
     })
     const start = args.indexOf('--chdir')
-    args.splice(start, 0, '--setenv', 'LINECLEAR_CHAT', spec.key, '--ro-bind', socket, '/run/shepherdr/gateway.sock')
+    args.splice(start, 0, '--setenv', 'LINECLEAR_CHAT', spec.key, '--ro-bind', socket, '/run/lineclear/gateway.sock')
     for (const kind of kinds) {
       const executable = fixture ? fixture.executable(kind) : Bun.which(kind)
       if (!executable) throw new Error(`${kind} reviewer is not installed.`)
@@ -398,7 +396,7 @@ export async function prepareSandbox(
         writeFileSync(target, `#!/bin/sh\nexec ${q(real)} "$@"\n`, { mode: 0o500 })
       } else {
         writeFileSync(target, '')
-        args.splice(start, 0, '--ro-bind', real, `/run/shepherdr/bin/${kind}`)
+        args.splice(start, 0, '--ro-bind', real, `/run/lineclear/bin/${kind}`)
       }
     }
     const helper = join(homedir(), '.lineclear/helper')

@@ -37,7 +37,7 @@ export class MachinesActions extends MachinesLinks {
     return fetch(`${l.rec.url}${path}`, init)
   }
 
-  /* ---------- shepherdr doctor ---------- */
+  /* ---------- lineclear doctor ---------- */
 
   /** check every machine and repair what is missing: the helper put there again, its worker started again */
   async doctor(): Promise<string[]> {

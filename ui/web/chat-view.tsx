@@ -280,6 +280,7 @@ export function Chat({
         ref={panel ? box : undefined}
         className={panel ? "min-h-0 w-full flex-1 overflow-y-auto px-4 pt-4" : "mx-auto mt-8 w-full max-w-[760px] flex-1"}
         data-thread-scroll={panel || undefined}
+        tabIndex={panel ? 0 : undefined}
       >
         <ThreadBody view={view} items={items} writing={writing} task={task} onImage={onImage} onAsk={ask} ready={ready} />
       </div>

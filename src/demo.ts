@@ -5,13 +5,11 @@ import { piHarness } from "./harness-pi.ts";
 import { writeAtomic } from "../pi/atomic.ts";
 import { runMain } from "./rules.ts";
 import { startWeb } from "./web.ts";
+import { DAY, HOUR_MS, MIN } from "./time.ts";
+import { gitWith } from "./git.ts";
 
 // Demo mode: `lineclear run --demo` serves the real app on fixed data written into one folder, so a picture of it
 // shows what the app does. The data has no real project, owner or machine name, and the machine shown is a fixed stand-in.
-
-const MIN = 60_000;
-const HOUR = 3_600_000;
-const DAY = 86_400_000;
 
 const write = (file: string, data: unknown) => {
   mkdirSync(join(file, ".."), { recursive: true });
@@ -116,7 +114,7 @@ const API_TASKS: DemoTask[] = [
   { id: "API-2", title: "B1 Retry failed webhooks", status: "work", sub: "Writing the tests", ago: 9 },
 ];
 
-const git = (repo: string, args: string[], at: number) => {
+const commitAt = (repo: string, args: string[], at: number) => {
   const env = {
     ...process.env,
     GIT_AUTHOR_NAME: "Demo",
@@ -126,7 +124,7 @@ const git = (repo: string, args: string[], at: number) => {
     GIT_AUTHOR_DATE: `@${Math.floor(at / 1000)} +0000`,
     GIT_COMMITTER_DATE: `@${Math.floor(at / 1000)} +0000`,
   };
-  Bun.spawnSync(["git", "-C", repo, ...args], { stdin: "ignore", stdout: "ignore", stderr: "ignore", env });
+  gitWith({ env }, repo, ...args);
 };
 
 /** A project's repo: its roadmap, then one commit per merged task, with origin/main at the last. */
@@ -134,11 +132,11 @@ function writeRepo(dir: string, name: string, roadmap: string, tasks: DemoTask[]
   const repo = join(dir, "repos", name);
   write(join(repo, "docs", "ROADMAP.md"), roadmap);
   const start = now - 4 * DAY;
-  git(repo, ["init", "-q", "-b", "main"], start);
-  git(repo, ["add", "."], start);
-  git(repo, ["commit", "-q", "-m", "Roadmap"], start);
-  for (const t of tasks.filter((x) => x.status === "done")) git(repo, ["commit", "-q", "--allow-empty", "-m", `${t.id}: ${t.title}`], now - t.ago * MIN);
-  git(repo, ["update-ref", "refs/remotes/origin/main", "HEAD"], now);
+  commitAt(repo, ["init", "-q", "-b", "main"], start);
+  commitAt(repo, ["add", "."], start);
+  commitAt(repo, ["commit", "-q", "-m", "Roadmap"], start);
+  for (const t of tasks.filter((x) => x.status === "done")) commitAt(repo, ["commit", "-q", "--allow-empty", "-m", `${t.id}: ${t.title}`], now - t.ago * MIN);
+  commitAt(repo, ["update-ref", "refs/remotes/origin/main", "HEAD"], now);
   return repo;
 }
 
@@ -162,12 +160,12 @@ const DAILY_K_TOKENS = [310, 420, 380, 250, 90, 60, 510, 640, 590, 470, 700, 820
 
 function writeUsage(dir: string, now: number) {
   const lines = DAILY_K_TOKENS.map((k, i) => {
-    const at = now - (DAILY_K_TOKENS.length - 1 - i) * DAY - HOUR;
+    const at = now - (DAILY_K_TOKENS.length - 1 - i) * DAY - HOUR_MS;
     return [sessionLine(at, "anthropic", "demo-sonnet", k * 1000), ...(i % 3 === 0 ? [sessionLine(at, "openai", "demo-codex", k * 400)] : [])];
   });
   write(join(piHarness.sessionsRoot(join(dir, "pi")), "demo", "work.jsonl"), `${lines.flat().join("\n")}\n`);
   write(join(dir, "pi", "models-store.json"), PRICES);
-  const window = (percent: number, hours: number) => ({ percent, resetAt: new Date(now + hours * HOUR).toISOString() });
+  const window = (percent: number, hours: number) => ({ percent, resetAt: new Date(now + hours * HOUR_MS).toISOString() });
   const at = new Date(now).toISOString();
   write(join(dir, "config", "limits.json"), {
     anthropic: { at, session: window(42, 2.5), week: window(81, 70) },
@@ -188,10 +186,10 @@ function writeProject(dir: string, name: string, space: string, repo: string) {
   });
 }
 
-// The stand-ins for Shepherdr's and playwright-cli's commands: the first answers `task list` from the task files, the
+// The stand-ins for Lineclear's and playwright-cli's commands: the first answers `task list` from the task files, the
 // second lists two open browsers. They find their data by their own path: a child process may not see the changed environment. Every other command does nothing.
-const SHEPHERDR = `#!/bin/sh
-[ "$1 $2" = "task list" ] && cat "$(dirname "$0")/../shepherdr/task-list-$4.json"
+const LINECLEAR = `#!/bin/sh
+[ "$1 $2" = "task list" ] && cat "$(dirname "$0")/../lineclear/task-list-$4.json"
 exit 0
 `;
 const PLAYWRIGHT_CLI = `#!/bin/sh
@@ -214,13 +212,13 @@ function writeDemo(dir: string, now = Date.now()): Record<string, string> {
     { key: "API", name: "billing-api", roadmap: API_ROADMAP, tasks: API_TASKS },
   ];
   const repos = projects.map((p) => writeRepo(dir, p.name, p.roadmap, p.tasks, now));
-  const shepherdr = join(dir, "shepherdr");
+  const lineclear = join(dir, "lineclear");
   write(
-    join(shepherdr, "spaces.json"),
+    join(lineclear, "spaces.json"),
     projects.map((p, i) => ({ key: p.key, name: p.name, path: repos[i] })),
   );
   const all = projects.flatMap((p) => p.tasks);
-  write(join(shepherdr, "tasks.json"), {
+  write(join(lineclear, "tasks.json"), {
     tasks: all.map((t) => ({
       id: t.id,
       title: t.title,
@@ -230,12 +228,12 @@ function writeDemo(dir: string, now = Date.now()): Record<string, string> {
     })),
     red: {},
   });
-  write(join(shepherdr, "chatlog", "cards.json"), {
+  write(join(lineclear, "chatlog", "cards.json"), {
     posted: [{ at: now - 25 * MIN, card: { task: "WEB-3", status: "need", text: "Which payment provider should the saved card use?" } }],
   });
   for (const p of projects) {
     write(
-      join(shepherdr, `task-list-${p.name}.json`),
+      join(lineclear, `task-list-${p.name}.json`),
       p.tasks.map((t) => ({ id: t.id, title: t.title, status: t.status, ...(t.sub ? { sub: t.sub } : {}) })),
     );
   }
@@ -252,7 +250,7 @@ function writeDemo(dir: string, now = Date.now()): Record<string, string> {
   write(join(dir, "doctor.json"), []);
   writeUsage(dir, now);
   for (const [name, text] of [
-    ["lineclear", SHEPHERDR],
+    ["lineclear", LINECLEAR],
     ["playwright-cli", PLAYWRIGHT_CLI],
   ] as const) {
     write(join(dir, "bin", name), text);
@@ -260,10 +258,10 @@ function writeDemo(dir: string, now = Date.now()): Record<string, string> {
   }
   return {
     LINECLEAR_CONFIG: join(dir, "config"),
-    LINECLEAR_SHEPHERDR_DIR: shepherdr,
+    LINECLEAR_HOME: lineclear,
     PI_CODING_AGENT_DIR: join(dir, "pi"),
     XDG_CACHE_HOME: join(dir, "cache"),
-    SHEPHERDR_BIN: join(dir, "bin", "lineclear"),
+    LINECLEAR_SERVER_BIN: join(dir, "bin", "lineclear"),
     LINECLEAR_PLAYWRIGHT_CLI: join(dir, "bin", "playwright-cli"),
     LINECLEAR_DOCTOR_FILE: join(dir, "doctor.json"),
     PI_BIN: "true",

@@ -68,7 +68,7 @@ export class ChatsReplies extends ChatsLogs {
       const i = lately.findIndex((o) => at >= o.at - 3000 && o.words === words(text))
       return i < 0 ? undefined : lately.splice(i, 1)[0].cid
     }
-    // Shepherdr's update cards are messages too, among the rest by time, so a reaction can quote one
+    // Lineclear's update cards are messages too, among the rest by time, so a reaction can quote one
     const cards = l.posted.filter((p) => p.card).map((p) => cardMessage(p.card!, p.at))
     let sessions = 0
     let newSession = false
@@ -171,7 +171,7 @@ export class ChatsReplies extends ChatsLogs {
     }
     msgs.push(...cards)
     msgs.sort((a, b) => (a.at ?? 0) - (b.at ?? 0))
-    // what else Shepherdr posted: a question or artifact joins the agent's reply of that turn
+    // what else Lineclear posted: a question or artifact joins the agent's reply of that turn
     const echoed = new Set<Message>()
     /** the replies an artifact came with: one each */
     const hosting = new Set<Message>()
@@ -251,7 +251,7 @@ export class ChatsReplies extends ChatsLogs {
             })
             .join('\n'),
         )
-        // what Shepherdr itself sends (instructions, news) never shows as yours
+        // what Lineclear itself sends (instructions, news) never shows as yours
         if (text || answered) msgs.push({ id: o.id, who: 'you', at: o.at, text: text || undefined, answered, waiting: true, waitsFor, cid: o.cid, reply })
         files.forEach((file, i) =>
           msgs.push({ id: `${o.id}:${i}`, who: 'you', at: o.at, file, waiting: true, waitsFor, cid: o.cid, reply: !i && !text ? reply : undefined }),
@@ -264,7 +264,7 @@ export class ChatsReplies extends ChatsLogs {
         const m = msgs.find((x) => x.who === 'you' && x.reply?.id === id.slice('reply:'.length))
         if (m) Object.assign(m, { answered: m.answered ?? 'Answered', elsewhere: this.answeredIn(s.space) })
       }
-    // a menu in the terminal shows as a question card, posted by Shepherdr
+    // a menu in the terminal shows as a question card, posted by Lineclear
     const menu = this.menus.get(key)
     if (menu && !this.openQuestion(key)) {
       const waitingAt = msgs.findIndex((m) => m.waiting)

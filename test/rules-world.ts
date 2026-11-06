@@ -1,4 +1,4 @@
-// A Lineclear project in a temp folder for the rules tests: a fake shepherdr and a fake pi that only read and log files.
+// A Lineclear project in a temp folder for the rules tests: a fake lineclear and a fake pi that only read and log files.
 import { afterAll } from "bun:test";
 import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -31,7 +31,7 @@ interface Opts {
   machine?: object;
 }
 
-/** A project in a temp folder, with a fake shepherdr and a fake pi that only read and log files. */
+/** A project in a temp folder, with a fake lineclear and a fake pi that only read and log files. */
 export function setup(o: Opts = {}) {
   const dir = mkdtempSync(join(tmpdir(), "lc-rules-"));
   temps.push(dir);
@@ -83,8 +83,7 @@ esac`,
     LINECLEAR_STORE_COPIES: join(dir, "store-copies"),
     XDG_CACHE_HOME: join(dir, "cache"),
     TMPDIR: join(dir, "tmp"),
-    LINECLEAR_SECRETS_FOLDER: join(dir, "no-logins"),
-    SHEPHERDR_BIN: join(bin, "lineclear"),
+    LINECLEAR_SERVER_BIN: join(bin, "lineclear"),
     PI_BIN: join(bin, "pi"),
   };
   mkdirSync(join(config, "projects", "demo"), { recursive: true });

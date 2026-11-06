@@ -2,11 +2,11 @@ import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSy
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { dataDir } from "./paths.ts";
-import { oldDir } from "./old-install.ts";
+import { OLD_NAME, oldDir } from "./old-install.ts";
 
 type Env = Record<string, string | undefined>;
 
-/** Where an agent's `shepherdr` command finds the server on a machine: the helper's socket, under each data folder. */
+/** Where an agent's old command finds the server on a machine: the helper's socket, under each data folder. */
 const sockets = (env: Env) => ({ old: join(oldDir(env), "helper", "main.sock"), now: join(dataDir(env), "helper", "main.sock") });
 
 const linked = (env: Env) => {
@@ -18,9 +18,9 @@ const linked = (env: Env) => {
   }
 };
 
-/** True when Lineclear is in use here and an agent started under Shepherdr 2.0 would find no socket. */
+/** True when Lineclear is in use here and an agent started under herdr-projects 2.0 would find no socket. */
 export function helperApart(env: Env = process.env): boolean {
-  // no old helper folder: no agent was ever started under Shepherdr 2.0 here
+  // no old helper folder: no agent was ever started under herdr-projects 2.0 here
   if (!existsSync(join(oldDir(env), "helper"))) return false;
   const inUse = existsSync(join(dataDir(env), "migrated.json")) || existsSync(join(dataDir(env), "helper"));
   return inUse && !linked(env);
@@ -36,7 +36,7 @@ export function linkHelper(env: Env = process.env): boolean {
   return true;
 }
 
-/** Running agents started before the command was renamed: their `LINECLEAR_COMMAND` still ends in `shepherdr`. Each is its chat name (else its pid). `procRoot` is a test seam. */
+/** Running agents started before the command was renamed: their `LINECLEAR_COMMAND` still ends in the old name. Each is its chat name (else its pid). `procRoot` is a test seam. */
 export function agentsOnOldName(procRoot = "/proc", self = process.pid): string[] {
   const found: string[] = [];
   let pids: string[];
@@ -48,7 +48,7 @@ export function agentsOnOldName(procRoot = "/proc", self = process.pid): string[
   for (const pid of pids) {
     try {
       const vars = readFileSync(join(procRoot, pid, "environ"), "utf8").split("\0");
-      if (!vars.some((v) => /^LINECLEAR_COMMAND=.*\/shepherdr$/.test(v))) continue;
+      if (!vars.some((v) => v.startsWith("LINECLEAR_COMMAND=") && v.endsWith(`/${OLD_NAME}`))) continue;
       if (!vars.includes(`HOME=${homedir()}`)) continue;
       found.push(vars.find((v) => v.startsWith("LINECLEAR_CHAT="))?.slice("LINECLEAR_CHAT=".length) || `process ${pid}`);
     } catch {

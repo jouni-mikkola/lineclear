@@ -1,6 +1,6 @@
 # Spaces
 
-Run many coding agents across machines from a phone, tablet or desktop. Shepherdr is a herdr plugin: one private web
+Run many coding agents across machines from a phone, tablet or desktop. Lineclear is a herdr plugin: one private web
 app on your tailnet (installable on a phone) with your spaces in a sidebar, as herdr has them: a space is a folder on
 a machine plus a name, with its own coordinator. Each machine is a section, as Slack's: its emoji (a server icon without
 one) and its name, both set in its ⋯ menu's Rename machine and kept for every device, with its spaces under it, its
@@ -27,7 +27,7 @@ also has a side panel: its live herdr terminal, its files, its diff against main
   machines (or none: everything) also by machine, or machine › space. A machine's heading has a + (New space) and a ⋯ (New space…, New section…,
   Rename machine…: its emoji and name), and says when it is in trouble: `Can't reach`, `herdr down`, or a limit it is over.
 - Add a space with the + on a machine's heading (it shows on hover with a mouse), its ⋯ (New space…), `N` on a desktop
-  (on the machine you are in), or by asking a coordinator (`add ~/dev/x as a space`, or `shepherdr space add <path>
+  (on the machine you are in), or by asking a coordinator (`add ~/dev/x as a space`, or `lineclear space add <path>
   [--name NAME]`). Pick the machine when there is more than one, then a folder in your home there: the picker starts at
   ~ (~ itself is refused: it is the home space). Type the path to narrow the list (Tab goes into a folder, Enter
   picks); your latest repos are listed first. Then its name, filled in from the folder's. Names follow Slack's channel
@@ -38,7 +38,7 @@ also has a side panel: its live herdr terminal, its files, its diff against main
   on main with an empty first commit; files already there stay uncommitted). Either way it gets its own herdr space
   and coordinator, and opens. Only folders in your home are listed or made.
 - New messages show like Slack's unread, for coordinators' chats only: a coordinator's chat with something new from it
-  or Shepherdr that you haven't seen makes its space's row bold in the sidebar (a done task's last word comes as its
+  or Lineclear that you haven't seen makes its space's row bold in the sidebar (a done task's last word comes as its
   card in the space's chat, so it counts). A folded heading still shows the spaces under it with something new or a
   red count, and the open one, as a collapsed Slack section does. Headings carry no marks of their own. Having a chat on screen reads it,
   and the main machine keeps the marks, so every device shows the same; a row's menu has **Mark as read**. Tasks' chats never make a row bold: the tasks list shows each
@@ -52,13 +52,13 @@ also has a side panel: its live herdr terminal, its files, its diff against main
 - Rename a space from its row's menu, or a machine from its heading's ⋯: its name becomes a box right there; Enter (or tapping
   away) keeps the new name, Escape the old, and an empty one gives it back its own. Only the name you read changes,
   everywhere it shows (the sidebar, the header, search, task rows, alerts, links) and on every device: the main machine
-  keeps it (`names.json`). A space's new name follows the same rules as a new one's (`shepherdr space rename <name>
+  keeps it (`names.json`). A space's new name follows the same rules as a new one's (`lineclear space rename <name>
   <new-name>`). Its folder, repo, herdr space, task ids and the machine's SSH and herdr name stay as they were.
 - Remove a space from its row's menu (a held finger on a phone or tablet; its ⋯ or a right click on a
-  desktop, where it opens beside the row): Remove asks first. Its folder and code stay on disk; Shepherdr forgets it and closes its
+  desktop, where it opens beside the row): Remove asks first. Its folder and code stay on disk; Lineclear forgets it and closes its
   coordinator. Its open tasks hide with it (their worktrees and branches stay) and come back, with its chat, when it is
   added again under the same name. Not while one of its tasks is working: pause it or let it finish first. Never a
-  home space, so a machine always keeps one. A coordinator can do the same (`shepherdr space remove <name>`).
+  home space, so a machine always keeps one. A coordinator can do the same (`lineclear space remove <name>`).
 - Machines, and each machine's spaces (its home space first), show A to Z. Drag one to reorder them (with a mouse at
   once; a finger holds the row, its menu opens, and sliding it closes the menu and moves the row); a machine takes its
   spaces and sections along, a section its spaces, and Option+Shift+↑/↓ (Alt+Shift off a Mac) moves a focused space. The main
@@ -78,12 +78,12 @@ also has a side panel: its live herdr terminal, its files, its diff against main
   over once (`server/live/migrate.ts`). Projects become spaces with their ids, names and chats (`projects.json` becomes
   `spaces.json`); each machine coordinator's chat moves into that machine's home space, and All machines' into the main
   machine's home space, which takes over its jobs; modes, settings, pins, unread marks, heartbeats and artifacts
-  follow. A pinned machine becomes its pinned home space. `shepherdr project …` and `--project` still work, as
+  follow. A pinned machine becomes its pinned home space. `lineclear project …` and `--project` still work, as
   `space`.
 
 - A repository space starts with the base detected when it was added (usually `origin/HEAD`, then main or master).
   Change it under **Settings → Repository → Base branch**, or with
-  `shepherdr set space.base develop --space NAME` (`shepherdr space set base develop --space NAME` also works).
-  `shepherdr show --space NAME` shows it. The branch and write access are checked before saving.
+  `lineclear set space.base develop --space NAME` (`lineclear space set base develop --space NAME` also works).
+  `lineclear show --space NAME` shows it. The branch and write access are checked before saving.
   This changes only new tasks; existing and waiting tasks keep their own target. It never changes the repository's
   default branch, space key or task IDs. Home spaces have no repository base.

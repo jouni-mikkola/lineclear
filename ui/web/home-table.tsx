@@ -1,5 +1,5 @@
 import type { TaskDetail } from "../../src/task-detail.ts";
-import { type Browser, type Column, DataTable, dollars, type InboxItem, LivePicture, ago, type Project, type Task } from "../kit/index.ts";
+import { type Browser, type Column, DataTable, dollars, exact, type InboxItem, LivePicture, ago, type Project, type Task } from "../kit/index.ts";
 import { type HomeData, type Load, useTaskDetail } from "./data.ts";
 import { AskInRow } from "./inbox-strip.tsx";
 
@@ -35,7 +35,7 @@ export function rowsOf(projects: Project[], loose: HomeData["loose"], host: stri
     step: t.step ?? "",
     title: t.title,
     machine: t.machine ?? host,
-    stage: t.state === "need" ? (t.text ?? "waits for you") : t.stalled ? "no sign of life" : STAGE_WORD[t.stage ?? "work"],
+    stage: t.state === "need" ? (t.text ?? "waits for you") : t.silentSince ? "not reached" : t.stalled ? "no sign of life" : STAGE_WORD[t.stage ?? "work"],
     stuck: t.state === "need" || !!t.stalled,
     last: t.last,
     files: t.files,
@@ -65,7 +65,7 @@ const columns: Column<Row>[] = [
     label: "Last",
     show: (r) =>
       r.last ? (
-        <span className="block max-w-32 truncate" title={r.last.text}>
+        <span className="block max-w-32 truncate" title={`${r.last.text} · ${exact(r.last.at)}`}>
           {r.last.text} · {ago(r.last.at)}
         </span>
       ) : (

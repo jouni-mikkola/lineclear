@@ -12,12 +12,12 @@ const TAIL_LINES = 40;
 /** The longest line given back, in characters: a pasted log would crowd out the rest; the log keeps it whole. */
 const MAX_GIVEN = 1_000;
 
-/** The log, beside Shepherdr's tasks.json in the task store's folder. */
+/** The log, beside Lineclear's tasks.json in the task store's folder. */
 export function directionLogFile(env: Env = process.env): string {
-  return join(env.LINECLEAR_HOME || env.LINECLEAR_SHEPHERDR_DIR || join(env.HOME ?? homedir(), ".lineclear"), "owner-direction.md");
+  return join(env.LINECLEAR_HOME || join(env.HOME ?? homedir(), ".lineclear"), "owner-direction.md");
 }
 
-/** A tag's attributes: their quoted values may hold `>`, which Shepherdr does not escape. */
+/** A tag's attributes: their quoted values may hold `>`, which Lineclear does not escape. */
 const ATTRS = `(?:\\s+[a-z-]+="[^"]*")*`;
 const attr = (attrs: string, name: string) => attrs.match(new RegExp(`\\s${name}="([^"]*)"`))?.[1];
 
@@ -32,10 +32,10 @@ const WORDS: Record<string, (attrs: string) => string | undefined> = {
 };
 
 /**
- * The owner's words in one chat message, or undefined when it holds none: Shepherdr's own tagged lines, reactions and
+ * The owner's words in one chat message, or undefined when it holds none: Lineclear's own tagged lines, reactions and
  * files alone are not the owner's words; plain words, a reply, an answer to a card, a comment or note on an artifact
  * and the shared browser's notes are, with any words written after the tag. The lines a file or reaction adds on
- * their own are left out. A message that starts with `<` but holds no tag of Shepherdr's is plain words.
+ * their own are left out. A message that starts with `<` but holds no tag of Lineclear's is plain words.
  */
 export function ownerStatement(text: string): string | undefined {
   const t = text
@@ -45,7 +45,7 @@ export function ownerStatement(text: string): string | undefined {
     .trim();
   if (t === "") return undefined;
   const m = t.match(new RegExp(`^<([a-z-]+)(${ATTRS})\\s*>([\\s\\S]*?)</\\1>([\\s\\S]*)$`));
-  if (!m) return t.startsWith("<shepherdr") ? undefined : t;
+  if (!m) return t.startsWith("<lineclear") ? undefined : t;
   const place = WORDS[m[1] ?? ""];
   const words = [m[3]?.trim(), m[4]?.trim()].filter(Boolean).join("\n");
   if (!place || !words) return undefined;

@@ -2,7 +2,6 @@ import { expect, test } from "bun:test";
 import { mkdirSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import compactionNotes, {
-  retireOldNotes,
   HEADINGS,
   MAX_FILE,
   MAX_MESSAGES,
@@ -270,12 +269,12 @@ test("no file a few turns after the ask is asked for once more, never twice", ()
   expect(s.sent[1]).toContain("no state file");
 });
 
-test("Shepherdr's own tagged lines are not the owner's messages", () => {
+test("Lineclear's own tagged lines are not the owner's messages", () => {
   const s = setup();
   s.turn(140_000);
   s.write(s.good);
   const r = s.compact({
-    branchEntries: [...s.entries, { type: "message", message: { role: "user", content: "<shepherdr><heartbeat>nothing new</heartbeat></shepherdr>" } }],
+    branchEntries: [...s.entries, { type: "message", message: { role: "user", content: "<lineclear><heartbeat>nothing new</heartbeat></lineclear>" } }],
   });
   expect(r.compaction.summary).not.toContain("heartbeat");
 });
@@ -291,12 +290,12 @@ test("a coordinator's summary keeps the newest owner's messages and says where t
   expect(sum).toContain(`5 earlier messages of the owner are in the owner's direction log, ${directionLogFile(s.env)}`);
 });
 
-test("a coordinator logs each owner statement word for word with its time; Shepherdr's lines and the pack's own are not", () => {
+test("a coordinator logs each owner statement word for word with its time; Lineclear's lines and the pack's own are not", () => {
   const s = setup("lineclear");
   s.say("Keep the line green\nalways");
   s.say('<reply from="Elias" to="Merge it?">Yes, merge it</reply>');
   s.say('<answer from="Elias" question="Rerun CI?">Rerun it</answer>');
-  s.say("<shepherdr><heartbeat>tick</heartbeat></shepherdr>");
+  s.say("<lineclear><heartbeat>tick</heartbeat></lineclear>");
   s.say('<reaction from="Elias" emoji="👍" to="ok"/>');
   s.say('<attachment from="Elias" name="a.png" path="~/inbox/a.png"/>');
   s.say(`${MARK} write it`);
@@ -354,18 +353,4 @@ test("after any compaction, even pi's own, a coordinator and your own session ge
   a.env.LINECLEAR_HOME = c.env.LINECLEAR_HOME;
   a.h.session_compact?.({ reason: "threshold" }, {});
   expect(a.given).toEqual([]);
-});
-
-test("control-center's older state-file extension is turned off by its own switch, so no session is asked twice", () => {
-  const s = setup();
-  expect(retireOldNotes(s.env)).toBe(false); // not installed: nothing to do
-  const old = join(s.env.HOME, ".pi", "agent", "extensions", "state-file");
-  mkdirSync(old, { recursive: true });
-  writeFileSync(join(old, "defaults.json"), JSON.stringify({ enabled: true, override: "~/.config/control-center/state-file.json" }));
-  const own = join(s.env.HOME, ".config", "control-center", "state-file.json");
-  mkdirSync(join(own, ".."), { recursive: true });
-  writeFileSync(own, JSON.stringify({ limitTokens: 120000 }));
-  compactionNotes({ on: () => undefined }, s.env); // loading the part is enough
-  expect(JSON.parse(readFileSync(own, "utf8"))).toEqual({ limitTokens: 120000, enabled: false });
-  expect(retireOldNotes(s.env)).toBe(false); // already off
 });

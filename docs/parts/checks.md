@@ -17,23 +17,23 @@ The check tiers of each project and what keeps its checks honest: `lineclear che
   (tier, limit, time) to `check-runs.jsonl` for the rule loop, and its verdict stands. A busy machine's run is not counted.
 - Each run names the machine it ran on (`machine`, from `whereRun`): a task started on another machine checks there and waits in that machine's check line, never the main one.
 - The repo's own check (`bun run check`) runs only what the branch's change reaches, its independent steps side by side,
-  and writes each step's time to the steps log `check-steps.jsonl`. A test file over 5 s, a spec over 20 s or a run over
+  and writes each step's time to the steps log `check-steps.jsonl`. A test over 2 s, a spec over 20 s or a run over
   180 s fails it by name, unless the file is in `scripts/gates/baseline/slow.json` (docs/numbers.md). `--full` runs
   everything: the release loop, on the newest main, after waiting up to 30 minutes for a quiet machine. Times are scaled
   by the busiest load from the run's start to its end (`loadMeter`).
+- `check.where` = `github` (default `local`): a landing opens its pull request and waits for GitHub's checks (`.github/workflows/`: changed tests per pull request, the full check in 4 shards in the merge queue, heavy suites nightly), naming failing tests from the job log.
 
 ## Interface
 
 `lineclear check [--tier <tier>] [command]`, `lineclear check --release <test>`, the check
 log `check-runs.jsonl`, and these names:
-
-- `src/check-runs.ts`: `Tier`, `loadMeter`, `recordStepTimes`, `fullCheckPassed`, `readRuns`, `laneDays`, `redByCause`, `refusedMergeBranches`, `whereRun`, `testKey`, `recordRun`
+- `src/check-runs.ts`: `Tier`, `CheckRun`, `loadMeter`, `recordStepTimes`, `fullCheckPassed`, `readRuns`, `laneDays`, `redByCause`, `refusedMergeBranches`, `whereRun`, `testKey`, `recordRun`
+- `src/git.ts`: `git`, `gitWith`, `gitText`, `gitAsLineclear`
 - `src/check-tier.ts`: `checkTier`, `flakeFixIn`
 
 ## Files
 
-- code: `src/check-runs.ts`, `src/check-tier.ts`
-- research: `docs/research/merge-line.md`
+- code: `src/check-runs.ts`, `src/check-tier.ts`, `src/git.ts`
 - tests: `test/contracts/checks.test.ts`, `test/red-causes.test.ts`
 
 ## Tests

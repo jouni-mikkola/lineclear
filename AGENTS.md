@@ -4,7 +4,7 @@ What Lineclear is and why: [docs/idea.md](docs/idea.md). The order of work: [doc
 
 ## Commands
 
-- `bun run check`: what the branch's change reaches (types, tests, doc checks, gates, the server's check when `server/` changed, the specs of changed views), in 180 s at most on an idle machine, each test file under 5 s and each spec under 20 s (`docs/numbers.md`). It must pass before a merge. `bun scripts/check.ts --full` runs everything: the release loop does, on the newest main.
+- `bun run check`: what the branch's change reaches (types, tests, doc checks, gates, the server's check when `server/` changed, the specs of changed views), in 180 s at most on an idle machine, each test case under 2 s (a file with a slower one needs a baseline) and each spec under 20 s (`docs/numbers.md`). It must pass before a merge. `bun scripts/check.ts --full` runs everything (a test file that passed with the same files is skipped unless `--no-cache` or `--full`): the release loop does, on the newest main.
 - `bun run types` (tsc), `bun run test` (bun test), `bun run dashes` (no en or em dash in any tracked file).
 - `bun run gates`: the code gates (Biome lint and format, knip dead code, jscpd copies, module borders and cycles,
   file size, comments), each against its baseline in `scripts/gates/baseline/`. A fix lowers its baseline:
@@ -25,7 +25,7 @@ What Lineclear is and why: [docs/idea.md](docs/idea.md). The order of work: [doc
 - `bun run shots`: starts `lineclear run --demo` (fixed demo data, no real names) and takes every view at 390 and 1440 px
   into `docs/shots/`, with `docs/shots/list.md`. A release runs it. The check fails when the README or a docs page shows a
   picture of the app that is not in that list (`bun run shots:check`).
-- `server/`: the fork of Shepherdr 2.0 (MIT, see `server/NOTICE`). `bin/lineclear serve --port <port>` starts it; `bun run check` runs its types and tests too (it prints each step's time).
+- `server/`: the fork of herdr-projects 2.0 (MIT, see `server/NOTICE`). `bin/lineclear serve --port <port>` starts it; `bun run check` runs its types and tests too (it prints each step's time).
 - `bin/lineclear --help` lists the CLI. `bin/lineclear roadmap check .` checks `docs/ROADMAP.md`.
 
 ## Layout
@@ -40,7 +40,7 @@ What Lineclear is and why: [docs/idea.md](docs/idea.md). The order of work: [doc
 - General voice: explain Lineclear for any user. No stories about one setup, no dates of one run, no owner details.
   A why is a reason that holds for everyone. Goals stay goals, not claims.
 - Short: every sentence earns its place. Plain English, short sentences. No en or em dashes.
-- Facts about other tools (Shepherdr, herdr, pi) only when anyone can check them, with a link.
+- Facts about other tools (Lineclear, herdr, pi) only when anyone can check them, with a link.
 - New ideas go to `docs/backlog.md`, never into the roadmap or the code.
 
 ## Code

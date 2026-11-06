@@ -1,4 +1,4 @@
-// The way back from another machine: its agents' shepherdr command (the helper's bin/shepherdr) talks to the socket
+// The way back from another machine: its agents' lineclear command (the helper's bin/lineclear) talks to the socket
 // main.sock in the helper's folder there, which an SSH tunnel kept open from here leads to this worker's API. The API
 // stays on 127.0.0.1 here; SSH is the only way in.
 import { LinkBackoff } from './recovery.ts'

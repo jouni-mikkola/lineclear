@@ -15,6 +15,8 @@ export interface HerdrServer {
   pid: number;
   cpuSeconds: number;
   inService: boolean;
+  /** Resident memory in MB, when known. */
+  rssMb?: number;
 }
 
 /** One herdr workspace and the repo whose worktree it shows (undefined for a plain workspace). */
@@ -36,10 +38,12 @@ export interface HerdrFacts {
 /** CPU share of one core, above which a server counts as spinning, and the ticks in a row it takes. */
 const CPU_LIMIT = 0.9;
 const HOT_TICKS = 6;
+/** Resident memory in MB above which a server counts as bloated: a leak that spinning does not show. */
+const RSS_LIMIT_MB = 1500;
 
 interface Kept {
   /** Per server pid: its CPU seconds and time at the last tick, and the ticks in a row above the limit. */
-  seen: Record<string, { cpu: number; at: number; hot: number }>;
+  seen: Record<string, { cpu: number; at: number; hot: number; fat?: number }>;
   /** Home's line, or undefined while the service is healthy. */
   line?: string;
 }
@@ -74,8 +78,10 @@ function judgeServers(f: HerdrFacts, kept: Kept, now: number): string | undefine
     const before = kept.seen[s.pid];
     const share = before && now > before.at ? (s.cpuSeconds - before.cpu) / ((now - before.at) / 1000) : 0;
     const hot = share > CPU_LIMIT ? (before?.hot ?? 0) + 1 : 0;
-    seen[s.pid] = { cpu: s.cpuSeconds, at: now, hot };
+    const fat = (s.rssMb ?? 0) > RSS_LIMIT_MB ? (before?.fat ?? 0) + 1 : 0;
+    seen[s.pid] = { cpu: s.cpuSeconds, at: now, hot, fat };
     if (!s.inService) why ??= `herdr server ${s.pid} runs outside ${f.unit}`;
+    else if (fat >= HOT_TICKS / 2) why ??= `herdr server ${s.pid} holds ${s.rssMb} MB of memory`;
     else if (hot >= HOT_TICKS) why ??= `herdr server ${s.pid} used over ${Math.round(CPU_LIMIT * 100)} % of a core for ${hot} ticks`;
   }
   kept.seen = seen;

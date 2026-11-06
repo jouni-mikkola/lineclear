@@ -1,4 +1,4 @@
-// Shepherdr updates itself when its checkout moves: each commit becomes a frozen release, built and checked; the server
+// Lineclear updates itself when its checkout moves: each commit becomes a frozen release, built and checked; the server
 // restarts on it only when no voice call is on; a failed release leaves the running one.
 import { describe, expect, test } from 'bun:test'
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -14,7 +14,7 @@ function defined<T>(v: T | null | undefined): T {
   return v
 }
 
-/** a stand-in Shepherdr checkout: its build writes the screen saying which version it is */
+/** a stand-in Lineclear checkout: its build writes the screen saying which version it is */
 function fixture() {
   const repo = mkdtempSync(join(tmpdir(), 'shep-update-'))
   const git = (...a: string[]) => Bun.spawnSync(['git', '-C', repo, '-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { stderr: 'pipe' })
@@ -246,7 +246,7 @@ describe("the human's own plugins", () => {
   const home = mkdtempSync(join(tmpdir(), 'shep-update-home-'))
   const plugin = (name: string, text: string) => {
     mkdirSync(join(home, 'plugins', name), { recursive: true })
-    writeFileSync(join(home, 'plugins', name, 'client.tsx'), text)
+    writeFileSync(join(home, 'plugins', name, 'server.ts'), text)
   }
   const at = (release: string | undefined, ...p: string[]) => join(releasesOf(repo), defined(release), ...p)
   const staged = (release?: string) => JSON.parse(readFileSync(at(release, 'user-plugins.json'), 'utf8'))
@@ -258,7 +258,7 @@ describe("the human's own plugins", () => {
     commit('v1', { build })
     first = await update(repo, { built: null, home })
     expect(first?.state).toBe('ok')
-    expect(readFileSync(at(first?.release, 'user-plugins', 'hello', 'client.tsx'), 'utf8')).toBe('hello v1')
+    expect(readFileSync(at(first?.release, 'user-plugins', 'hello', 'server.ts'), 'utf8')).toBe('hello v1')
     expect(staged(first?.release)).toEqual({ off: ['voice'], broken: {} })
   })
 
@@ -267,13 +267,13 @@ describe("the human's own plugins", () => {
     plugin('bad', 'BROKEN')
     const r = await update(repo, { built: defined(first).built, release: defined(first).release, force: true, home })
     expect(r?.state).toBe('ok')
-    expect(readFileSync(at(r?.release, 'user-plugins', 'hello', 'client.tsx'), 'utf8')).toBe('hello v1')
+    expect(readFileSync(at(r?.release, 'user-plugins', 'hello', 'server.ts'), 'utf8')).toBe('hello v1')
     expect(readFileSync(at(r?.release, 'dist', 'plugins.txt'), 'utf8').trim()).toBe('hello')
     const { broken } = staged(r?.release)
     expect(broken.hello).toMatchObject({ kept: true })
-    expect(broken.hello.error).toBe('~/.lineclear/plugins/hello/client.tsx')
+    expect(broken.hello.error).toBe('~/.lineclear/plugins/hello/server.ts')
     expect(broken.bad.kept).toBeUndefined()
-    expect(broken.bad.error).toBe('~/.lineclear/plugins/bad/client.tsx')
+    expect(broken.bad.error).toBe('~/.lineclear/plugins/bad/server.ts')
     first = r
   })
 
@@ -283,7 +283,7 @@ describe("the human's own plugins", () => {
     commit('v2', { build })
     const r = await update(repo, { built: defined(first).built, release: defined(first).release, home })
     expect(r?.state).toBe('ok')
-    expect(readFileSync(at(r?.release, 'user-plugins', 'hello', 'client.tsx'), 'utf8')).toBe('hello v3')
+    expect(readFileSync(at(r?.release, 'user-plugins', 'hello', 'server.ts'), 'utf8')).toBe('hello v3')
     expect(staged(r?.release).broken).toEqual({})
   })
 

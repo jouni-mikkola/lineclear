@@ -6,7 +6,7 @@ rounds, owner questions, tokens and dollars of the check, for steps planned befo
 
 ## Invariants
 
-- No AI and no network: only Shepherdr's files, pi's session files and git are read.
+- No AI and no network: only Lineclear's files, pi's session files and git are read.
 - A number it cannot price or place is named as not counted, never guessed.
 - A reviewer's calls carry their role and round, so `lineclear measure` prices the review apart from the agent's work.
 - Part health counts only what anyone can recount: lines, copies, debts, stalls, review findings and flaky tests.
@@ -16,7 +16,7 @@ rounds, owner questions, tokens and dollars of the check, for steps planned befo
 
 `lineclear measure <project> --since <date> [--json]`, and these names:
 
-- `src/measure.ts`: `chatFiles`, `findSpace`, `shepherdrDir`, `spaceTasks`, `costOf`, `priceFinder`, `Price`, `taskStart`, `worktreeCost`, `Numbers`
+- `src/measure.ts`: `chatFiles`, `findSpace`, `lineclearDir`, `spaceTasks`, `costOf`, `priceFinder`, `Price`, `taskStart`, `worktreeCost`, `Numbers`
 - `src/wait-goal.ts`: `appendGoalLine` (text, line, heading), `goalSince`, `waitGoal`, `waitGoalFailure`, `waitGoalLine`
 - `src/cost-goal.ts`: `costGoal`, `costGoalFailure`, `costGoalLine`
 - `src/ask-goal.ts`: `askGoal`, `askGoalFailure`, `askGoalLine`
@@ -26,13 +26,13 @@ rounds, owner questions, tokens and dollars of the check, for steps planned befo
 - `src/kit-cli.ts`: `kitMain`, `remoteKitDiffs`
 - `src/part-health.ts`: `partHealth`, `taskSignals`, `worstParts`
 - `src/step-check-cost.ts`: `allChecks`
+- `src/time.ts`: `MIN`, `HOUR_MS`, `DAY`
 
 ## Files
 
-- code: `scripts/simplify-count.ts`, `src/measure.ts`, `src/measure-main.ts`, `src/measure-server.ts`, `src/measure-bands.ts`, `src/measure-refiles.ts`, `src/measure-remote.ts`, `src/measure-sessions.ts`, `src/wait-causes.ts`, `src/wait-goal.ts`, `src/cost-goal.ts`, `src/ask-goal.ts`, `src/kit.ts`, `src/kit-cli.ts`, `pi/kit.json`, `src/part-health.ts`, `scripts/measure-service.ts`, `scripts/browsers-speed.ts`, `scripts/measure-speed.ts`, `scripts/fake-sessions.ts`, `src/health-numbers.ts`, `src/session-text.ts`, `src/step-check-cost.ts`
-- docs: `docs/numbers.md`, `docs/simplify.md`, `docs/audit/truth-1.md`, `docs/audit/truth-4.md`, `docs/audit/truth-5.md`, `docs/audit/code-src.md`, `docs/audit/code-ui.md`, `docs/audit/code-live.md`, `docs/audit/truth-7.md`, `docs/kit.md`, `docs/research/critique.md`
-- tests: `test/kit.test.ts`, `test/simplify.test.ts`, `test/measure.test.ts`, `test/measure-server.test.ts`, `test/measure-bands.test.ts`, `test/measure-refiles.test.ts`, `test/wait-causes.test.ts`, `test/wait-goal.test.ts`, `test/cost-goal.test.ts`, `test/ask-goal.test.ts`, `test/measure-service.test.ts`, `test/part-health.test.ts`
-- audit: `docs/audit/truth-3.md`
+- code: `scripts/simplify-count.ts`, `src/time.ts`, `src/measure.ts`, `src/measure-main.ts`, `src/catches.ts`, `src/measure-server.ts`, `src/measure-bands.ts`, `src/measure-refiles.ts`, `src/measure-remote.ts`, `src/measure-sessions.ts`, `src/wait-causes.ts`, `src/wait-goal.ts`, `src/cost-goal.ts`, `src/ask-goal.ts`, `src/kit.ts`, `src/kit-cli.ts`, `pi/kit.json`, `src/part-health.ts`, `scripts/measure-service.ts`, `scripts/browsers-speed.ts`, `scripts/measure-speed.ts`, `scripts/fake-sessions.ts`, `src/health-numbers.ts`, `src/session-text.ts`, `src/step-check-cost.ts`
+- docs: `docs/numbers.md`, `docs/simplify.md`, `docs/kit.md`
+- tests: `test/kit.test.ts`, `test/simplify.test.ts`, `test/measure.test.ts`, `test/catches.test.ts`, `test/measure-server.test.ts`, `test/measure-bands.test.ts`, `test/measure-refiles.test.ts`, `test/wait-causes.test.ts`, `test/wait-goal.test.ts`, `test/cost-goal.test.ts`, `test/ask-goal.test.ts`, `test/measure-service.test.ts`, `test/part-health.test.ts`
 
 ## Tests
 

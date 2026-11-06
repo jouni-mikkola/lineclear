@@ -54,9 +54,9 @@ export function cli(...args: string[]): string {
     HOME: `${FIXTURE}/home`,
     LINECLEAR_CONFIG: `${FIXTURE}/config`,
     LINECLEAR_STATE: `${FIXTURE}/state`,
-    LINECLEAR_SHEPHERDR_DIR: `${FIXTURE}/shepherdr`,
+    LINECLEAR_HOME: `${FIXTURE}/lineclear`,
     PI_CODING_AGENT_DIR: `${FIXTURE}/pi`,
-    SHEPHERDR_BIN: `${process.cwd()}/ui/test/fake-shepherdr`,
+    LINECLEAR_SERVER_BIN: `${process.cwd()}/ui/test/fake-lineclear`,
   };
   return execFileSync("bin/lineclear", args, { env, encoding: "utf8", stdio: "pipe" });
 }

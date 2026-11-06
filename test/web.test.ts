@@ -63,7 +63,7 @@ test("the address comes from LINECLEAR_HOST and LINECLEAR_PORT", () => {
 const api = () => {
   const dir = webShopDir("lc-api-");
   writeFileSync(
-    join(dir, "shepherdr", "tasks.json"),
+    join(dir, "lineclear", "tasks.json"),
     JSON.stringify({ tasks: [{ id: "WEB-1", title: "Pay with a saved card", told: "work", updated: 1 }], red: {} }),
   );
   mkdirSync(join(dir, "config", "projects", "web-shop"), { recursive: true });
@@ -87,9 +87,9 @@ const api = () => {
   item(3, { answer: "Yes" });
   const env = {
     LINECLEAR_CONFIG: join(dir, "config"),
-    LINECLEAR_SHEPHERDR_DIR: join(dir, "shepherdr"),
+    LINECLEAR_HOME: join(dir, "lineclear"),
     PI_CODING_AGENT_DIR: join(dir, "pi"),
-    SHEPHERDR_BIN: "true",
+    LINECLEAR_SERVER_BIN: "true",
     HOME: dir,
     LINECLEAR_MAIN_HOME: join(dir, "data"),
     LINECLEAR_HOSTS: "box.tail.ts.net",
@@ -118,7 +118,7 @@ test("/api/home answers with the projects at once while spend and usage are stil
   const { dir } = api();
   const env = {
     LINECLEAR_CONFIG: join(dir, "config"),
-    LINECLEAR_SHEPHERDR_DIR: join(dir, "shepherdr"),
+    LINECLEAR_HOME: join(dir, "lineclear"),
     HOME: dir,
     LINECLEAR_DOCTOR_FILE: join(dir, "none.json"),
   };
@@ -140,7 +140,7 @@ test("a roadmap answers from its last read while the next one runs", async () =>
   let t = 0;
   const reads: string[] = [];
   const handle = webApi(
-    { LINECLEAR_CONFIG: join(dir, "config"), LINECLEAR_SHEPHERDR_DIR: join(dir, "shepherdr"), HOME: dir },
+    { LINECLEAR_CONFIG: join(dir, "config"), LINECLEAR_HOME: join(dir, "lineclear"), HOME: dir },
     () => t,
     async (what, arg) => {
       if (what !== "roadmap") return new Promise(() => {});
@@ -244,7 +244,7 @@ test("a name that is not in LINECLEAR_HOSTS is refused by the API and by the pag
   const env = {
     LINECLEAR_HOSTS: "box.tail.ts.net",
     LINECLEAR_CONFIG: join(dir, "config"),
-    LINECLEAR_SHEPHERDR_DIR: join(dir, "shepherdr"),
+    LINECLEAR_HOME: join(dir, "lineclear"),
     PI_CODING_AGENT_DIR: join(dir, "pi"),
     HOME: dir,
     LINECLEAR_DOCTOR_FILE: join(dir, "none.json"),
@@ -402,9 +402,9 @@ test("a machine is added over SSH in the background and removed, only from the s
   const dir = mkdtempSync(join(tmpdir(), "lc-api-"));
   const env = {
     LINECLEAR_CONFIG: join(dir, "config"),
-    LINECLEAR_SHEPHERDR_DIR: join(dir, "shepherdr"),
+    LINECLEAR_HOME: join(dir, "lineclear"),
     PI_CODING_AGENT_DIR: join(dir, "pi"),
-    SHEPHERDR_BIN: "true",
+    LINECLEAR_SERVER_BIN: "true",
     HOME: dir,
     PATH: process.env.PATH,
     LINECLEAR_SSH: join(import.meta.dir, "..", "ui", "test", "fake-ssh"),
@@ -437,7 +437,7 @@ test("the add form's API detects a folder and saves a project where the CLI does
   writeFileSync(join(repo, "package.json"), JSON.stringify({ scripts: { check: "true" } }));
   writeFileSync(join(repo, "bun.lock"), "");
   const config = join(root, "config");
-  const env = { LINECLEAR_CONFIG: config, SHEPHERDR_BIN: "/nowhere/shepherdr", PI_BIN: "/nowhere/pi", LINECLEAR_DOCTOR_FILE: join(root, "none.json") };
+  const env = { LINECLEAR_CONFIG: config, LINECLEAR_SERVER_BIN: "/nowhere/lineclear", PI_BIN: "/nowhere/pi", LINECLEAR_DOCTOR_FILE: join(root, "none.json") };
   const api = webApi(env);
   const found = await (await api(new Request(`http://127.0.0.1/api/detect?repo=${encodeURIComponent(repo)}`))).json();
   expect(found).toMatchObject({ repo, name: "new-repo", check: "bun run check", roadmap: false, models: [] });
@@ -479,7 +479,7 @@ test("a space with a Now, Next and Later roadmap and no Lineclear project is not
     ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "start"],
   ])
     Bun.spawnSync(["git", "-C", repo, ...a]);
-  writeFileSync(join(dir, "shepherdr", "spaces.json"), JSON.stringify([{ key: "NOT", name: "Notes App", path: repo }]));
+  writeFileSync(join(dir, "lineclear", "spaces.json"), JSON.stringify([{ key: "NOT", name: "Notes App", path: repo }]));
   const home = (await (await handle(new Request("http://127.0.0.1:7420/api/home"))).json()) as any;
   expect(home.projects.map((p: any) => p.name)).toEqual(["web-shop"]);
   const view = (await (await handle(new Request("http://127.0.0.1:7420/api/roadmap/notes-app"))).json()) as any;
@@ -505,27 +505,11 @@ test("a space with a Now, Next and Later roadmap and no Lineclear project is not
   rmSync(dir, { recursive: true, force: true });
 });
 
-test("/api/stalls gives the stalls of the last hours by class, and refuses a bad window", async () => {
-  const { dir, handle } = api();
-  const at = new Date().toISOString();
-  writeFileSync(
-    join(dir, "config", "decisions.jsonl"),
-    `${JSON.stringify({ time: at, project: "web-shop", step: "WEB-1", kind: "stall", class: "signed-out", event: "stall", reason: "stall signed-out: x" })}\n`,
-  );
-  const body = (await (await handle(new Request("http://127.0.0.1:7420/api/stalls?hours=2"))).json()) as {
-    stalls: number;
-    classes: Record<string, { stalls: number }>;
-  };
-  expect(body.stalls).toBe(1);
-  expect(body.classes["signed-out"]?.stalls).toBe(1);
-  expect((await handle(new Request("http://127.0.0.1:7420/api/stalls?hours=x"))).status).toBe(400);
-});
-
 test("/api/home lists three projects, not the Dispatcher's space, and shows the open task of another space apart", async () => {
   const { dir, handle } = api();
   const spaces = ["web-shop", "two", "three", "dispatcher", "retired"];
-  writeFileSync(join(dir, "shepherdr", "spaces.json"), JSON.stringify(spaces.map((name, i) => ({ key: `S${i}`, name, path: join(dir, "none", name) }))));
-  writeFileSync(join(dir, "shepherdr", "tasks.json"), JSON.stringify({ tasks: [{ id: "S4-1", title: "Left over", told: "work", updated: 1 }], red: {} }));
+  writeFileSync(join(dir, "lineclear", "spaces.json"), JSON.stringify(spaces.map((name, i) => ({ key: `S${i}`, name, path: join(dir, "none", name) }))));
+  writeFileSync(join(dir, "lineclear", "tasks.json"), JSON.stringify({ tasks: [{ id: "S4-1", title: "Left over", told: "work", updated: 1 }], red: {} }));
   for (const name of ["two", "three"]) {
     mkdirSync(join(dir, "config", "projects", name), { recursive: true });
     writeFileSync(join(dir, "config", "projects", name, "settings.json"), JSON.stringify({ space: name, repo: join(dir, "none", name) }));

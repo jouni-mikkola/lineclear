@@ -44,7 +44,7 @@ describe('the restart hint', () => {
 })
 
 describe('a harness', () => {
-  test('in words, and as Shepherdr passes it', () => {
+  test('in words, and as Lineclear passes it', () => {
     expect(harnessWords({ kind: 'codex' })).toBe('Codex')
     expect(harnessWords({ kind: 'claude', model: 'sonnet', effort: 'high' })).toBe('Claude Code (Sonnet 5.5, high)')
     expect(harnessWords({ kind: 'claude', effort: 'xhigh' })).toBe('Claude Code (xhigh)')

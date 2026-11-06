@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import * as part from "../brand/rail.ts";
-import type { AccountUse } from "./charts.tsx";
+import type { AccountUse } from "./spend-charts.tsx";
 import { Count, type Project, type Stage, type Task } from "./parts.tsx";
 import { byStep, JunctionPic, Key, type Placed, RowSignal, stageOf, Train, TrainCard } from "./line-parts.tsx";
 import { EnginePic, paint, Shapes, SignalBoxPic, SignalPic, StationPic, TrainPic } from "./rail.tsx";

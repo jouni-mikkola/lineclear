@@ -2,10 +2,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { logLines, notesStats } from "../pi/parts/compaction-notes.ts";
 import { dataDir } from "./paths.ts";
+import { DAY } from "./time.ts";
 
 type Env = Record<string, string | undefined>;
 
-const DAY = 86_400_000;
 /** The window of Home's compaction card and of the tokens it divides, the same as its spend chart. */
 export const GAUGE_WINDOW = 14 * DAY;
 
@@ -25,7 +25,7 @@ export interface CompactionGauge {
   tasks: number;
 }
 
-/** Tasks merged after a time, from Shepherdr's tasks.json in the task store. */
+/** Tasks merged after a time, from Lineclear's tasks.json in the task store. */
 function mergedAfter(env: Env, since: number): number {
   let tasks: unknown;
   try {

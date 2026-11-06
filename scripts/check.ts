@@ -9,9 +9,12 @@
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { compileCacheDir, diskTmpRoot, trimCache } from "../src/tmpdirs.ts";
+import { ownSlot } from "../src/waits.ts";
 import { specsFor, testsFor } from "./changed.ts";
 import { buildMap, readMap, saveMap } from "./load-map.ts";
+import { recordPassed, splitCached } from "./result-cache.ts";
 import {
+  junitSlowestCase,
   junitTimes,
   loadFactorMeter,
   lowered,
@@ -32,6 +35,10 @@ import {
 import { fastGates } from "./fast-gates.ts";
 import { describeFailure, type Failure, outsideChange, parseFailures, settleFailures } from "./flaky.ts";
 import { changedSince } from "./gates/tools.ts";
+
+// A check started by hand waits for a check slot of the machine first (the same slots `lineclear check` takes).
+const inSlot = ownSlot(["bun", "scripts/check.ts", ...process.argv.slice(2)].map((a) => `'${a.replaceAll("'", "'\\''")}'`).join(" "));
+if (inSlot) process.exit(await inSlot);
 
 // Every step but the server's (below) runs with TMPDIR in a folder of this run, on disk. Each test process clears its own
 // folder inside it (tmp-scope.ts), so anything left in it when the steps end was left by a process that did not get
@@ -82,6 +89,7 @@ const finish = (code: number, record?: (ok: boolean) => void): never => {
 type Step = { name: string; cmd: string[]; cwd?: string; needs?: string[] };
 
 const full = process.argv.includes("--full");
+const noCache = process.argv.includes("--no-cache");
 const onlyChanged = process.argv.includes("--changed");
 // the release run: load decides a test file's time there, not the code, so the times are recorded and not judged
 const untimed = process.argv.includes("--untimed");
@@ -117,9 +125,26 @@ const SERVER_INSTALL: Step = { name: "server install", cmd: ["bun", "install", "
 const loadDir = join(reports, "loads");
 let recording = false;
 
+// test files whose key (scripts/result-cache.ts) passed before are not run again; the keys of the others are recorded on a pass
+let passedKeys: Record<string, string> = {};
+let ran: string[] = [];
+
 function testSteps(): Step[] {
-  const files = known ? testsFor(".", changed, readMap("."))?.map((f) => `./${f}`) : undefined;
+  const map = known ? readMap(".") : undefined;
+  const reachedFiles = known
+    ? testsFor(".", changed, map)
+        ?.filter((f) => existsSync(f))
+        .map((f) => `./${f}`)
+    : undefined;
+  let files = reachedFiles;
+  if (files && map && !noCache) {
+    const split = splitCached(".", files, map.tests, Bun.version);
+    passedKeys = split.keys;
+    if (split.cached.length > 0) console.log(`check: ${split.cached.length} test file(s) passed before with the same files, not run again`);
+    files = split.run;
+  }
   if (files?.length === 0) return [];
+  ran = files ?? [];
   const list = files ?? allTests();
   if (files === undefined) {
     recording = true;
@@ -180,6 +205,8 @@ function steps(): Step[] {
     // each under a second
     { name: "words", cmd: ["bun", "run", "words"] },
     { name: "shots", cmd: ["bun", "run", "shots:check"] },
+    { name: "personal", cmd: ["bun", "run", "scan"] },
+    { name: "prose", cmd: ["bun", "scripts/prose-check.ts", "."] },
     { name: "direction", cmd: ["bun", "run", "direction"] },
     ...(onlyChanged ? [] : [{ name: "scales", cmd: ["bun", "scripts/scales-check.ts", "."] }]),
     ...fastGates(ownFolders, code, full),
@@ -256,7 +283,28 @@ async function runStep(step: Step): Promise<boolean> {
   return ok;
 }
 
-const plan = steps();
+/** `--shard i/n` (the GitHub job): every n-th step of the plan, with the steps those need (an install, a build). */
+function shardOf(all: Step[]): Step[] {
+  const m = process.argv.find((a) => a.startsWith("--shard="))?.match(/^--shard=(\d+)\/(\d+)$/);
+  if (!m) return all;
+  const [i, n] = [Number(m[1]), Number(m[2])];
+  // budgets waits for every step to measure it; a shard has only its own, so it waits for the build alone
+  const own = all.map((s) => (s.name === "budgets" ? { ...s, needs: (s.needs ?? []).filter((n) => n === "ui build") } : s));
+  const byName = new Map(own.map((s) => [s.name, s]));
+  const keep = new Set(all.filter((_, at) => at % n === i - 1).map((s) => s.name));
+  const grow = (name: string) => {
+    for (const need of byName.get(name)?.needs ?? []) {
+      if (!keep.has(need)) {
+        keep.add(need);
+        grow(need);
+      }
+    }
+  };
+  for (const name of [...keep]) grow(name);
+  return own.filter((s) => keep.has(s.name));
+}
+const sharded = process.argv.some((a) => a.startsWith("--shard="));
+const plan = shardOf(steps());
 for (const step of plan) outcome.set(step.name, runStep(step));
 // every step runs even after one fails: one run names every failure, so no rerun is needed to find the next one, and
 // `lineclear check` can tell a run that failed only on quarantined tests from one where another failed
@@ -264,7 +312,7 @@ const results = await Promise.all(plan.map((s) => outcome.get(s.name)));
 const wall = (performance.now() - started) / 1000;
 factor = measure();
 let failed = results.some((ok) => !ok) ? 1 : 0;
-if (recording && failed === 0) {
+if (recording && failed === 0 && !sharded) {
   const tests = allTests().map((f) => f.slice(2));
   saveMap(".", buildMap(loadDir, tests));
 }
@@ -283,19 +331,24 @@ function speed(): void {
     junitTimes,
   );
   writeTimes(unit);
+  // the unit limit is per test case: a file is judged by its slowest case
+  const slowest = read(
+    readdirSync(reports).filter((n) => n.startsWith("unit-")),
+    junitSlowestCase,
+  );
   const spec = exists("ui.json") ? read(["ui.json"], specTimes) : new Map<string, number>();
   if (lowering) {
-    const next = lowered("spec", spec, lowered("unit", unit, baseline, factor, adding), factor, adding);
+    const next = lowered("spec", spec, lowered("unit", slowest, baseline, factor, adding), factor, adding);
     writeSlowBaseline(".", next);
     console.log("check: scripts/gates/baseline/slow.json lowered to the files over their limits");
     return;
   }
-  const faults = [...slowFaults("unit", unit, baseline, factor), ...slowFaults("spec", spec, baseline, factor)];
+  const faults = [...slowFaults("unit", slowest, baseline, factor), ...slowFaults("spec", spec, baseline, factor)];
   if (faults.length > 0 && !slowFails(faults, untimed)) {
     console.log(`check: --untimed, not failing on ${faults.length} slow file(s); the slowest: ${faults[0]}`);
   } else if (faults.length > 0) {
     console.error(
-      `check: too slow, a test file over 5 s or a spec over 20 s (docs/numbers.md); the slowest first:\n${faults
+      `check: too slow, a test over 2 s or a spec over 20 s (docs/numbers.md); the slowest first:\n${faults
         .slice(0, 8)
         .map((f) => `  ${f}`)
         .join("\n")}`,
@@ -320,5 +373,6 @@ if (failed !== 0) {
   console.error("check: every step ran");
   finish(failed, record);
 }
+if (!recording && !sharded) recordPassed(passedKeys, ran);
 console.log(`check: passed in ${wall.toFixed(0)} s (budget 180 s on a machine that is not busy)`);
 finish(0, record);

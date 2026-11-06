@@ -4,11 +4,11 @@ import { dirname, join } from "node:path";
 import type { Task } from "./roadmap.ts";
 import type { ChatCard, StallCard } from "./stalls.ts";
 import type { Decision, State } from "./rules.ts";
-import { configDir, decisionsPath } from "../pi/config.ts";
+import { MIN } from "./time.ts";
 
 // Every way a task or a ready step stops moving has a class. A detector in plain code sees it, the stall is recorded
 // in decisions.jsonl once it passes its class's limit, its remedy is recorded with the minutes from the stall, and
-// its end with the minutes it cost. `lineclear stalls` and /api/stalls sum them by class.
+// its end with the minutes it cost. `lineclear stalls` sums them by class.
 
 /** Every decision of the rule loop, one JSON line each. */
 
@@ -16,13 +16,6 @@ import { configDir, decisionsPath } from "../pi/config.ts";
 function stallSummary(file: string, now: Date, hours = 24): StallSummary {
   const since = new Date(now.getTime() - hours * 3_600_000);
   return summarize(readDecisionsSince(file, since.getTime() - 86_400_000), since, now);
-}
-
-/** `GET /api/stalls?hours=`: the stalls of the last hours (24 unless asked, a month at most), as `json` answers. */
-export function stallsReply(hours: string | null, env: NodeJS.ProcessEnv, now: number, json: (body: unknown, status?: number) => Response): Response {
-  const h = Number(hours ?? 24);
-  if (!(h > 0 && h <= 24 * 31)) return json({ error: "hours must be from 0 to 744" }, 400);
-  return json(stallSummary(decisionsPath(env), new Date(now), h));
 }
 
 const STALL_CLASSES = [
@@ -128,7 +121,6 @@ export interface Observation {
   since?: number;
 }
 
-const MIN = 60_000;
 const NO_LIFE_FRESH_MS = 30 * MIN;
 const DONE_STATES = new Set(["done", "closed"]);
 
@@ -427,26 +419,18 @@ export function summarize(decisions: Decision[], since: Date, now: Date): StallS
   return out;
 }
 
-export const stallsDailyPath = (env = process.env) => join(configDir(env), "stalls-daily.jsonl");
+/** The day of the last cut, kept beside decisions.jsonl. */
+const cutMarkPath = (file: string) => join(dirname(file), "decisions-cut-day");
 
-/** Once a day, the day before as one line in stalls-daily.jsonl. Returns the line's day when it wrote one. */
-export function writeDaily(decisionsFile: string, now: Date, env = process.env): string | undefined {
-  const day = new Date(now.getTime() - 86_400_000).toISOString().slice(0, 10);
-  const file = stallsDailyPath(env);
-  const last = existsSync(file) ? readFileSync(file, "utf8").trimEnd().split("\n").at(-1) : undefined;
-  try {
-    if (last && JSON.parse(last).day >= day) return undefined;
-  } catch {}
-  const from = new Date(`${day}T00:00:00Z`);
-  const to = new Date(from.getTime() + 86_400_000);
-  const s = summarize(
-    readDecisionsSince(decisionsFile, from.getTime() - 86_400_000).filter((d) => new Date(d.time) < to),
-    from,
-    to,
-  );
-  mkdirSync(dirname(file), { recursive: true });
-  appendFileSync(file, `${JSON.stringify({ day, ...s })}\n`);
-  return day;
+/** Once a day, old lines of decisions.jsonl go to the archive. Returns how many moved, 0 when today's cut is done. */
+export function cutDecisionsDaily(file: string, now: Date): number {
+  const mark = cutMarkPath(file);
+  const today = now.toISOString().slice(0, 10);
+  if (existsSync(mark) && readFileSync(mark, "utf8").trim() >= today) return 0;
+  const moved = rotateDecisions(file, now);
+  mkdirSync(dirname(mark), { recursive: true });
+  writeAtomic(mark, `${today}\n`);
+  return moved;
 }
 
 /** The lines `lineclear stalls` prints. */

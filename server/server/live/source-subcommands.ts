@@ -242,11 +242,12 @@ export class LiveSourceSubcommands extends LiveSourceActions {
             'reviewer-model',
             'reviewer-effort',
             'set',
+            'on',
           ].includes(f),
       )
       if (odd.length)
         throw new Error(
-          `Task add takes no --${odd[0]}: only --desc, --result, --space, --base, --after, --later, --set, --agent, --model, --effort, --reviewer, --reviewer-model and --reviewer-effort`,
+          `Task add takes no --${odd[0]}: only --desc, --result, --space, --base, --after, --later, --set, --agent, --model, --effort, --reviewer, --reviewer-model, --reviewer-effort and --on`,
         )
       // --set key=value: a How tasks work setting for this task, or what --agent, --reviewer and the like set
       const set: Record<string, string> = {}
@@ -295,8 +296,11 @@ export class LiveSourceSubcommands extends LiveSourceActions {
       const after = p.opts.after ?? []
       const agent = harnessOf(p, this.settings)
       const reviewer = reviewerOf(p, this.settings)
+      const where = one(p, 'on')
+      if (where && !this.engine.machines.has(where)) throw new Error(`No machine called ${where}: \`lineclear machine list\` names them.`)
       const t = this.engine.add({
         project: pr.name,
+        machine: where,
         base: one(p, 'base'),
         title,
         result,
@@ -336,9 +340,12 @@ export class LiveSourceSubcommands extends LiveSourceActions {
             closed: 'closed' in t && t.closed ? true : undefined,
             closedBy: 'closedBy' in t && t.closed ? t.closedBy : undefined,
             machine: 'machine' in t ? t.machine : undefined,
+            space: 'place' in t ? t.place.split(':').slice(2).join(':') : undefined, // the name `--space` takes
             archived: t.archived,
             pinned: t.pinned,
             orphaned: t.orphaned,
+            // the owner stopped it; a tell would start it again
+            stopped: this.engine.tasks.some((r) => r.id === t.id && r.stopped) || undefined,
           })),
           null,
           2,

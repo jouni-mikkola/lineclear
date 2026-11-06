@@ -7,7 +7,6 @@ import { join } from 'node:path'
 import { pluginCatalog, readStaged, stageUserPlugins, writeRegistries } from '../scripts/build-plugins.ts'
 import { pluginsPage, setPluginOn } from '../server/plugins.ts'
 import { HOME } from '../server/store.ts'
-import { guardFn, setupGuarded } from '../src/guard.tsx'
 
 function file(path: string, text = '') {
   mkdirSync(join(path, '..'), { recursive: true })
@@ -19,15 +18,13 @@ function fixture() {
   const dir = mkdtempSync(join(tmpdir(), 'shep-plugins-'))
   const home = mkdtempSync(join(tmpdir(), 'shep-plugins-home-'))
   file(join(dir, 'plugins.json'), JSON.stringify({ plugins: ['a', 'b'] }))
-  file(join(dir, 'plugins', 'a', 'client.tsx'))
-  file(join(dir, 'plugins', 'b', 'client.tsx'))
+  file(join(dir, 'plugins', 'a', 'server.ts'))
   file(join(dir, 'plugins', 'b', 'server.ts'))
-  file(join(home, 'plugins', 'b', 'client.tsx'))
-  file(join(home, 'plugins', 'c', 'client.tsx'))
+  file(join(home, 'plugins', 'b', 'server.ts'))
   file(join(home, 'plugins', 'c', 'server.ts'))
   // not plugins: a folder with neither part, a name that isn't one, a loose file
   file(join(home, 'plugins', 'notes', 'README.md'))
-  file(join(home, 'plugins', 'Bad Name', 'client.tsx'))
+  file(join(home, 'plugins', 'Bad Name', 'server.ts'))
   file(join(home, 'plugins', 'loose.ts'))
   return { dir, home }
 }
@@ -42,14 +39,10 @@ describe('a build with the human’s own plugins', () => {
       { name: 'c', from: 'user', on: true },
     ])
     writeRegistries(dir)
-    const client = readFileSync(join(dir, 'generated', 'client-plugins.ts'), 'utf8')
-    expect(client).toContain("import a from '../plugins/a/client.tsx'")
-    expect(client).toContain(`{ name: "b", load: () => import('../user-plugins/b/client.tsx') }`)
-    expect(client).not.toContain('../plugins/b/')
-    expect(client).toContain('export const user = ["b","c"]')
     const server = readFileSync(join(dir, 'generated', 'server-plugins.ts'), 'utf8')
-    // the base b's server part goes with it; c's loads on its own, so one that throws is only skipped
-    expect(server).not.toContain('plugins/b/server.ts')
+    // the base b's server part goes with it; b and c load on their own, so one that throws is only skipped
+    expect(server).toContain("import a from '../plugins/a/server.ts'")
+    expect(server).not.toContain("'../plugins/b/server.ts'")
     expect(server).toContain(`["c", () => import('../user-plugins/c/server.ts')]`)
   })
 
@@ -115,40 +108,5 @@ describe('Settings → Plugins', () => {
     expect(setPluginOn('voice', true)).toEqual({ ok: true })
     expect(JSON.parse(readFileSync(join(HOME, 'plugins.json'), 'utf8'))).toEqual({ off: ['chat'] })
     expect(setPluginOn('nothing-here', false).ok).toBe(false)
-  })
-})
-
-describe('on the screen', () => {
-  test('a setup that throws leaves the slots as they were', () => {
-    const View = () => null
-    const reg = { overlays: [View], views: { chat: View } as Record<string, unknown>, composerIdle: null as unknown }
-    setupGuarded('boom', reg, (r) => {
-      r.overlays.push(() => null)
-      r.views.tasks = () => null
-      r.composerIdle = () => null
-      throw new Error('nope')
-    })
-    expect(reg.overlays).toEqual([View])
-    expect(reg.views).toEqual({ chat: View })
-    expect(reg.composerIdle).toBeNull()
-  })
-
-  test('what it adds is wrapped: its functions give a safe answer once they throw', async () => {
-    const reg = { keys: [] as { order: number; handle: () => boolean }[], settingActions: {} as Record<string, () => Promise<string>> }
-    setupGuarded('keys', reg, (r) => {
-      r.keys.push({
-        order: 1,
-        handle: () => {
-          throw new Error('nope')
-        },
-      })
-      r.settingActions.go = async () => {
-        throw new Error('nope')
-      }
-    })
-    expect(reg.keys[0].order).toBe(1)
-    expect(reg.keys[0].handle()).toBe(false)
-    expect(await reg.settingActions.go()).toBe('That failed.')
-    expect(guardFn('x', () => 2, 0)()).toBe(2)
   })
 })

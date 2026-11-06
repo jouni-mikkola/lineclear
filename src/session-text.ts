@@ -56,8 +56,8 @@ export function sessionUsage(text: string): Usage[] {
 
 /**
  * The times of the model turns in one pi session file that nothing asked for: a user message that is not the brief
- * (the first), not an owner message, not a step's own line (`<shepherdr><go>`), not a rule's resume or answer
- * (`[lineclear:resume]`, `[lineclear:answer]`). What counts is a `[lineclear]` line with no kind, and a Shepherdr
+ * (the first), not an owner message, not a step's own line (`<lineclear><go>`), not a rule's resume or answer
+ * (`[lineclear:resume]`, `[lineclear:answer]`). What counts is a `[lineclear]` line with no kind, and a Lineclear
  * line with a tag other than `go` (news, health, heartbeat, github, queue). The owner's lines have no mark. Goal: none.
  */
 export function turnTimes(text: string): number[] {
@@ -74,8 +74,8 @@ export function turnTimes(text: string): number[] {
       }
       const c = e.message.content;
       const body = (typeof c === "string" ? c : (c ?? []).map((x: { text?: string } | null) => x?.text ?? "").join("")).trimStart();
-      const shepherdr = /^<shepherdr>\s*<([a-z][\w-]*)/.exec(body)?.[1];
-      const counted = /^\[lineclear\]/.test(body) || (shepherdr !== undefined && shepherdr !== "go");
+      const lineclear = /^<lineclear>\s*<([a-z][\w-]*)/.exec(body)?.[1];
+      const counted = /^\[lineclear\]/.test(body) || (lineclear !== undefined && lineclear !== "go");
       const at = new Date(e.timestamp).getTime();
       if (counted && !Number.isNaN(at)) out.push(at);
     } catch {

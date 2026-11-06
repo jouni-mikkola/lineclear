@@ -1,5 +1,5 @@
 import { isOpen, readItems } from "./inbox.ts";
-import { chatFiles, findSpace, shepherdrDir, spaceTasks, taskStart, worktreeCost } from "./measure.ts";
+import { chatFiles, findSpace, lineclearDir, spaceTasks, taskStart, worktreeCost } from "./measure.ts";
 import { readRuns } from "./check-runs.ts";
 import { projectSettings, roadmapData, type RoadmapStep } from "./roadmap-view.ts";
 import { allChecks } from "./step-check-cost.ts";
@@ -147,7 +147,7 @@ export function stepRecord(
   const settings = projectSettings(project, env);
   const s = read.ok.steps.find((x) => x.id === id);
   if (!s || !settings) return { error: `${project} has no step ${id}.`, status: 404 };
-  const dir = shepherdrDir(env);
+  const dir = lineclearDir(env);
   const space = findSpace(dir, settings.space, settings.repo);
   const tasks = space ? spaceTasks(dir, space, true).filter((t) => String(t.title ?? "").startsWith(`${id} `)) : [];
   // the merged task is the step's; else the open one, else the latest

@@ -39,22 +39,22 @@ export interface World {
   addTask(space: string, title: string, brief: string, extra: string[]): string | undefined;
   /** What another machine of the project says about its room and its tasks, or why it cannot be reached. */
   room?(host: string, space: string): Room | string;
-  /** The brief of a task as Shepherdr holds it, or undefined when it cannot be read. */
+  /** The brief of a task as Lineclear holds it, or undefined when it cannot be read. */
   briefOf?(id: string): string | undefined;
   /** Makes a task on another machine (cloning the repo there once). Returns an error text, or undefined. */
   addTaskOn?(host: string, settings: Settings, title: string, brief: string, extra: string[], project?: string): string | undefined;
   /** The machine's one-minute load average. */
   load(): number;
-  /** `shepherdr task stop`. Returns an error text, or undefined. */
+  /** `lineclear task stop`. Returns an error text, or undefined. */
   stopTask(id: string): string | undefined;
   /**
-   * `shepherdr task tell`, which resumes a stopped agent. `kind` says why: `resume` goes on with the step's own work
+   * `lineclear task tell`, which resumes a stopped agent. `kind` says why: `resume` goes on with the step's own work
    * (a wait is over, a stall, a cut-off), `answer` is a rule answering the agent's own question. Both are marked in
    * the agent's log so `lineclear measure` does not count them; a call with no kind is counted. Machine news
    * (load, quota, accounts, status changes) is never a reason to call this. Returns an error text, or undefined.
    */
   tellTask(id: string, text: string, kind?: TellKind): string | undefined;
-  /** `shepherdr task close`, which keeps a branch with unmerged work. Returns an error text, or undefined. */
+  /** `lineclear task close`, which keeps a branch with unmerged work. Returns an error text, or undefined. */
   closeTask(id: string): string | undefined;
   /** The `work/<n>-...` branch of a task, if the repo still has it. */
   branchOf(repo: string, task: string): string | undefined;
@@ -66,7 +66,7 @@ export interface World {
   started(id: string): StartState;
   /** Types a line and Enter into the task's pane. Returns an error text, or undefined. */
   nudge(id: string, text: string): string | undefined;
-  /** `reviewer.model` from `shepherdr show`, or undefined when it names none. */
+  /** `reviewer.model` from `lineclear show`, or undefined when it names none. */
   reviewerSetting(space: string): string | undefined;
   /** Chat cards of a space with their text, for reading a reported usage limit. */
   chatCards(space: string, repo: string): ChatCard[];

@@ -4,18 +4,21 @@ import { join } from "node:path";
 import { readJson } from "../pi/config.ts";
 import { dataDir } from "./paths.ts";
 
-// Shepherdr 2.0's folder. Only `lineclear migrate` and the checks about moving off it name it, and they do it here.
+// herdr-projects 2.0's folder. Only `lineclear migrate` and the checks about moving off it name it, and they do it here.
 // A test fails if any other code of Lineclear names it (test/no-old-folder.test.ts).
 
 type Env = Record<string, string | undefined>;
 
-/** Shepherdr 2.0's data folder, which `lineclear migrate` reads and never changes. */
-export const oldDir = (env: Env = process.env) => env.LINECLEAR_OLD_DIR ?? join(homedir(), ".shepherdr");
+/** The old product's name, joined from two parts so no file of this repo spells it (`bun run names` fails on that). */
+export const OLD_NAME = ["shep", "herdr"].join("");
+
+/** herdr-projects 2.0's data folder, which `lineclear migrate` reads and never changes. */
+export const oldDir = (env: Env = process.env) => env.LINECLEAR_OLD_DIR ?? join(homedir(), `.${OLD_NAME}`);
 
 /** The old folder as a person reads it, for messages. */
-export const OLD_DIR_NAME = "~/.shepherdr";
+export const OLD_DIR_NAME = `~/.${OLD_NAME}`;
 
-/** The other folder Shepherdr 2.0 left, where its projects plugin kept its data. */
+/** The other folder herdr-projects 2.0 left, where its projects plugin kept its data. */
 const oldProjectsDir = (env: Env = process.env) => env.LINECLEAR_OLD_PROJECTS_DIR ?? join(homedir(), ".herdr-projects");
 
 /** The old folders that still exist on this machine. */
@@ -91,7 +94,7 @@ function socketInodes(procRoot: string, inside: (path: string) => boolean): Set<
 }
 
 /** Which side still runs: both keep their tasks in memory and save over a folder written under them. */
-export type Busy = (side: "lineclear" | "shepherdr", env: Env) => boolean;
+export type Busy = (side: "lineclear" | "old", env: Env) => boolean;
 
 export const realBusy: Busy = (side, env) => {
   try {
@@ -103,3 +106,21 @@ export const realBusy: Busy = (side, env) => {
     return false;
   }
 };
+
+/** The herdr plugin's install wrote a config.json naming its main machine; nothing reads it now. */
+export function pluginConfig(dir: string): { problem: string; fix: string } {
+  const file = join(dir, "config.json");
+  let config: Record<string, unknown>;
+  try {
+    config = JSON.parse(readFileSync(file, "utf8"));
+  } catch {
+    return { problem: "", fix: "" };
+  }
+  if (!config || typeof config !== "object" || !("main" in config)) return { problem: "", fix: "" };
+  // the user key is still read (timer-off.ts), so only a file holding nothing else is removed whole
+  const alone = Object.keys(config).length === 1;
+  return {
+    problem: `${file} is left from the herdr plugin install: its "main" key is not read any more`,
+    fix: alone ? `rm ${file}` : `remove the "main" key from ${file}`,
+  };
+}

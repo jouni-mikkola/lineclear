@@ -34,7 +34,7 @@ export interface AgentRecord {
   finished?: boolean
   /** 'ask' keeps the CLI's own approvals; otherwise (task agents) it runs without asking */
   access?: 'full' | 'ask'
-  /** environment for its terminal: who it is to the shepherdr command */
+  /** environment for its terminal: who it is to the lineclear command */
   env?: Record<string, string>
   /** where its hooks record what it reports of itself (Claude Code: readers/hooks.ts) */
   hooks?: string
@@ -58,7 +58,7 @@ export interface OutItem {
   brief?: boolean
   /** a CLI command (/model, /compact): goes in only between turns */
   idle?: boolean
-  /** a slash command you typed: Shepherdr follows what it does (commands.ts) */
+  /** a slash command you typed: Lineclear follows what it does (commands.ts) */
   command?: boolean
 }
 
@@ -105,7 +105,7 @@ export type Events = {
   output: [key: string, screen: TermScreen]
 }
 
-/** where the hooks of the agents Shepherdr starts record their events */
+/** where the hooks of the agents Lineclear starts record their events */
 export const HOOKS_DIR = join(boxDir(), 'hooks')
 
 /** where an agent's instructions are kept for its CLI to read */
@@ -114,7 +114,7 @@ export const promptPath = (name: string) => join(boxDir(), 'prompts', `${name}.m
 /** what an agent's hooks said is read again at most this often */
 export const SAID_MS = 250
 
-/** wraps text Shepherdr sends that is not for the chat (instructions, news), in a tag of what it is when it is one
- *  of its lines: <shepherdr><news task="SHE-9" event="merged">…</news></shepherdr>; readers' text is stripped of it */
-export const hidden = (s: string, kind?: string, attrs: Record<string, string> = {}) => tag('shepherdr', {}, kind ? tag(kind, attrs, s) : s)
-export const stripHidden = (s: string) => s.replace(/<shepherdr(?:\s+[\w-]+="[^"]*")*\s*>[\s\S]*?<\/shepherdr>\s*/g, '').trim()
+/** wraps text Lineclear sends that is not for the chat (instructions, news), in a tag of what it is when it is one
+ *  of its lines: <lineclear><news task="SHE-9" event="merged">…</news></lineclear>; readers' text is stripped of it */
+export const hidden = (s: string, kind?: string, attrs: Record<string, string> = {}) => tag('lineclear', {}, kind ? tag(kind, attrs, s) : s)
+export const stripHidden = (s: string) => s.replace(/<lineclear(?:\s+[\w-]+="[^"]*")*\s*>[\s\S]*?<\/lineclear>\s*/g, '').trim()

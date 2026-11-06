@@ -4,6 +4,7 @@ import type { HomeProject } from "./home-data.ts";
 import type { Item } from "./inbox.ts";
 import { readMachines } from "./machine-list.ts";
 import { remoteLineclear, remoteLineclearSync } from "./ssh.ts";
+import { git } from "./git.ts";
 
 type Env = Record<string, string | undefined>;
 
@@ -38,8 +39,7 @@ export function relationOf(mine: string, theirs: string, repo = resolve(import.m
   const key = `${repo}:${mine}:${theirs}`;
   const known = relations.get(key);
   if (known) return known;
-  const ancestor = (a: string, b: string) =>
-    Bun.spawnSync(["git", "-C", repo, "merge-base", "--is-ancestor", a, b], { stdin: "ignore", stderr: "ignore" }).exitCode === 0;
+  const ancestor = (a: string, b: string) => git(repo, "merge-base", "--is-ancestor", a, b).ok;
   const found: Relation = ancestor(theirs, mine) ? "behind" : ancestor(mine, theirs) ? "ahead" : "different";
   relations.set(key, found);
   return found;

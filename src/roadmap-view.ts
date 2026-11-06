@@ -5,7 +5,7 @@ import { countSteps, currentPhase, lineOf, type Plan, readPlan, type RoadmapLine
 import { type Goal, goalsOf, type Hold } from "./goals.ts";
 import { readWaits, waitsForOwner } from "./waits.ts";
 import { unprovenOf } from "./doneproof.ts";
-import { roadmapSource, shepherdrTasks } from "./roadmap-source.ts";
+import { roadmapSource, lineclearTasks } from "./roadmap-source.ts";
 import { checkRoadmap, doneIds, resultOf, type State, type Task } from "./roadmap.ts";
 import { statusesOf, taskOfStep, titledByStep } from "./task-steps.ts";
 
@@ -50,7 +50,7 @@ export interface RoadmapStep {
   locks: string[];
   after: string[];
   dropped?: string;
-  /** The task whose title starts with the step's id: an open one first, else the first in Shepherdr's list. */
+  /** The task whose title starts with the step's id: an open one first, else the first in Lineclear's list. */
   task?: { id?: string; status: string; sub?: string; stalled?: boolean };
   commits: { commit: string; subject: string; at: number }[];
 }
@@ -120,7 +120,7 @@ function listRoadmap(project: string, plan: Plan, line: RoadmapLine, rounds: num
   };
 }
 
-/** A Lineclear project by its name, else any space Shepherdr lists on this machine by its slug. */
+/** A Lineclear project by its name, else any space Lineclear lists on this machine by its slug. */
 export function projectSettings(project: string, env: Env): { repo: string; space: string; reviewRounds?: number; paused?: boolean } | undefined {
   const own = readSettings(project, env);
   if (typeof own !== "string") return own;
@@ -135,7 +135,7 @@ export function projectSettings(project: string, env: Env): { repo: string; spac
 export function roadmapData(
   project: string,
   env: Env = process.env,
-  tasksOf: (space: string) => Task[] | string = (s) => shepherdrTasks(s, env),
+  tasksOf: (space: string) => Task[] | string = (s) => lineclearTasks(s, env),
   now = Date.now(),
 ): RoadmapRead {
   const settings = projectSettings(project, env);

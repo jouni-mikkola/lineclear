@@ -18,12 +18,12 @@ function setup(tasks: { id: string; title: string; status: string }[]) {
   const dir = tmp("close");
   dirs.push(dir);
   const config = demoConfig(dir, { loadPerCore: 1e6 });
-  // A stub that fails at once: the real Shepherdr command can take seconds to start on a busy machine, and a test blocked on it makes the next test time out.
+  // A stub that fails at once: the real Lineclear command can take seconds to start on a busy machine, and a test blocked on it makes the next test time out.
   const env = {
     ...process.env,
-    SHEPHERDR_BIN: "/bin/false",
+    LINECLEAR_SERVER_BIN: "/bin/false",
     LINECLEAR_CONFIG: config,
-    LINECLEAR_SHEPHERDR_DIR: join(dir, "shep"),
+    LINECLEAR_HOME: join(dir, "shep"),
     PI_CODING_AGENT_DIR: join(dir, "pi"),
   };
   const wrote = new Set<string>();
@@ -124,16 +124,16 @@ test("inbox lists open items only, --all adds the closed ones with their reason,
   expect(run("answer", "1", "Yes")).toEqual({ code: 1, text: "lineclear inbox: item 1 was closed: its task is done" });
 });
 
-test("the owner's message is read from the task's agent log, not Shepherdr's own lines", () => {
+test("the owner's message is read from the task's agent log, not Lineclear's own lines", () => {
   const t = setup([]);
   const worktree = join(t.dir, "wt");
-  mkdirSync(t.env.LINECLEAR_SHEPHERDR_DIR, { recursive: true });
-  writeFileSync(join(t.env.LINECLEAR_SHEPHERDR_DIR, "tasks.json"), JSON.stringify({ tasks: [{ id: "LIN-2", worktree }] }));
+  mkdirSync(t.env.LINECLEAR_HOME, { recursive: true });
+  writeFileSync(join(t.env.LINECLEAR_HOME, "tasks.json"), JSON.stringify({ tasks: [{ id: "LIN-2", worktree }] }));
   const folder = join(t.env.PI_CODING_AGENT_DIR, "sessions", sessionFolder(worktree));
   mkdirSync(folder, { recursive: true });
   const line = (timestamp: string, text: string) => JSON.stringify({ timestamp, message: { role: "user", content: [{ type: "text", text }] } });
   const file = join(folder, "s.jsonl");
-  writeFileSync(file, [line("2026-06-01T08:00:00Z", "before"), line("2026-06-01T09:30:00Z", "<shepherdr><news>x</news></shepherdr>")].join("\n"));
+  writeFileSync(file, [line("2026-06-01T08:00:00Z", "before"), line("2026-06-01T09:30:00Z", "<lineclear><news>x</news></lineclear>")].join("\n"));
   const real = realWorld(t.env);
   expect(real.ownerWrote("LIN-2", "2026-06-01T09:00:00Z")).toBe(false);
   writeFileSync(file, `${readFileSync(file, "utf8")}\n${line("2026-06-01T09:35:00Z", "[lineclear] You may be stuck: nothing has moved")}`);

@@ -6,26 +6,18 @@
 //   bun run test engine layout    only the test files whose path has these words
 //   bun run test changed --since=HEAD   only what changed since that commit (here: not committed yet)
 //   bun run test changed --list   which test files would run, without running them
-//   bun run test --map            and note which lines of the screen each browser test runs (screen-map.ts)
-//
-// A change to the screen runs only the browser tests that run the lines it changed, by the map GitHub makes on main
-// (screen-map.ts); every one where there is no map yet, or for a change to the whole screen (styles.css). All the
-// browser tests of a run share one browser (test/chromium.ts).
 //
 // Any other flag goes to bun test as it is (-t <pattern>, --bail, --rerun-each=3, --shard=2/6 as GitHub runs it). LINECLEAR_TEST_JOBS sets how many
 // processes run at once.
 //
 // The tests run below everything else on this machine, on every core: they take only the CPU and disk no one else
-// wants, so herdr, Shepherdr's server and the agents stay quick while several tasks test at once.
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+// wants, so herdr, Lineclear's server and the agents stay quick while several tasks test at once.
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
-import { gather, mapFile, pick, readMap, screenMap } from '../test/screen-map.ts'
-import { INPUTS } from '../test/web.ts'
 import { writeRegistries } from './build-plugins.ts'
 
 const root = join(import.meta.dir, '..')
-const cache = join(root, 'node_modules', '.cache', 'shepherdr-test')
+const cache = join(root, 'node_modules', '.cache', 'lineclear-test')
 const timings = join(cache, 'timings.json')
 const passed = join(cache, 'passed.json')
 
@@ -44,7 +36,7 @@ const testFiles = () =>
     .sort()
 
 const transpiler = new Bun.Transpiler({ loader: 'tsx' })
-const ALIASES: Record<string, string> = { '@shared/': 'shared/', '@client/': 'src/' }
+const ALIASES: Record<string, string> = { '@shared/': 'shared/' }
 
 /** a local import as a repo path, or null for a package */
 function resolveImport(from: string, spec: string): string | null {
@@ -55,9 +47,8 @@ function resolveImport(from: string, spec: string): string | null {
   return null
 }
 
-/** every file a test file reaches: what it imports (all the way down), what it reads by name, and the whole screen
- *  when it opens it in a browser (test/web.ts builds it), unless `screen` is false */
-function reach(test: string, seen = new Set<string>(), screen = true): Set<string> {
+/** every file a test file reaches: what it imports (all the way down) and what it reads by name */
+function reach(test: string, seen = new Set<string>()): Set<string> {
   if (seen.has(test)) return seen
   seen.add(test)
   let text = ''
@@ -73,12 +64,11 @@ function reach(test: string, seen = new Set<string>(), screen = true): Set<strin
   } catch {}
   for (const i of imports) {
     const p = resolveImport(test, i.path)
-    if (p) reach(p, seen, screen)
+    if (p) reach(p, seen)
   }
   // files and folders it reads: join(root, 'src'), join(import.meta.dir, 'samples')
   for (const m of text.matchAll(/join\((root|import\.meta\.dir), '([^']+)'/g))
     seen.add(m[1] === 'root' ? m[2] : relative(root, join(root, dirname(test), m[2])))
-  if (test === 'test/web.ts' && screen) for (const p of INPUTS) seen.add(p)
   return seen
 }
 
@@ -98,9 +88,6 @@ function changedFiles(since?: string) {
   return [...new Set([...lines(git('diff', '--name-only', base)), ...lines(git('ls-files', '--others', '--exclude-standard'))])]
 }
 
-/** what the screen is built from */
-const screenInput = (f: string) => INPUTS.some((p) => f === p || f.startsWith(`${p}/`))
-
 /** changing one of these can break any test */
 const EVERYTHING = ['package.json', 'bun.lock', 'bunfig.toml', 'tsconfig.json', 'test/preload.ts', 'test/once.ts', 'scripts/test.ts']
 
@@ -109,9 +96,6 @@ const EVERYTHING = ['package.json', 'bun.lock', 'bunfig.toml', 'tsconfig.json', 
 const args = process.argv.slice(2)
 const force = args.includes('--force')
 const list = args.includes('--list')
-// --map[=file]: note which lines of the screen each browser test runs, into that file (the one kept for every worktree)
-const mapArg = args.find((a) => a === '--map' || a.startsWith('--map='))
-const mapOut = mapArg ? (mapArg.includes('=') ? resolve(mapArg.slice('--map='.length)) : mapFile()) : null
 const since = args.find((a) => a.startsWith('--since='))?.slice('--since='.length)
 // --since says what to compare with, so it means changed too
 const changed = args.includes('changed') || args.includes('--changed') || since !== undefined
@@ -119,7 +103,7 @@ const flags: string[] = []
 const words: string[] = []
 for (let i = 0; i < args.length; i++) {
   const a = args[i]
-  if (['--force', 'changed', '--changed', '--list'].includes(a) || a.startsWith('--since=') || a === mapArg) continue
+  if (['--force', 'changed', '--changed', '--list'].includes(a) || a.startsWith('--since=')) continue
   if (a.startsWith('-')) {
     flags.push(a)
     // flags that take the next word
@@ -134,27 +118,10 @@ if (changed) {
   const touched = changedFiles(since)
   if (touched.some((f) => EVERYTHING.includes(f))) files = null
   else {
-    // the browser tests that run the screen's changed lines, or null: all of them
-    const screen = touched.filter(screenInput)
-    let picked: Set<string> | null = null
-    let mapped: string[] = []
-    if (screen.length) {
-      const map = screenMap()
-      const r = map ? await pick(map, screen) : { all: 'no map yet of which lines of the screen each one runs' }
-      if ('all' in r) console.log(`Every browser test: ${r.all}.`)
-      else [picked, mapped] = [r.tests, Object.keys(map!.tests)]
-    }
-    const opens = testFiles().filter((t) => reach(t).has('test/web.ts'))
     files = testFiles().filter((t) => {
-      // a browser test the map knows: by the map, or by what it reaches besides the screen (the server, itself)
-      if (picked && opens.includes(t) && mapped.includes(t)) return picked.has(t) || touched.some((f) => reaches(reach(t, new Set(), false), f))
       const set = reach(t)
       return touched.some((f) => reaches(set, f))
     })
-    if (picked) {
-      const run = opens.filter((t) => files!.includes(t))
-      console.log(`Screen changed: ${run.length} of ${opens.length} browser test files run what changed.`)
-    }
     const covered = new Set(testFiles().flatMap((t) => [...reach(t)]))
     const none = touched.filter((f) => !reaches(covered, f) && /\.(tsx?|css|html)$/.test(f))
     if (none.length) console.log(`No test reaches: ${none.join(', ')}`)
@@ -182,7 +149,7 @@ if (list) {
 const whole = files === null && flags.every((f) => f === '--bail' || /^--bail=/.test(f))
 const commit = git('rev-parse', 'HEAD')
 const clean = git('status', '--porcelain') === ''
-if (whole && !force && !mapOut && commit && clean && existsSync(passed)) {
+if (whole && !force && commit && clean && existsSync(passed)) {
   const last = JSON.parse(readFileSync(passed, 'utf8')) as { commit: string; at: number; summary: string }
   if (last.commit === commit) {
     const ago = Math.round((Date.now() - last.at) / 60_000)
@@ -225,38 +192,6 @@ if (files) console.log(`${files.length} test file${files.length === 1 ? '' : 's'
 const t0 = Date.now()
 const env: Record<string, string | undefined> = { ...process.env, LINECLEAR_TEST_RUNNER: '1' }
 
-// one browser for every browser test of the run, as low in line as the tests; it closes when this process is gone
-// (its profile and artifacts go in a temp folder of its own, removed once it is gone)
-let browser: ReturnType<typeof Bun.spawn> | null = null
-const browserTmp = mkdtempSync(join(tmpdir(), 'lineclear-browser-'))
-if ((files ?? testFiles()).some((t) => reach(t).has('test/chromium.ts'))) {
-  const b = Bun.spawn([...lowPriority(), process.execPath, join(root, 'test', 'chromium.ts')], {
-    cwd: root,
-    stdin: 'pipe',
-    stdout: 'pipe',
-    stderr: 'ignore',
-    env: { ...process.env, TMPDIR: browserTmp },
-  })
-  browser = b
-  // where to connect: its first line (none when it can't start one: each file then starts its own, or skips)
-  const firstLine = async () => {
-    let s = ''
-    const r = (b.stdout as ReadableStream<Uint8Array>).getReader()
-    while (!s.includes('\n')) {
-      const x = await r.read()
-      if (x.done) break
-      s += decoder.decode(x.value)
-    }
-    return s
-  }
-  const line = await Promise.race([firstLine(), Bun.sleep(30_000).then(() => '')])
-  if (line.startsWith('ws://')) env.LINECLEAR_TEST_BROWSER = line.trim()
-}
-const mapParts = join(cache, `map-${process.pid}`)
-if (mapOut) {
-  rmSync(mapParts, { recursive: true, force: true })
-  env.LINECLEAR_TEST_MAP = mapParts
-}
 const p = Bun.spawn(cmd, { cwd: root, stdout: 'inherit', stderr: 'pipe', stdin: 'inherit', env })
 // bun test reports on stderr: pass it on, and keep its closing lines
 let tail = ''
@@ -267,21 +202,6 @@ for (let r = await reader.read(); !r.done; r = await reader.read()) {
   tail = (tail + s).slice(-2000)
 }
 const code = await p.exited
-if (browser) {
-  ;(browser.stdin as import('bun').FileSink).end()
-  await Promise.race([browser.exited, Bun.sleep(5000)])
-  browser.kill()
-}
-rmSync(browserTmp, { recursive: true, force: true })
-if (mapOut) {
-  mkdirSync(dirname(mapOut), { recursive: true })
-  const map = gather(mapParts, commit, readMap(mapOut))
-  writeFileSync(mapOut, JSON.stringify(map))
-  rmSync(mapParts, { recursive: true, force: true })
-  console.log(
-    `Screen map of ${commit.slice(0, 7)}${clean ? '' : ' (and what is not committed)'}: ${Object.keys(map.tests).length} browser test files, in ${mapOut}`,
-  )
-}
 const secs = ((Date.now() - t0) / 1000).toFixed(1)
 if (code === 0 && whole && commit && clean && git('rev-parse', 'HEAD') === commit && git('status', '--porcelain') === '') {
   const ran = tail.match(/Ran \d+ tests across \d+ files?/)?.[0] ?? 'passed'

@@ -205,7 +205,7 @@ describe("why work waits", () => {
 
   test("five tasks that wait for one task count together, and ready steps say why they have not started", () => {
     const root = tmp("waiting");
-    const dir = join(root, "shepherdr");
+    const dir = join(root, "lineclear");
     const cfg = join(root, "cfg");
     mkdirSync(dir, { recursive: true });
     const path = join(root, "proj");
@@ -239,7 +239,7 @@ describe("why work waits", () => {
     writeFileSync(bin, `#!/bin/sh\necho '${JSON.stringify(tasks.map((t) => ({ id: t.id, title: t.title, status: t.id === "PR-1" ? "work" : "queued" })))}'\n`, {
       mode: 0o755,
     });
-    const home = homeData({ LINECLEAR_SHEPHERDR_DIR: dir, PI_CODING_AGENT_DIR: join(root, "pi"), LINECLEAR_CONFIG: cfg, SHEPHERDR_BIN: bin }, NOW);
+    const home = homeData({ LINECLEAR_HOME: dir, PI_CODING_AGENT_DIR: join(root, "pi"), LINECLEAR_CONFIG: cfg, LINECLEAR_SERVER_BIN: bin }, NOW);
     const w = home.projects[0]?.waiting;
     if (!w) throw new Error("no waiting");
     expect(w.running.map((t) => [t.title, t.stage])).toEqual([["U3 Holds the lock", "work"]]);

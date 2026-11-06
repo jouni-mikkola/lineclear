@@ -14,11 +14,10 @@ critical finding. An id is the task that decided the line.
 
 - Lineclear is a development system: your own software team on your machines.
 - Lineclear is where all development happens from now on: the owner talks to the Dispatcher and decides in the
-  Inbox. Not herdr and pi by hand, not Shepherdr. herdr and pi stay only as the engine underneath, never as the
+  Inbox. Not herdr and pi by hand, not Lineclear. herdr and pi stay only as the engine underneath, never as the
   owner's tool.
-- Lineclear is our own product and stays stable: no dependence on Shepherdr or its releases (LIN-147); every update
+- Lineclear is our own product and stays stable: no dependence on Lineclear or its releases (LIN-147); every update
   proves itself and rolls back if broken (LIN-136); a self-update never ends running work (LIN-135).
-- The projects are lineclear, webshop and ledger. control-center folds into Lineclear and ends (LIN-169).
 - The UI is ours, thought through, graphic first: the Dispatcher chat as Home, the line as the live picture in the
   railway language of brand.md, roles clear at first look without explainers (LIN-139, LIN-149, LIN-150, LIN-152).
   Each fact once: no headline repeating counts, no subtitles, no slogans, no "How it works", no command for the
@@ -142,7 +141,7 @@ The same eight roles as the README's How it works list (the step check, which th
 
 - **You**: say what you want, do what only a human can (a code, a release), and undo what you dislike. You never
   have to watch an agent, approve a plan or tell it what is next.
-- **The Dispatcher** is an AI model, the one chat you talk to, in Lineclear's web UI or in Shepherdr. It knows
+- **The Dispatcher** is an AI model, the one chat you talk to, in Lineclear's web UI or in Lineclear. It knows
   which project each request belongs to, and hands it on to the planner. If two projects fit, it asks you with a
   button for each. It shows you the steps live, answers where things stand from the live status, and decides step
   questions from the brief and the roadmap. It never builds, never merges, never answers the Inbox for you.
@@ -157,7 +156,7 @@ The same eight roles as the README's How it works list (the step check, which th
   step and hold new work while a machine is busy. They never use AI and never write code.
 - **A worker** is an AI model. It builds one step on its own branch, runs the project's check, has it reviewed,
   then merges it. It never picks its next step and never pushes: it asks the server to merge, and the server pushes
-  (Shepherdr's server today).
+  (Lineclear's server today).
 - **A reviewer** is an AI model from another company than the worker. It reads the change against the step's why
   and done when, and lists what to fix. It never writes the code.
 - **The Inbox** is plain code. It brings you only what a human must do, as buttons on Lineclear's web page, on your phone
@@ -265,11 +264,11 @@ It follows three principles:
 
 ## The path
 
-- **Strangler.** Lineclear starts beside [Shepherdr](https://github.com/eliasstravik/herdr-projects) 2.0, which
-  keeps the tasks and their worktrees, and drives it through its `shepherdr` command. Each phase takes one job from
+- **Strangler.** Lineclear starts beside [Lineclear](https://github.com/eliasstravik/herdr-projects) 2.0, which
+  keeps the tasks and their worktrees, and drives it through its `lineclear` command. Each phase takes one job from
   the AI coordinator, on one pilot project first.
-- At phase 5 Lineclear forks Shepherdr 2.0 at `ebb17d5`, its first commit with the MIT license, and fixes its known
-  faults. The migration moves every machine and keeps a way back in one command. Shepherdr is retired at the end.
+- At phase 5 Lineclear forks herdr-projects 2.0 at `ebb17d5`, its first commit with the MIT license, and fixes its known
+  faults. The migration moves every machine and keeps a way back in one command. Lineclear is retired at the end.
 - `lineclear measure` prints the numbers with no AI. Goals: under 3 asks a day, owner taps per merged step near 0, a median wait from ready to start
   under 5 min, a cost per merged step at least 15 % below the pilot's before Lineclear, and 0 model turns that no
   step and no owner message started. From phase 2 on, each

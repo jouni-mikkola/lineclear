@@ -131,14 +131,14 @@ export type Notify = (typeof NOTIFY)[number]
 export const NOTIFY_DEFAULT: Notify = 'Needs me'
 
 /** a place's Notify row in Settings: its value there, and where it comes from or what it would be unset */
-export const notifyRow = (snap: Pick<Snapshot, 'settings'>, place: string) =>
+const notifyRow = (snap: Pick<Snapshot, 'settings'>, place: string) =>
   snap.settings
     .filter((s) => s.level === place)
     .flatMap((s) => s.rows)
     .find((r) => r.key === NOTIFY_KEY)
 
 /** a place's Notify, as Settings has it at that place's level */
-export function notifyOf(snap: Pick<Snapshot, 'settings'>, place: string): Notify {
+function notifyOf(snap: Pick<Snapshot, 'settings'>, place: string): Notify {
   const v = notifyRow(snap, place)?.value
   return NOTIFY.find((n) => n === v) ?? NOTIFY_DEFAULT
 }

@@ -17,7 +17,7 @@ export const PINNED = 'pinned'
 export const TOP = 'sections'
 
 /** where the order of a machine's sections is kept */
-export const sectionsIn = (machineId: string) => `sections:${machineId}`
+const sectionsIn = (machineId: string) => `sections:${machineId}`
 
 /** a section the human made (s:<id>): its name, its emoji, and the machine (its key) it is inside, none at the top */
 export interface SectionDef {
@@ -109,7 +109,7 @@ export function setOrder(order: PlaceOrder, under: string, ids: string[]) {
 }
 
 /** a new order of those that show, the others in it as they were among them */
-export function kept(was: string[], ids: string[]) {
+function kept(was: string[], ids: string[]) {
   const out = [...ids]
   for (const [i, id] of was.entries()) {
     if (out.includes(id)) continue

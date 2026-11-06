@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { broken, loadFactor, type Numbers } from "../scripts/budget.ts";
+import { broken, type Numbers } from "../scripts/budget.ts";
+import { loadFactor } from "../scripts/check-speed.ts";
 
 const budgets = { network: { rttMs: 100 }, firstViewMs: 1000, idleCpuPercent: 1, idleMemoryMb: 300 };
 const ok: Numbers = { firstViewMs: 600, idleCpuPercent: 0.5, idleMemoryMb: 100, notGzipped: [] };

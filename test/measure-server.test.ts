@@ -18,7 +18,7 @@ function fake(): { url: string; stop: () => void } {
 test("measure --server prints p50, p95, max and the CPU share", async () => {
   const s = fake();
   const out: string[] = [];
-  const code = await measureServer(["--server", "--window", "2"], (l) => out.push(l), { LINECLEAR_SHEPHERDR_URL: s.url });
+  const code = await measureServer(["--server", "--window", "2"], (l) => out.push(l), { LINECLEAR_URL: s.url });
   s.stop();
   expect(code).toBe(0);
   const text = out.join("\n");
@@ -32,7 +32,7 @@ test("measure --server --profile saves the profile", async () => {
   const s = fake();
   const dir = mkdtempSync(join(tmpdir(), "prof-"));
   const out: string[] = [];
-  const code = await measureServer(["--server", "--profile"], (l) => out.push(l), { LINECLEAR_SHEPHERDR_URL: s.url }, dir);
+  const code = await measureServer(["--server", "--profile"], (l) => out.push(l), { LINECLEAR_URL: s.url }, dir);
   s.stop();
   expect(code).toBe(0);
   expect(readdirSync(dir).filter((f) => f.endsWith(".cpuprofile"))).toHaveLength(1);

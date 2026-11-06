@@ -26,7 +26,7 @@ export interface TaskRec {
   base?: string
   /** its pull request on GitHub, once one is open */
   pr?: { number: number; url: string }
-  /** the commit Shepherdr last pushed to its branch on GitHub, and when: checks a push starts take a moment to show */
+  /** the commit Lineclear last pushed to its branch on GitHub, and when: checks a push starts take a moment to show */
   pushed?: { sha: string; at: number }
   /** what its agent knows of its pull request, so news is told once: comments from before `since` (when it first
    *  reported done) and those in `seen` (by id), and the checks that failed at a commit (`failed`) */
@@ -67,12 +67,12 @@ export interface TaskRec {
   plan?: string[]
   /** its agent waits for a go (lineclear todo); anything written to it clears it */
   todo?: boolean
-  /** queued: the tasks it waits for ("SHE-12", or "vm-str:SHE-12" on another machine); cleared by the go Shepherdr
+  /** queued: the tasks it waits for ("SHE-12", or "vm-str:SHE-12" on another machine); cleared by the go Lineclear
    *  sends once they are all done, or by anything written to it */
   after?: string[]
   /** the go sent to its agent, until the agent is seen at work: a restart in between sends it again */
   going?: string
-  /** held by Shepherdr until this machine has room for it (Settings → the machine's limits): why it waits (all its
+  /** held by Lineclear until this machine has room for it (Settings → the machine's limits): why it waits (all its
    *  slots are taken, or the machine is too loaded) and since when. go: the message its agent gets then, and why it
    *  starts (none: it has no agent yet, and starts then on its brief). Anything you write to it lets it go at once */
   held?: { why: 'slots' | 'machine'; since: number; go?: string; goWhy?: string; plain?: boolean }
@@ -208,7 +208,7 @@ export const CHECKS_EVERY = 10_000
 export const CHECKS_SHOW = 90_000
 
 /** a merge's caller may be gone after this long (an agent's shell, Claude Code's, moves a command to the background
- *  after two minutes), and a stopping Shepherdr waits this long for the merges on their way */
+ *  after two minutes), and a stopping Lineclear waits this long for the merges on their way */
 export const MERGE_DEADLINE = 90_000
 
 /** done tasks' pull requests are looked at for news (failed checks, comments) this long after starting, then this often */

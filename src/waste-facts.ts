@@ -11,10 +11,9 @@ import { listProjectNames, readSettings } from "./project.ts";
 import type { World } from "./rules.ts";
 import { readDecisionsSince } from "./stall-class.ts";
 import type { Facts } from "./waste.ts";
+import { DAY, HOUR_MS } from "./time.ts";
 
 type Env = Record<string, string | undefined>;
-const HOUR = 3_600_000;
-const DAY = 24 * HOUR;
 const MAX_DIFFS = 10;
 const LOCK_SKIP = /^lock '(.+)' is held by/;
 
@@ -69,7 +68,7 @@ function decisionFacts(env: Env, now: number): Pick<Facts, "starts" | "lockSkips
   for (const d of readDecisionsSince(decisionsPath(env), now - DAY)) {
     if (d.kind === "start" && d.step) count(starts, `${d.project} ${d.step}`);
     const lock = d.kind === "skip" ? LOCK_SKIP.exec(d.reason)?.[1] : undefined;
-    if (lock === undefined || new Date(d.time).getTime() < now - HOUR) continue;
+    if (lock === undefined || new Date(d.time).getTime() < now - HOUR_MS) continue;
     count(lockSkips, `${d.project} ${lock}`);
     if (d.step) count(stepSkips, `${d.project} ${d.step}`);
   }

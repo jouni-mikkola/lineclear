@@ -167,9 +167,9 @@ printf '%s\\n' "$@" > '${cwd}/launch-args'
 test ! -e '${secret}'
 if echo bad > '${repo}/escape' 2>/dev/null; then exit 11; fi
 if echo bad > '${cwd}/.git/config' 2>/dev/null; then exit 12; fi
-if echo bad > /run/shepherdr/policy 2>/dev/null; then exit 13; fi
+if echo bad > /run/lineclear/policy 2>/dev/null; then exit 13; fi
 /bin/sh -c "test ! -e '${secret}' && echo child > '${cwd}/child'"
-/run/shepherdr/bun -e 'try { await fetch("http://127.0.0.1:9", {signal: AbortSignal.timeout(200)}); process.exit(14) } catch {}'
+/run/lineclear/bun -e 'try { await fetch("http://127.0.0.1:9", {signal: AbortSignal.timeout(200)}); process.exit(14) } catch {}'
 echo safe > '${cwd}/result'
 `,
         { mode: 0o700 },

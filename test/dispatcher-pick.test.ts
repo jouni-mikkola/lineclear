@@ -9,10 +9,10 @@ import { planMain } from "../src/plan.ts";
 import { about, addedSteps, planStatus, readRequests } from "../src/requests.ts";
 import { webApi } from "../src/web.ts";
 import { type ChatMessage, chatClient, step } from "./chat-client.ts";
-import { startFakeShepherdr } from "../ui/test/fake-shepherdr-server.ts";
+import { startFakeLineclear } from "../ui/test/fake-lineclear-server.ts";
 
 // One request from a sentence in the web chat to steps on the roadmap. Two fake projects, a fake planner (it puts its
-// plan in the Inbox as `lineclear plan submit` does) and a fake Shepherdr. No model runs in a test, so a script plays
+// plan in the Inbox as `lineclear plan submit` does) and a fake Lineclear. No model runs in a test, so a script plays
 // the Dispatcher's model: it reads the real project list and picks by the words they share, the way its brief says.
 // Every lineclear command it runs is the real one.
 const dirs: string[] = [];
@@ -44,10 +44,10 @@ function world() {
       JSON.stringify({ repo, space: name, check: "true", askBefore: { plans: true }, models: { worker: [], reviewer: [], planner: [] } }),
     );
   }
-  const bin = join(dir, "shepherdr");
+  const bin = join(dir, "lineclear");
   const log = join(dir, "calls.log");
   writeFileSync(log, "");
-  // a planning task gets the next id, as Shepherdr's own answer says
+  // a planning task gets the next id, as Lineclear's own answer says
   writeFileSync(
     bin,
     `#!/bin/sh\nprintf '%s\\n' "$*" >> "${log}"\n` +
@@ -55,7 +55,7 @@ function world() {
       `if [ "$1" = task ] && [ "$2" = list ]; then echo '[]'; fi\n`,
   );
   chmodSync(bin, 0o755);
-  const env = { ...process.env, LINECLEAR_CONFIG: config, SHEPHERDR_BIN: bin, LINECLEAR_ROLE: "dispatcher" };
+  const env = { ...process.env, LINECLEAR_CONFIG: config, LINECLEAR_SERVER_BIN: bin, LINECLEAR_ROLE: "dispatcher" };
   return { dir, config, env, log, repo: (name: string) => join(dir, name) };
 }
 
@@ -112,13 +112,13 @@ const planned = (env: NodeJS.ProcessEnv, task: string, project: string, ids: str
   );
 
 async function chatWith(w: ReturnType<typeof world>) {
-  const fake = startFakeShepherdr({ reply: dispatcher(w.env) });
+  const fake = startFakeLineclear({ reply: dispatcher(w.env) });
   const handle = webApi({
     ...w.env,
-    LINECLEAR_SHEPHERDR_DIR: join(w.dir, "sh"),
+    LINECLEAR_HOME: join(w.dir, "sh"),
     HOME: w.dir,
     LINECLEAR_PLAYWRIGHT_CLI: "true",
-    LINECLEAR_SHEPHERDR_URL: fake.url,
+    LINECLEAR_URL: fake.url,
   });
   const { req, view, send } = chatClient(handle);
   await view((v) => v.state === "ready");

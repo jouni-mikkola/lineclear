@@ -7,6 +7,7 @@ import { ownerDirection } from "./direction.ts";
 import { readParts, stepFiles, stepParts } from "./parts.ts";
 import { mainRefs } from "./main-branch.ts";
 import { READER_ASK } from "./reader-ask.ts";
+import { gitText } from "./git.ts";
 
 /** The most characters a step's brief may have. The rules give way first, then the part pages, then the file list. */
 export const BRIEF_MAX = 12_000;
@@ -21,11 +22,6 @@ export function stepText(text: string, step: Step): string {
     .slice(step.line - 1, end)
     .join("\n")
     .trimEnd();
-}
-
-function git(repo: string, ...args: string[]): string {
-  const p = Bun.spawnSync(["git", "-C", repo, ...args]);
-  return p.exitCode === 0 ? p.stdout.toString() : "";
 }
 
 /** The paths on a step's `files` line that a brief may name: inside the repo, with no trailing slash. */
@@ -53,7 +49,7 @@ function afterFiles(repo: string, after: string[]): string[] {
   for (const id of after) {
     const esc = id.replace(/[^\w-]/g, "");
     if (esc === "") continue;
-    const names = git(
+    const names = gitText(
       repo,
       "log",
       origin,
@@ -63,7 +59,7 @@ function afterFiles(repo: string, after: string[]): string[] {
       "--name-only",
       "--format=",
     );
-    out.push(...names.split("\n").filter((n) => n !== ""));
+    out.push(...(names ?? "").split("\n").filter((n) => n !== ""));
   }
   return out;
 }

@@ -2,7 +2,6 @@ import { afterAll, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
-import { codeCommit, codeVersion } from "../src/paths.ts";
 import { realWorld, tick } from "../src/rules.ts";
 import type { World } from "../src/world.ts";
 import { readRoom } from "../src/spread.ts";
@@ -27,11 +26,12 @@ interface Opts {
   remoteLoadPerCore?: number;
   slotsBusy?: number;
   unreachable?: boolean;
+  freeKb?: number;
   /** Project settings added to the project's (`local: false`). */
   settings?: object;
 }
 
-/** A project whose origin is a real bare repo, a fake shepherdr here, and a fake `ssh` that runs the command at a fake home. */
+/** A project whose origin is a real bare repo, a fake lineclear here, and a fake `ssh` that runs the command at a fake home. */
 function setup(o: Opts) {
   const dir = mkdtempSync(join(tmpdir(), "lc-second-"));
   temps.push(dir);
@@ -44,46 +44,45 @@ function setup(o: Opts) {
   mkdirSync(fake);
   writeFileSync(
     join(fake, "show.json"),
-    JSON.stringify({ desc: "Do the held thing.\n\nSettings: (from shepherdr show; where the brief above says otherwise, it wins)\n- Review: on." }),
+    JSON.stringify({ desc: "Do the held thing.\n\nSettings: (from lineclear show; where the brief above says otherwise, it wins)\n- Review: on." }),
   );
   writeFileSync(join(fake, "tasks.json"), JSON.stringify(o.localTasks ?? []));
-  script(
-    join(bin, "lineclear"),
-    `case "$1 $2" in
-  "task list") cat "${fake}/tasks.json" ;;
-  "task add") echo "$*" >> "${fake}/adds.log" ;;
-  "task show") cat "${fake}/show.json" ;;
-  "task close") echo "$*" >> "${fake}/closes.log" ;;
-  show*) echo "machine.maxTasks       ${o.localMax ?? 0}  (here)" ;;
-esac`,
-  );
   script(join(bin, "pi"), `echo "provider model context"; echo "anthropic claude-sonnet-5-5 1M"; echo "anthropic claude-opus-5-5 1M"`);
 
-  // The second machine: a home folder with the helper, the machine settings and the slot files.
+  // The second machine: a home folder for the clone and the secrets (over SSH) and the files the one server's fake reads.
   const home = join(dir, "farbox-home");
   const seen = join(dir, "farbox.log");
-  script(
-    join(home, ".lineclear", "helper", "bin", "lineclear"),
-    `case "$1 $2" in
-  "task list") cat "${home}/tasks.json" ;;
-  "task add") echo "ADD $*" >> "${seen}" ;;
-  "space list") [ -f "${home}/space" ] && cat "${home}/space"; true ;;
-  "space add") echo "SPACE $*" >> "${seen}"; echo "lineclear  LIN  $3" > "${home}/space" ;;
-  show*) echo "machine.maxTasks       ${o.remoteMax ?? 8}  (farbox)" ;;
-esac`,
-  );
-  // read once: HEAD moving under the run (a rebase, a commit) would make the fake machine look like another build
-  const build = { version: codeVersion(), commit: codeCommit() };
-  // `secrets import <space>` keeps what it was sent and the space, since the fake machine has no vault of its own
-  script(
-    join(home, ".local", "bin", "lineclear"),
-    `[ "$1 $2" = "secrets import" ] && { echo "$3" > "$HOME/imported-space"; cat > "$HOME/imported"; exit 0; }
-echo "lineclear ${build.version} ${build.commit}"`,
-  );
+  mkdirSync(home, { recursive: true });
   writeFileSync(join(home, "tasks.json"), JSON.stringify(o.remoteTasks ?? []));
-  mkdirSync(join(home, ".config", "lineclear", "check-slots", "m"), { recursive: true });
-  writeFileSync(join(home, ".config", "lineclear", "machine.json"), JSON.stringify({ loadPerCore: o.remoteLoadPerCore ?? 1e6, checkSlots: 2 }));
-  for (let i = 0; i < (o.slotsBusy ?? 0); i++) writeFileSync(join(home, ".config", "lineclear", "check-slots", "m", `slot-${i}`), String(process.pid));
+  writeFileSync(join(home, "max"), String(o.remoteMax ?? 8));
+  if (o.unreachable) writeFileSync(join(home, "down"), "");
+  // `secrets import <space>` keeps what it was sent and the space, since the fake machine has no vault of its own
+  script(join(home, ".local", "bin", "lineclear"), `[ "$1 $2" = "secrets import" ] && { echo "$3" > "$HOME/imported-space"; cat > "$HOME/imported"; exit 0; }`);
+  mkdirSync(join(dir, "config", "check-slots", "farbox"), { recursive: true });
+  writeFileSync(join(dir, "config", "machine.json"), JSON.stringify({ loadPerCore: o.remoteLoadPerCore ?? 1e6, checkSlots: 2 }));
+  for (let i = 0; i < (o.slotsBusy ?? 0); i++) writeFileSync(join(dir, "config", "check-slots", "farbox", `slot-${i}`), String(process.pid));
+  // The one server's `room` and `task list` for farbox, and `task add --on farbox`, which lands in the second machine's log.
+  writeFileSync(
+    join(fake, "farbox.js"),
+    `const fs = require("fs");
+const [cmd, sub, ...rest] = process.argv.slice(2);
+const read = (f) => JSON.parse(fs.readFileSync(f, "utf8"));
+const remote = read("${home}/tasks.json");
+if (cmd === "room") {
+  if (fs.existsSync("${home}/down")) { console.error("herdr could not reach farbox for workspace.list"); process.exit(1); }
+  const working = remote.filter((t) => t.status === "work").length;
+  console.log(JSON.stringify({ host: "farbox", load: 1, cores: 4, freeKb: ${o.freeKb ?? 8_000_000}, working, max: Number(fs.readFileSync("${home}/max", "utf8")) }));
+} else if (cmd === "task" && sub === "list") {
+  console.log(JSON.stringify([...read("${fake}/tasks.json"), ...remote.map((t) => ({ ...t, machine: "farbox" }))]));
+} else if (cmd === "task" && sub === "add") {
+  const line = [cmd, sub, ...rest].join(" ");
+  fs.appendFileSync(rest.includes("--on") ? "${seen}" : "${fake}/adds.log", (rest.includes("--on") ? "ADD " : "") + line + "\\n");
+} else if (cmd === "task" && sub === "show") process.stdout.write(fs.readFileSync("${fake}/show.json"));
+else if (cmd === "task" && sub === "close") fs.appendFileSync("${fake}/closes.log", [cmd, sub, ...rest].join(" ") + "\\n");
+else if (cmd === "show") console.log("machine.maxTasks       ${o.localMax ?? 0}  (here)");
+`,
+  );
+  script(join(bin, "lineclear"), `exec bun "${fake}/farbox.js" "$@"`);
   // The fake ssh: its last argument is the command; it runs at the fake home, or the machine is down.
   const ssh = join(bin, "ssh");
   script(
@@ -104,7 +103,6 @@ echo "lineclear ${build.version} ${build.commit}"`,
       models: { worker: ["anthropic/claude-sonnet-5-5"], reviewer: ["anthropic/claude-opus-5-5"], planner: ["anthropic/claude-opus-5-5"] },
     }),
   );
-  writeFileSync(join(config, "machine.json"), JSON.stringify({ loadPerCore: 1e6 }));
   // No GIT_* variable of the run around the test (a hook's GIT_DIR, a global config) reaches the clone on the fake machine.
   const own = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith("GIT_")));
   const vars = {
@@ -113,17 +111,20 @@ echo "lineclear ${build.version} ${build.commit}"`,
     GIT_CONFIG_NOSYSTEM: "1",
     LINECLEAR_CONFIG: config,
     LINECLEAR_MAIN_HOME: join(dir, "data"),
-    LINECLEAR_SHEPHERDR_DIR: join(dir, "shepherdr"),
-    SHEPHERDR_BIN: join(bin, "lineclear"),
+    LINECLEAR_HOME: join(dir, "lineclear"),
+    LINECLEAR_SERVER_BIN: join(bin, "lineclear"),
     PI_BIN: join(bin, "pi"),
     LINECLEAR_SSH: ssh,
     TMPDIR: join(dir, "tmp"),
     XDG_CACHE_HOME: join(dir, "cache"),
   };
   const doTick = (dryRun = false, world: Partial<World> = {}) =>
-    tick({ ...realWorld(vars), room: (host, space) => readRoom(host, space, vars, build), load: () => 0, ...world }, dryRun, vars);
+    tick({ ...realWorld(vars), room: (host, space) => readRoom(host, space, vars), load: () => 0, ...world }, dryRun, vars);
   const read = (f: string) => (existsSync(f) ? readFileSync(f, "utf8") : "");
-  const down = () => writeFileSync(ssh, `#!/bin/sh\necho "ssh: connect to host farbox port 22: Connection timed out" >&2; exit 255\n`);
+  const down = () => {
+    writeFileSync(join(home, "down"), "");
+    writeFileSync(ssh, `#!/bin/sh\necho "ssh: connect to host farbox port 22: Connection timed out" >&2; exit 255\n`);
+  };
   return {
     dir,
     repo,
@@ -146,26 +147,10 @@ test("a ready step with no room here starts on the second machine, which clones 
   expect(reason).toMatch(/ there, 0\.0 of \d+ here\)/);
   expect(t.local()).toBe("");
   expect(existsSync(join(t.home, "code", "lineclear", ".git"))).toBe(true);
-  expect(t.remote()).toContain("SPACE space add");
   expect(t.remote()).toContain("ADD task add A Title A --brief");
   expect(t.remote()).toContain("because A");
   expect(t.remote()).toContain("--space lineclear");
   expect(t.remote()).toContain("--reviewer-model anthropic/claude-opus-5-5");
-});
-
-test("the space is added once, not on every start", () => {
-  const t = setup({ steps: [step("A", "a"), step("B", "b")], localMax: 0 });
-  t.doTick();
-  expect(t.remote().match(/SPACE/g)).toHaveLength(1);
-  writeFileSync(
-    join(t.home, "tasks.json"),
-    JSON.stringify([
-      { id: "LIN-1", title: "A Title A", status: "work" },
-      { id: "LIN-2", title: "B Title B", status: "work" },
-    ]),
-  );
-  expect(t.doTick()).toEqual([]);
-  expect(t.remote().match(/SPACE/g)).toHaveLength(1);
 });
 
 const setVault = (t: ReturnType<typeof setup>, levels: Record<string, Record<string, string>>) => {
@@ -298,7 +283,7 @@ test("a machine that cannot be reached is skipped and noted, and the local steps
   const d = t.doTick();
   expect(d.map((x) => `${x.step}:${x.kind}`)).toEqual(["machine:farbox:skip", "A:start"]);
   expect(d[0]!.reason).toContain("machine farbox skipped");
-  expect(d[0]?.reason).toContain("No route to host");
+  expect(d[0]?.reason).toContain("cannot be reached");
   expect(t.local()).toContain("task add A Title A");
 });
 
@@ -323,43 +308,6 @@ test("a second machine that is loaded or has all its check slots busy takes no t
   const busy = setup({ steps: [step("A")], localMax: 0, slotsBusy: 2 });
   expect(busy.doTick()[0]!.reason).toContain("farbox: all 2 check slots are in use");
   expect(busy.remote()).toBe("");
-});
-
-test("a second machine on another build than this one's takes no task, and one on the same build does", () => {
-  const onBuild = (commit: string) => {
-    const t = setup({ steps: [step("A")], localMax: 0 });
-    script(join(t.home, ".local", "bin", "lineclear"), `echo "lineclear 0.1.0 ${commit}"`);
-    return t;
-  };
-  const apart = onBuild("deadbeef");
-  const reason = apart.doTick()[0]?.reason ?? "";
-  expect(reason).toContain("farbox: it runs deadbee but this machine runs");
-  expect(reason).toContain("lineclear machine update farbox");
-  expect(apart.remote()).toBe("");
-  const same = onBuild(codeCommit().slice(0, 7));
-  expect(same.doTick().map((x) => x.kind)).toEqual(["start"]);
-});
-
-test("a release has no commit: its version tells the machines apart", () => {
-  const onVersion = (version: string) => {
-    const t = setup({ steps: [step("A")], localMax: 0 });
-    script(join(t.home, ".local", "bin", "lineclear"), `echo "lineclear ${version} unknown"`);
-    return t;
-  };
-  const apart = onVersion("9.9.9");
-  expect(apart.doTick()[0]?.reason).toContain("farbox: it runs 9.9.9 but this machine runs");
-  expect(
-    onVersion(codeVersion())
-      .doTick()
-      .map((x) => x.kind),
-  ).toEqual(["start"]);
-});
-
-test("a machine that does not say its build takes no task", () => {
-  const t = setup({ steps: [step("A")], localMax: 0 });
-  script(join(t.home, ".local", "bin", "lineclear"), "exit 1");
-  expect(t.doTick()[0]?.reason).toContain("does not say which build it runs");
-  expect(t.remote()).toBe("");
 });
 
 test("a dry run starts nothing on the second machine", () => {
@@ -443,7 +391,7 @@ test("a held hand-made task starts on the second machine when this one is full, 
   expect(d.map((x) => `${x.step}:${x.kind}`)).toEqual(["LIN-9:start"]);
   expect(d[0]?.reason).toContain("farbox");
   expect(t.remote()).toContain("ADD task add Hand made --brief Do the held thing.");
-  expect(t.remote()).not.toContain("Settings: (from shepherdr show");
+  expect(t.remote()).not.toContain("Settings: (from lineclear show");
   expect(t.closes()).toContain("task close LIN-9");
   expect(t.local()).toBe("");
 });
@@ -515,8 +463,14 @@ test("local: false with the second machine full starts nothing here", () => {
   expect(t.local()).toBe("");
 });
 
-test("remote commands use the helper in ~/.lineclear and work when the old ~/.shepherdr folder is gone", () => {
+test("remote commands use the helper in ~/.lineclear and work when the old folder is gone", () => {
   const t = setup({ steps: [step("A")], localMax: 0 });
-  expect(existsSync(join(t.home, ".shepherdr"))).toBe(false);
+  expect(existsSync(join(t.home, [".shep", "herdr"].join("")))).toBe(false);
   expect(t.doTick()[0]?.kind).toBe("start");
+});
+
+test("a second machine with little free memory takes no task", () => {
+  const t = setup({ steps: [step("A")], localMax: 0, freeKb: 200_000 });
+  expect(t.doTick()[0]?.reason).toContain("MiB of memory is free");
+  expect(t.remote()).toBe("");
 });

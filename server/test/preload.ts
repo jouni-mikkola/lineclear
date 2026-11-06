@@ -8,7 +8,7 @@ import { writeRegistries } from '../scripts/build-plugins.ts'
 import { once } from './once.ts'
 import './tmp-scope.ts'
 
-// Tests never touch the Shepherdr that runs on this machine: its data folder, its server and its chats. A test file
+// Tests never touch the Lineclear that runs on this machine: its data folder, its server and its chats. A test file
 // that wants a home of its own sets one before it imports the store; until then, and in every file that doesn't,
 // it is a fresh empty folder (bun test without --parallel shares the store between files).
 // (and the folders of runs gone an hour ago go, since a test process doesn't always get to clear its own)
@@ -26,14 +26,14 @@ process.env.LINECLEAR_COORDINATOR_TIMER = 'on'
 
 const root = join(import.meta.dir, '..')
 const modules = join(root, 'node_modules')
-const stamp = join(modules, '.shepherdr-deps')
+const stamp = join(modules, '.lineclear-deps')
 const want = createHash('sha256')
   .update(['bun.lock', 'package.json'].map((f) => readFileSync(join(root, f), 'utf8')).join('\0'))
   .digest('hex')
 
 mkdirSync(modules, { recursive: true })
 await once(
-  join(modules, '.shepherdr-deps.lock'),
+  join(modules, '.lineclear-deps.lock'),
   () => existsSync(stamp) && readFileSync(stamp, 'utf8') === want,
   () => {
     const r = Bun.spawnSync([process.execPath, 'install', '--frozen-lockfile'], { cwd: root, stdout: 'pipe', stderr: 'pipe' })

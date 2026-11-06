@@ -8,13 +8,13 @@ import type { Decision, World } from "./rules.ts";
 import { CLASS_INFO, readDecisionsSince, type StallClass } from "./stall-class.ts";
 import { configDir, readJson } from "../pi/config.ts";
 import type { Task } from "./roadmap.ts";
+import { DAY } from "./time.ts";
 
 // Lineclear files its own bugs through `fileFix`: an unknown stall, or a known one seen twice in 24 hours, a waste past
 // its limit, and a step that is reopened, unproven or closed with a failing test. A hard cap: at most one open per fix
 // and at most DAY_CAP filed in any 24 hours in all, so it cannot fill its own roadmap or spend its tokens on itself.
 // A fix task that ends with nothing merged goes to the Inbox, so nothing is skipped in silence.
 
-const DAY_MS = 86_400_000;
 const TITLE_MAX = 32;
 const EVIDENCE_MAX = 8;
 export const DAY_CAP = 3;
@@ -43,7 +43,7 @@ export type Fixes = Record<string, Fix>;
 
 /** Fixes filed in the 24 hours before `now`, all classes together. */
 function filedToday(fixes: Fixes, now: Date): number {
-  const from = new Date(now.getTime() - DAY_MS).toISOString();
+  const from = new Date(now.getTime() - DAY).toISOString();
   return Object.values(fixes).reduce((n, f) => n + (f ? (f.filed ?? [f.since]) : []).filter((t) => t > from).length, 0);
 }
 
@@ -94,7 +94,7 @@ function fixGoal(c: StallClass, evidence: string[]): string {
 
 const isStall = (d: Decision) => d.event === "stall" || (d.event === "remedy" && d.kind === "stall" && typeof d.minutes === "number");
 
-const isOpen = (f: { title: string }, tasks: { title: string; status: string }[]) =>
+export const isOpen = (f: { title: string }, tasks: { title: string; status: string }[]) =>
   tasks.some((t) => t.title === f.title && t.status !== "done" && t.status !== "closed");
 
 /** A task that ended with nothing merged: closed, or done with nothing to merge (a planning task may end that way). */
@@ -137,7 +137,7 @@ function settleFixes(world: World, fixes: Fixes, env = process.env): boolean {
 /** The stalls of the last day by class; a class whose fix closed counts only the stalls after that. */
 function stallsByClass(decisionsFile: string, fixes: Fixes, now: Date): Map<StallClass, Decision[]> {
   const byClass = new Map<StallClass, Decision[]>();
-  for (const d of readDecisionsSince(decisionsFile, now.getTime() - DAY_MS).filter(isStall)) {
+  for (const d of readDecisionsSince(decisionsFile, now.getTime() - DAY).filter(isStall)) {
     const c = d.class as StallClass;
     if (!(c in CLASS_INFO)) continue;
     const after = fixes[c]?.closed;
@@ -257,9 +257,9 @@ function stepFixHeld(world: World, spec: FixSpec, step: string, local: Task[], e
       continue;
     }
     if (!(key in ends)) (ends[key] = now), (changed = true);
-    if (now - (ends[key] ?? 0) < DAY_MS) held ??= `a fix task of ${step} ended in the last 24 hours: ${t.title}`;
+    if (now - (ends[key] ?? 0) < DAY) held ??= `a fix task of ${step} ended in the last 24 hours: ${t.title}`;
   }
-  const kept = Object.fromEntries(Object.entries(ends).filter(([, at]) => now - at < 2 * DAY_MS));
+  const kept = Object.fromEntries(Object.entries(ends).filter(([, at]) => now - at < 2 * DAY));
   if (changed || Object.keys(kept).length !== Object.keys(ends).length) writeAtomic(endsPath(env), `${JSON.stringify(kept)}\n`);
   return held;
 }
@@ -288,7 +288,7 @@ export function fileFix(world: World, spec: FixSpec, env = process.env): { filed
   const err = world.addTask(settings.space, spec.title, spec.brief, spec.planning ? planningFlags(settings) : []);
   if (err) return { filed: false, why: `could not file it: ${err}` };
   const now = world.now();
-  const from = new Date(now.getTime() - DAY_MS).toISOString();
+  const from = new Date(now.getTime() - DAY).toISOString();
   const filed = [...(prev?.filed ?? (prev ? [prev.since] : [])).filter((t) => t > from), now.toISOString()];
   fixes[spec.key] = {
     title: spec.title,

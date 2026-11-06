@@ -152,7 +152,6 @@ Never written (the check's list, one per line):
 - Nothing to carry yet
 - things wait for you
 - How it works
-- Shepherdr
 <!-- /voice:never -->
 
 ## The board

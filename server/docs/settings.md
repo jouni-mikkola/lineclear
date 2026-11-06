@@ -2,20 +2,20 @@
 
 - Settings (sidebar, or `,` on a desktop) holds the few app settings, in two groups. What agents are told: How tasks
   work, only words in each new brief's Settings block (review, the Reviewer a brief suggests, Must fix, Review rounds,
-  merge), each row offering its exact line under Brief wording. How Shepherdr runs: the agent, model and effort tasks and
+  merge), each row offering its exact line under Brief wording. How Lineclear runs: the agent, model and effort tasks and
   coordinators start with (model:
   an id or alias, or default for the CLI's own; effort: default, lowest, low, medium, high, xhigh or max, each CLI
   taking it its own way) and tasks' backup agent, when Done tasks archive themselves, coordinator timer's heartbeat (its trigger) and checklist, the time zone of every schedule, each machine's limits, the idle browser, Notifications and Voice. Notifications gathers scoped delivery rules and device enrolment; device delivery is Everywhere. Space menus still offer Notify. Its
-  defaults are set Everywhere, for a machine or for a space (`shepherdr set <key> <value> [--machine | --space NAME]`, from any machine);
+  defaults are set Everywhere, for a machine or for a space (`lineclear set <key> <value> [--machine | --space NAME]`, from any machine);
   the most specific one set wins. Editing above the content names the scope; its searchable hierarchy handles many machines and spaces. Values set here are highlighted, with their inherited value, source and Reset beside them. And, kept on each device, its Appearance: System (the device's own light
   or dark), Light or Dark, set before the first paint, with the browser's bar and artifacts following it. A phone
   lists the sections in groups, as iOS's Settings does, and opens one over the list; a wider screen keeps the list
   down its side.
-- Secrets (How Shepherdr runs) holds the keys, tokens and passwords agents use, by name: add, replace and remove them
+- Secrets (How Lineclear runs) holds the keys, tokens and passwords agents use, by name: add, replace and remove them
   in masked boxes, Everywhere, for a machine or for a space; the most specific one wins. An agent that needs one asks
-  with `shepherdr secret ask NAME --why "…"`: its chat shows a masked box, and the agent is told by name once it is
-  kept. Agents run commands with them (`shepherdr secret run NAME -- <command>`, which masks them in what the command prints) or write them to a file git ignores
-  (`shepherdr secret env NAME --file .env`), and never see them in a chat, a terminal or a log. All of them are kept
+  with `lineclear secret ask NAME --why "…"`: its chat shows a masked box, and the agent is told by name once it is
+  kept. Agents run commands with them (`lineclear secret run NAME -- <command>`, which masks them in what the command prints) or write them to a file git ignores
+  (`lineclear secret env NAME --file .env`), and never see them in a chat, a terminal or a log. All of them are kept
   in one file on the main machine, readable by you only (`~/.lineclear/vault.json`); a value goes to another machine
   only when an authenticated agent there uses one, over its SSH link. Agent credentials bind access to that agent’s
   own space and machine; loopback or a forwarded socket alone grants nothing. See [agent secret access](secrets.md)
@@ -42,7 +42,7 @@ agent prompts and session history. Agents must never copy it into git, task brie
 
 Private rules supplement repository/team rules. Explicit human instructions and the task brief take precedence over
 private rules. A conflict with team rules must be surfaced to the human, not silently resolved by replacing them.
-Shepherdr's normal role prompt and skills still apply.
+Lineclear's normal role prompt and skills still apply.
 
 A new launch snapshots the role's current effective instructions. Claude Code and pi use the existing appended
 prompt file; other CLIs receive the existing hidden initial prompt. Saving does not interrupt, restart or update an
@@ -58,10 +58,10 @@ Changes to reviewer rules therefore need a new task agent or an explicit restart
 The CLI uses the same fields, for example:
 
 ```sh
-shepherdr set task.instructions "Keep replies short." --space my-space
-shepherdr set coordinator.instructions "Ask before adding tasks." --machine
-shepherdr set reviewer.instructions "Pay extra attention to data loss."
-shepherdr unset task.instructions --space my-space
+lineclear set task.instructions "Keep replies short." --space my-space
+lineclear set coordinator.instructions "Ask before adding tasks." --machine
+lineclear set reviewer.instructions "Pay extra attention to data loss."
+lineclear unset task.instructions --space my-space
 ```
 
 Text is limited to 16,000 characters per field. These settings are not part of the saved task brief or its Settings

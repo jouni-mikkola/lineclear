@@ -3,7 +3,7 @@
 # WebSocket on 127.0.0.1 that only takes pages of this machine. This listens on another port of 127.0.0.1 (shared on
 # the tailnet by tailscale serve, under a path no one can guess) and passes each connection on to agent-browser's
 # port, as from here. Prints the port it listens on; ends when its stdin ends (the main machine let go). Put here by
-# Shepherdr.
+# Lineclear.
 use strict;
 use warnings;
 use IO::Socket::INET;

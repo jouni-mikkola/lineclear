@@ -19,7 +19,7 @@ in owner-only `~/.lineclear/helper/routes` and `credentials` directories, and bi
 The CLI obtains proof from a live ancestor's binding or that explicit credential reference. Folder/chat routing may
 choose the command's destination, but cannot grant a credential. The helper carries Authorization unchanged through
 main.sock and the SSH forward; there is no `local=true` bypass. The transient bearer environment variable is removed
-before running the user's command. Private Shepherdr state cannot be imported into browser-visible artifacts, even
+before running the user's command. Private Lineclear state cannot be imported into browser-visible artifacts, even
 through symlinks. Snapshots, names, list output and secret cards contain no values.
 
 Capabilities rotate on a new launch or changed scope, are revoked on finish/forget/relaunch and observed agent loss,

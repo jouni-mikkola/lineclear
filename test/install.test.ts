@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, setDefaultTimeout, test } from "bun:test";
-import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { makeStubs, sh, tmp } from "./helpers.ts";
@@ -18,7 +18,7 @@ const bunCache = sh(["bun", "pm", "cache"]).out.trim();
 
 const app = join(home, ".local/share/lineclear");
 
-// The running service, as far as the smoke check sees it: the pages, the Shepherdr API and a chat. A version that has a
+// The running service, as far as the smoke check sees it: the pages, the Lineclear API and a chat. A version that has a
 // file BROKEN in it breaks what the file says ("chat": a message is refused, "paused": it pauses the project p).
 // It runs in a process of its own: the tests wait on install.sh without letting this process answer.
 const fake = Bun.spawn(
@@ -72,31 +72,34 @@ const env = () => ({
   BUN_INSTALL_CACHE_DIR: bunCache,
   LINECLEAR_REPO: repo,
   LINECLEAR_REF: "main",
-  // the smoke check's screenshots: a real browser would write its own files into this home
-  LINECLEAR_PLAYWRIGHT_CLI: "true",
 });
 // LINECLEAR_REPO is a local clone, the way someone with access to a private repo installs it: no network, no public repo.
 const install = () => sh(["sh", "install.sh"], { env: env() });
-/** doctor found nothing wrong but the build, its paths and the builder's own Control Center, which may run on the machine that tests: these tests install from a branch, which doctor rightly refuses as not a release */
+/** doctor found nothing wrong but the build, its paths : these tests install from a branch, which doctor rightly refuses as not a release */
 const wellButBuild = (r: { out: string }) =>
-  expect(
-    r.out
-      .split("\n")
-      .filter((l) => l.startsWith("FAILED") && !/^FAILED (stable build|installed paths|no Control Center left|agents on the old command name)/.test(l)),
-  ).toEqual([]);
+  expect(r.out.split("\n").filter((l) => l.startsWith("FAILED") && !/^FAILED (stable build|installed paths|agents on the old command name)/.test(l))).toEqual(
+    [],
+  );
 /** it exited 0; when not, the failure shows what it printed */
 const passes = (r: { code: number | null; out: string }) => expect({ code: r.code, out: r.code ? r.out : "" }).toEqual({ code: 0, out: "" });
 const lineclear = (...a: string[]) => sh([join(home, ".local/bin/lineclear"), ...a], { env: env() });
 
-/** Every file under home with its content (or link target), to see that a run changed nothing. */
+/**
+ * Every file under home with its size, mode and mtime (or link target), to see that a run changed nothing. A run
+ * that rewrites a file with the same content counts as a change too; hashing the 20,000 files of node_modules took
+ * seconds per call on a busy machine.
+ */
 function snapshot(dir: string): string[] {
   const out: string[] = [];
   const walk = (d: string) => {
     for (const e of readdirSync(d, { withFileTypes: true })) {
       const p = join(d, e.name);
       if (e.isDirectory()) walk(p);
-      else
-        out.push(`${relative(dir, p)} ${e.isSymbolicLink() ? sh(["readlink", p]).out : new Bun.CryptoHasher("sha256").update(readFileSync(p)).digest("hex")}`);
+      else if (e.isSymbolicLink()) out.push(`${relative(dir, p)} -> ${readlinkSync(p)}`);
+      else {
+        const s = lstatSync(p);
+        out.push(`${relative(dir, p)} ${s.size} ${s.mode} ${s.mtimeMs}`);
+      }
     }
   };
   walk(dir);
@@ -109,6 +112,10 @@ beforeAll(() => {
   // The repository to install: this checkout's files, as the first commit on main.
   mkdirSync(repo);
   git("init", "-q", "-b", "main");
+  // the first install fetches the whole checkout (about 100 MB): stored and served uncompressed and without a delta
+  // search, that fetch takes seconds instead of half a minute on a busy machine
+  git("config", "core.compression", "0");
+  git("config", "pack.window", "0");
   const files = sh(["git", "ls-files", "-co", "--exclude-standard"]).out.trim().split("\n");
   for (const f of files) {
     if (!existsSync(f)) continue;
@@ -126,7 +133,7 @@ afterAll(() => {
 test("install adds Lineclear, the extension and the service, and doctor passes", () => {
   const r = install();
   passes(r);
-  expect(existsSync(join(state, "shepherdr"))).toBe(false); // no Shepherdr 2.0 plugin
+  expect(existsSync(join(state, "lineclear"))).toBe(false); // no herdr-projects 2.0 plugin
   expect(existsSync(join(home, ".local/share/lineclear/bin/lineclear"))).toBe(true);
   const ext = join(home, ".pi/agent/extensions/lineclear.ts");
   expect(lstatSync(ext).isSymbolicLink()).toBe(false); // pi resolves a link's imports from the link's folder
@@ -152,10 +159,10 @@ test("install adds Lineclear, the extension and the service, and doctor passes",
   expect(d.out).toContain("ok     compile cache on disk");
   wellButBuild(d);
   expect(d.out).toContain("FAILED stable build");
-});
+}, 180_000); // the first full build of the app and its web pages, then a doctor run
 
 test("where lingering needs root, install prints the one command and doctor names it", () => {
-  rmSync(join(state, "linger"));
+  rmSync(join(state, "linger"), { force: true });
   writeFileSync(join(state, "linger-needs-root"), "");
   const r = install();
   expect(r.code).toBe(0);
@@ -167,14 +174,14 @@ test("where lingering needs root, install prints the one command and doctor name
   rmSync(join(state, "linger-needs-root"));
   passes(install());
   wellButBuild(lineclear("doctor"));
-});
+}, 180_000); // two installs and two doctor runs
 
 test("a second install changes no file", () => {
   const before = snapshot(home);
   const r = install();
   expect(r.code).toBe(0);
   expect(snapshot(home)).toEqual(before);
-});
+}, 180_000); // a full install after a snapshot of the home folder
 
 test("install again updates Lineclear to the newest commit", () => {
   writeFileSync(join(repo, "newer.txt"), "newer\n");

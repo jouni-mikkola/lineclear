@@ -1,9 +1,11 @@
+import { DAY } from "./time.ts";
 import { decisionsPath, readJson } from "../pi/config.ts";
 import { logLines as notesLogLines, notesStats } from "../pi/parts/compaction-notes.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { bandLines } from "./measure-bands.ts";
 import { allNeedCards } from "./asks.ts";
+import { catchesOf } from "./catches.ts";
 import { DEFAULT_ROUNDS } from "./brief.ts";
 import { askKind } from "./cards.ts";
 import { laneDays, readRuns, redByCause, refusedMergeBranches } from "./check-runs.ts";
@@ -18,7 +20,6 @@ import { mainRefs } from "./main-branch.ts";
 import {
   chatFiles,
   costOf,
-  DAY,
   findSpace,
   type Measured,
   measure,
@@ -26,7 +27,7 @@ import {
   type PartSplit,
   type Price,
   priceFinder,
-  shepherdrDir,
+  lineclearDir,
   spaceTasks,
   type TaskInfo,
   taskStart,
@@ -44,6 +45,7 @@ import { causeLine, causeTotals, unexplainedWaits } from "./wait-causes.ts";
 import { readDecisionsSince } from "./stall-class.ts";
 import { allChecks, reviewRoundLines, type StepCheckNumbers, stepCheckLines, stepCheckNumbers } from "./step-check-cost.ts";
 import type { TaskLine } from "./kept-read.ts";
+import { git } from "./git.ts";
 
 type Out = (line: string) => void;
 type Env = Record<string, string | undefined>;
@@ -76,7 +78,7 @@ function ownerTaps(items: Item[], key: string, project: string, merged: number, 
   return { taps, steps: merged, perStep: merged > 0 ? taps / merged : null };
 }
 
-/** The ready and merge times of a merged task, from the times Shepherdr keeps on it. */
+/** The ready and merge times of a merged task, from the times Lineclear keeps on it. */
 function mergedTimes(task: TaskLine): { ready?: number; merged?: number } {
   return task.merged === true && typeof task.reportedAt === "number" && typeof task.doneAt === "number" ? { ready: task.reportedAt, merged: task.doneAt } : {};
 }
@@ -89,10 +91,10 @@ function taskEnd(task: TaskLine): number | undefined {
 
 function gitMerges(repo: string, ids: Set<string>): Map<string, number> | string {
   for (const ref of mainRefs(repo)) {
-    const p = Bun.spawnSync(["git", "-C", repo, "log", ref, "-z", "--format=%ct%x01%s%x01%b"], { stderr: "ignore" });
-    if (p.exitCode !== 0) continue;
+    const p = git(repo, "log", ref, "-z", "--format=%ct%x01%s%x01%b");
+    if (!p.ok) continue;
     const merged = new Map<string, number>();
-    for (const r of p.stdout.toString().split("\0")) {
+    for (const r of p.out.split("\0")) {
       if (r.trim() === "") continue;
       const [ct = "", subject = "", body = ""] = r.split("\x01");
       for (const id of doneIds([{ subject: subject.trim(), body }], ids)) {
@@ -107,12 +109,8 @@ function gitMerges(repo: string, ids: Set<string>): Map<string, number> | string
 /** The subjects of the commits on main that start with Revert. */
 function gitReverts(repo: string): string[] {
   for (const ref of mainRefs(repo)) {
-    const p = Bun.spawnSync(["git", "-C", repo, "log", ref, "--format=%s", "-i", "--grep=^Revert"], { stderr: "ignore" });
-    if (p.exitCode === 0)
-      return p.stdout
-        .toString()
-        .split("\n")
-        .filter((l) => /^Revert\b/i.test(l));
+    const p = git(repo, "log", ref, "--format=%s", "-i", "--grep=^Revert");
+    if (p.ok) return p.out.split("\n").filter((l) => /^Revert\b/i.test(l));
   }
   return [];
 }
@@ -215,7 +213,7 @@ export function measureMain(args: string[], out: Out, env: Env = process.env): n
   const merges = gitMerges(settings.repo, new Set(steps.map((s) => s.id)));
   if (typeof merges === "string") return fail(merges);
 
-  const dir = shepherdrDir(env);
+  const dir = lineclearDir(env);
   const space = findSpace(dir, settings.space, settings.repo);
   if (!space) return fail(`no space '${settings.space}' in ${join(dir, "spaces.json")}`);
   if (refilesOnly) return refilesOut(spaceTasks(dir, space), steps, since, env, out);
@@ -286,7 +284,17 @@ export function measureMain(args: string[], out: Out, env: Env = process.env): n
   if (args.includes("--json")) {
     out(
       JSON.stringify(
-        { ...numbers, roadmapReads: reads, ownerTaps: taps, stepCheck, health: healthy, partHealth: parts, mergeLine: lane, redMerges: red },
+        {
+          ...numbers,
+          roadmapReads: reads,
+          ownerTaps: taps,
+          stepCheck,
+          health: healthy,
+          partHealth: parts,
+          mergeLine: lane,
+          redMerges: red,
+          catches: catchesOf(settings.repo, env, Number(env.LINECLEAR_NOW) || Date.now()),
+        },
         null,
         2,
       ),
@@ -305,6 +313,7 @@ export function measureMain(args: string[], out: Out, env: Env = process.env): n
     roundLines,
     lane,
     red,
+    catches: catchesOf(settings.repo, env, Number(env.LINECLEAR_NOW) || Date.now()),
     roundDollars: roundDollars(numbers),
   });
   return 0;
@@ -340,11 +349,16 @@ type Printed = {
   roundLines: string[];
   lane: ReturnType<typeof laneDays>;
   red: ReturnType<typeof redByCause>;
+  catches: string[];
   roundDollars: number;
 };
 
 /** The numbers of `lineclear measure` as text, one line each. */
-function printNumbers(out: Out, env: Env, { machines, numbers, taps, reads, healthy, parts, stepCheck, roundLines, lane, red, roundDollars }: Printed): void {
+function printNumbers(
+  out: Out,
+  env: Env,
+  { machines, numbers, taps, reads, healthy, parts, stepCheck, roundLines, lane, red, catches, roundDollars }: Printed,
+): void {
   if (machines.length > 0) out(`counted on this machine and ${machines.join(", ")}`);
   out("date        asks  wait (median min)  cost ($ per merged step)  tokens per merged step  ready to merged (median min)  turns (goal 0)");
   for (const d of numbers.days) {
@@ -368,6 +382,7 @@ function printNumbers(out: Out, env: Env, { machines, numbers, taps, reads, heal
     out(
       `red merge checks (goal under 15 %): ${red.red} of ${red.total}, ${((red.red / red.total) * 100).toFixed(1)} %${red.causes.length > 0 ? `; by cause: ${red.causes.map(([c, n]) => `${c} ${n}`).join(", ")}` : ""}`,
     );
+  for (const l of catches) out(l);
   for (const d of lane) {
     const wait = d.longestWait === null ? "-" : `${d.longestWait.toFixed(1)} min`;
     out(`merge line ${d.date}: ${d.merges} merges, ${d.perHour.toFixed(2)} per hour, longest wait of a turn ${wait}`);

@@ -1,4 +1,4 @@
-// Unread, as Slack has it: when each chat last had something new from its agent or Shepherdr, and how far you have read
+// Unread, as Slack has it: when each chat last had something new from its agent or Lineclear, and how far you have read
 // each one, so the sidebar and the tasks list show where new messages came in. Each machine keeps the first for its own
 // chats; the main machine keeps the read marks for all of them, so every device shows the same.
 import { readJson, writeJson } from '../store.ts'
@@ -34,7 +34,7 @@ export class Unread {
     return this.d.read
   }
 
-  /** the chat's newest thing from its agent or Shepherdr is from then: true when that is newer than it was */
+  /** the chat's newest thing from its agent or Lineclear is from then: true when that is newer than it was */
   saw(key: string, at: number | undefined) {
     if (!at || at <= (this.d.last[key] ?? 0)) return false
     this.d.last[key] = at

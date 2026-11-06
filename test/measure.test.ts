@@ -208,7 +208,7 @@ beforeEach(() => {
     `# R\n\n## Phase 0: P\n\n${step("S1", "none")}${step("S2", "S1")}${step("S3", "S2")}${step("S4", "S1, S2")}${step("S5", "none")}${step("S6", "none")}`,
   );
   cpSync(join(history, ".git"), join(repo, ".git"), { recursive: true });
-  const shep = join(root, "shepherdr");
+  const shep = join(root, "lineclear");
   const pi = join(root, "pi");
   mkdirSync(join(shep, "chatlog"), { recursive: true });
   writeTasks(shep, repo);
@@ -220,7 +220,6 @@ beforeEach(() => {
     LINECLEAR_NOW: String(at("2026-01-03T00:00:00")),
     LINECLEAR_CONFIG: join(root, "config"),
     LINECLEAR_HOME: shep,
-    LINECLEAR_SHEPHERDR_DIR: shep,
     PI_CODING_AGENT_DIR: pi,
   };
 });
@@ -238,7 +237,7 @@ test("--refiles runs with no --since, over the last 7 days", async () => {
 });
 
 test("--refiles reads fix tasks of two machines from tasks.json and tasks-cold.jsonl and prints each cause", async () => {
-  const shep = join(root, "shepherdr");
+  const shep = join(root, "lineclear");
   const h = 3_600_000;
   const t0 = at("2026-01-02T00:00:00");
   const fix = (n: number, title: string, machine: string, hours: number, end?: number, merged?: boolean) => ({
@@ -273,6 +272,9 @@ test("a fixture of two days gives the hand counted numbers", async () => {
   // the planted log has 4 merge-tier runs, 3 red, none with a cause (logged before L218)
   expect(got.redMerges).toEqual({ total: 4, red: 3, causes: [["unnamed", 3]] });
   delete got.redMerges;
+  // no gates in the fixture repo, so no catches to list
+  expect(got.catches).toEqual([]);
+  delete got.catches;
   expect(got).toEqual({
     days: [
       {

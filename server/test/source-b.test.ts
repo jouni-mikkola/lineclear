@@ -452,7 +452,7 @@ describe("a task's own progress (lineclear status)", () => {
       // Ready: a report would show nothing now, and come back stale later
       expect((await src.cli(['status', t.id, 'Tidying up', '--done', '99'], { chat: key })).out).toContain('is Ready')
       expect(t.report).toBeUndefined()
-      // with no id it still says how Shepherdr is
+      // with no id it still says how Lineclear is
       expect((await src.cli(['status'], {})).out).toContain('Lineclear on ')
     } finally {
       agents.status = status

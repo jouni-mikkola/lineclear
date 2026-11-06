@@ -4,18 +4,18 @@ import { ROOT } from '../root.ts'
 import { BOX, helperDir } from './box.ts'
 import { boxDir } from './mfs.ts'
 
-/** agent-browser keeps Shepherdr's sessions apart from any of your own */
-const NAMESPACE = 'shepherdr'
+/** agent-browser keeps Lineclear's sessions apart from any of your own */
+const NAMESPACE = 'lineclear'
 
 /** the agent-browser command at the pinned version (bin/agent-browser picks the package's binary) */
 export const browserBin = () => process.env.LINECLEAR_AGENT_BROWSER ?? join(BOX ? helperDir(BOX.home) : ROOT, 'bin', 'agent-browser')
 
-/** a task's id (SHE-61): the only session names Shepherdr closes or forgets. agent-browser takes any name, so one an
+/** a task's id (SHE-61): the only session names Lineclear closes or forgets. agent-browser takes any name, so one an
  *  agent made up ("..") must never lead the clean-up to a folder that is not a task's own profile */
 export const isTaskId = (s: string) => /^[A-Za-z0-9]+-\d+$/.test(s)
 
 /** where a task's browser keeps its sign-ins between restarts */
-export const profileOf = (task: string) => join(boxDir(), 'browser', task)
+const profileOf = (task: string) => join(boxDir(), 'browser', task)
 
 /** the environment that puts every agent-browser command in a task's terminal on its shared browser */
 export function browserEnv(task: string): Record<string, string> {
@@ -118,7 +118,7 @@ export function chromesIn(ps: string, flag: string): Chrome[] {
 }
 
 /** ps's elapsed time, [[dd-]hh:]mm:ss (Linux and macOS alike), in ms */
-export function elapsed(s: string) {
+function elapsed(s: string) {
   const [d, rest] = s.includes('-') ? s.split('-') : ['0', s]
   const parts = rest.split(':').map(Number)
   while (parts.length < 3) parts.unshift(0)

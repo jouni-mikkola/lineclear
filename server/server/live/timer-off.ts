@@ -7,7 +7,7 @@ export const TIMER_OFF =
   "A coordinator on a timer stays off: Lineclear's rules start the next steps of each Running project. Pause or run a project on its track."
 
 /**
- * Lineclear's rules start each Running project's steps: the coordinator's timer stays off (Lineclear L117). Only the
+ * Lineclear's rules start each Running project's steps: the coordinator's timer stays off. Only the
  * fork's own tests turn it on, to test the code it keeps. The error for a switch to `mode`, or undefined.
  */
 export function timerRefused(mode: string, env = process.env): string | undefined {

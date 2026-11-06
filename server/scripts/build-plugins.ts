@@ -1,4 +1,4 @@
-// Reads the plugin lists and writes the registries the server and the screen import. Base plugins are the repo's
+// Reads the plugin lists and writes the registry the server imports. Base plugins are the repo's
 // (plugins/<name>/, listed in plugins.json); the human's own live in ~/.lineclear/plugins/<name>/, outside the repo, so
 // updates never touch them. A build reads the copies staged in it (user-plugins/, user-plugins.json): a release stages
 // them when it is made (scripts/update.ts), `--user` stages them here first. One with a base plugin's name replaces it;
@@ -37,8 +37,8 @@ export function readStaged(dir = root): Staged {
 
 export const writeStaged = (dir: string, s: Staged) => writeFileSync(join(dir, 'user-plugins.json'), JSON.stringify(s, null, 2))
 
-/** a plugin folder: a client.tsx or a server.ts in it */
-const isPlugin = (d: string) => existsSync(join(d, 'client.tsx')) || existsSync(join(d, 'server.ts'))
+/** a plugin folder: a server.ts in it */
+const isPlugin = (d: string) => existsSync(join(d, 'server.ts'))
 
 /** Copy the human's own plugins and their off list into a build, as they are now: a release keeps them as they were. */
 export function stageUserPlugins(dir: string, home = userHome()) {
@@ -99,27 +99,9 @@ export function writeRegistries(dir = root) {
   const ident = (n: string) => n.replace(/-(\w)/g, (_, c: string) => c.toUpperCase())
   const folder = (p: PluginEntry) => `../${p.from === 'user' ? 'user-plugins' : 'plugins'}/${p.name}`
   const has = (p: PluginEntry, file: string) => existsSync(join(dir, folder(p).slice(3), file))
-  const client = on.filter((p) => has(p, 'client.tsx'))
   const server = on.filter((p) => has(p, 'server.ts'))
   const head = "// Written by scripts/build-plugins.ts from plugins.json and the human's own plugins. Do not edit.\n"
   mkdirSync(join(dir, 'generated'), { recursive: true })
-  put(
-    join(dir, 'generated', 'client-plugins.ts'),
-    `${head}import type { ClientPlugin } from '../src/kernel-registry.ts'
-${client
-  .filter((p) => p.from === 'base')
-  .map((p) => `import ${ident(p.name)} from '${folder(p)}/client.tsx'`)
-  .join('\n')}
-
-export const enabled = ${JSON.stringify(names)}
-/** the human's own: each loads on its own (one that throws as it loads is skipped), and whatever they add to the
- *  slots is guarded, so one that throws stops only itself */
-export const user = ${JSON.stringify(client.filter((p) => p.from === 'user').map((p) => p.name))}
-export default [${client
-      .map((p) => (p.from === 'base' ? ident(p.name) : `{ name: ${JSON.stringify(p.name)}, load: () => import('${folder(p)}/client.tsx') }`))
-      .join(', ')}] as (ClientPlugin | { name: string; load: () => Promise<{ default: ClientPlugin }> })[]
-`,
-  )
   // the human's own server parts load one by one, so one that throws as it loads is only skipped (server/plugins.ts)
   put(
     join(dir, 'generated', 'server-plugins.ts'),

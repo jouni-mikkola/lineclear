@@ -9,12 +9,10 @@ import { checkRoadmap, parseRoadmap, resultOf, stepResultProblems, type Step } f
 import { configDir } from "../pi/config.ts";
 import { HEALTH_TAG, holdsPartsWhole, type Part, stepLocks, stepPartFaults, stepParts } from "./parts.ts";
 import { clearWait } from "./waits.ts";
+import { gitAsLineclear } from "./git.ts";
 
 /** The step the longest chain is counted to: the last one of a roadmap that has it. */
 const LAST_STEP = "U43";
-
-const git = (cwd: string, ...a: string[]) =>
-  Bun.spawnSync(["git", "-C", cwd, "-c", "user.name=Lineclear", "-c", "user.email=lineclear@localhost", ...a], { stdin: "ignore" });
 
 const lines = (s: Step, field: string) => {
   const f = s.fields[field];
@@ -204,7 +202,7 @@ export const plansAreAuto = (project: string | undefined, env = process.env): bo
   return typeof s === "object" && !askBefore(s).plans;
 };
 
-const tip = (repo: string) => git(repo, "rev-parse", "HEAD").stdout.toString().trim();
+const tip = (repo: string) => gitAsLineclear(repo, "rev-parse", "HEAD").out.trim();
 
 /** Records a change that applied by itself, as an answered item on the Roadmap's list: the owner can undo it. */
 export function recordApplied(
@@ -222,14 +220,14 @@ export function recordApplied(
 function mergeTask(task: string, repo: string, env = process.env): { base: string; commit: string; commits?: string[] } | string {
   const base = tip(repo);
   const n = /-(\d+)$/.exec(task)?.[1];
-  const subjects = new Set((n ? git(repo, "log", "--format=%s", `main..refs/heads/work/${n}-*`).stdout.toString().trim().split("\n") : []).filter(Boolean));
+  const subjects = new Set((n ? gitAsLineclear(repo, "log", "--format=%s", `main..refs/heads/work/${n}-*`).out.trim().split("\n") : []).filter(Boolean));
   const m = Bun.spawnSync([serverBin(env), "merge", task], { stdin: "ignore" });
   if (m.exitCode !== 0) return (m.stderr.toString() || m.stdout.toString()).trim() || "merge failed";
   const commit = tip(repo);
   // another task may have merged in between: keep only this task's own commits for an undo
-  const all = git(repo, "rev-list", "--first-parent", `${base}..${commit}`).stdout.toString().trim().split("\n").filter(Boolean);
+  const all = gitAsLineclear(repo, "rev-list", "--first-parent", `${base}..${commit}`).out.trim().split("\n").filter(Boolean);
   const own = all.filter((c) => {
-    const subject = git(repo, "log", "-1", "--format=%s", c).stdout.toString().trim();
+    const subject = gitAsLineclear(repo, "log", "-1", "--format=%s", c).out.trim();
     return subjects.has(subject) || subject.includes(task);
   });
   return own.length > 0 && own.length < all.length ? { base, commit, commits: own } : { base, commit };
@@ -257,26 +255,26 @@ export function undoApplied(item: Item, now: Date, env = process.env): string | 
   const settings = readSettings(item.project, env);
   if (typeof settings === "string") return settings;
   const repo = settings.repo;
-  if (git(repo, "rev-parse", "--abbrev-ref", "HEAD").stdout.toString().trim() !== "main") return `${repo} is not on main, switch it to main and undo again`;
-  if (git(repo, "status", "--porcelain", "--untracked-files=no").stdout.toString().trim() !== "")
+  if (gitAsLineclear(repo, "rev-parse", "--abbrev-ref", "HEAD").out.trim() !== "main") return `${repo} is not on main, switch it to main and undo again`;
+  if (gitAsLineclear(repo, "status", "--porcelain", "--untracked-files=no").out.trim() !== "")
     return `${repo} has uncommitted changes, commit or stash them and undo again`;
-  const commits = item.commits ?? git(repo, "rev-list", "--first-parent", `${item.base}..${item.commit}`).stdout.toString().trim().split("\n").filter(Boolean);
+  const commits = item.commits ?? gitAsLineclear(repo, "rev-list", "--first-parent", `${item.base}..${item.commit}`).out.trim().split("\n").filter(Boolean);
   if (commits.length === 0) return "no commit of this change is on main";
   const before = tip(repo);
   for (const c of commits) {
-    const parents = git(repo, "rev-list", "--parents", "-n", "1", c).stdout.toString().trim().split(" ").length - 1;
-    const r = git(repo, "revert", "--no-edit", ...(parents > 1 ? ["-m", "1"] : []), c);
-    if (r.exitCode !== 0) {
-      git(repo, "revert", "--abort");
-      git(repo, "reset", "-q", "--hard", before);
-      return `the revert did not apply cleanly (${r.stderr.toString().trim().split("\n")[0]}), nothing changed`;
+    const parents = gitAsLineclear(repo, "rev-list", "--parents", "-n", "1", c).out.trim().split(" ").length - 1;
+    const r = gitAsLineclear(repo, "revert", "--no-edit", ...(parents > 1 ? ["-m", "1"] : []), c);
+    if (!r.ok) {
+      gitAsLineclear(repo, "revert", "--abort");
+      gitAsLineclear(repo, "reset", "-q", "--hard", before);
+      return `the revert did not apply cleanly (${r.err.split("\n")[0]}), nothing changed`;
     }
   }
-  if (git(repo, "remote", "get-url", "origin").exitCode === 0) {
-    const p = git(repo, "push", "-q", "origin", "main");
-    if (p.exitCode !== 0) {
-      git(repo, "reset", "-q", "--hard", before);
-      return `git push failed, nothing changed: ${p.stderr.toString().trim()}`;
+  if (gitAsLineclear(repo, "remote", "get-url", "origin").ok) {
+    const p = gitAsLineclear(repo, "push", "-q", "origin", "main");
+    if (!p.ok) {
+      gitAsLineclear(repo, "reset", "-q", "--hard", before);
+      return `git push failed, nothing changed: ${p.err}`;
     }
   }
   writeAtomic(itemFile(item.n, env), `${JSON.stringify({ ...item, undone: now.toISOString() }, null, 2)}\n`);
@@ -311,19 +309,19 @@ function settleOne(item: Item & { head: string; diff: string }, now: Date, env: 
     out.push(`inbox ${item.n}: ${item.task} stays: ${why}`);
   };
   const n = /-(\d+)$/.exec(item.task)?.[1];
-  const branch = n && git(repo, "for-each-ref", "--format=%(objectname)", `refs/heads/work/${n}-*`).stdout.toString().trim();
+  const branch = n && gitAsLineclear(repo, "for-each-ref", "--format=%(objectname)", `refs/heads/work/${n}-*`).out.trim();
   if (branch !== item.head) {
     closeItem(item, "the branch changed after the plan was sent", now, env);
     out.push(`inbox ${item.n}: closed, the branch changed after the plan was sent`);
     return;
   }
-  const was = git(repo, "show", "main:docs/ROADMAP.md");
-  const will = git(repo, "show", `${item.head}:docs/ROADMAP.md`);
-  if (was.exitCode !== 0 || will.exitCode !== 0) {
+  const was = gitAsLineclear(repo, "show", "main:docs/ROADMAP.md");
+  const will = gitAsLineclear(repo, "show", `${item.head}:docs/ROADMAP.md`);
+  if (!was.ok || !will.ok) {
     tried("the roadmap could not be read");
     return;
   }
-  const problems = planProblems(was.stdout.toString(), will.stdout.toString());
+  const problems = planProblems(was.out, will.out);
   if (problems.length > 0) {
     tried(problems.join("; "));
     return;

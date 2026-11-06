@@ -1,6 +1,6 @@
 #!/usr/bin/perl
-# How loaded this machine is, for Shepherdr on the main machine (health.ts): cores, 1-minute load, memory, how full
-# home and /tmp are, a GPU's use. One JSON line. Linux and macOS. Put here by Shepherdr.
+# How loaded this machine is, for Lineclear on the main machine (health.ts): cores, 1-minute load, memory, how full
+# home and /tmp are, a GPU's use. One JSON line. Linux and macOS. Put here by Lineclear.
 use strict;
 use warnings;
 use JSON::PP;

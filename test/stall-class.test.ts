@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { decisionsPath, tick, type Decision, type State } from "../src/rules.ts";
-import { CLASS_INFO, classify, stallsDailyPath, stallsMain, summarize, watchStalls, type Observation } from "../src/stall-class.ts";
+import { CLASS_INFO, classify, stallsMain, summarize, watchStalls, type Observation } from "../src/stall-class.ts";
 import { DAY_CAP, fileFixes, fileFixNow, readFixes } from "../src/self-fix.ts";
 import { recordRun } from "../src/check-runs.ts";
 import { fileOutsideFixes } from "../src/outside-fix.ts";
@@ -77,7 +77,7 @@ test("each class is named from its reason, and the owner's waits are no stall", 
   const c = (reason: string, kind: Decision["kind"] = "skip") => classify({ kind, reason });
   expect(c("LIN-5 is signed out of anthropic")).toBe("signed-out");
   expect(c("no worker model has room: anthropic is full until 12:00")).toBe("account-full");
-  expect(c("LIN-5: Shepherdr couldn't start it again")).toBe("revive-loop");
+  expect(c("LIN-5: Lineclear couldn't start it again")).toBe("revive-loop");
   expect(c("the health command failed on main abc")).toBe("main-red");
   expect(c("lock 'rules' is held by L12")).toBe("lock-held");
   expect(c("no free slot in the space")).toBe("no-room");
@@ -86,7 +86,7 @@ test("each class is named from its reason, and the owner's waits are no stall", 
   expect(c("machine m2 skipped: ssh timed out")).toBe("machine-unreachable");
   expect(c("the coordinator of banking-app cannot restart")).toBe("coordinator-gone");
   expect(c("LIN-5's merge isn't through after 90 s (another merge into this repo still runs)")).toBe("head-of-line");
-  expect(c("shepherdr task list failed: exit 1")).toBe("command-failed");
+  expect(c("lineclear task list failed: exit 1")).toBe("command-failed");
   expect(c("rung 1: told LIN-5 it may be stuck", "stall")).toBe("no-sign-of-life");
   expect(c("pressed Enter for LIN-5: its agent is idle and never started", "stall")).toBe("brief-unsent");
   expect(c("LIN-5: its agent never answered, but the nudge failed: no pane")).toBe("brief-unsent");
@@ -195,7 +195,7 @@ test("a task whose step is merged is closed by its remedy, and lineclear stalls 
 
 test("a revive loop is told once to carry on, not revived again", () => {
   const t = setup([{ id: "LIN-5", title: "A Alpha", status: "need" }]);
-  t.world.chatCards = () => [{ id: "c1", task: "LIN-5", at: t.clock.at.getTime(), text: "Shepherdr couldn't start it again" }];
+  t.world.chatCards = () => [{ id: "c1", task: "LIN-5", at: t.clock.at.getTime(), text: "Lineclear couldn't start it again" }];
   t.step(0);
   t.step(10 * MIN);
   expect(t.log.filter((l) => l.startsWith("tell LIN-5 Your agent was found waiting"))).toHaveLength(1);
@@ -320,17 +320,15 @@ test("a hard cap: at most 3 fixes filed in 24 hours in all, however many classes
   expect(t.adds).toHaveLength(4);
 });
 
-test("the loop keeps one summary line a day", () => {
+test("the loop cuts decisions.jsonl once a day by its own day mark", () => {
   const t = setup();
   t.step(0);
   t.step(MIN);
-  // one long gap: the day boundary is what counts here, not the ticks in between
+  const mark = join(dirname(decisionsPath(t.env)), "decisions-cut-day");
+  expect(readFileSync(mark, "utf8").trim()).toBe("2026-06-01");
   t.jump(24 * 60 * MIN);
-  const days = readFileSync(stallsDailyPath(t.env), "utf8")
-    .trim()
-    .split("\n")
-    .map((l) => JSON.parse(l).day);
-  expect(days).toEqual(["2026-05-31", "2026-06-01"]);
+  expect(readFileSync(mark, "utf8").trim()).toBe("2026-06-02");
+  expect(existsSync(join(dirname(decisionsPath(t.env)), "stalls-daily.jsonl"))).toBe(false);
 });
 
 test("a Paused project starts none of its steps, and that is no stall; Running again, the step starts", () => {
@@ -456,6 +454,6 @@ test("a step's task holds its locks by the rules' record, never by a title", () 
 });
 
 test("an unproven step is no stall: the done-when text gets no class", () => {
-  const reason = `L13 is merged, unproven: Shepherdr's checkStalls posts a "may be stuck" card after 20 min with no sign of life.`;
+  const reason = `L13 is merged, unproven: Lineclear's checkStalls posts a "may be stuck" card after 20 min with no sign of life.`;
   expect(classify({ kind: "skip", reason })).toBeUndefined();
 });

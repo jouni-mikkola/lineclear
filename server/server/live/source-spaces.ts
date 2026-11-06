@@ -195,7 +195,7 @@ export class LiveSourceSpaces extends LiveSourceViews {
   }
 
   /**
-   * Shepherdr forgets a space, as `lineclear space remove` and the sidebar's menu do: nothing on disk changes. Its
+   * Lineclear forgets a space, as `lineclear space remove` and the sidebar's menu do: nothing on disk changes. Its
    * coordinator closes; its tasks, chat and mode are kept and come back if it is added again. Refused while one of its
    * tasks is working: pause or finish it first. A home space is never removed, nor a machine's last space.
    */
@@ -333,7 +333,7 @@ export class LiveSourceSpaces extends LiveSourceViews {
             as: to,
             restart: async () =>
               hidden(
-                `Fresh ${mode === 'autopilot' ? 'Coordinator timer' : 'regular'} coordinator. Same chat and saved progress.\n\nRecent chat:\n${history}\n\n${mode === 'autopilot' ? 'Read Heartbeat, inspect Lineclear using its tools, act within the permission profile, and save progress/next step with shepherdr progress.' : `coordinator timer is off. Do only what the human asks; do not act on Heartbeat or earlier wakes. Saved progress: ${readJson<Record<string, string>>('autopilot-progress.json', {})[place] ?? '(none)'}. Nothing needs a reply: respond only <no-reply>regular coordinator ready</no-reply>.`}`,
+                `Fresh ${mode === 'autopilot' ? 'Coordinator timer' : 'regular'} coordinator. Same chat and saved progress.\n\nRecent chat:\n${history}\n\n${mode === 'autopilot' ? 'Read Heartbeat, inspect Lineclear using its tools, act within the permission profile, and save progress/next step with lineclear progress.' : `coordinator timer is off. Do only what the human asks; do not act on Heartbeat or earlier wakes. Saved progress: ${readJson<Record<string, string>>('autopilot-progress.json', {})[place] ?? '(none)'}. Nothing needs a reply: respond only <no-reply>regular coordinator ready</no-reply>.`}`,
                 'mode',
               ),
           })

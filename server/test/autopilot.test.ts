@@ -297,7 +297,7 @@ describe('fresh replacement, failures and worker ownership', () => {
     const state = a as unknown as { outbox: { key: string; id: string; text: string; at: number; launch?: string; cid?: string }[]; live: Map<string, unknown> }
     a.records[key] = { key, name: key, kind: 'codex', cwd: '/fixture', workspace: 'fixture', launch: 'new', logs: [], started: 1 }
     state.outbox = [
-      { key, id: 'old', text: '<shepherdr>act on old Heartbeat</shepherdr>', at: 1, launch: 'old' },
+      { key, id: 'old', text: '<lineclear>act on old Heartbeat</lineclear>', at: 1, launch: 'old' },
       { key, id: 'new', text: 'regular startup', at: 2, launch: 'new' },
       { key, id: 'human', cid: 'human', text: 'my next message', at: 3 },
     ]

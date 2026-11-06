@@ -1,4 +1,4 @@
-// An agent that stopped, or runs on files Shepherdr no longer starts it with, is started again: what counts as wrong,
+// An agent that stopped, or runs on files Lineclear no longer starts it with, is started again: what counts as wrong,
 // and that tries are spaced out and end, so a start that keeps failing never loops.
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'

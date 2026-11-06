@@ -1,6 +1,6 @@
 // The web server lets only this app's own pages (and local programs) act: another website can't.
 import { afterAll, describe, expect, test } from 'bun:test'
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { startApp } from '../server/app.ts'
@@ -58,7 +58,7 @@ class Stub extends Emitter<SourceEvents> {
 const pushed: { alert: Alert; skip: Set<string> }[] = []
 const push = { publicKey: 'k', send: async (alert: Alert, skip: Set<string>) => void pushed.push({ alert, skip }) }
 const source = new Stub()
-const server = startApp({ source: source as unknown as Source, dist: '/nonexistent', push: push as unknown as Push, port: 0 })
+const server = startApp({ source: source as unknown as Source, push: push as unknown as Push, port: 0 })
 const base = `http://127.0.0.1:${server.port}`
 afterAll(() => server.stop(true))
 
@@ -150,12 +150,32 @@ describe('alerts', () => {
   })
 })
 
+describe('no page is served', () => {
+  const withCli = Object.assign(new Stub(), {
+    async cli(args: string[], c: { chat?: string }) {
+      return { out: `ran ${args.join(' ')} for ${c.chat}\n`, code: 0 }
+    },
+  })
+  const app = startApp({ source: withCli as unknown as Source, port: 0 })
+  afterAll(() => app.stop(true))
+  const url = `http://127.0.0.1:${app.port}`
+
+  test('the old root, an old view path and a built asset are 404', async () => {
+    for (const path of ['/', '/index.html', '/inbox', '/task/X-1', '/assets/index-AbC123.js', '/manifest.webmanifest'])
+      expect((await fetch(url + path)).status).toBe(404)
+  })
+  test('an agent started before the step still reaches the API it was started with', async () => {
+    expect((await fetch(`${url}/api/snapshot`)).status).toBe(200)
+    const cli = await fetch(`${url}/api/cli`, { method: 'POST', body: JSON.stringify({ args: ['show'], chat: 'X-1/Agent' }) })
+    expect(await cli.json()).toEqual({ out: 'ran show for X-1/Agent\n', code: 0 })
+    expect((await post({})).status).toBe(200)
+  })
+})
+
 describe('updates', () => {
   const dir = mkdtempSync(join(tmpdir(), 'shep-app-'))
-  mkdirSync(join(dir, 'dist'))
-  writeFileSync(join(dir, 'dist', 'index.html'), '<script type="module" src="./assets/index-AbC123.js"></script>')
   const updates = join(dir, 'home', 'update.json')
-  const app = startApp({ source: source as unknown as Source, dist: join(dir, 'dist'), port: 0, updates })
+  const app = startApp({ source: source as unknown as Source, port: 0, updates })
   afterAll(() => app.stop(true))
   const open = async () => {
     const ws = new WebSocket(`ws://127.0.0.1:${app.port}/api/ws`)
@@ -166,9 +186,8 @@ describe('updates', () => {
     return { ws, got }
   }
 
-  test('every screen hears which build the server serves', async () => {
+  test('every screen hears the update status', async () => {
     const { ws, got } = await open()
-    expect(got.find((m) => m.type === 'build')?.id).toBe('assets/index-AbC123.js')
     expect(got.find((m) => m.type === 'update')?.update).toBeNull()
     ws.close()
   })

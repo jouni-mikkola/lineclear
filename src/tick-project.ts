@@ -454,11 +454,12 @@ function startStep(s: Starting, step: Step): boolean {
 
 /**
  * A reopened step whose task merged after its Reopened line was added kept the line: starting it again would loop. It
- * gets one Fix task instead, and nothing more until the line is gone. Returns whether the step was handled here.
+ * gets one Fix task instead, and nothing more until the line is gone, unless the limit is reached: a Fix task is a start too. Returns whether the step was handled here.
  */
 function refileReopened(s: Starting, step: Step): boolean {
   const { t } = s;
   const { settings, world, dryRun, note } = t;
+  if (overStartLimit({ ...t, space: settings.space }, step, LIMITS.starts.limit)) return true;
   const line = (step.fields["done when"]?.more ?? []).find((l) => /^\s+- Reopened: /.test(l));
   const since = line === undefined ? undefined : world.commitsSince?.(settings.repo, line);
   if (line !== undefined && since === undefined) {
@@ -557,11 +558,10 @@ export function tickProject(
     return list.set;
   };
   // The project's other machines: asked once per tick. One that cannot be reached is skipped and noted.
-  const seen = state.remoteSeen ?? {};
-  state.remoteSeen = seen;
   const { rooms, remote } = askMachines(
     settings.machines ?? [],
-    seen,
+    state,
+    world.now().getTime(),
     (host) => world.room?.(host, settings.space) ?? "this world cannot reach other machines",
     (host, why) => note("skip", why, `machine:${host}`),
   );

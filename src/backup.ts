@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { writeAtomic } from "../pi/atomic.ts";
 import { configDir, readJson } from "../pi/config.ts";
-import { dataDir } from "./paths.ts";
+import { dataDir, lockFile } from "./paths.ts";
 import { copyStoreQuietly } from "./store-copies.ts";
 import { fail, host, maskSecrets, ownerSecret } from "./secrets.ts";
 
@@ -45,7 +45,6 @@ export const KEEP = ["--keep-hourly", "48", "--keep-daily", "30"];
 
 const settingsFile = (env: Env) => join(configDir(env), "backup.json");
 const stateFile = (env: Env) => join(configDir(env), "backup-state.json");
-const lockFile = (env: Env) => join(configDir(env), "backup.lock");
 const home = (env: Env) => env.HOME ?? homedir();
 const expand = (p: string, env: Env) => resolve(p.startsWith("~/") ? join(home(env), p.slice(2)) : p);
 
@@ -68,7 +67,7 @@ function backupPaths(s: BackupSettings, env: Env): { paths: string[]; excludes: 
       join(data, "helper"),
       join(data, "autopilot-runtime"),
       join(data, "machines", "*", "mirror"),
-      lockFile(env),
+      lockFile(env, "backup"),
       "*.tmp",
       "*.sock",
     ],
@@ -132,7 +131,7 @@ function runBackup(out: (l: string) => void, env: Env = process.env, now = new D
   mkdirSync(configDir(env), { recursive: true });
   let lock: number;
   try {
-    lock = openSync(lockFile(env), "wx");
+    lock = openSync(lockFile(env, "backup"), "wx");
   } catch {
     out("lineclear backup: another backup runs now");
     return 0;
@@ -155,7 +154,7 @@ function runBackup(out: (l: string) => void, env: Env = process.env, now = new D
     return failed === 0 ? 0 : 1;
   } finally {
     closeSync(lock);
-    rmSync(lockFile(env), { force: true });
+    rmSync(lockFile(env, "backup"), { force: true });
   }
 }
 
@@ -171,7 +170,7 @@ export function backupDue(env: Env = process.env, now = new Date()): boolean {
 export function startBackupIfDue(env: Env = process.env, now = new Date()): void {
   copyStoreQuietly(env, now); // the local rolling copy, for a machine with no restic repository too
   try {
-    if (now.getTime() - statSync(lockFile(env)).mtimeMs > STALE_MS) rmSync(lockFile(env), { force: true });
+    if (now.getTime() - statSync(lockFile(env, "backup")).mtimeMs > STALE_MS) rmSync(lockFile(env, "backup"), { force: true });
   } catch {
     // no lock: nothing runs
   }

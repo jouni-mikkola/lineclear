@@ -23,7 +23,7 @@
 //   agent → <reply to="What needs me today?"/>      a line of its own, then its reply
 //   agent → <no-reply>SHE-72 merged, nothing to do</no-reply>   a reply that is only this shows nothing (news with nothing to say)
 //
-// Shepherdr's own lines to agents are <shepherdr type="news">…</shepherdr> and the like (agents.ts hidden). The older
+// Lineclear's own lines to agents are <lineclear type="news">…</lineclear> and the like (agents.ts hidden). The older
 // [square bracket] lines still read back, from agents started before the change and from old chat logs.
 
 import type { BrowserNote } from '../../shared/browser.ts'

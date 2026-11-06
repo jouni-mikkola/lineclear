@@ -2,7 +2,7 @@
 // From git and `gh` in the task's worktree, with no AI.
 import { existsSync } from "node:fs";
 import { readTasksKept } from "./kept-read.ts";
-import { baseOf, git } from "./task-detail.ts";
+import { baseOf, taskGit } from "./task-detail.ts";
 
 const MAX_FILES = 80;
 const MAX_LINES = 400;
@@ -59,15 +59,15 @@ function pullRequest(worktree: string): TaskChanges["pr"] {
 }
 
 /** The task's changes, or undefined for an id this machine has no worktree of. */
-export function taskChanges(id: string, shepherdr: string, withPr = true): TaskChanges | undefined {
-  const t = readTasksKept(shepherdr).tasks.find((x) => x.id === id) as { base?: unknown; worktree?: unknown } | undefined;
+export function taskChanges(id: string, lineclear: string, withPr = true): TaskChanges | undefined {
+  const t = readTasksKept(lineclear).tasks.find((x) => x.id === id) as { base?: unknown; worktree?: unknown } | undefined;
   if (!t || typeof t.worktree !== "string" || !existsSync(t.worktree)) return undefined;
   const base = baseOf(t);
   const pr = withPr ? pullRequest(t.worktree) : undefined;
-  return { base, ...parseDiff(git(t.worktree, "diff", "--no-color", "--no-ext-diff", `${base}...HEAD`)), ...(pr ? { pr } : {}) };
+  return { base, ...parseDiff(taskGit(t.worktree, "diff", "--no-color", "--no-ext-diff", `${base}...HEAD`)), ...(pr ? { pr } : {}) };
 }
 
-export const changesReply = (id: string, shepherdr: string, json: (body: unknown, status?: number) => Response): Response => {
-  const read = taskChanges(id, shepherdr);
+export const changesReply = (id: string, lineclear: string, json: (body: unknown, status?: number) => Response): Response => {
+  const read = taskChanges(id, lineclear);
   return read ? json(read) : json({ error: "This task has no worktree on this machine." }, 404);
 };

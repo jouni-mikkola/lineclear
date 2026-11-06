@@ -8,6 +8,7 @@ import type { StepCheck } from "./stepcheck.ts";
 import { clearWait, findProject, findTask, readWaits, writeWait } from "./waits.ts";
 import { configDir } from "../pi/config.ts";
 import { storedLoginAdvice } from "./secrets.ts";
+import { git, gitText } from "./git.ts";
 
 /** The five kinds of item the Inbox holds. */
 const inboxKinds = ["plan", "step", "login", "outward", "stuck", "release"] as const;
@@ -91,7 +92,7 @@ const writeItem = (item: Item, env = process.env) => {
   forgetReads(env);
 };
 export const waitReason = (task: string, env = process.env) => readWaits(env).find((w) => w.task === task)?.reason;
-export const shepherdr = serverBin;
+export const lineclear = serverBin;
 
 /** A project's open asks, newest first, each with the title of the step its task works on (the Roadmap lists them). */
 export function projectDecisions(project: string, steps: { title: string; task?: { id?: string } }[], env = process.env) {
@@ -144,7 +145,7 @@ export function noticeTimers(spaces: string[], env = process.env): void {
 
 /** Answers a card of a space's coordinator chat in words, which closes it. Returns an error text, or undefined. */
 export function answerCard(card: NonNullable<Item["card"]>, answer: string, env = process.env): string | undefined {
-  const r = Bun.spawnSync([shepherdr(env), "answer", card.id, answer, "--space", card.space], { stdin: "ignore" });
+  const r = Bun.spawnSync([lineclear(env), "answer", card.id, answer, "--space", card.space], { stdin: "ignore" });
   return r.exitCode === 0 ? undefined : (r.stderr.toString() || r.stdout.toString()).trim() || `exit ${r.exitCode}`;
 }
 
@@ -158,16 +159,14 @@ export function closeItem(item: Item, reason: string, now: Date, env = process.e
 /** The commit a rolled-back update notice names ("The update to 8946737 failed: ..."), or undefined for any other item. */
 const failedUpdateCommit = (i: Item) => (i.kind === "stuck" && i.task === "-" ? /^The update to ([0-9a-f]{7,40}) failed:/.exec(i.question)?.[1] : undefined);
 
-const gitIn = (app: string, ...args: string[]) => Bun.spawnSync(["git", "-C", app, ...args], { stdin: "ignore", stderr: "ignore" });
-
 /**
  * Whether the app runs `commit` or a newer version. An install fetches one commit with no history, so the commit is
  * often not behind HEAD to see: a HEAD committed after the notice was made is newer as well.
  */
 function runsOrPast(app: string, commit: string, since: string): boolean {
-  const head = gitIn(app, "rev-parse", "HEAD").stdout.toString().trim();
-  if (head.startsWith(commit) || gitIn(app, "merge-base", "--is-ancestor", commit, "HEAD").exitCode === 0) return true;
-  const committed = Number(gitIn(app, "log", "-1", "--format=%ct", "HEAD").stdout.toString().trim()) * 1000;
+  const head = gitText(app, "rev-parse", "HEAD") ?? "";
+  if (head.startsWith(commit) || git(app, "merge-base", "--is-ancestor", commit, "HEAD").ok) return true;
+  const committed = Number(gitText(app, "log", "-1", "--format=%ct", "HEAD")) * 1000;
   return committed > Date.parse(since);
 }
 

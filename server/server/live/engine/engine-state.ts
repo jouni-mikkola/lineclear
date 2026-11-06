@@ -81,7 +81,7 @@ export abstract class EngineState extends Emitter<Events> {
   protected headWatch = new HeadWatch()
   /** each task's merge while it runs */
   protected landings = new Map<string, Promise<{ ok: boolean; error?: string; note?: string }>>()
-  /** how long a stopping Shepherdr waits for the merges on their way, and after which a merge's caller may be gone
+  /** how long a stopping Lineclear waits for the merges on their way, and after which a merge's caller may be gone
    *  (tests shorten it) */
   mergeDeadline = MERGE_DEADLINE
   /** stopping: no merge starts */
@@ -331,6 +331,11 @@ export abstract class EngineState extends Emitter<Events> {
   /** how many tasks are at work here now */
   working() {
     return this.tasks.filter((t) => this.busy(t)).length
+  }
+
+  /** how many tasks are at work on one machine now (none given: the server's own) */
+  workingOn(machine?: string) {
+    return this.tasks.filter((t) => (t.machine ?? undefined) === machine && this.busy(t)).length
   }
 
   /** whether one more task may start now, and if not, why: its slots are all taken, or the machine is too loaded */

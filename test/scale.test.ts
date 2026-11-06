@@ -78,7 +78,7 @@ writeFileSync(join(data, "spaces.json"), JSON.stringify(spaces));
 writeFileSync(join(data, "tasks.json"), JSON.stringify({ next: {}, tasks }));
 mkdirSync(config, { recursive: true });
 writeFileSync(join(config, "machine.json"), JSON.stringify({ loadLimit: 1e6 }));
-// `shepherdr task list --space <name> --json` answers from a file, as fast as the server's own list
+// `lineclear task list --space <name> --json` answers from a file, as fast as the server's own list
 for (const [name, list] of Object.entries(lists)) writeFileSync(join(bin, `${name}.json`), JSON.stringify(list));
 writeFileSync(join(bin, "all.json"), JSON.stringify(Object.values(lists).flat()));
 writeFileSync(
@@ -93,10 +93,9 @@ const env = {
   ...process.env,
   LINECLEAR_CONFIG: config,
   LINECLEAR_HOME: data,
-  LINECLEAR_SHEPHERDR_DIR: data,
   LINECLEAR_STORE_COPIES: join(root, "copies"), // the tick copies the store: not the real one, shared with other runs
   LINECLEAR_PLAYWRIGHT_CLI: join(bin, "playwright-cli"),
-  SHEPHERDR_BIN: join(bin, "lineclear"),
+  LINECLEAR_SERVER_BIN: join(bin, "lineclear"),
   PI_CODING_AGENT_DIR: join(root, "pi"),
   LINECLEAR_NO_DOCTOR: "1",
 };

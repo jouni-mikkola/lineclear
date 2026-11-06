@@ -25,7 +25,7 @@ export function askGoalFailure(g: AskGoal): string | undefined {
   return `${over.map((d) => `${d.date} had ${d.asks} asks`).join(", ")}; the goal is under ${ASK_GOAL} a day. Each ask is a card or Inbox item: settle its kind by a rule (docs/asks.md) so it stops reaching the owner`;
 }
 
-/** The line `docs/numbers.md` gets under "L245" for one run. */
+/** The line `docs/numbers.md` gets for one run. */
 export function askGoalLine(g: AskGoal, today: string): string {
   return `- ${today}: asks per day with work: ${g.days.length === 0 ? "-" : g.days.map((d) => `${d.date} ${d.asks}`).join(", ")}`;
 }

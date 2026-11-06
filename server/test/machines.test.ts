@@ -1,4 +1,4 @@
-// One install for every machine: the helper Shepherdr puts on another machine (helper/), run here as it runs there.
+// One install for every machine: the helper Lineclear puts on another machine (helper/), run here as it runs there.
 // The SSH link itself (box.ts, machines.ts) was checked by hand against a machine saved in herdr.
 import { describe, expect, test } from 'bun:test'
 import { spawn, spawnSync } from 'node:child_process'
@@ -102,7 +102,7 @@ describe('the helper', () => {
     const first = mirror()
     await until('one\n')
     first.stop()
-    // Shepherdr starts again (an update): the new mirror goes on from what is here, and the copy shows it was not sent again
+    // Lineclear starts again (an update): the new mirror goes on from what is here, and the copy shows it was not sent again
     writeFileSync(copy(log), 'ONE\n')
     appendFileSync(log, 'two\n')
     const again = mirror()
@@ -134,7 +134,7 @@ describe('the helper', () => {
     expect(helperVersion('Linux', 'x86_64')).toMatch(/^[0-9a-f]{16}$/)
   })
 
-  test.if(perl)('the shepherdr command there says plainly when the way back is down', () => {
+  test.if(perl)('the lineclear command there says plainly when the way back is down', () => {
     const dir = mkdtempSync(join(tmpdir(), 'shep-shim-'))
     mkdirSync(join(dir, 'bin'))
     writeFileSync(join(dir, 'bin', 'lineclear'), readFileSync(join(root, 'helper', 'lineclear')), { mode: 0o755 })
@@ -148,13 +148,13 @@ describe('the helper', () => {
 describe('a machine run from the main one', () => {
   test("its home space's coordinator runs in its home folder there, and its log is read from the mirror of that machine's", () => {
     const home = mkdtempSync(join(tmpdir(), 'shep-worker-'))
-    const box: BoxInfo = { label: 'vm-demo', target: 'vm-demo', session: 'default', herdr: 'herdr', home: '/home/exedev', path: '/usr/bin:/bin', os: 'Linux' }
+    const box: BoxInfo = { label: 'vm-demo', target: 'vm-demo', session: 'default', herdr: 'herdr', home: '/home/user', path: '/usr/bin:/bin', os: 'Linux' }
     const code = `const { Places } = await import(${JSON.stringify(join(root, 'server/live/places.ts'))}); const { claudeLogPath } = await import(${JSON.stringify(join(root, 'server/live/readers/find.ts'))}); const c = new Places().coordinator('p:vm-demo:~'); console.log(JSON.stringify({ cwd: c?.cwd, log: claudeLogPath(c?.cwd ?? '', 'abc') }))`
     const r = spawnSync(process.execPath, ['-e', code], {
       encoding: 'utf8',
       env: { ...process.env, ...mirrorHomes(home, box), LINECLEAR_BOX: JSON.stringify(box), LINECLEAR_HOME: home, LINECLEAR_MACHINE: 'vm-demo' },
     })
-    expect(JSON.parse(r.stdout)).toEqual({ cwd: '/home/exedev', log: `${home}/mirror/home/exedev/.claude/projects/-home-exedev/abc.jsonl` })
+    expect(JSON.parse(r.stdout)).toEqual({ cwd: '/home/user', log: `${home}/mirror/home/user/.claude/projects/-home-user/abc.jsonl` })
   })
 
   test("its coordinator's heartbeat holds no path of the main machine: the checklist comes in it", () => {
@@ -243,7 +243,7 @@ describe('a machine run from the main one', () => {
     const there = mkdtempSync(join(tmpdir(), 'shep-there-'))
     const bin = mkdtempSync(join(tmpdir(), 'shep-ssh-'))
     writeFileSync(join(bin, 'ssh'), '#!/bin/sh\nfor a; do last=$a; done\nexec /bin/sh -c "$last"\n', { mode: 0o755 })
-    // the main machine's Shepherdr: it keeps Everywhere in its settings file
+    // the main machine's Lineclear: it keeps Everywhere in its settings file
     const asked: string[][] = []
     const everywhere: Record<string, string> = {}
     const server = Bun.serve({
@@ -273,7 +273,7 @@ describe('a machine run from the main one', () => {
       const src = new LiveSource()
       const run = async (args) => { const r = await src.cli(args, {}); return [r.code, r.out.trim(), src.settings.pick(args[1], 'machine')] }
       const outs = [await run(['set', 'brief.review', 'off']), await run(['set', 'machine.maxTasks', '3', '--machine']), await run(['unset', 'brief.review'])]
-      // the main machine's Shepherdr is away (it restarts)
+      // the main machine's Lineclear is away (it restarts)
       ;(await import('node:fs')).rmSync(${JSON.stringify(join(main, 'server.json'))})
       outs.push(await run(['set', 'brief.review', 'off']))
       console.log(JSON.stringify(outs))
@@ -313,7 +313,7 @@ describe('a machine run from the main one', () => {
     }
   })
 
-  test.if(perl)('the shepherdr command there sends a new HEARTBEAT.md on stdin', async () => {
+  test.if(perl)('the lineclear command there sends a new HEARTBEAT.md on stdin', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'shep-shim-'))
     mkdirSync(join(dir, 'bin'))
     writeFileSync(join(dir, 'bin', 'lineclear'), readFileSync(join(root, 'helper', 'lineclear')), { mode: 0o755 })
@@ -349,9 +349,9 @@ describe('a machine run from the main one', () => {
 
   test.if(perl)("a /clear there starts another session: the chat follows it, from what the agent's hooks say", () => {
     const home = mkdtempSync(join(tmpdir(), 'shep-worker-'))
-    const box: BoxInfo = { label: 'vm-demo', target: 'vm-demo', session: 'default', herdr: 'herdr', home: '/home/exedev', path: '/usr/bin:/bin', os: 'Linux' }
-    const hooks = '/home/exedev/.lineclear/hooks/shep-machine.jsonl'
-    const project = '/home/exedev/.claude/projects/-home-exedev--lineclear-coordinators-machine'
+    const box: BoxInfo = { label: 'vm-demo', target: 'vm-demo', session: 'default', herdr: 'herdr', home: '/home/user', path: '/usr/bin:/bin', os: 'Linux' }
+    const hooks = '/home/user/.lineclear/hooks/shep-machine.jsonl'
+    const project = '/home/user/.claude/projects/-home-user--lineclear-coordinators-machine'
     const copy = `${home}/mirror${hooks}`
     mkdirSync(join(copy, '..'), { recursive: true })
     // as the helper's hook.pl records them there, and the mirror brings them: an earlier run's start, then its /clear
@@ -362,7 +362,7 @@ describe('a machine run from the main one', () => {
       const { Agents } = await import(${JSON.stringify(join(root, 'server/live/agents.ts'))})
       const a = new Agents()
       const old = ${JSON.stringify(`${home}/mirror${project}/old.jsonl`)}
-      const r = { key: 'm:vm-demo', name: 'shep-machine', kind: 'claude', cwd: '/home/exedev/.lineclear/coordinators/machine', workspace: 'w', logs: [old], sessionId: 'd071', started: Date.now() + 60000, hooks: ${JSON.stringify(hooks)} }
+      const r = { key: 'm:vm-demo', name: 'shep-machine', kind: 'claude', cwd: '/home/user/.lineclear/coordinators/machine', workspace: 'w', logs: [old], sessionId: 'd071', started: Date.now() + 60000, hooks: ${JSON.stringify(hooks)} }
       a.records[r.key] = r
       const seen = []
       // its own run started after that: what the copy says of an earlier run is not followed
@@ -395,16 +395,16 @@ describe('a machine run from the main one', () => {
     process.env.CLAUDE_CONFIG_DIR = claude
     try {
       // it ran in the home folder, not the folder its record named
-      mkdirSync(join(claude, 'projects', '-home-exedev'), { recursive: true })
-      writeFileSync(join(claude, 'projects', '-home-exedev', 'abc.jsonl'), '{"type":"user"}\n')
-      const log = carryClaudeSession('abc', '/home/exedev/.lineclear/coordinators/machine')
-      expect(log).toBe(join(claude, 'projects', '-home-exedev--lineclear-coordinators-machine', 'abc.jsonl'))
+      mkdirSync(join(claude, 'projects', '-home-user'), { recursive: true })
+      writeFileSync(join(claude, 'projects', '-home-user', 'abc.jsonl'), '{"type":"user"}\n')
+      const log = carryClaudeSession('abc', '/home/user/.lineclear/coordinators/machine')
+      expect(log).toBe(join(claude, 'projects', '-home-user--lineclear-coordinators-machine', 'abc.jsonl'))
       expect(readFileSync(log!, 'utf8')).toBe('{"type":"user"}\n')
       // one that is there already stays as it is; one written nowhere has nothing to carry
       writeFileSync(log!, 'kept\n')
-      expect(carryClaudeSession('abc', '/home/exedev/.lineclear/coordinators/machine')).toBe(log)
+      expect(carryClaudeSession('abc', '/home/user/.lineclear/coordinators/machine')).toBe(log)
       expect(readFileSync(log!, 'utf8')).toBe('kept\n')
-      expect(carryClaudeSession('nope', '/home/exedev/elsewhere')).toBeUndefined()
+      expect(carryClaudeSession('nope', '/home/user/elsewhere')).toBeUndefined()
     } finally {
       if (was === undefined) delete process.env.CLAUDE_CONFIG_DIR
       else process.env.CLAUDE_CONFIG_DIR = was

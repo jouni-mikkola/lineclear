@@ -79,7 +79,7 @@ describe("the brief's default way of working", () => {
     expect(s.setBy()).toEqual({})
     s.set('review.rounds', '2', 'machine')
     s.set('brief.merge', 'ask me first', { space: 'web' })
-    // the same as Shepherdr's own default is no change
+    // the same as Lineclear's own default is no change
     s.set('review.mustFix', 'major')
     expect(s.setBy('web')).toEqual({ rounds: 'machine', merge: 'space' })
     expect(s.setBy('web', { 'review.mustFix': 'critical' })).toEqual({ rounds: 'machine', merge: 'space', mustFix: 'task' })

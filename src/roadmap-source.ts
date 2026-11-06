@@ -1,39 +1,25 @@
-import { serverBin } from "./paths.ts";
+import { readTasks } from "./task-read.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { keptBy, refsKey } from "./kept-read.ts";
 import { remoteTasks } from "./spread.ts";
 import type { Task } from "./roadmap.ts";
 import { mainRefs } from "./main-branch.ts";
+import { git } from "./git.ts";
 
 type Env = Record<string, string | undefined>;
 
-function git(repo: string, ...args: string[]) {
-  const p = Bun.spawnSync(["git", "-C", repo, ...args], { stdin: "ignore", stderr: "pipe" });
-  return { ok: p.exitCode === 0, out: p.stdout.toString(), err: p.stderr.toString().trim() };
-}
-
 /** This machine's tasks of every space in one call, for a reader that needs them all (Home). */
-export function shepherdrAllTasks(env: Env = process.env): (Task & { machine?: string })[] | string {
-  try {
-    const p = Bun.spawnSync([serverBin(env), "task", "list", "--json"], { stdin: "ignore", timeout: 10_000 });
-    if (p.exitCode !== 0) return `lineclear task list failed: ${(p.stderr.toString() || p.stdout.toString()).trim()}`;
-    // other machines' tasks are in it too: each reader adds its project's own from what they last said
-    return (JSON.parse(p.stdout.toString()) as (Task & { machine?: string })[]).filter((t) => !t.machine);
-  } catch {
-    return "lineclear task list did not give JSON";
-  }
+export function lineclearAllTasks(env: Env = process.env): (Task & { machine?: string })[] | string {
+  // other machines' tasks are left out: each reader adds its project's own from what they last said
+  const r = readTasks(env);
+  return "tasks" in r ? r.tasks : `lineclear task list failed: ${r.why}`;
 }
 
-export function shepherdrTasks(space: string, env: Env = process.env): Task[] | string {
-  try {
-    const p = Bun.spawnSync([serverBin(env), "task", "list", "--space", space, "--json"], { stdin: "ignore", timeout: 10_000 });
-    if (p.exitCode !== 0) return `task list failed: ${(p.stderr.toString() || p.stdout.toString()).trim()}`;
-    // The tasks of the project's other machines count as its own: ids end in `@host`, titles say where they run.
-    return [...(JSON.parse(p.stdout.toString()) as Task[]), ...remoteTasks(space, env)];
-  } catch {
-    return "task list did not give JSON";
-  }
+export function lineclearTasks(space: string, env: Env = process.env): Task[] | string {
+  const r = readTasks(env, space);
+  // The tasks of the project's other machines count as its own: ids end in `@host`, titles say where they run.
+  return "tasks" in r ? [...r.tasks, ...remoteTasks(space, env)] : `task list failed: ${r.why}`;
 }
 
 type Source = { text: string; commits: { commit: string; at: number; subject: string; body: string }[] };

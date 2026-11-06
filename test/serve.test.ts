@@ -33,15 +33,15 @@ test("a new board runs pi for every role, and a board with settings keeps them",
 
 test("the board's help says Lineclear, renames its ask to card and leaves out the lines Lineclear answers itself", () => {
   const help = [
-    "shepherdr: talk to Shepherdr from a terminal",
-    "  shepherdr space add <path>   add a repo",
-    '  shepherdr ask "<q>" --choice a',
+    "lineclear: talk to Lineclear from a terminal",
+    "  lineclear space add <path>   add a repo",
+    '  lineclear ask "<q>" --choice a',
     "                                 asks the human",
-    '  shepherdr status <id> "<line>" --done 5',
-    "  shepherdr doctor               check every machine",
+    '  lineclear status <id> "<line>" --done 5',
+    "  lineclear doctor               check every machine",
     "                                 and put its helper there",
-    "  shepherdr status               spaces",
-    "  shepherdr task list",
+    "  lineclear status               spaces",
+    "  lineclear task list",
   ].join("\n");
   expect(brandedHelp(help)).toBe(
     [
@@ -67,8 +67,8 @@ test("a word both CLIs had goes to the board only by its own arguments", () => {
 });
 
 test("an answer of the board keeps its data and the commands that are not the board's", () => {
-  expect(brandedAnswer("Shepherdr is restarting: run shepherdr merge X-1 again, not shepherdr ask")).toBe(
+  expect(brandedAnswer("Lineclear is restarting: run lineclear merge X-1 again, not lineclear ask")).toBe(
     "Lineclear is restarting: run lineclear merge X-1 again, not lineclear card",
   );
-  expect(brandedAnswer("Fix the shepherdr import")).toBe("Fix the shepherdr import");
+  expect(brandedAnswer("Fix the lineclear import")).toBe("Fix the lineclear import");
 });

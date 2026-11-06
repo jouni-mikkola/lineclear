@@ -1,10 +1,9 @@
 // The web server: the screen (built files), the API and the live link. Served on 127.0.0.1 only; it is shared
 // privately over the tailnet (tailscale serve), never on a public address.
 import type { ServerWebSocket } from 'bun'
-import { existsSync, mkdirSync, readFileSync, statSync, watch } from 'node:fs'
-import { basename, dirname, join, normalize } from 'node:path'
+import { mkdirSync, readFileSync, watch } from 'node:fs'
+import { basename, dirname, join } from 'node:path'
 import { notifies, waiting } from '../shared/alerts.ts'
-import { buildId } from '../shared/build.ts'
 import { fileType } from '../shared/files.ts'
 import type { Action, AddSpace, ServerEvent, UpdateStatus, WorktreeAsk } from '../shared/types.ts'
 import { frameResponse, wrapPage } from './frame.ts'
@@ -22,11 +21,10 @@ const FONT = join(import.meta.dir, '..', 'node_modules', 'inter-ui', 'variable',
 
 export interface AppOptions {
   source: Source
-  dist: string
   push?: Push
   port: number
   host?: string
-  /** update.json: how the last update of Shepherdr went, shown on every screen */
+  /** update.json: how the last update of Lineclear went, shown on every screen */
   updates?: string
   /** gets a line for each loop lag over 200 ms (default: the console's warning) */
   log?: (line: string) => void
@@ -35,16 +33,13 @@ export interface AppOptions {
 /** The seconds a measure asks for (`window`), in ms: 1 to 600 s, 10 s by default. */
 const windowOf = (q: URLSearchParams) => Math.min(600, Math.max(0.05, Number(q.get('window')) || 10)) * 1000
 
-export function startApp({ source, dist, push, port, host = '127.0.0.1', updates, log }: AppOptions) {
+export function startApp({ source, push, port, host = '127.0.0.1', updates, log }: AppOptions) {
   const live = new Set<ServerWebSocket<Sock>>()
   const send = (ws: ServerWebSocket<Sock>, e: ServerEvent) => ws.send(JSON.stringify(e))
 
   const calls = new Set<ServerWebSocket<Sock>>()
   /** about to restart for an update: no new voice call starts, so none is cut short */
   let draining = false
-  // the build this server serves; a screen on another one reloads (it keeps what you were typing)
-  const index = join(dist, 'index.html')
-  const build = existsSync(index) ? buildId(readFileSync(index, 'utf8')) : ''
   let update = updates ? readUpdate(updates) : null
   if (updates) {
     mkdirSync(dirname(updates), { recursive: true })
@@ -120,7 +115,7 @@ export function startApp({ source, dist, push, port, host = '127.0.0.1', updates
     idleTimeout: 120,
     async fetch(req, srv) {
       const url = new URL(req.url)
-      // the app may sit under a path (/shepherdr): everything is addressed relative to the app's own folder
+      // the app may sit under a path (/lineclear): everything is addressed relative to the app's own folder
       const at = url.pathname.indexOf('/api/')
       const path = at >= 0 ? url.pathname.slice(at) : url.pathname
       const q = url.searchParams
@@ -149,7 +144,7 @@ export function startApp({ source, dist, push, port, host = '127.0.0.1', updates
           if (path === '/api/loop-lag' || path === '/api/loop-profile') srv.timeout(req, 0)
           if (path === '/api/loop-lag') return json(await measureLoop(windowOf(q)))
           if (path === '/api/loop-profile') return json(await profileLoop(windowOf(q)))
-          // which Shepherdr answers: a start from another plugin folder or version stops it (scripts/plugin.ts)
+          // which Lineclear answers: a start from another plugin folder or version stops it (scripts/plugin.ts)
           if (path === '/api/version') return json(running())
           // the updater restarts the server only once it has stopped new calls and none is on; both at once, so no call
           // can start in between. It lifts the stop again while it waits for a call to end.
@@ -246,8 +241,8 @@ export function startApp({ source, dist, push, port, host = '127.0.0.1', updates
               return json({
                 out:
                   source.kind === 'demo'
-                    ? 'This demo server does not accept shepherdr commands. Target your owning live server or installed helper.\n'
-                    : 'This server does not provide the shepherdr command. Check the target URL or installed helper.\n',
+                    ? 'This demo server does not accept lineclear commands. Target your owning live server or installed helper.\n'
+                    : 'This server does not provide the lineclear command. Check the target URL or installed helper.\n',
                 code: 1,
               })
             const b = (await req.json()) as { args: string[]; chat?: string; cwd?: string; stdin?: string }
@@ -276,7 +271,8 @@ export function startApp({ source, dist, push, port, host = '127.0.0.1', updates
         } catch (e) {
           return json({ error: (e as Error).message }, 500)
         }
-        return serveStatic(dist, path)
+        // no page is served: the new UI and the CLI use the API alone
+        return new Response('Not found', { status: 404 })
       })
     },
     websocket: {
@@ -284,7 +280,6 @@ export function startApp({ source, dist, push, port, host = '127.0.0.1', updates
         if (ws.data.kind === 'live') {
           live.add(ws)
           send(ws, { type: 'snapshot', snapshot: source.snapshot() })
-          send(ws, { type: 'build', id: build })
           send(ws, { type: 'update', update })
         } else if (ws.data.kind === 'voice' && draining) {
           ws.send(JSON.stringify({ type: 'error', message: 'Lineclear is updating. Call again in a moment.' }))
@@ -362,7 +357,7 @@ function running() {
 
 /**
  * A browser always names the page a request comes from (Origin) on a POST and a WebSocket; it must be this app's own
- * address. Requests without an Origin come from programs (the shepherdr command, another machine's copy), not from a
+ * address. Requests without an Origin come from programs (the lineclear command, another machine's copy), not from a
  * website. A browser POST must also carry the app's own header, which a cross-site form or no-cors request can't set.
  */
 function sameSite(req: Request, path: string): boolean {
@@ -401,29 +396,6 @@ function sameSite(req: Request, path: string): boolean {
 /** Legacy routing hint only. Headers do not authenticate a caller; secret access requires a capability. */
 const direct = (req: Request) => !['x-forwarded-for', 'x-forwarded-host', 'forwarded', 'tailscale-user-login', 'origin'].some((h) => req.headers.has(h))
 
-const TYPES: Record<string, string> = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.svg': 'image/svg+xml',
-  '.png': 'image/png',
-  '.woff2': 'font/woff2',
-  '.webmanifest': 'application/manifest+json',
-  '.json': 'application/json',
-}
-
-function serveStatic(dist: string, path: string) {
-  // anything that is not a file is the app (its address carries the place and task)
-  const clean = normalize(decodeURIComponent(path)).replace(/^(\.\.[/\\])+/, '')
-  const parts = clean.split('/').filter(Boolean)
-  // strip a leading mount path such as /shepherdr/
-  for (let i = 0; i <= parts.length; i++) {
-    const f = join(dist, ...parts.slice(i))
-    if (f.startsWith(dist) && existsSync(f) && statSync(f).isFile()) return file(f)
-  }
-  return file(join(dist, 'index.html'))
-}
-
 /** an attached file: a picture, PDF or text opens in the browser (as text, never as a page that runs); the rest
  *  downloads. Nothing in it runs with this app's origin. */
 function attachment(blob: Blob, name: string, download: boolean) {
@@ -436,19 +408,6 @@ function attachment(blob: Blob, name: string, download: boolean) {
       ...(type === 'application/pdf' ? {} : { 'content-security-policy': "sandbox; default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'" }),
       'cache-control': 'private, max-age=86400',
       'cross-origin-resource-policy': 'same-origin',
-      'x-content-type-options': 'nosniff',
-      'referrer-policy': 'no-referrer',
-    },
-  })
-}
-
-function file(f: string) {
-  const ext = f.slice(f.lastIndexOf('.'))
-  const immutable = f.includes('/assets/')
-  return new Response(Bun.file(f), {
-    headers: {
-      'content-type': TYPES[ext] ?? 'application/octet-stream',
-      'cache-control': immutable ? 'public, max-age=31536000, immutable' : 'no-cache',
       'x-content-type-options': 'nosniff',
       'referrer-policy': 'no-referrer',
     },

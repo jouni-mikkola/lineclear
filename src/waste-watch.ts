@@ -6,13 +6,12 @@ import { fileFix, planningFix, readFixes, selfProject } from "./self-fix.ts";
 import type { Decision, World } from "./rules.ts";
 import { type Alarm, alarms, type Facts, LIMITS, wasteLine } from "./waste.ts";
 import { readFacts } from "./waste-facts.ts";
+import { DAY, MIN } from "./time.ts";
 
 // The waste watch, once in 10 minutes from the rule loop: reads the facts, keeps the alarms that stand for Home and
 // files one Fix task for each alarm that has none open, under the same cap of fixes a day as the stall fixes.
 
 type Env = Record<string, string | undefined>;
-const MIN = 60_000;
-const DAY = 86_400_000;
 const WATCH_EVERY = 10 * MIN;
 /** A fix that closed is not filed again for a day: the 24-hour numbers it was filed for still carry the old waste. */
 const QUIET_AFTER_FIX = DAY;

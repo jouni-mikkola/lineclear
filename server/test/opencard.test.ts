@@ -1,4 +1,4 @@
-// A card Shepherdr posted for an agent (its plan, a choice card) is why it waits on you only while it is unanswered
+// A card Lineclear posted for an agent (its plan, a choice card) is why it waits on you only while it is unanswered
 // and nothing was written to it since.
 import { expect, test } from 'bun:test'
 import { mkdtempSync } from 'node:fs'

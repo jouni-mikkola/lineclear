@@ -175,30 +175,30 @@ test("a good build reaches the second machine after the first", async () => {
   expect(hosts).toEqual(["one-box", "two-box"]);
 });
 
-test("this machine's task slots: as many as Shepherdr's machine.maxTasks, busy as many as tasks at work", async () => {
-  const bin = join(root, "shepherdr");
+test("this machine's task slots: as many as Lineclear's machine.maxTasks, busy as many as tasks at work", async () => {
+  const bin = join(root, "lineclear");
   writeFileSync(bin, "#!/bin/sh\n[ \"$1\" = show ] && printf 'machine.maxTasks       4  (here)\\n'\nexit 0\n", { mode: 0o755 });
   let busy = 3;
   const view = machinesView(
-    { ...env, SHEPHERDR_BIN: bin },
+    { ...env, LINECLEAR_SERVER_BIN: bin },
     () => Date.now(),
     () => busy,
   );
-  // the limit is read in the background: a read never waits on Shepherdr
+  // the limit is read in the background: a read never waits on Lineclear
   await until(() => !!view()[0]!.slots, 20);
   expect(view()[0]!.slots).toEqual({ total: 4, busy: 3 });
   busy = 9;
   expect(view()[0]!.slots).toEqual({ total: 4, busy: 4 });
-  // without a count of tasks at work, or a Shepherdr that says its limit, no sidings are drawn
-  expect(machinesView({ ...env, SHEPHERDR_BIN: bin })()[0]!.slots).toBeUndefined();
-  // a Shepherdr that fails: once its read is over (the working one, read at the same time, has its slots), none
+  // without a count of tasks at work, or a Lineclear that says its limit, no sidings are drawn
+  expect(machinesView({ ...env, LINECLEAR_SERVER_BIN: bin })()[0]!.slots).toBeUndefined();
+  // a Lineclear that fails: once its read is over (the working one, read at the same time, has its slots), none
   const broken = machinesView(
-    { ...env, SHEPHERDR_BIN: "/bin/false" },
+    { ...env, LINECLEAR_SERVER_BIN: "/bin/false" },
     () => Date.now(),
     () => 1,
   );
   const working = machinesView(
-    { ...env, SHEPHERDR_BIN: bin },
+    { ...env, LINECLEAR_SERVER_BIN: bin },
     () => Date.now(),
     () => 1,
   );

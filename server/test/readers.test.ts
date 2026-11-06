@@ -356,7 +356,7 @@ describe('pi reader', () => {
 
 let dir = ''
 beforeAll(() => {
-  dir = mkdtempSync(join(tmpdir(), 'shepherdr-readers-'))
+  dir = mkdtempSync(join(tmpdir(), 'lineclear-readers-'))
 })
 afterAll(() => {
   rmSync(dir, { recursive: true, force: true })

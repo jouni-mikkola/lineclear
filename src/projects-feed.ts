@@ -8,7 +8,7 @@ function withRoadmap(p: HomeProject, spaces: Map<string, string>): HomeProject {
   return own ? { ...p, roadmap: own } : p;
 }
 
-/** Each Lineclear project by its Shepherdr space, so Home can link a project to its roadmap. */
+/** Each Lineclear project by its Lineclear space, so Home can link a project to its roadmap. */
 function roadmapsBySpace(env: Env): Map<string, string> {
   const by = new Map<string, string>();
   for (const name of listProjectNames(env)) {
@@ -18,7 +18,7 @@ function roadmapsBySpace(env: Env): Map<string, string> {
   return by;
 }
 
-/** Every space with its tasks and its roadmap link. Reading it runs git and shepherdr and blocks: never on the web's thread. */
+/** Every space with its tasks and its roadmap link. Reading it runs git and lineclear and blocks: never on the web's thread. */
 export function readProjects(env: Env, t: number): HomeData["projects"] {
   const spaces = roadmapsBySpace(env);
   return projectsData(env, t).map((p) => withRoadmap(p, spaces));

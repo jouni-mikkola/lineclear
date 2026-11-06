@@ -2,6 +2,8 @@
 // started from the page, which `lineclear project list` then shows.
 import { expect, test } from "@playwright/test";
 import { execFileSync, spawnSync } from "node:child_process";
+import { rmSync } from "node:fs";
+import { join } from "node:path";
 import { FIXTURE, NEW_REPO, startEmpty } from "./fixture.ts";
 
 test("the first-day card offers the home's repos and shows what it found in one, at this width", async ({ page }) => {
@@ -57,6 +59,8 @@ test.describe("live", () => {
 
   test("Home shows a problem the doctor finds with its fix command", async ({ page }) => {
     startEmpty();
+    // this one asks the real doctor
+    rmSync(join(FIXTURE, "doctor.json"), { force: true });
     await page.waitForTimeout(1100);
     await page.goto("/");
     const fixes = page.locator("[data-doctor] li");

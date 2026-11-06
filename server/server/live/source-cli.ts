@@ -11,6 +11,7 @@ import { eventRules, eventsText, eventWords, nextWords, runWords, timeRule, time
 import { checkTitle, ended, type TaskRec } from './engine/engine.ts'
 import { answerCard } from './answer.ts'
 import * as G from './engine/git.ts'
+import { room } from './herdr-forward.ts'
 import { BOX, boxHome, forwardTask, machineRef } from './box.ts'
 import { asMode, HOST, NAME, placeId } from './places.ts'
 import { settingsBlock } from './prompts.ts'
@@ -104,14 +105,14 @@ export class LiveSourceCli extends LiveSourceSubcommands {
     }
   }
 
-  /* ---------- the shepherdr command ---------- */
+  /* ---------- the lineclear command ---------- */
 
   async cli(
     args: string[],
     ctx: { chat?: string; cwd?: string; stdin?: string; local?: boolean; proof?: string },
   ): Promise<{ out: string; code: number; secrets?: Record<string, string> }> {
     try {
-      // the values themselves, for the shepherdr command to put in a command's environment or a file: never printed,
+      // the values themselves, for the lineclear command to put in a command's environment or a file: never printed,
       // only with a worker-issued capability whose stored scope selects the secret chain
       if (args[0] === 'secret' && (args[1] === 'run' || args[1] === 'env')) {
         const owner = this.agents.secretAccess.authenticate(ctx.proof)
@@ -144,6 +145,13 @@ export class LiveSourceCli extends LiveSourceSubcommands {
         const kept = this.engine.keptLeftovers()
         const line = `Lineclear on ${NAME}: ${this.places.shown().length} spaces, ${this.engine.tasks.filter((t) => !ended(t) && !t.archived).length} open tasks; herdr ${this.agents.reachable ? 'answers' : 'does not answer'}.`
         return kept.length ? `${line}\nDone tasks that kept work (remove it by hand once you're sure):\n${kept.map((k) => `  ${k}`).join('\n')}` : line
+      }
+      // a machine's room as the adapter reads it, with its tasks at work and its slots from the one store
+      case 'room': {
+        if (a1 && !this.engine.machines.has(a1)) throw new Error(`No machine called ${a1}.`)
+        const read = await room(a1)
+        if (!read) throw new Error(`${a1 ?? NAME} cannot be reached through herdr.`)
+        return JSON.stringify({ host: a1 ?? NAME, ...read, working: this.engine.workingOn(a1), max: this.settings.machine().max }, null, 2)
       }
       // project, from before spaces, is space
       case 'project':
@@ -458,7 +466,7 @@ export class LiveSourceCli extends LiveSourceSubcommands {
       }
       case 'heartbeat': {
         // a space by its name, else the coordinator asking, else the space of its folder, else the home space. Its
-        // checklist is printed and changed here, never named by path: the file is on the machine Shepherdr runs from
+        // checklist is printed and changed here, never named by path: the file is on the machine Lineclear runs from
         const set = a1 === 'set'
         const name = set ? rest[0] : a1
         const named = name ? this.placeNamed(name) : undefined

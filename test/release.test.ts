@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   fullCheckWhy,
+  pointOriginAt,
   PROMOTE_EVERY_MS,
   type ReleaseDeps,
   readRelease,
@@ -82,6 +83,27 @@ test("a planted breaking merge is held at next, never promoted, and files one fi
   expect(did.tested).toEqual([B]);
   expect(did.tasks).toHaveLength(1);
   expect(readRelease(env).stable?.commit).toBe(A);
+});
+
+test("a red main with no new commit costs one full check in 10 ticks, and a new commit one more", () => {
+  let head = B;
+  const { deps } = world(() => head, new Set([B, C]));
+  const test = deps.test;
+  const dir = env.LINECLEAR_CONFIG as string;
+  const log = join(dir, "check-runs.jsonl");
+  deps.test = (c, again) => {
+    mkdirSync(dir, { recursive: true });
+    appendFileSync(log, `${JSON.stringify({ mode: "full", commit: c })}\n`);
+    return test(c, again);
+  };
+  const fullChecks = () => readFileSync(log, "utf8").trim().split("\n").length;
+  for (let i = 0; i < 10; i++) releaseStep(deps, env, at(i * 2));
+  expect(fullChecks()).toBe(1);
+  head = C;
+  for (let i = 10; i < 20; i++) releaseStep(deps, env, at(i * 2));
+  expect(fullChecks()).toBe(2);
+  releaseStep(deps, env, at(41), true);
+  expect(fullChecks()).toBe(3);
 });
 
 test("a good merge is promoted with no human, and the fix of a red one too", () => {
@@ -304,4 +326,51 @@ test("failing tests of every shard are named, and a shard with no test names is 
   const why = fullCheckWhy(out);
   expect(why).toContain("test/a.test.ts > one: e1; test/c.test.ts > two: e2; and 3 more");
   expect(why).toContain("tests 1/2 failed: error: unhandled between tests");
+});
+
+test("--again on a held commit that now passes records green and does not promote", () => {
+  const broken = new Set([B]);
+  const { deps, did } = world(() => B, broken);
+  releaseStep(deps, env, at(0));
+  broken.clear();
+  const s = releaseStep(deps, env, at(5), true);
+  expect(did.tested).toEqual([B, B]);
+  expect(did.promoted).toEqual([]);
+  expect(s.stable?.commit).toBe(A);
+  expect(s.next).toMatchObject({ commit: B, result: "green" });
+  expect(s.runs?.map((r) => r.verdict)).toEqual(["held", "green"]);
+  expect(releaseLines(s).filter((l) => l.startsWith("run "))).toHaveLength(2);
+  // a later plain run promotes as before
+  releaseStep(deps, env, at(10));
+  expect(did.promoted).toEqual([B]);
+});
+
+test("--again on a held commit gives the same held line for the same planted failure", () => {
+  const { deps, did } = world(() => B, new Set([B]));
+  const first = releaseStep(deps, env, at(0)).held;
+  const again = releaseStep(deps, env, at(5), true);
+  expect(again.held).toBe(first);
+  expect(did.promoted).toEqual([]);
+  expect(did.tasks).toHaveLength(1);
+  expect(again.runs?.map((r) => r.verdict)).toEqual(["held", "held"]);
+});
+
+test("--again on a promoted commit tests it too and promotes nothing", () => {
+  const { deps, did } = world(() => A);
+  const s = releaseStep(deps, env, at(0), true);
+  expect(did.tested).toEqual([A]);
+  expect(did.promoted).toEqual([]);
+  expect(s.runs?.[0]).toMatchObject({ commit: A, verdict: "green" });
+});
+
+test("the release clone follows the app's origin when the repository is renamed", () => {
+  const dir = join(root, "next");
+  mkdirSync(dir);
+  sh(["git", "init", "-q"], { cwd: dir });
+  sh(["git", "remote", "add", "origin", "https://example.com/acme/old.git"], { cwd: dir });
+  pointOriginAt(dir, "https://example.com/acme/new.git", env);
+  expect(sh(["git", "remote", "get-url", "origin"], { cwd: dir }).out.trim()).toBe("https://example.com/acme/new.git");
+  pointOriginAt(dir, "https://example.com/acme/new.git", env);
+  expect(sh(["git", "remote", "get-url", "origin"], { cwd: dir }).out.trim()).toBe("https://example.com/acme/new.git");
+  expect(() => pointOriginAt(dir, "fatal: No such remote 'origin'", env)).toThrow();
 });

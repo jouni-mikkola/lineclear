@@ -1,11 +1,8 @@
 // The smoke check install.sh runs after an update restarts the service (see "An update that breaks rolls back" in the
 // README). `bun scripts/smoke.ts check <projects-folder> <api|noapi>` retries each check until LINECLEAR_SMOKE_SECONDS (default 120)
 // are up and prints one line per failure. `bun scripts/smoke.ts post <text>` puts the Inbox item that names it.
-// `bun scripts/smoke.ts shots` takes every view at 390, 768 and 1440 px from the live service into <data>/ui-shots/<commit>/
-// for the reviewer of the next UI step; it never fails an update.
 // `bun scripts/smoke.ts branch` is the merge lane's: it starts this checkout's service on free ports with a scratch
 // data folder, runs the web and API checks against it, stops it, and prints one line per failure.
-import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -32,7 +29,6 @@ const live: Target = {
     }
   },
 };
-const web = live.web;
 
 async function get(url: string): Promise<Response> {
   const r = await fetch(url, { signal: AbortSignal.timeout(5000) });
@@ -65,7 +61,7 @@ async function chat(t: Target) {
   if (!to) throw new Error("the board lists no space on this machine");
   const r = await fetch(`http://127.0.0.1:${t.api()}/api/action`, {
     method: "POST",
-    headers: { "content-type": "application/json", "x-shepherdr": "1" },
+    headers: { "content-type": "application/json", "x-lineclear": "1" },
     body: JSON.stringify({ type: "probe", chat: to.chat ?? to.id }),
     signal: AbortSignal.timeout(15000),
   });
@@ -100,7 +96,7 @@ async function runningOrPaused(before: Record<string, boolean>) {
 
 /** Runs every check until it passes or the time is up; returns what still failed. */
 export async function check(before: Record<string, boolean>, api = true, limit = seconds, t: Target = live, scratch = false): Promise<string[]> {
-  // A machine that did not run the Shepherdr API before the update has nothing to compare it with. A scratch data
+  // A machine that did not run the Lineclear API before the update has nothing to compare it with. A scratch data
   // folder has no spaces, so there is no chat to write to and no project to keep Running or Paused.
   const checks: [string, () => Promise<void>][] = [
     ["the web pages do not answer", () => pages(t)],
@@ -194,71 +190,19 @@ export async function checkBranch(root: string, limit = seconds): Promise<string
   }
 }
 
-/** The pages of the live service, in three widths, with `playwright-cli` (the browser the machine already has). Returns the folder. */
-export function shots(commit: string): string {
-  const dir = join(dataDir(env), "ui-shots", commit);
-  mkdirSync(dir, { recursive: true });
-  const cli = env.LINECLEAR_PLAYWRIGHT_CLI ?? "playwright-cli";
-  const run = (...args: string[]) => execFileSync(cli, ["-s=lineclear-shots", ...args], { stdio: "ignore", timeout: 60_000 });
-  try {
-    run("open", web);
-    for (const width of [390, 768, 1440]) {
-      run("resize", String(width), "900");
-      for (const [name, path] of [
-        ["home", "/"],
-        ["inbox", "/inbox"],
-        ["settings", "/settings"],
-        ["browsers", "/browsers"],
-      ] as const) {
-        run("goto", web + path);
-        run("screenshot", `--filename=${join(dir, `${name}-${width}.png`)}`, "--full-page");
-      }
-    }
-  } finally {
-    try {
-      run("close");
-    } catch {}
-  }
-  return dir;
-}
-
-/** An event is a courtesy: a log that cannot be written never fails the check or the rollback. */
-async function note(e: Parameters<typeof import("../src/events.ts").recordEvent>[0]): Promise<void> {
-  try {
-    (await import("../src/events.ts")).recordEvent(e);
-  } catch {
-    // the check goes on
-  }
-}
-
 if (import.meta.main) {
   const [verb, arg = "", api = "api"] = process.argv.slice(2);
   if (verb === "check") {
     const before = pausedIn(arg);
-    const began = Date.now();
-    await note({ part: "updates", kind: "start", text: "Checking the new version" });
     const failed = await check(before, api === "api");
-    const took = `${Math.floor((Date.now() - began) / 60_000)}m${String(Math.floor(((Date.now() - began) % 60_000) / 1000)).padStart(2, "0")}s`;
-    await note(
-      failed.length
-        ? { part: "updates", kind: "fail", text: `The check failed after ${took}: ${failed.join("; ")}` }
-        : { part: "updates", kind: "end", text: `The new version works (check ${took})` },
-    );
     for (const f of failed) console.log(f);
     process.exit(failed.length ? 1 : 0);
   } else if (verb === "branch") {
     const failed = await checkBranch(join(import.meta.dir, ".."));
     for (const f of failed) console.log(f);
     process.exit(failed.length ? 1 : 0);
-  } else if (verb === "shots") {
-    try {
-      console.log(shots(arg || "live"));
-    } catch (e) {
-      console.log(`no pictures: ${(e as Error).message}`);
-    }
   } else if (verb === "post" && arg) {
     const { addItem } = await import("../src/inbox.ts");
-    await note({ part: "updates", kind: "fail", text: arg });
     const item = addItem({ kind: "stuck", task: "-", question: arg, choices: ["Ok"], alert: "An update was rolled back", since: new Date().toISOString() });
     console.log(`inbox ${item.n}: ${arg}`);
   } else {

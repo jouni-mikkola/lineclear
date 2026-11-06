@@ -199,7 +199,7 @@ export class LiveSourceRestarts extends LiveSourceSpaces {
       this.emit('chat', key)
       return { ok: true }
     }
-    // Shepherdr's own choice card: the answer goes in as one chat line
+    // Lineclear's own choice card: the answer goes in as one chat line
     const posted = this.chats.log(key).posted.find((p) => p.question?.id === qid)
     if (posted?.question) {
       const q = posted.question

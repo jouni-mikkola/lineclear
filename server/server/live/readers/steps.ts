@@ -148,7 +148,6 @@ export function commandSay(cmd: string): Said {
       }
       return said('web', G[what] ?? (sub === 'api' ? 'Ask GitHub' : `Use GitHub ${sub}`.trim()))
     }
-    case 'shepherdr':
     case 'lineclear': {
       const what = `${sub} ${args[1] ?? ''}`.trim()
       const S: Record<string, string> = {

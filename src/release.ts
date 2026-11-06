@@ -12,7 +12,8 @@ import { writeAtomic } from "../pi/atomic.ts";
 import { configDir, readJson } from "../pi/config.ts";
 import * as Q from "../server/server/live/engine/check-queue.ts";
 import { fullCheckPassed, loadMeter, recordRun, whereRun } from "./check-runs.ts";
-import { dataDir, pathsFor, serverBin } from "./paths.ts";
+import { dataDir, lockFile, pathsFor, serverBin } from "./paths.ts";
+import { forgetTaskReads, readTasks } from "./task-read.ts";
 import { listProjectNames, readSettings } from "./project.ts";
 import { cacheDir, diskTmpRoot } from "./tmpdirs.ts";
 import { tryLines, tryMain } from "./try-instance.ts";
@@ -44,6 +45,18 @@ export interface ReleaseState {
   promoteTried?: string;
 }
 
+/** The state file as the release run writes it: the last test runs of main, newest last, beside the state. */
+type Stored = ReleaseState & { runs?: Run[] };
+
+/** One test run: of which commit, when it started, how long to its verdict, and the verdict ("held" names why). */
+interface Run {
+  commit: string;
+  at: string;
+  minutes: number;
+  verdict: "green" | "held";
+  why?: string;
+}
+
 export interface CandidateCheck {
   name: string;
   outcome: "passed" | "failed" | "skipped";
@@ -66,8 +79,8 @@ export interface ReleaseDeps {
   stable(): string;
   /** Main's newest commit, fetched. */
   head(): string;
-  /** Builds and tests `commit`; returns why it failed, or "". */
-  test(commit: string): string;
+  /** Builds and tests `commit`; returns why it failed, or "". `again` runs the full check even if it passed at this commit. */
+  test(commit: string, again?: boolean): string;
   /** Installs `commit` as stable; returns why that failed (and was rolled back), or "". */
   promote(commit: string): string;
   /** Files a fix task; returns why it could not, or "". */
@@ -85,7 +98,6 @@ const STALE_LOCK_MS = 4 * 60 * 60_000;
 const MAX_BACKOFF_MS = 15 * 60_000;
 
 const stateFile = (env: Env) => join(configDir(env), "release.json");
-const lockFile = (env: Env) => join(configDir(env), "release.lock");
 const startedFile = (env: Env) => join(configDir(env), "release-started.json");
 const nextDir = (env: Env) => join(cacheDir(env), "next");
 /** Written by install.sh on a machine another one installs: it takes that machine's stable build and promotes none. */
@@ -111,8 +123,8 @@ export function saveRelease(s: ReleaseState, env: Env) {
 }
 
 /** One pass: look at main, and test and promote it when it is due. Saves the state as it goes. */
-export function releaseStep(deps: ReleaseDeps, env: Env = process.env, now = new Date()): ReleaseState {
-  const s = readRelease(env);
+export function releaseStep(deps: ReleaseDeps, env: Env = process.env, now = new Date(), again = false): Stored {
+  const s: Stored = readRelease(env);
   const at = now.toISOString();
   const stable = deps.stable();
   if (s.stable?.commit !== stable) s.stable = { commit: stable, at };
@@ -122,10 +134,20 @@ export function releaseStep(deps: ReleaseDeps, env: Env = process.env, now = new
     head = deps.head();
   } catch (e) {
     s.held = `cannot read main: ${(e as Error).message}`;
+    if (again) noteRun(s, { commit: "", at, verdict: "held", why: s.held }, now);
     saveRelease(s, env);
     return s;
   }
-  if (head === stable) {
+  if (again) {
+    // a second test of the same commit: nothing reused, nothing promoted, no fix task
+    s.next = { commit: head, at, result: "testing" };
+    s.held = `testing ${short(head)}`;
+    saveRelease(s, env);
+    const why = deps.test(head, true);
+    s.next = { commit: head, at, result: why ? "red" : "green", ...(why ? { why } : {}) };
+    s.held = why ? `next ${short(head)} failed: ${why}` : undefined;
+    noteRun(s, { commit: head, at, verdict: why ? "held" : "green", why: why || undefined }, now);
+  } else if (head === stable) {
     s.next = { commit: head, at: s.next?.commit === head ? s.next.at : at, result: "green" };
     s.held = undefined;
   } else if (s.next?.commit === head && s.next.result === "red") {
@@ -138,6 +160,7 @@ export function releaseStep(deps: ReleaseDeps, env: Env = process.env, now = new
     s.held = `testing ${short(head)}`;
     saveRelease(s, env);
     const failed = deps.test(head) || promoteOrWhy(deps, head);
+    noteRun(s, { commit: head, at, verdict: failed ? "held" : "green", why: failed || undefined }, now);
     if (failed) red(s, deps, head, stable, failed);
     else {
       s.promoted = { commit: head, at, from: stable };
@@ -148,6 +171,12 @@ export function releaseStep(deps: ReleaseDeps, env: Env = process.env, now = new
   }
   saveRelease(s, env);
   return s;
+}
+
+/** Adds a run to the history (the last 20), with the minutes from its start `started` to the verdict. */
+function noteRun(s: Stored, r: Omit<Run, "minutes">, started: Date) {
+  const minutes = Math.max(0, Math.round((Date.now() - started.getTime()) / 60_000));
+  s.runs = [...(s.runs ?? []), { ...r, minutes }].slice(-20);
 }
 
 function promoteOrWhy(deps: ReleaseDeps, head: string): string {
@@ -209,6 +238,14 @@ export function runSteps(steps: [string, string[], string][], env: Env): string 
 
 export const tail = (out: string) => out.split("\n").slice(-6).join("; ").slice(-600);
 
+/** Sets the clone's origin to the app's when they differ (and says so on stderr), so a renamed repository is not fetched under its old name. */
+export function pointOriginAt(dir: string, url: string, env: Env): void {
+  if (!url || /\s/.test(url)) throw new Error(`the app has no origin: ${tail(url)}`);
+  if (run(["git", "-C", dir, "config", "remote.origin.url"], dir, env).out === url) return;
+  run(["git", "-C", dir, "config", "remote.origin.url", url], dir, env);
+  process.stderr.write(`lineclear release: the clone's origin is now ${url}\n`);
+}
+
 /** The real world: the installed app is stable, a clone in the cache is next. */
 function realDeps(env: Env = process.env): ReleaseDeps {
   const app = pathsFor(env).app;
@@ -217,16 +254,13 @@ function realDeps(env: Env = process.env): ReleaseDeps {
   return {
     stable: () => run(["git", "-C", app, "rev-parse", "HEAD"], app, env).out,
     head() {
-      if (!existsSync(join(dir, ".git"))) {
-        mkdirSync(dir, { recursive: true });
-        run(["git", "init", "-q"], dir, env);
-        run(["git", "remote", "add", "origin", origin()], dir, env);
-      }
+      run(["git", "init", "-q", dir], app, env);
+      pointOriginAt(dir, origin(), env);
       const f = run(["git", "fetch", "-q", "origin", "main"], dir, env, 120_000);
       if (!f.ok) throw new Error(tail(f.out));
       return run(["git", "rev-parse", "FETCH_HEAD"], dir, env).out;
     },
-    test: (commit) => testNext(app, dir, commit, env),
+    test: (commit, again) => testNext(app, dir, commit, env, again),
     promote(commit) {
       const r = run(["sh", join(dir, "install.sh")], dir, { ...env, LINECLEAR_REF: commit, LINECLEAR_REPO: origin() }, 30 * 60_000);
       const now = run(["git", "-C", app, "rev-parse", "HEAD"], app, env).out;
@@ -242,22 +276,18 @@ export function fixTaskTools(origin: () => string, dir: string, prefix: string, 
     openFix() {
       const space = ownSpace(origin(), env);
       if (!space) return undefined;
-      const r = run([serverBin(env), "task", "list", "--space", space, "--json"], dir, env, 60_000);
-      if (!r.ok) return undefined;
-      try {
-        const tasks = JSON.parse(r.out) as { id: string; title: string; status: string }[];
-        return tasks.find((x) => x.title.startsWith(prefix) && x.status !== "done" && x.status !== "closed")?.id;
-      } catch {
-        return undefined;
-      }
+      const r = readTasks(env, space);
+      return "tasks" in r ? r.tasks.find((x) => x.title.startsWith(prefix) && x.status !== "done" && x.status !== "closed")?.id : undefined;
     },
     tell(task, message) {
+      forgetTaskReads();
       const r = run([serverBin(env), "task", "tell", task, message], dir, env, 60_000);
       return r.ok ? "" : tail(r.out);
     },
     fileTask(title, brief) {
       const space = ownSpace(origin(), env);
       if (!space) return "no project on this machine has Lineclear's repository";
+      forgetTaskReads();
       const r = run([serverBin(env), "task", "add", title, "--brief", brief, "--space", space], dir, env, 60_000);
       return r.ok ? "" : tail(r.out);
     },
@@ -292,7 +322,7 @@ export function fullCheckWhy(out: string): string {
 }
 
 /** Builds next at `commit` and runs its smoke check and canary, then stable's format check on what next wrote. */
-function testNext(app: string, dir: string, commit: string, env: Env): string {
+function testNext(app: string, dir: string, commit: string, env: Env, again = false): string {
   const steps: [string, string[], string][] = [
     ...checkoutSteps(dir, commit),
     ["web build", ["bun", "run", "web:build"], dir],
@@ -301,8 +331,8 @@ function testNext(app: string, dir: string, commit: string, env: Env): string {
   const broke = runSteps(steps, env);
   if (broke) return broke;
   // the full check, the browser suite included, on the newest main only (a release run tests no older commit); one that
-  // already passed at this commit is not run again
-  if (!fullCheckPassed(commit, env)) {
+  // already passed at this commit is not run again, unless `again` asks for a second test of it
+  if (again || !fullCheckPassed(commit, env)) {
     const full = runFullCheck(["bun", "scripts/check.ts", "--full", "--untimed"], dir, env);
     if (!full.ok) return `full check: ${fullCheckWhy(full.out)}`;
   }
@@ -440,7 +470,7 @@ const sameRepo = (a: string, b: string) =>
   a.replace(/(\.git)?\/?$/, "").replace(/^git@github\.com:/, "https://github.com/") ===
   b.replace(/(\.git)?\/?$/, "").replace(/^git@github\.com:/, "https://github.com/");
 
-/** The Shepherdr space of the project whose repository is Lineclear's own. */
+/** The Lineclear space of the project whose repository is Lineclear's own. */
 function ownSpace(origin: string, env: Env): string | undefined {
   for (const name of listProjectNames(env as NodeJS.ProcessEnv)) {
     const s = readSettings(name, env as NodeJS.ProcessEnv);
@@ -479,7 +509,7 @@ export function startReleaseIfDue(env: Env = process.env, now = new Date()): voi
   const app = pathsFor(env).app;
   if (env.LINECLEAR_CANARY || env.LINECLEAR_RELEASE === "off" || follows(env) || resolve(import.meta.dir, "..") !== app) return;
   try {
-    if (now.getTime() - statSync(lockFile(env)).mtimeMs > STALE_LOCK_MS) rmSync(lockFile(env), { force: true });
+    if (now.getTime() - statSync(lockFile(env, "release")).mtimeMs > STALE_LOCK_MS) rmSync(lockFile(env, "release"), { force: true });
     else return;
   } catch {
     // no lock: no run is going
@@ -511,13 +541,17 @@ export function releaseTry(args: string[], out: (l: string) => void, env: Env = 
 }
 
 /** The lines of `lineclear release` and of doctor and Home. */
-export function releaseLines(s: ReleaseState): string[] {
+export function releaseLines(s: Stored): string[] {
   const next = s.next ? `${short(s.next.commit)} ${s.next.result}${s.next.commit === s.stable?.commit ? " (same as stable)" : ""}` : "not looked at yet";
   return [
     `stable  ${s.stable ? `${short(s.stable.commit)} since ${s.stable.at.slice(0, 16).replace("T", " ")} UTC` : "unknown"}`,
     `next    ${next}`,
     `last promotion  ${s.promoted ? `${short(s.promoted.from)} to ${short(s.promoted.commit)} at ${s.promoted.at.slice(0, 16).replace("T", " ")} UTC` : "none yet"}`,
     ...(s.held ? [`held    ${s.held}`] : []),
+    ...(s.runs ?? []).map(
+      (r) =>
+        `run  ${short(r.commit) || "main"} at ${r.at.slice(0, 16).replace("T", " ")} UTC, ${r.minutes} min, ${r.verdict}${r.why ? `: ${r.why.slice(0, 200)}` : ""}`,
+    ),
     ...candidateLines(s.candidate),
   ];
 }
@@ -541,24 +575,24 @@ export function releaseMain(args: string[], out: (l: string) => void, env: Env =
     return 0;
   }
   if (verb === "rollback") return rollbackMain(out, env, args[1] === "--from" ? args[2] : undefined);
-  if (verb !== "run") {
-    out("usage: lineclear release [status|run|check|promote|rollback|try]");
+  if (verb !== "run" || args.slice(1).some((a) => a !== "--again")) {
+    out("usage: lineclear release [status|run [--again]|check|promote|rollback|try]");
     return 2;
   }
   mkdirSync(configDir(env), { recursive: true });
   let lock: number;
   try {
-    lock = openSync(lockFile(env), "wx");
+    lock = openSync(lockFile(env, "release"), "wx");
   } catch {
     out("lineclear release: another run is going");
     return 0;
   }
   try {
-    const s = releaseStep(realDeps(env), env);
+    const s = releaseStep(realDeps(env), env, new Date(), args[1] === "--again");
     for (const l of releaseLines(s)) out(l);
     return s.next?.result === "red" ? 1 : 0;
   } finally {
     closeSync(lock);
-    rmSync(lockFile(env), { force: true });
+    rmSync(lockFile(env, "release"), { force: true });
   }
 }

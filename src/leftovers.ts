@@ -6,10 +6,11 @@ import type { Check, Probe } from "./doctor.ts";
 import { dataDir } from "./paths.ts";
 
 import { TMP_STALL_BYTES } from "./tmpdirs.ts";
+import { git } from "./git.ts";
 
 type Env = Record<string, string | undefined>;
 
-type LeftoverKind = "worktree" | "branch" | "folder" | "autopilot runtime";
+type LeftoverKind = "worktree" | "branch" | "folder" | "autopilot runtime" | "screenshots";
 
 interface Leftover {
   kind: LeftoverKind;
@@ -33,11 +34,6 @@ export interface Leftovers {
 const MAIN = ["main", "master"];
 /** The runs whose folders the board still reads live. */
 const LIVE_RUN = new Set(["starting", "on", "stopping", "workers"]);
-
-function git(cwd: string, ...args: string[]): { ok: boolean; out: string } {
-  const r = Bun.spawnSync(["git", "-C", cwd, ...args], { stdin: "ignore", stdout: "pipe", stderr: "pipe" });
-  return { ok: r.exitCode === 0, out: r.stdout.toString().trim() };
-}
 
 function sizeOf(path: string): number {
   const r = Bun.spawnSync(["du", "-sk", path], { stdin: "ignore", stdout: "pipe", stderr: "ignore" });
@@ -95,7 +91,7 @@ export function onMain(repo: string, branch: string): boolean {
   const cherry = git(repo, "cherry", main, branch);
   if (cherry.ok && !cherry.out.split("\n").some((l) => l.startsWith("+"))) return true;
   const merged = git(repo, "merge-tree", "--write-tree", main, branch);
-  return merged.ok && merged.out.split("\n")[0] === git(repo, "rev-parse", `${main}^{tree}`).out;
+  return merged.ok && merged.out.split("\n")[0] === git(repo, "rev-parse", `${main}^{tree}`).out.trim();
 }
 
 /** A folder git no longer knows holds only what a build left (node_modules and the like), never a file of the user's. */
@@ -114,9 +110,9 @@ function worktreeLeftover(dir: string, open: OpenWork, found: Leftovers, repos: 
     else found.kept.push({ what: dir, why: "not a worktree, and it holds files" });
     return;
   }
-  const common = git(dir, "rev-parse", "--path-format=absolute", "--git-common-dir").out;
+  const common = git(dir, "rev-parse", "--path-format=absolute", "--git-common-dir").out.trim();
   const repo = common ? dirname(common) : "";
-  const branch = git(dir, "branch", "--show-current").out;
+  const branch = git(dir, "branch", "--show-current").out.trim();
   if (!repo || (branch && open.branches.has(branch))) return;
   repos.add(repo);
   // ignored files go with the folder: only node_modules (made again by an install) may be among them
@@ -124,14 +120,14 @@ function worktreeLeftover(dir: string, open: OpenWork, found: Leftovers, repos: 
     .out.split("\n")
     .filter((l) => l && !/^!! (.*\/)?node_modules\/$/.test(l));
   if (changes.length) found.kept.push({ what: dir, why: "uncommitted or ignored files" });
-  else if (!onMain(repo, branch || git(dir, "rev-parse", "HEAD").out))
+  else if (!onMain(repo, branch || git(dir, "rev-parse", "HEAD").out.trim()))
     found.kept.push({ what: dir, why: `commits of ${branch || "its detached head"} that main lacks` });
   else found.removable.push({ kind: "worktree", path: dir, repo, bytes: sizeOf(dir) });
 }
 
 /** Local work/ branches that are on main and checked out nowhere. */
 function branchLeftovers(repo: string, open: OpenWork, found: Leftovers): void {
-  const out = git(repo, "for-each-ref", "--format=%(refname:short)", "refs/heads/work/").out;
+  const out = git(repo, "for-each-ref", "--format=%(refname:short)", "refs/heads/work/").out.trim();
   const checkedOut = new Set(
     git(repo, "worktree", "list", "--porcelain")
       .out.split("\n")
@@ -173,6 +169,8 @@ export function findLeftovers(env: Env = process.env): Leftovers {
   }
   for (const repo of repos) branchLeftovers(repo, open, found);
   runtimeLeftovers(env, found);
+  const shots = join(dataDir(env), "ui-shots");
+  if (existsSync(shots)) found.removable.push({ kind: "screenshots", path: shots, bytes: sizeOf(shots) });
   return found;
 }
 
@@ -181,10 +179,10 @@ function removeLeftover(item: Leftover): void {
   if (item.kind === "branch" || item.kind === "worktree") {
     const repo = item.repo;
     if (!repo) throw new Error("its repo is unknown");
-    const branch = item.kind === "branch" ? item.path : git(item.path, "branch", "--show-current").out;
+    const branch = item.kind === "branch" ? item.path : git(item.path, "branch", "--show-current").out.trim();
     if (item.kind === "worktree") {
-      const r = Bun.spawnSync(["git", "-C", repo, "worktree", "remove", item.path], { stdin: "ignore", stdout: "pipe", stderr: "pipe" });
-      if (r.exitCode !== 0) throw new Error(r.stderr.toString().split("\n")[0] || "git could not remove it");
+      const r = git(repo, "worktree", "remove", item.path);
+      if (!r.ok) throw new Error(r.err.split("\n")[0] || "git could not remove it");
       git(repo, "worktree", "prune");
     }
     if (branch && !MAIN.includes(branch) && !git(repo, "branch", "-D", branch).ok) throw new Error(`branch ${branch} stays`);
@@ -200,6 +198,7 @@ const NAMES: Record<LeftoverKind, string> = {
   branch: "local branches already on main",
   folder: "worktree folders git no longer knows",
   "autopilot runtime": "coordinator timer folders of finished runs",
+  screenshots: "update screenshot folders (nothing reads them)",
 };
 
 /** One check per kind of leftover with its count and size; what is kept for holding work is told on the line of an ok check. */
@@ -232,7 +231,7 @@ export function fixLeftovers(p: Probe, out: (line: string) => void): number {
   if (!found) return 0;
   let code = 0;
   // worktrees first: a branch can only go once its folder has
-  const order: LeftoverKind[] = ["worktree", "folder", "branch", "autopilot runtime"];
+  const order: LeftoverKind[] = ["worktree", "folder", "branch", "autopilot runtime", "screenshots"];
   for (const item of [...found.removable].sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind))) {
     try {
       removeLeftover(item);

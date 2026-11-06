@@ -39,7 +39,7 @@ export class ChatsLogs {
   protected threadLogs = new Map<string, string>()
   protected jobsSeen = new Map<string, string>()
 
-  /* ---------- Shepherdr's own log per chat ---------- */
+  /* ---------- Lineclear's own log per chat ---------- */
 
   log(key: string): ChatLog {
     let l = this.logs.get(key)
@@ -191,7 +191,7 @@ export class ChatsLogs {
     return undefined
   }
 
-  /** the newest thing in the chat from its agent (a reply you will see, its question) or Shepherdr (a card, an
+  /** the newest thing in the chat from its agent (a reply you will see, its question) or Lineclear (a card, an
    *  artifact): when it came, its words, and whether it is a card about a task (whose own alert tells of it) */
   newest(key: string): { at: number; text?: string; card?: boolean } | undefined {
     this.pull(key)
@@ -336,7 +336,7 @@ export class ChatsLogs {
   /**
    * What you or a coordinator wrote to this agent that it hasn't read yet: still waiting to go in, or typed in since its
    * turn began and not in its log since (Claude Code takes text typed mid-turn at its next step). Reactions and
-   * Shepherdr's own hidden lines aside.
+   * Lineclear's own hidden lines aside.
    */
   unseen(key: string): OutItem[] {
     this.pull(key)

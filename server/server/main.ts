@@ -1,4 +1,4 @@
-// Starts Shepherdr: LINECLEAR_SOURCE=demo for the fictional world (review, tests), otherwise live on herdr.
+// Starts Lineclear: LINECLEAR_SOURCE=demo for the fictional world (review, tests), otherwise live on herdr.
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { startApp } from './app.ts'
@@ -8,7 +8,6 @@ import { Push } from './push.ts'
 import type { Source } from './source.ts'
 import { DEFAULT_PORT, HOME, writeJson } from './store.ts'
 
-const root = join(import.meta.dir, '..')
 const port = Number(process.env.LINECLEAR_PORT ?? DEFAULT_PORT)
 const kind = process.env.LINECLEAR_SOURCE === 'demo' ? 'demo' : 'live'
 
@@ -23,7 +22,7 @@ if (kind === 'live') {
   if (holder !== undefined) {
     const at = holderPort(HOME, holder)
     console.error(
-      `shepherdr: another server (process ${holder}${at ? `, port ${at}` : ''}) already runs on ${HOME}. Stop it first, or use another LINECLEAR_HOME.`,
+      `lineclear: another server (process ${holder}${at ? `, port ${at}` : ''}) already runs on ${HOME}. Stop it first, or use another LINECLEAR_HOME.`,
     )
     process.exit(1)
   }
@@ -36,17 +35,17 @@ if (push && 'devices' in source && 'pushWarnings' in source) {
 }
 // a worker for another machine (machines.ts) serves only its main machine, which pushes alerts itself
 const worker = !!process.env.LINECLEAR_BOX
-const server = startApp({ source, dist: join(root, 'dist'), push: worker ? undefined : push, port, updates: worker ? undefined : join(HOME, 'update.json') })
+const server = startApp({ source, push: worker ? undefined : push, port, updates: worker ? undefined : join(HOME, 'update.json') })
 // a worker says which code it runs: the main server keeps it across its own restart while that is the same
 if (kind === 'live')
   writeJson('server.json', { port: server.port, pid: process.pid, code: worker ? (await import('./live/machines.ts')).codeVersion() : undefined })
 let tunnel: { stop(): void } | undefined
 if (worker) {
-  // the agents there reach this worker's shepherdr command through an SSH tunnel to it
+  // the agents there reach this worker's lineclear command through an SSH tunnel to it
   tunnel = (await import('./live/tunnel.ts')).keepTunnel(server.port!)
   orphaned()
 }
-console.log(`shepherdr (${kind}) on http://127.0.0.1:${server.port}, ready ${Math.round(performance.now())} ms after start`)
+console.log(`lineclear (${kind}) on http://127.0.0.1:${server.port}, ready ${Math.round(performance.now())} ms after start`)
 
 /** A worker outlives a restart of its main server, which takes it back; one whose main server stays gone stops. */
 function orphaned() {
@@ -65,7 +64,7 @@ function orphaned() {
   }, 60_000)
 }
 
-// an update restarts it, as one right after a merge into Shepherdr's own repo does: a merge on its way finishes and
+// an update restarts it, as one right after a merge into Lineclear's own repo does: a merge on its way finishes and
 // its answer goes out first, so none is cut halfway with its agent waiting on an answer that never comes
 let stopping = false
 for (const sig of ['SIGINT', 'SIGTERM'] as const)

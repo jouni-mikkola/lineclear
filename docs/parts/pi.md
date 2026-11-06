@@ -7,7 +7,7 @@ agents the kit: `kit/rules.md` in the system prompt and `kit/skills/` (plus play
 ## Invariants
 
 - An agent never pushes and never reads another task's secrets or the owner's login files.
-- The merge guard refuses `lineclear merge` and the old `shepherdr merge` alike; the idle nudge names `lineclear`.
+- The merge guard refuses `lineclear merge` and the old `lineclear merge` alike; the idle nudge names `lineclear`.
 - Each piece of the pack can be turned off with `lineclear pack off <piece>`, and each is on by default once measured to pay.
 - A piece never changes what a tool did, only how much of it the model reads, and says where the rest is.
 - The extension imports nothing from `src/`: it runs inside pi.
@@ -27,7 +27,7 @@ The pi extension file install links, `lineclear pack`, and these names:
 - `pi/config.ts`: `configDir`, `decisionsPath`, `readJson`
 - `pi/extension.ts`: `Limits`, `Window`, `callsOf`, `LIMITED_STREAK`
 - `pi/heavy-tool.ts`: `toolRun`
-- `pi/parts/compaction-notes.ts`: `logFile`, `logLines`, `notesStats`
+- `pi/parts/compaction-notes.ts`: `logLines`, `notesStats`
 - `pi/parts/cut-output.ts`: `cutStats`, `logFile`
 
 ## Files

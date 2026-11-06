@@ -20,7 +20,7 @@ const MAX_SAVE = 64 * 1024 * 1024; // a result longer than this is left whole: t
 
 /** Tools whose results are never cut. */
 export const NEVER = new Set(["write", "edit"]);
-const CHAT = /^\s*(?:\S*\/)?(?:shepherdr|lineclear)\s+(?:chat|ask|reply|say|wait|resume)\b/;
+const CHAT = /^\s*(?:\S*\/)?lineclear\s+(?:chat|ask|reply|say|wait|resume)\b/;
 const TEST =
   /(?:^|[\s;&|(])(?:bun\s+(?:run\s+)?(?:test|check)|(?:pnpm|npm|yarn)\s+(?:run\s+)?(?:test|check)|npx\s+(?:vitest|jest)|vitest|jest|pytest|cargo\s+test|go\s+test|make\s+(?:test|check)|lineclear\s+check)\b/;
 const SUMMARY =

@@ -4,10 +4,9 @@
 // file falls back to pi's own summary, and the log says why. Coordinators, the Dispatcher and sessions you run
 // yourself are the longest sessions: they get the notes too, and the owner's direction log after each compaction,
 // since their owner's words would otherwise live only in the chat. Imports nothing of Lineclear outside pi/.
-import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { writeAtomic } from "../atomic.ts";
+import { join } from "node:path";
 import { rolePoint } from "../compaction.ts";
 import { appendDirection, directionLogFile, directionTail, ownerStatement } from "../direction-log.ts";
 
@@ -52,34 +51,6 @@ export function roleOf(env: Env = process.env): Role | undefined {
 const whoOf = (env: Env) => (env.LINECLEAR_CHAT ?? "").split("/")[0] || (env.LINECLEAR_ROLE === "dispatcher" ? "dispatcher" : `session-${process.pid}`);
 
 const piAgentDir = (env: Env) => env.PI_CODING_AGENT_DIR || join(env.HOME ?? homedir(), ".pi", "agent");
-
-/**
- * Turns off control-center's older state-file extension where it is still installed: it asks for notes and builds the
- * summary too, so every session was asked twice. Its own off switch is `enabled: false` in its settings file, which it
- * reads again when the file changes, so running sessions stop asking too. Returns true when it turned it off.
- */
-export function retireOldNotes(env: Env = process.env): boolean {
-  const defaults = join(piAgentDir(env), "extensions", "state-file", "defaults.json");
-  if (!existsSync(defaults)) return false;
-  let path = env.CC_STATE_FILE_CONFIG;
-  try {
-    path ||= JSON.parse(readFileSync(defaults, "utf8"))?.override;
-  } catch {
-    return false;
-  }
-  if (typeof path !== "string" || path === "") return false;
-  const file = path.startsWith("~/") ? join(env.HOME ?? homedir(), path.slice(2)) : path;
-  let have: Record<string, unknown> = {};
-  try {
-    have = JSON.parse(readFileSync(file, "utf8")) ?? {};
-  } catch {
-    // no settings of its own yet: its defaults hold, and they are on
-  }
-  if (have.enabled === false) return false;
-  mkdirSync(dirname(file), { recursive: true });
-  writeAtomic(file, `${JSON.stringify({ ...have, enabled: false }, null, 2)}\n`);
-  return true;
-}
 
 /** The token count at which pi compacts a model: its window less its reserve, as pi's settings say (the pack's `compaction` part sets them). */
 export function compactionPoint(window: number, model: string | undefined, env: Env = process.env): number {
@@ -179,13 +150,13 @@ const textOf = (content: unknown): string =>
           .join("\n")
       : "";
 
-/** The user's messages on the branch, word for word, without our own ask and Shepherdr's own tagged lines. */
+/** The user's messages on the branch, word for word, without our own ask and Lineclear's own tagged lines. */
 export function userMessages(entries: any[]): string[] {
   const out: string[] = [];
   for (const e of entries ?? []) {
     if (e?.type !== "message" || e.message?.role !== "user") continue;
     const t = textOf(e.message.content);
-    if (t !== "" && !t.startsWith(MARK) && !t.trimStart().startsWith("<shepherdr>")) out.push(t);
+    if (t !== "" && !t.startsWith(MARK) && !t.trimStart().startsWith("<lineclear>")) out.push(t);
   }
   return out;
 }
@@ -225,11 +196,6 @@ export function directionMessage(env: Env = process.env): string | undefined {
 }
 
 export default function compactionNotes(pi: Pi, env: Env = process.env): void {
-  try {
-    retireOldNotes(env);
-  } catch {
-    // a settings file that cannot be written leaves the old one asking too, never stops this one
-  }
   const role = roleOf(env);
   if (role === undefined) return;
   const file = stateFile(env);

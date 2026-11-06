@@ -30,6 +30,8 @@ export interface Task extends TrainFacts, RowFacts {
   since?: number;
   /** No sign of life from it for a while. */
   stalled?: boolean;
+  /** Its machine did not answer the last read: when it last did (ms). */
+  silentSince?: number;
 }
 
 export interface Project extends ProjectFacts {

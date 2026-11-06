@@ -3,6 +3,7 @@ import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { writeAtomic } from "../pi/atomic.ts";
 import { join } from "node:path";
 import { configDir, readJson } from "../pi/config.ts";
+import { HOUR_MS } from "./time.ts";
 
 /** What a provider's account is. Missing means a subscription with room. */
 export interface Account {
@@ -86,7 +87,6 @@ export function clearFull(provider: string, env = process.env): void {
 
 const FULL = /usage limit|session limit|weekly limit|quota exceeded|rate limit \((five_hour|seven_day)\)/i;
 const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
-const HOUR_MS = 3_600_000;
 
 /**
  * Reads a failed model call: whether it says an account's session or week is full, and when it frees up. The

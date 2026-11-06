@@ -40,9 +40,7 @@ const TEXT = new Set([
   'patch',
 ])
 
-export const extOf = (name: string) => (name.match(/\.([a-z0-9]+)$/i)?.[1] ?? '').toLowerCase()
-
-export const isImage = (name: string) => extOf(name) in IMAGE
+const extOf = (name: string) => (name.match(/\.([a-z0-9]+)$/i)?.[1] ?? '').toLowerCase()
 
 /** the type an attachment is served with; anything not listed downloads instead of opening */
 export function fileType(name: string): { type: string; inline: boolean } {

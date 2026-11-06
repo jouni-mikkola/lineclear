@@ -1,9 +1,9 @@
-// Machine health: every 30 seconds Shepherdr reads how loaded this machine is (its 1-minute load against its cores,
+// Machine health: every 30 seconds Lineclear reads how loaded this machine is (its 1-minute load against its cores,
 // memory in use, how full home and /tmp are, a GPU's use where nvidia-smi is there) and whether herdr answers. Cheap:
 // /proc, statfs and one nvidia-smi call. It only measures and tells: past a limit in Settings (machine.*) its
 // coordinator hears once, with the numbers and what uses the machine most, and again only after it came back under.
 // What to do about it (pause or queue tasks, clean the disk, tell the human) is the coordinator's call. The same
-// numbers decide when Shepherdr starts more tasks (engine.release).
+// numbers decide when Lineclear starts more tasks (engine.release).
 import { readdirSync, readFileSync, readlinkSync, statfsSync, statSync } from 'node:fs'
 import { cpus, homedir, tmpdir } from 'node:os'
 import type { HealthLevel, HealthMeter } from '../../shared/types.ts'
@@ -321,7 +321,7 @@ export interface HealthEvent {
 
 /**
  * Samples this machine every SAMPLE_MS and looks at herdr every few seconds; tells `on` when something crossed its
- * limit or came back under. What was told is kept on disk: a restart (Shepherdr restarts on every merge) tells
+ * limit or came back under. What was told is kept on disk: a restart (Lineclear restarts on every merge) tells
  * nothing again while it is still over.
  */
 export class Monitor {

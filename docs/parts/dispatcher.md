@@ -18,14 +18,13 @@ planner (`lineclear plan`) or a move to the roadmap, and follows each request to
 - `src/dispatcher.ts`: `dispatcherMain`, `moveMain`, `applyMove`, `dispatcherDir`
 - `src/requests.ts`: `planStatus`, `liveLink`, `recordRequest`, `addedSteps`, `planViews`, `PlanView`
 - `src/reads-cache.ts`: `keepReads`, `cachedRead`, `forgetReads`
-- `src/chat.ts`: `chatEvents`, `dispatcherChat` (it makes a missing Dispatcher once a minute), `taskChatLinks`, `MAX_FILE_BYTES`, `namedImageResponse`, `parseSend` (the request body, as untyped JSON), `sizeText`, `ChatMessage`, `ChatView`
+- `src/chat.ts`: `chatEvents`, `dispatcherChat` (it makes a missing Dispatcher once a minute), `taskChatLinks`, `MAX_FILE_BYTES`, `namedImageResponse`, `parseSend` (the request body, as untyped JSON), `sizeText`, `ChatMessage`, `ChatView` (the chat of the Lineclear server)
 - `src/chat-limits.ts`: `sizeText`, `ACCEPT`, `MAX_FILE_BYTES`, `MAX_FILES`, `MAX_TEXT`
 
 ## Files
 
 - code: `src/dispatcher.ts`, `src/requests.ts`, `src/chat.ts`, `src/chat-limits.ts`, `src/reads-cache.ts`
 - words: `templates/dispatcher.md`
-- research: `docs/research/dispatcher-flow.md`
 - tests: `test/dispatcher.test.ts`, `test/dispatcher-chat.test.ts`, `test/dispatcher-pick.test.ts`, `test/dispatcher-eval.test.ts`, `test/dispatcher-eval/`, `test/chat.test.ts`
 
 ## Tests

@@ -1,5 +1,5 @@
 import { WorkerHealth } from './recovery.ts'
-import { existsSync, mkdirSync, openSync, rmSync } from 'node:fs'
+import { mkdirSync, openSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Action, Chat, Snapshot } from '../../shared/types.ts'
 import { Emitter } from '../source.ts'
@@ -18,8 +18,7 @@ import {
   type Saved,
 } from './install.ts'
 import { mirrorHomes } from './mirror.ts'
-import { q, sshArgs, tellRunBy } from './box.ts'
-import { herdrCli } from './herdr.ts'
+import { q, tellRunBy } from './box.ts'
 import { MERGE_DEADLINE } from './engine/engine.ts'
 import { type Events, type Link, type Worker, type Kept, CONNECTING_FOR, codeVersion, running, machineHome, dirOf, fits, sameBox } from './machines-helpers.ts'
 
@@ -208,7 +207,6 @@ export class MachinesLinks extends Emitter<Events> {
       }
       const p = await this.look(l, force)
       if (!p || !this.active(l)) return
-      if (p.oldInstall) await this.takeOver(l, home)
       if (last && l.worker && sameBox(l.saved, last, p)) return
       if (l.worker) {
         const old = l.worker as Worker
@@ -266,27 +264,6 @@ export class MachinesLinks extends Emitter<Events> {
     tellRunBy(l.saved.target)
     this.keep(l)
     return p
-  }
-
-  /**
-   * The machine had Shepherdr installed on it, reporting to this one (before one install ran every machine): its
-   * projects, tasks and chats come here once, and that copy is turned off in its herdr (herdr plugin disable shepherdr),
-   * so only this one runs its agents. Its files stay where they were.
-   */
-  protected async takeOver(l: Link, home: string) {
-    if (!existsSync(join(home, 'spaces.json')) && !existsSync(join(home, 'projects.json'))) {
-      const out = ['./helper', './browser', './inbox', './hooks', './run', './.releases', './config.json', './server.json']
-        .map((x) => `--exclude=${x}`)
-        .join(' ')
-      const from = Bun.spawn(sshArgs(l.saved.target, `cd "$HOME/.lineclear" && tar cf - ${out} .`), { stdout: 'pipe', stderr: 'ignore' })
-      const to = Bun.spawn(['tar', 'xf', '-', '-C', home], { stdin: from.stdout, stdout: 'ignore', stderr: 'ignore' })
-      await Promise.all([from.exited, to.exited])
-    }
-    await herdrCli(['--machine', l.saved.id, 'plugin', 'disable', 'shepherdr'])
-    await onMachine(
-      l.saved.target,
-      `PATH=${q(l.probe?.path ?? '/usr/bin:/bin')}; mv "$HOME/.lineclear/config.json" "$HOME/.lineclear/config.json.before-one-install" 2>/dev/null; true`,
-    )
   }
 
   protected active(l: Link) {
@@ -415,7 +392,7 @@ export class MachinesLinks extends Emitter<Events> {
     if (this.active(l)) await this.start(l)
   }
 
-  /** Its worker was started again out of this server's hands (shepherdr doctor while another server ran, by hand)
+  /** Its worker was started again out of this server's hands (lineclear doctor while another server ran, by hand)
    *  and serves at another address: its server.json says where, and that worker is taken as this machine's. */
   protected moved(l: Link): boolean {
     if (l.busy) return false

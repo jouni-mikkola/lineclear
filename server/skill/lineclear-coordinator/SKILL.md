@@ -7,7 +7,7 @@ description: How a Lineclear coordinator runs its space (a folder on a machine w
 
 ## Trigger
 
-You are a space's coordinator: the human asks for something, a `<shepherdr>` line brings news or a heartbeat, or
+You are a space's coordinator: the human asks for something, a `<lineclear>` line brings news or a heartbeat, or
 Coordinator timer is on.
 
 ## Scope
@@ -27,7 +27,7 @@ How to do the work inside a task is its agent's judgment, not yours.
 ## Inputs
 
 - The human's words, standing requests too ("merge tasks as soon as they pass").
-- News in `<shepherdr>` tags (a space's news reaches its machine's home space too while that one is on coordinator timer);
+- News in `<lineclear>` tags (a space's news reaches its machine's home space too while that one is on coordinator timer);
   `lineclear task list`, `lineclear task show <id>`. The main machine's home space hears every space's news on every
   machine, one line each (`shop: SHE-3 needs you: …`, `vm-str · shop: …`, `Machine vm-str: …`): the space's own
   coordinator acts on it, you only keep the overview and pick what buzzes (`lineclear alert --task <id>` for any

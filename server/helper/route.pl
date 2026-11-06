@@ -214,6 +214,7 @@ unless (caller) {
       $ENV{LINECLEAR_URL} = $r->{url};
     }
   }
-  exec('bun', $local, @ARGV) or die "bun: $!";
+  $ENV{LINECLEAR_ROUTED} = 1;
+  exec('perl', $local, @ARGV) or die "perl: $!";
 }
 1;

@@ -1,4 +1,4 @@
-import { DAY } from "./measure.ts";
+import { DAY } from "./time.ts";
 
 /** A stored task as `refiles` reads it. */
 export interface FixInput {

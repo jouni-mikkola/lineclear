@@ -3,9 +3,19 @@ import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { configDir } from "../pi/config.ts";
 import { compileCacheDir } from "./tmpdirs.ts";
+import { gitText } from "./git.ts";
 
-export const INSTALL_URL = "https://raw.githubusercontent.com/jouni-mikkola/lineclear/main/install.sh";
-export const SHEPHERDR_PLUGIN_ID = "herdr-projects";
+/** The address install.sh is fetched from: read from the install.sh shipped beside this code, so the repo's address lives in README and install.sh only. */
+export const INSTALL_URL = (() => {
+  try {
+    return (
+      readFileSync(join(import.meta.dir, "..", "install.sh"), "utf8").match(/https:\/\/raw\.githubusercontent\.com\/\S+\/install\.sh/)?.[0] ?? "install.sh"
+    );
+  } catch {
+    return "install.sh";
+  }
+})();
+export const OLD_PLUGIN_ID = "herdr-projects";
 export const SERVICE = "lineclear.service";
 
 /** Where install puts each thing. It follows the XDG folders and pi's own folder variable. */
@@ -48,14 +58,10 @@ export const extensionFile = (app: string) =>
 type Env = Record<string, string | undefined>;
 
 /** The board's data folder: the fork's `~/.lineclear`. */
-export const dataDir = (env: Env = process.env) => env.LINECLEAR_HOME ?? env.LINECLEAR_SHEPHERDR_DIR ?? join(homedir(), ".lineclear");
-
-/** The lineclear command of the helper on a machine: this one's path, or (`remote`) the shell word for another's, which needs no PATH there. */
-export const helperCommand = (remote = false, env: Env = process.env) =>
-  remote ? '"$HOME/.lineclear/helper/bin/lineclear"' : join(dataDir(env), "helper", "bin", "lineclear");
+export const dataDir = (env: Env = process.env) => env.LINECLEAR_HOME ?? join(homedir(), ".lineclear");
 
 /** The board's command, the fork's own `lineclear` in server/bin. */
-export const serverBin = (env: Env = process.env) => env.SHEPHERDR_BIN ?? join(import.meta.dir, "..", "server", "bin", "lineclear");
+export const serverBin = (env: Env = process.env) => env.LINECLEAR_SERVER_BIN ?? join(import.meta.dir, "..", "server", "bin", "lineclear");
 
 /** pi's own folder: its settings, extensions, packages and session files. */
 export const piDir = (env: Env = process.env) => env.PI_CODING_AGENT_DIR ?? join(homedir(), ".pi", "agent");
@@ -106,17 +112,10 @@ export function stableRefusal(root: string, args: string[], env: Env = process.e
   return `this checkout's bin/lineclear would use ${used.join(", ")}. The stable lineclear on PATH runs the real system. To try this code, start a test instance (lineclear release try, L130), or set LINECLEAR_CONFIG, LINECLEAR_HOME and LINECLEAR_PORT to a folder and a port of your own.`;
 }
 
-/** The package version of the code that runs here: all a release install knows of itself, as it has no checkout. */
-export function codeVersion(): string {
-  try {
-    return JSON.parse(readFileSync(resolve(import.meta.dir, "..", "package.json"), "utf8")).version;
-  } catch {
-    return "unknown";
-  }
-}
-
 /** The commit of the code that runs here. */
 export function codeCommit(): string {
-  const p = Bun.spawnSync(["git", "-C", resolve(import.meta.dir, ".."), "rev-parse", "HEAD"], { stdin: "ignore", stderr: "ignore" });
-  return p.exitCode === 0 ? p.stdout.toString().trim() : "unknown";
+  return gitText(resolve(import.meta.dir, ".."), "rev-parse", "HEAD") ?? "unknown";
 }
+
+/** The lock file `<name>.lock` in the config folder: one guard per job that must not run twice at once. */
+export const lockFile = (env: Env, name: string) => join(configDir(env), `${name}.lock`);

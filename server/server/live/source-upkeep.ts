@@ -121,7 +121,7 @@ export class LiveSourceUpkeep extends LiveSourceCli {
       .finally(() => this.reseating.delete(key))
   }
 
-  /** an agent Shepherdr keeps running: a space's coordinator it started, or a task's agent while its task goes on */
+  /** an agent Lineclear keeps running: a space's coordinator it started, or a task's agent while its task goes on */
   protected keepsRunning(key: string) {
     const r = this.agents.record(key)
     if (!r || r.finished || this.agents.busy(key) || this.reseating.has(key) || this.peers?.owner(key)) return false
@@ -130,7 +130,7 @@ export class LiveSourceUpkeep extends LiveSourceCli {
   }
 
   /**
-   * Coordinators and task agents that stopped, or run without the files Shepherdr starts them with now (herdr restored
+   * Coordinators and task agents that stopped, or run without the files Lineclear starts them with now (herdr restored
    * an older command after it restarted): started again, resuming their session, a few times at most (revive.ts)
    */
   async revive(now = Date.now()) {

@@ -2,7 +2,7 @@
 
 The composer + menu shows CLI observations (`Chat.agent.runtime`). `Chat.agent.model` and `effort` remain the selected
 launch policy; missing/default values still inherit the CLI configuration. Restart's `on` and `want` retain their
-existing meaning. Neither Settings nor Shepherdr's model catalog fills a missing runtime observation.
+existing meaning. Neither Settings nor Lineclear's model catalog fills a missing runtime observation.
 
 Both coordinator and task chats use the same path. Observations are tied to the active transcript and this launch's
 start time. Old logs cannot supply a new launch's values; a resumed Codex thread can supply current state before its

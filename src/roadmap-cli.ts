@@ -3,7 +3,7 @@ import { writeAtomic } from "../pi/atomic.ts";
 import { join } from "node:path";
 import { unprovenOf } from "./doneproof.ts";
 import { lineOfRoadmap } from "./roadmap-view.ts";
-import { shepherdrTasks } from "./roadmap-source.ts";
+import { lineclearTasks } from "./roadmap-source.ts";
 import { statusesOf } from "./task-steps.ts";
 import { importRoadmap } from "./roadmap-import.ts";
 import { stepText } from "./brief.ts";
@@ -22,6 +22,7 @@ import {
 } from "./roadmap.ts";
 import { readParts, stepPartFaults, stepParts, unblockedByFiles } from "./parts.ts";
 import { mainRefs } from "./main-branch.ts";
+import { git } from "./git.ts";
 
 type Out = (line: string) => void;
 
@@ -43,10 +44,9 @@ function readRoadmap(repo: string, out: Out): { text: string; file: string } | u
 }
 
 function mainCommits(repo: string, ref = mainRefs(repo)[0]): { subject: string; body: string }[] | string {
-  const p = Bun.spawnSync(["git", "-C", repo, "log", ref, "-z", "--format=%s%x01%b"]);
-  if (p.exitCode !== 0) return `cannot read origin/main in ${repo}: ${p.stderr.toString().trim()}`;
-  return p.stdout
-    .toString()
+  const p = git(repo, "log", ref, "-z", "--format=%s%x01%b");
+  if (!p.ok) return `cannot read origin/main in ${repo}: ${p.err}`;
+  return p.out
     .split("\0")
     .filter((r) => r.trim() !== "")
     .map((r) => {
@@ -68,7 +68,7 @@ function locksMain(steps: Step[], status: StepStatus[], out: Out): number {
 export function roadmapMain(
   args: string[],
   out: Out,
-  tasksOf: (space: string) => Task[] | string = (s) => shepherdrTasks(s),
+  tasksOf: (space: string) => Task[] | string = (s) => lineclearTasks(s),
   env: NodeJS.ProcessEnv = process.env,
   now = Date.now(),
 ): number {
@@ -201,11 +201,6 @@ function fail(out: Out, message: string): number {
   return 1;
 }
 
-function git(repo: string, ...a: string[]) {
-  const p = Bun.spawnSync(["git", "-C", repo, ...a]);
-  return { ok: p.exitCode === 0, text: (p.stderr.toString() + p.stdout.toString()).trim() };
-}
-
 /** Writes docs/ROADMAP.md from a JSON list and commits it with a `Step: <id>` line for each done step. */
 function importMain(args: string[], out: Out): number {
   const flags = new Set(args.filter((a) => a.startsWith("--")));
@@ -241,7 +236,7 @@ function importMain(args: string[], out: Out): number {
     git(repo, "reset", "-q", "--", "docs/ROADMAP.md");
     if (before === undefined) rmSync(target);
     else writeAtomic(target, before);
-    return fail(out, `commit failed, nothing written: ${commit.text}`);
+    return fail(out, `commit failed, nothing written: ${commit.err || commit.out.trim()}`);
   }
   out("committed");
   return 0;

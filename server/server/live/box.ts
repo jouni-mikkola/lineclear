@@ -1,9 +1,9 @@
-// Another machine, reached over SSH. Shepherdr is installed once, on the main machine; every other machine saved in
+// Another machine, reached over SSH. Lineclear is installed once, on the main machine; every other machine saved in
 // herdr's Remote (herdr machine list) is run from it by a worker process of its own (machines.ts), with LINECLEAR_BOX
 // naming the machine. In that worker, everything that touches the machine goes through here: herdr's API rides herdr's
 // own remote bridge (herdr.ts), commands (git, gh, agent-browser) and file reads run over one shared SSH connection
 // (a ControlMaster), and the CLIs' logs are mirrored to the main machine as they grow (mirror.ts). The machine itself
-// needs only herdr, git, perl and the agent CLIs, plus the small helper Shepherdr puts there (helper/, install.ts).
+// needs only herdr, git, perl and the agent CLIs, plus the small helper Lineclear puts there (helper/, install.ts).
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { existsSync, mkdirSync } from 'node:fs'
 import { homedir, hostname } from 'node:os'
@@ -13,7 +13,7 @@ import { DEFAULT_PORT, readJson } from '../store.ts'
 import type { Machines } from './machines.ts'
 
 export interface BoxInfo {
-  /** herdr's label for it: the machine's name in Shepherdr */
+  /** herdr's label for it: the machine's name in Lineclear */
   label: string
   /** the SSH target herdr reaches it by (a host, user@host, an ~/.ssh/config alias) */
   target: string
@@ -54,7 +54,7 @@ export const remoteBox = (): BoxInfo | null => {
 /** whether the box is reached over SSH (a box with a herdr socket of its own is local) */
 const remote = (b: BoxInfo | null): b is BoxInfo => !!b && !b.socket
 
-/** the helper's folder on a machine: its shepherdr command, hooks, inbox, skills (helper/, install.ts) */
+/** the helper's folder on a machine: its lineclear command, hooks, inbox, skills (helper/, install.ts) */
 export const helperDir = (home: string) => join(home, '.lineclear', 'helper')
 
 /** the home folder of the machine this process works on */
@@ -220,7 +220,7 @@ export function spawnOn(b: BoxInfo, argv: string[], o: { extra?: string[]; stdin
 /** the stable build's bin: an agent of any project, the Lineclear repo's included, runs this `lineclear`, never its own checkout's */
 const stableBin = (data: string) => (existsSync(join(data, 'builds', 'current', 'bin', 'lineclear')) ? join(data, 'builds', 'current', 'bin') : '')
 
-/** who an agent is to the shepherdr command, and where that command is: here Shepherdr's own bin and server; on
+/** who an agent is to the lineclear command, and where that command is: here Lineclear's own bin and server; on
  *  another machine the helper's bin first on its own PATH (its command finds the way back by itself) */
 export function agentEnv(chat: string, root: string, data = process.env.LINECLEAR_MAIN_HOME ?? join(homedir(), '.lineclear')): Record<string, string> {
   const b = box()

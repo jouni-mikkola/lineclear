@@ -13,7 +13,7 @@ const FAKE = join(import.meta.dir, "..", "ui", "test", "fake-playwright-cli");
 const api = (sessions: string[], extra: Record<string, string> = {}, now?: () => number) => {
   const dir = webShopDir("lc-browsers-");
   writeFileSync(
-    join(dir, "shepherdr", "tasks.json"),
+    join(dir, "lineclear", "tasks.json"),
     JSON.stringify({
       tasks: [
         { id: "WEB-1", title: "Pay with a saved card" },
@@ -42,10 +42,10 @@ const api = (sessions: string[], extra: Record<string, string> = {}, now?: () =>
   );
   const env = {
     LINECLEAR_CONFIG: join(dir, "config"),
-    LINECLEAR_SHEPHERDR_DIR: join(dir, "shepherdr"),
+    LINECLEAR_HOME: join(dir, "lineclear"),
     LINECLEAR_PLAYWRIGHT_CLI: FAKE,
     PI_CODING_AGENT_DIR: join(dir, "pi"),
-    SHEPHERDR_BIN: "true",
+    LINECLEAR_SERVER_BIN: "true",
     ...extra,
     HOME: dir,
     PATH: process.env.PATH,
@@ -124,7 +124,7 @@ test("/api/browsers is each open session with its task's plain title, a login it
 test("/api/browsers leaves out the browser of a task that is done", async () => {
   const { call, dir, done } = api(["WEB-1", "WEB-12-review", "scratch"]);
   writeFileSync(
-    join(dir, "shepherdr", "tasks.json"),
+    join(dir, "lineclear", "tasks.json"),
     JSON.stringify({
       tasks: [
         { id: "WEB-1", title: "Pay with a saved card", merged: true },
@@ -218,7 +218,7 @@ test("a page that points its own name at the server is refused", async () => {
   const { dir, done } = api(["WEB-1"]);
   const handle = webApi({
     LINECLEAR_CONFIG: join(dir, "config"),
-    LINECLEAR_SHEPHERDR_DIR: join(dir, "shepherdr"),
+    LINECLEAR_HOME: join(dir, "lineclear"),
     LINECLEAR_PLAYWRIGHT_CLI: FAKE,
     PATH: process.env.PATH,
   });
@@ -230,7 +230,7 @@ test("a playwright-cli that fails gives a 502 with its words, and is asked again
   const { dir, done } = api([]);
   const env = {
     LINECLEAR_CONFIG: join(dir, "config"),
-    LINECLEAR_SHEPHERDR_DIR: join(dir, "shepherdr"),
+    LINECLEAR_HOME: join(dir, "lineclear"),
     LINECLEAR_PLAYWRIGHT_CLI: FAKE,
     PATH: process.env.PATH,
   };

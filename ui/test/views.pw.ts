@@ -11,7 +11,7 @@ import { BASE, FIXTURE, LIVE, startFixture, writeItem, writeTasks } from "./fixt
 const MID: Record<string, { second: string; shown: string }> = {
   "/": {
     second: '[data-row-id="API-1"]:visible',
-    shown: `[...document.querySelectorAll('[data-row-id="API-1"]')].some((r) => r.getAttribute("aria-expanded") === "true")`,
+    shown: `[...document.querySelectorAll('[data-row-id="API-1"] [aria-expanded]')].some((b) => b.getAttribute("aria-expanded") === "true")`,
   },
 };
 

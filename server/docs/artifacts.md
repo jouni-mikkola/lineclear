@@ -1,9 +1,9 @@
 # Artifacts
 
 - Any agent can show you an **artifact**: a report, a dashboard, a deck, a draft screen or a small app, made as one
-  HTML file (`shepherdr artifact new`). It shows as a card in the chat where it was made and opens full screen on a
+  HTML file (`lineclear artifact new`). It shows as a card in the chat where it was made and opens full screen on a
   tap. Each space keeps its own in **Artifacts**, beside Tasks (a third tab on a phone): a home space lists its
-  machine's spaces' too, the main machine's home space every one. When an agent changes one it updates it (`shepherdr artifact update`), making a new
+  machine's spaces' too, the main machine's home space every one. When an agent changes one it updates it (`lineclear artifact update`), making a new
   version instead of a new artifact. The chat folds the older card to a line, and an open view swaps in the new
   version while you look, with only its numbers changing when only its data did. Full screen you can step back
   through its versions, mark it up, or write to the agent that keeps it, so you change it by chatting beside it. Its

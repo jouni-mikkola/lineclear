@@ -44,7 +44,7 @@ when that need is measured.
 
 ## UI
 
-- **More views.** U5 names what you still open Shepherdr's UI for. Each such need comes back as its own view.
+- **More views.** U5 names what you still open Lineclear's UI for. Each such need comes back as its own view.
 - **Machine status view**: CPU, memory and disk of each machine. The setup's own tools show them until a user
   needs them in Lineclear.
 - **Numbers across machines** in one view. `lineclear measure` counts every machine (L57); a view of them comes
@@ -69,3 +69,7 @@ when that need is measured.
 ## Roadmap view
 
 - Draw the `unproven` step state in `ui/web/roadmap` (words "merged, unproven: <item>", the station look of a step still to do). The data is there (`state`, `unproven` in the roadmap view); the roadmap spec takes about four minutes, so a change in that folder alone breaks the check's time budget.
+
+## Cost per merged step
+
+- The nightly `cost goal` fails: the cost per merged step is above the goal, and cache write is the largest share. Find which sessions write the most cache (a prompt prefix that changes between calls rewrites it) and cut that. It needs `lineclear measure` on a machine with the project set up.

@@ -52,7 +52,7 @@ function world(askPlans: boolean) {
       }),
     );
   write(askPlans);
-  const vars = { ...process.env, LINECLEAR_CONFIG: cfg, SHEPHERDR_BIN: bin, LINECLEAR_READINESS: "echo GO" } as NodeJS.ProcessEnv;
+  const vars = { ...process.env, LINECLEAR_CONFIG: cfg, LINECLEAR_SERVER_BIN: bin, LINECLEAR_READINESS: "echo GO" } as NodeJS.ProcessEnv;
   const item = {
     kind: "plan" as const,
     task: "LIN-7",

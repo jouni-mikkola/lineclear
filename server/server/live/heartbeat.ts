@@ -9,7 +9,7 @@ import { dirname, join } from 'node:path'
 import { HOME, readJson, writeJson } from '../store.ts'
 import { nextRun } from './trigger.ts'
 
-/** a place's HEARTBEAT.md, in Shepherdr's own folder (a worker's for another machine's places, on the main machine):
+/** a place's HEARTBEAT.md, in Lineclear's own folder (a worker's for another machine's places, on the main machine):
  *  never a path for the coordinator, whose machine may not have it. It reads the checklist in its heartbeat and with
  *  lineclear heartbeat, and edits it with lineclear heartbeat set, or the human in Settings */
 export const heartbeatFile = (place: string) => join(HOME, 'heartbeat', `${place.replace(/[^\w.-]+/g, '-')}.md`)

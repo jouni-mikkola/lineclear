@@ -138,7 +138,7 @@ describe('its pull request', () => {
   test('the GitHub host and repo of a remote', () => {
     expect(ghRepo('git@github.com:acme/gtm.git')).toEqual({ host: 'github.com', repo: 'acme/gtm' })
     expect(ghRepo('https://github.com/acme/gtm')).toEqual({ host: 'github.com', repo: 'acme/gtm' })
-    expect(ghRepo('http://github.localhost/eliasstravik/shepherdr.git')).toEqual({ host: 'github.localhost', repo: 'eliasstravik/shepherdr' })
+    expect(ghRepo('http://github.localhost/eliasstravik/herdr-projects.git')).toEqual({ host: 'github.localhost', repo: 'eliasstravik/herdr-projects' })
     expect(ghRepo('ssh://git@ghe.corp:2222/team/app.git')).toEqual({ host: 'ghe.corp', repo: 'team/app' })
     expect(ghRepo('/local/path')).toBeNull()
   })

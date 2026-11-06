@@ -1,12 +1,12 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { configDir } from "../pi/config.ts";
+import { MIN } from "./time.ts";
 
 // How long the board's API takes to answer, one line a minute with that minute's count and 95th percentile, so the
 // waste watch (src/waste.ts) can read it from the rule loop's process, which is not the server's.
 
 type Env = Record<string, string | undefined>;
-const MIN = 60_000;
 const file = (env: Env) => join(configDir(env), "api-latency.jsonl");
 
 let minute = 0;

@@ -248,7 +248,7 @@ function nudged(env: Record<string, string>) {
 test("a task agent's quiet turn is nudged at once, twice in a row, then left to the ladder", () => {
   const n = nudged({ LINECLEAR_CHAT: "LIN-1/Agent" });
   n.end(turn("Looks fine."));
-  n.end(turn("I'll keep calling shepherdr merge."));
+  n.end(turn("I'll keep calling lineclear merge."));
   n.end(turn("Still nothing."));
   expect(n.sent).toEqual([IDLE_NUDGE, PROMISE_NUDGE]);
   n.human();
@@ -258,7 +258,7 @@ test("a task agent's quiet turn is nudged at once, twice in a row, then left to 
 
 test("a turn that asked, declared a wait or reported ends with no nudge, and others are never nudged", () => {
   const n = nudged({ LINECLEAR_CHAT: "LIN-1/Agent" });
-  for (const cmd of ['shepherdr ask "Rerun?" --choice a', 'lineclear wait task LIN-2 "its code"', "shepherdr ready LIN-1 --summary x", "shepherdr done LIN-1"])
+  for (const cmd of ['lineclear ask "Rerun?" --choice a', 'lineclear wait task LIN-2 "its code"', "lineclear ready LIN-1 --summary x", "lineclear done LIN-1"])
     n.end(turn("ok", cmd));
   expect(n.sent).toEqual([]);
   for (const chat of ["LIN-1/Reviewer", "dispatcher"]) {
@@ -267,6 +267,12 @@ test("a turn that asked, declared a wait or reported ends with no nudge, and oth
     expect(other.sent).toEqual([]);
   }
 });
+
+// Waits for a condition instead of a fixed time, so a loaded machine only makes the test slower.
+async function until(ok: () => boolean): Promise<void> {
+  for (let i = 0; i < 400 && !ok(); i++) await Bun.sleep(10);
+  expect(ok()).toBe(true);
+}
 
 test("L257: a task agent beats while a tool call runs and stops when it ends", async () => {
   const handlers: Record<string, ((e: any, c: any) => unknown)[]> = {};
@@ -278,15 +284,12 @@ test("L257: a task agent beats while a tool call runs and stops when it ends", a
   expect(beats).toEqual([]);
   fire("tool_call", { toolCallId: "a" });
   fire("tool_call", { toolCallId: "b" });
-  await Bun.sleep(60);
-  expect(beats.length).toBeGreaterThan(1);
+  await until(() => beats.length > 1);
   expect(new Set(beats)).toEqual(new Set(["LINE-9"]));
   fire("tool_result", { toolCallId: "a" });
   const one = beats.length;
-  await Bun.sleep(40);
-  expect(beats.length).toBeGreaterThan(one);
+  await until(() => beats.length > one);
   fire("tool_result", { toolCallId: "b" });
-  await Bun.sleep(5);
   const done = beats.length;
   await Bun.sleep(50);
   expect(beats.length).toBe(done);
@@ -306,7 +309,7 @@ test("L257: the beat is at most 5 minutes apart and runs `lineclear alive <task>
   const pi = { on: (e: string, h: (e: any, c: any) => unknown) => void (handlers[e] ??= []).push(h) };
   beatDuringCalls(pi, { LINECLEAR_CHAT: "LINE-9/Agent", LINECLEAR_BIN: bin }, undefined, 10);
   handlers.tool_call![0]!({ toolCallId: "a" }, {});
-  await Bun.sleep(150);
+  await until(() => existsSync(out) && readFileSync(out, "utf8").includes("\n"));
   handlers.tool_result![0]!({ toolCallId: "a" }, {});
   expect(readFileSync(out, "utf8").split("\n")[0]).toBe("alive LINE-9");
 });

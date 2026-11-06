@@ -1,5 +1,5 @@
 #!/bin/sh
-# agent-browser at the version Shepherdr pins (package.json), for agents: their shared browser runs on it. Each command
+# agent-browser at the version Lineclear pins (package.json), for agents: their shared browser runs on it. Each command
 # an agent runs marks when its browser was last used (below).
 # The package's binaries come without the execute bit (its own install script would also repoint a global install,
 # so it is not run); it is set here.
@@ -10,11 +10,11 @@ musl=
 [ "$os" = linux ] && ldd --version 2>&1 | grep -qi musl && musl=-musl
 b="$here/node_modules/agent-browser/bin/agent-browser-$os$musl-$arch"
 if [ ! -f "$b" ]; then
-  echo "agent-browser is not installed in Shepherdr (run bun install in $here)" >&2
+  echo "agent-browser is not installed in Lineclear (run bun install in $here)" >&2
   exit 127
 fi
 [ -x "$b" ] || chmod +x "$b" 2>/dev/null
-# a task's browser was used now: Shepherdr closes one left idle (server/live/browser.ts closeIdle)
+# a task's browser was used now: Lineclear closes one left idle (server/live/browser.ts closeIdle)
 if [ -n "$AGENT_BROWSER_PROFILE" ]; then
   # pages see prefers-reduced-motion: reduce, so they don't animate (Chrome draws them in software); an agent turns it
   # off for its browser with set media no-preference. Asked for here, so every command on a session asks the same

@@ -1,3 +1,4 @@
+import { OLD_NAME } from "../src/old-install.ts";
 import { expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, utimesSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -6,7 +7,7 @@ import { copyBrowsers, oldPathRecords, rewriteOldPaths } from "../src/old-paths.
 
 function setup() {
   const dir = mkdtempSync(join(tmpdir(), "oldpaths-"));
-  const r = { old: join(dir, ".shepherdr"), now: join(dir, ".lineclear"), app: join(dir, "app") };
+  const r = { old: join(dir, `.${OLD_NAME}`), now: join(dir, ".lineclear"), app: join(dir, "app") };
   mkdirSync(r.old, { recursive: true });
   mkdirSync(r.now, { recursive: true });
   const checkout = join(dir, ".config/herdr/plugins/github-installations/herdr-projects-b1278ffb803c/1408050-0/checkout");
@@ -16,7 +17,7 @@ function setup() {
       "LIN-1/Agent": {
         key: "LIN-1/Agent",
         cwd: "/work/lin-1",
-        system: `Read ${checkout}/skill/shepherdr/SKILL.md first`,
+        system: `Read ${checkout}/skill/${OLD_NAME}/SKILL.md first`,
         env: { AGENT_BROWSER_PROFILE: `${r.old}/browser/LIN-1`, PATH: `${checkout}/bin:/usr/bin` },
         logs: [join(r.old, "chatlog", "LIN-1.jsonl")],
       },
@@ -55,7 +56,7 @@ test("doctor --fix rewrites old paths in agents.json and tasks.json, and the tas
   const agent = JSON.parse(readFileSync(join(r.now, "agents.json"), "utf8"))["LIN-1/Agent"];
   expect(agent.env.AGENT_BROWSER_PROFILE).toBe(join(r.now, "browser", "LIN-1"));
   expect(agent.env.PATH).toBe(`${join(r.now, "helper", "bin")}:/usr/bin`);
-  expect(agent.system).toBe(`Read ${join(r.app, "server")}/skill/shepherdr/SKILL.md first`);
+  expect(agent.system).toBe(`Read ${join(r.app, "server")}/skill/${OLD_NAME}/SKILL.md first`);
   const task = JSON.parse(readFileSync(join(r.now, "tasks.json"), "utf8")).tasks[0];
   expect(task.log).toBe(join(r.now, "chatlog", "LIN-1.jsonl"));
   expect(task.lost).toBe(`${r.old}/chatlog/none.jsonl`);

@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { shepherdrDir, worktreeCost } from "../src/measure.ts";
+import { lineclearDir, worktreeCost } from "../src/measure.ts";
 import { taskDetail, taskFacts } from "../src/task-detail.ts";
 
 const home = () => {
@@ -15,7 +15,7 @@ const home = () => {
   return { LINECLEAR_HOME: dir, HOME: dir };
 };
 
-const detail = (id: string, env = home()) => taskDetail(id, { shepherdr: shepherdrDir(env), costSoFar: (w) => worktreeCost(w, env) }, env);
+const detail = (id: string, env = home()) => taskDetail(id, { lineclear: lineclearDir(env), costSoFar: (w) => worktreeCost(w, env) }, env);
 
 test("an opened row has its log oldest first and its reviewer's findings", () => {
   const d = detail("A-1");

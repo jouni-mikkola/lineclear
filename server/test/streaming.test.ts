@@ -11,7 +11,7 @@ const codex = (...above: string[]) =>
 describe('a reply on the screen', () => {
   test('Claude Code: none while it thinks or runs a tool', () => {
     expect(
-      replyOnScreen('claude', claude('❯ <shepherdr><news task="SHE-9" event="ready">SHE-9 is ready.</news></shepherdr>', '', '✻ Infusing… (1s · thinking)')),
+      replyOnScreen('claude', claude('❯ <lineclear><news task="SHE-9" event="ready">SHE-9 is ready.</news></lineclear>', '', '✻ Infusing… (1s · thinking)')),
     ).toBeUndefined()
     expect(
       replyOnScreen(

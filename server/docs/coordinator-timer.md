@@ -7,14 +7,14 @@ evaluation or reporting forms and no mission dashboard. Task briefs and Heartbea
 introduced in SHE-294.
 
 An ongoing instruction such as “keep improving the game” has no invented stopping target. A finite goal such as
-“halve startup time” ends when the coordinator proves it, saves evidence and calls `shepherdr complete "evidence"`.
-Each wake reads Heartbeat and saved progress, inspects Shepherdr with its tools, chooses permitted useful work,
-acts, evaluates evidence and saves progress/next step with `shepherdr progress "…"`.
+“halve startup time” ends when the coordinator proves it, saves evidence and calls `lineclear complete "evidence"`.
+Each wake reads Heartbeat and saved progress, inspects Lineclear with its tools, chooses permitted useful work,
+acts, evaluates evidence and saves progress/next step with `lineclear progress "…"`.
 
 When, Events and time zone reuse the existing trigger machinery. Selected events wake immediately; other news
 waits for the next heartbeat. Run now queues a wake until the coordinator is idle. Next and Last show schedule,
 time, wake reason and delivery/turn outcome; a turn ending is not a claim that the goal succeeded. The coordinator's
-actual messages and saved progress carry its results; Shepherdr generates no separate status report.
+actual messages and saved progress carry its results; Lineclear generates no separate status report.
 
 Turning ON closes/replaces the regular coordinator with a fresh selected coordinator timer session. OFF starts a fresh
 regular coordinator using normal defaults. The chat key, old transcripts, queued human messages and saved progress
@@ -32,7 +32,7 @@ wrapper PATH are verified before Herdr starts any agent. A shell configuration t
 
 | Runtime | Claude Code | Codex | pi | Other Herdr agents |
 | --- | --- | --- | --- | --- |
-| Shepherdr chat reader, model/effort adapter | Yes | Yes | Yes | Not currently viable for coordinator chat; refused |
+| Lineclear chat reader, model/effort adapter | Yes | Yes | Yes | Not currently viable for coordinator chat; refused |
 | Shared Linux isolation, schedule, fresh mode replacement | Yes | Yes | Yes | Refused |
 | Local Linux repository space with usable bubblewrap namespaces | Required | Required | Required | - |
 | Remote workers, macOS, home-space coordinator timer | Currently refused | Currently refused | Currently refused | - |
@@ -40,7 +40,7 @@ wrapper PATH are verified before Herdr starts any agent. A shell configuration t
 The **Isolated workspace** profile uses bubblewrap PID, mount, user and network namespaces, drops capabilities,
 clears inherited environment and starts with a private provider home. It applies to the whole process tree,
 including shell commands, native helpers and headless reviewers, regardless of their own sandbox flags. System executables, libraries and certificate configuration are read-only. Other host
-home files, Herdr/Shepherdr control sockets and local/private network are absent. The coordinator sees its project read-only;
+home files, Herdr/Lineclear control sockets and local/private network are absent. The coordinator sees its project read-only;
 workers can write only their own worktree and private runtime home. Host Git metadata is read-only. A worktree
 containing hardlinks to shared files is refused rather than exposing those shared inodes for writing.
 
@@ -56,7 +56,7 @@ The gateway fixes command chat/cwd identity itself. A caller cannot choose anoth
 profile. Secret values use the existing masked CLI flow, only for names explicitly in this profile. Settings,
 deleting tasks, unrelated work and host-file artifacts require the human. Merges require human approval by default;
 choosing `none` permits managed-task merges while each task brief's merge policy still applies. Workers save a
-commit using `shepherdr checkpoint "message"`; this broker operation stages their worktree and commits with hooks, filters, custom Git credential helpers
+commit using `lineclear checkpoint "message"`; this broker operation stages their worktree and commits with hooks, filters, custom Git credential helpers
 and filesystem monitors disabled. Broker Git uses normal SSH configuration or the authenticated GitHub account;
 workspace-controlled scripts are not run on the host. Custom clean/smudge filters and custom SSH command wrappers
 are unavailable through this broker. Direct Git metadata writes are refused.
@@ -80,7 +80,7 @@ Access and limits are behind an expansion:
   is not a hard token or money cap. No exact financial spending cap is offered.
 - **Shared runtime:** elapsed wall time since ON, including idle time. Every runtime gets the same absolute deadline
   through an external timeout; the manager also checks it. This ends all descendants, not just a turn.
-- **Maximum parallel tasks:** the number of active managed Shepherdr tasks belonging to this run. It does not count
+- **Maximum parallel tasks:** the number of active managed Lineclear tasks belonging to this run. It does not count
   native helper processes as separate tasks; they share their parent's namespace, network allowance and deadline.
 
 The new `autopilot.*` settings, `autopilot-run` action, optional mode `keepWorkers` and optional

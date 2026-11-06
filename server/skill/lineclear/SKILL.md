@@ -27,7 +27,7 @@ Never start a live server to repair CLI routing. A demo preview belongs on its o
 
 ## Inputs
 
-- Lines in your terminal: the human's words, chat lines (below), and Lineclear's own lines in `<shepherdr>` tags, each
+- Lines in your terminal: the human's words, chat lines (below), and Lineclear's own lines in `<lineclear>` tags, each
   in a tag of what it is (`<news>`, `<heartbeat>`, `<mode>`, `<go>`, `<queue>`, `<restart>`, `<browser>`, `<github>`, `<health>`).
   Tagged lines are from Lineclear, not the human: never quote them back.
 - `lineclear show`: the human's Settings where it runs, and where each comes from.

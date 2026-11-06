@@ -2,7 +2,7 @@
 # Sends the main machine what the agents' log files here gain, as they grow, so it reads them as its own files
 # (mirror.ts). Lines on stdin say what to follow: "D <folder>" every file in it, "F <file>" one file whatever its age,
 # "S <ms>" files in folders changed since then, "K <bytes> <file>" how much of it the main machine has already. Out goes, for each piece: "<path>\t<offset>\t<length>\n" and the bytes;
-# offset 0 means the file starts over. Put here by Shepherdr.
+# offset 0 means the file starts over. Put here by Lineclear.
 use strict;
 use warnings;
 use IO::Select;

@@ -44,7 +44,7 @@ export class BrowsersHubs {
     this.why = ok
       ? ''
       : BOX
-        ? `agent-browser is missing on ${this.o.host}: shepherdr doctor on the main machine puts it there again`
+        ? `agent-browser is missing on ${this.o.host}: lineclear doctor on the main machine puts it there again`
         : `agent-browser is missing on ${this.o.host}: run bun install in ${ROOT}`
     return ok
   }
@@ -148,7 +148,7 @@ export class BrowsersHubs {
   /** an error said plainly, with what to do */
   protected hint(e: string) {
     if (CLASH.test(e))
-      return `Another agent-browser (another version, or other settings) is using this browser, so it keeps restarting. The agent should run ${this.bin}, the version Shepherdr pins, without --session or --profile.`
+      return `Another agent-browser (another version, or other settings) is using this browser, so it keeps restarting. The agent should run ${this.bin}, the version Lineclear pins, without --session or --profile.`
     if (/chrome|chromium|executable|no browser|install/i.test(e))
       return `Chrome is missing on ${this.o.host}: run ${this.bin} install there. (${e.split('\n')[0]})`
     return `The browser could not start: ${e.split('\n')[0]}`
@@ -225,7 +225,7 @@ export class BrowsersHubs {
       const relay = Number(first)
       if (!relay) throw new Error('no relay')
       const token = randomBytes(16).toString('hex')
-      const at = `/shepherdr-browser/${token}`
+      const at = `/lineclear-browser/${token}`
       const on = await onBox(['tailscale', 'serve', '--bg', '--set-path', at, `http://127.0.0.1:${relay}`], { timeoutMs: 20_000 })
       const st = on.code === 0 ? await onBox(['tailscale', 'status', '--json'], { timeoutMs: 10_000 }) : null
       const dns = st?.code === 0 ? String(JSON.parse(st.out).Self?.DNSName ?? '').replace(/\.$/, '') : ''
@@ -376,7 +376,7 @@ export class BrowsersHubs {
     h.told = true
     this.o.tell(
       h.task,
-      `${this.o.user()} took over the shared browser. Don't drive it (no agent-browser clicks, typing, scrolling or navigation) until Shepherdr says it is handed back; reading it (snapshot, screenshot, get) is fine. Nothing else to say: reply with only <no-reply>browser taken over</no-reply>.`,
+      `${this.o.user()} took over the shared browser. Don't drive it (no agent-browser clicks, typing, scrolling or navigation) until Lineclear says it is handed back; reading it (snapshot, screenshot, get) is fine. Nothing else to say: reply with only <no-reply>browser taken over</no-reply>.`,
     )
   }
 

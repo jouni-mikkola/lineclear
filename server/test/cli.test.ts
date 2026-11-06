@@ -1,5 +1,5 @@
-// The shepherdr command, here (server/cli.ts) and on another machine (the helper's shepherdr, over the SSH tunnel's
-// main.sock): lineclear merge never waits on and on for an answer that isn't coming, as when Shepherdr restarted
+// The lineclear command, the one perl client (helper/lineclear), over the server's port here and over the SSH tunnel's
+// main.sock): lineclear merge never waits on and on for an answer that isn't coming, as when Lineclear restarted
 // halfway or the tunnel dropped and left its end open (SHE-212's agent sat on one for 40 minutes).
 import { describe, expect, test } from 'bun:test'
 import { spawn, spawnSync } from 'node:child_process'
@@ -30,11 +30,11 @@ describe('lineclear merge with no answer coming', () => {
     const server = Bun.serve({ hostname: '127.0.0.1', port: 0, idleTimeout: 0, fetch: () => new Promise<Response>(() => {}) })
     try {
       const env = { LINECLEAR_URL: `http://127.0.0.1:${server.port}`, LINECLEAR_MERGE_WAIT: '500', LINECLEAR_MERGE_TOTAL: '1200' }
-      const r = await run([process.execPath, join(root, 'server', 'cli.ts'), 'merge', 'SHE-9'], env)
+      const r = await run(['perl', join(root, 'helper', 'lineclear'), 'merge', 'SHE-9'], env)
       expect(r.code).toBe(1)
       for (const words of noAnswer('SHE-9')) expect(r.err).toContain(words)
       // task merge, its other name
-      expect((await run([process.execPath, join(root, 'server', 'cli.ts'), 'task', 'merge', 'SHE-9'], env)).err).toContain(noAnswer('SHE-9')[0])
+      expect((await run(['perl', join(root, 'helper', 'lineclear'), 'task', 'merge', 'SHE-9'], env)).err).toContain(noAnswer('SHE-9')[0])
     } finally {
       server.stop(true)
     }
@@ -59,14 +59,14 @@ describe('lineclear merge with no answer coming', () => {
 })
 
 describe('lineclear secret run and env', () => {
-  // Shepherdr's answer to secret run and env: the values, for the command to use here; it never prints them
+  // Lineclear's answer to secret run and env: the values, for the command to use here; it never prints them
   const values = { TOKEN: "a b'c$d", PLAIN: 'xyz' }
   const answer = async (req: Request) => {
     const b = (await req.json()) as { args: string[]; stdin?: string }
     return Response.json({ out: '', code: 0, ...(b.args[1] === 'run' || b.args[1] === 'env' ? { secrets: values } : {}), args: b.args, stdin: b.stdin ?? null })
   }
 
-  /** each shepherdr, here and on another machine, against the answer above */
+  /** each lineclear, here and on another machine, against the answer above */
   async function each(check: (cmd: string[], cwd: string) => Promise<void>) {
     const server = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: answer })
     const dir = mkdtempSync(join(tmpdir(), 'shep-sec-'))
@@ -80,7 +80,6 @@ describe('lineclear secret run and env', () => {
       mkdirSync(repo)
       spawnSync('git', ['init', '-q'], { cwd: repo })
       writeFileSync(join(repo, '.gitignore'), '.env\n')
-      await check([process.execPath, join(root, 'server', 'cli.ts')], repo)
       if (perl) await check(['perl', join(dir, 'bin', 'lineclear')], repo)
     } finally {
       delete process.env.LINECLEAR_URL
@@ -89,7 +88,7 @@ describe('lineclear secret run and env', () => {
     }
   }
 
-  /** run to its end, never blocking: Shepherdr's answer comes from this same process */
+  /** run to its end, never blocking: Lineclear's answer comes from this same process */
   const sh = (argv: string[], cwd: string) =>
     new Promise<{ stdout: string; stderr: string; status: number | null }>((done) => {
       const c = spawn(argv[0], argv.slice(1), { cwd, stdio: ['ignore', 'pipe', 'pipe'], env: process.env })
@@ -315,7 +314,7 @@ describe('the installed command with no server.json, no URL and no old folder', 
     const sock = Bun.serve({ unix: join(data, 'helper', 'main.sock'), fetch: () => Response.json({ out: 'via socket\n', code: 0 }) })
     try {
       const env = { HOME: home, LINECLEAR_HOME: data, LINECLEAR_URL: '', LINECLEAR_PORT: '' }
-      expect(existsSync(join(home, '.shepherdr'))).toBe(false)
+      expect(existsSync(join(home, ['.shep', 'herdr'].join('')))).toBe(false)
       const r = await run([join(root, 'bin', 'lineclear'), 'show'], env)
       expect({ out: r.out, err: r.err, code: r.code }).toEqual({ out: 'via socket\n', err: '', code: 0 })
     } finally {

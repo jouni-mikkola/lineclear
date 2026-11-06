@@ -220,6 +220,24 @@ if ("error" in found) fail(`Home could not read the repo: ${found.error}`);
 const companies = new Set(((found.models as string[] | undefined) ?? []).map((m) => company(m)));
 if (companies.size < 2)
   fail(`the models Home offers are of one company (${[...companies].join(", ") || "none"}); the plan check needs two. Name a second login in COLD_PROVIDERS.`);
+// the first run's setup, as the page does it: a worker, a reviewer and a plan checker of another company than the planner's
+const offeredModels = (found.models as string[] | undefined) ?? [];
+const worker = offeredModels[0] ?? "";
+const other = offeredModels.find((m) => company(m) !== company(worker)) ?? worker;
+const chosen = await fetch(`${web}/api/setup`, {
+  method: "POST",
+  headers: { "content-type": "application/json", "x-lineclear-token": token, origin: web },
+  body: JSON.stringify({ worker, reviewer: other, planner: worker, stepChecker: other }),
+});
+if (!chosen.ok) fail(`Setup on the web failed: ${JSON.stringify(await chosen.json().catch(() => ({})))}`);
+// a login that is out of credit or usage would leave the planner silent for the whole wait: ask each chosen model once now
+for (const model of new Set([worker, other])) {
+  const asked = asNew(`timeout -k 5 90 pi --model ${model} -p 'Reply with ok.'`);
+  if (!asked.ok)
+    fail(
+      `${model} does not answer (${(asked.out || asked.err).slice(0, 200)}): its login in ~/.pi/agent/auth.json is out of credit or usage, so no task could start`,
+    );
+}
 const added = await fetch(`${web}/api/projects`, {
   method: "POST",
   headers: { "content-type": "application/json", "x-lineclear-token": token },

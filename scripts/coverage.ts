@@ -1,5 +1,5 @@
 // Runs the root tests with line coverage and fails when a module is below its floor (scripts/gates/baseline/coverage.json).
-// `--raise` lifts the floors to what is measured; a floor only rises. Run by the nightly job and a release (L90), not by the check.
+// `--raise` lifts the floors to what is measured; a floor only rises. Run by the nightly job and a release, not by the check.
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -16,11 +16,23 @@ Bun.spawnSync(["bun", "test", "./test", "--timeout=60000", "--coverage", "--cove
 });
 // the root tests load only what they reach, so a tracked source file none loads would be missing from the report
 const ignored: string[] = (/coveragePathIgnorePatterns = \[(.*)\]/.exec(readFileSync(join(root, "bunfig.toml"), "utf8"))?.[1] ?? "").match(/[^"]+\.ts/g) ?? [];
+// only code the root tests are meant to reach counts when no test loads it: the server, Playwright, the repo's own
+// drivers and the eval run under other runners
+const reachedHere = /^(src\/|bin\/|pi\/|ui\/(brand|kit)\/)/;
 const sources = Object.fromEntries(
   Bun.spawnSync(["git", "ls-files", "*.ts", "*.tsx", "bin/lineclear"], { cwd: root })
     .stdout.toString()
     .split("\n")
-    .filter((f) => f && !ignored.includes(f) && !f.endsWith(".d.ts") && !f.includes(".test.") && !f.startsWith("docs/") && !f.startsWith("test/fixtures/"))
+    .filter(
+      (f) =>
+        f &&
+        !ignored.includes(f) &&
+        !f.endsWith(".d.ts") &&
+        !f.includes(".test.") &&
+        !f.startsWith("docs/") &&
+        reachedHere.test(f) &&
+        !f.startsWith("test/fixtures/"),
+    )
     .map((f) => [f, readFileSync(join(root, f), "utf8")]),
 );
 const lcov = withUnloaded(readFileSync(join(dir, "lcov.info"), "utf8"), sources);

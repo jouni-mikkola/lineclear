@@ -8,14 +8,16 @@ import { modelPrice } from "./routine.ts";
 import { serverBin } from "./paths.ts";
 import { company } from "./company.ts";
 import { changeSettings, readSettings } from "./project.ts";
-import { shepherdrTasks } from "./roadmap-source.ts";
+import { lineclearTasks } from "./roadmap-source.ts";
 import { realWorld, type World } from "./rules.ts";
 import { fileFixNow, selfProject } from "./self-fix.ts";
 import { CLASS_INFO, readDecisionsSince, type StallClass } from "./stall-class.ts";
+import { MIN } from "./time.ts";
+import { gitWith } from "./git.ts";
 
 // The test track: a small fixture project that runs the whole chain (a request, its plan, the start, the work, the
 // review and the merge) with a forced restart and a switch to another model in the middle, on the cheapest models.
-// It passes, or names the stage and the stall class that broke it. A broken run files the fix (L113), and a broken
+// It passes, or names the stage and the stall class that broke it. A broken run files the fix, and a broken
 // run just after an update puts the previous version back.
 
 export const STAGES = ["request", "plan", "start", "restart", "switch", "work", "review", "merge"] as const;
@@ -43,8 +45,6 @@ export interface TrackResult {
   /** Where it broke, and the class and evidence of the stall that broke it. */
   broke?: { stage: Stage; class: StallClass; evidence: string };
 }
-
-const MIN = 60_000;
 
 /** Drives the chain one stage at a time; each stage is looked at every `poll` ms until its limit. */
 export async function runTrack(w: TrackWorld, poll = 15_000): Promise<TrackResult> {
@@ -104,20 +104,22 @@ export function cheapest(models: string[], price: (m: string) => number | undefi
     .map((x) => x.m);
 }
 
-/** The cheapest reviewer of the self project from another company than the track's planner: the step check of a plan needs one (L62). */
+/** The cheapest reviewer of the self project from another company than the track's planner: the step check of a plan needs one. */
 export function trackReviewer(planner: string, reviewers: string[], price: (m: string) => number | undefined): string | undefined {
   return [...new Set(reviewers)].filter((m) => company(m) !== company(planner)).sort((a, b) => (price(a) ?? Infinity) - (price(b) ?? Infinity))[0];
 }
 
-function git(args: string[], cwd: string): string {
-  const p = Bun.spawnSync(["git", ...args], {
-    cwd,
-    stdin: "ignore",
-    stderr: "pipe",
-    env: { ...process.env, GIT_AUTHOR_NAME: "track", GIT_AUTHOR_EMAIL: "track@lineclear", GIT_COMMITTER_NAME: "track", GIT_COMMITTER_EMAIL: "track@lineclear" },
-  });
-  if (p.exitCode !== 0) throw new Error(`git ${args[0]} failed: ${p.stderr.toString().trim()}`);
-  return p.stdout.toString().trim();
+function trackGit(args: string[], cwd: string): string {
+  const env = {
+    ...process.env,
+    GIT_AUTHOR_NAME: "track",
+    GIT_AUTHOR_EMAIL: "track@lineclear",
+    GIT_COMMITTER_NAME: "track",
+    GIT_COMMITTER_EMAIL: "track@lineclear",
+  };
+  const r = gitWith({ env }, cwd, ...args);
+  if (!r.ok) throw new Error(`git ${args[0]} failed: ${r.err}`);
+  return r.out.trim();
 }
 
 /** The fixture repo and its origin, made once; each run puts main back to the seed so nothing grows. */
@@ -128,22 +130,22 @@ function resetFixture(env = process.env): string {
   if (!existsSync(join(origin, "HEAD"))) {
     rmSync(dir, { recursive: true, force: true });
     mkdirSync(dir, { recursive: true });
-    git(["init", "-q", "--bare", "-b", "main", origin], dir);
-    git(["clone", "-q", origin, repo], dir);
+    trackGit(["init", "-q", "--bare", "-b", "main", origin], dir);
+    trackGit(["clone", "-q", origin, repo], dir);
     mkdirSync(join(repo, "docs"), { recursive: true });
     writeAtomic(join(repo, "README.md"), "# The test track\n\nA fixture Lineclear works on every night to see the whole chain run.\n");
     writeAtomic(join(repo, "docs", "ROADMAP.md"), SEED_ROADMAP);
     writeAtomic(join(repo, "package.json"), `${JSON.stringify({ name: "lineclear-track", private: true, scripts: { check: "true" } }, null, 2)}\n`);
-    git(["checkout", "-q", "-b", "main"], repo);
-    git(["add", "-A"], repo);
-    git(["commit", "-q", "-m", "T0: the seed"], repo);
-    git(["push", "-q", "origin", "main", "main:seed"], repo);
+    trackGit(["checkout", "-q", "-b", "main"], repo);
+    trackGit(["add", "-A"], repo);
+    trackGit(["commit", "-q", "-m", "T0: the seed"], repo);
+    trackGit(["push", "-q", "origin", "main", "main:seed"], repo);
   }
-  git(["fetch", "-q", "origin"], repo);
-  git(["checkout", "-q", "-f", "main"], repo);
-  git(["reset", "-q", "--hard", "origin/seed"], repo);
-  git(["clean", "-qfd"], repo);
-  git(["push", "-q", "-f", "origin", "main"], repo);
+  trackGit(["fetch", "-q", "origin"], repo);
+  trackGit(["checkout", "-q", "-f", "main"], repo);
+  trackGit(["reset", "-q", "--hard", "origin/seed"], repo);
+  trackGit(["clean", "-qfd"], repo);
+  trackGit(["push", "-q", "-f", "origin", "main"], repo);
   return repo;
 }
 
@@ -227,13 +229,13 @@ function realTrack(repo: string, space: string, worker: string[], stamp: string,
   let step: string | undefined;
   let task: { id?: string; status: string; sub?: string } | undefined;
   const mine = () => {
-    const all = shepherdrTasks(space, env);
+    const all = lineclearTasks(space, env);
     if (typeof all === "string" || step === undefined) return undefined;
     return all.filter((t) => t.title.startsWith(`${step} `) || t.title === step).at(-1);
   };
   const mainSubjects = () => {
-    git(["fetch", "-q", "origin"], repo);
-    return git(["log", "origin/main", "--format=%s"], repo).split("\n");
+    trackGit(["fetch", "-q", "origin"], repo);
+    return trackGit(["log", "origin/main", "--format=%s"], repo).split("\n");
   };
   return {
     now: () => Date.now(),
@@ -256,8 +258,8 @@ function realTrack(repo: string, space: string, worker: string[], stamp: string,
     reached: async (stage) => {
       if (stage === "request" || stage === "switch") return true;
       if (stage === "plan") {
-        git(["fetch", "-q", "origin"], repo);
-        const ids = stepIds(git(["show", "origin/main:docs/ROADMAP.md"], repo)).filter((id) => id !== "T0");
+        trackGit(["fetch", "-q", "origin"], repo);
+        const ids = stepIds(trackGit(["show", "origin/main:docs/ROADMAP.md"], repo)).filter((id) => id !== "T0");
         step = ids[0];
         return step !== undefined;
       }

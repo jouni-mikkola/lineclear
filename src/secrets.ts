@@ -1,11 +1,12 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readdirSync, readFileSync, realpathSync } from "node:fs";
-import { homedir, hostname } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { mkdirSync, readFileSync, realpathSync } from "node:fs";
+import { hostname } from "node:os";
+import { join, resolve } from "node:path";
 import { writeAtomic } from "../pi/atomic.ts";
 import { configDir } from "../pi/config.ts";
 import { dataDir } from "./paths.ts";
 import { listProjectNames, readSettings } from "./project.ts";
+import { quote } from "./ssh.ts";
 import { parseTotpKey, totpCode } from "./totp.ts";
 
 type Env = Record<string, string | undefined>;
@@ -16,8 +17,6 @@ const ownerFile = (env: Env) => join(configDir(env), "owner.env");
 // Where the server keeps it: a worker for another machine runs on the main one and reads the main one's vault.
 const vaultHome = (env: Env) => env.LINECLEAR_MAIN_HOME || dataDir(env);
 const vaultFile = (env: Env) => join(vaultHome(env), "vault.json");
-
-const quote = (value: string) => `'${value.replace(/'/g, `'\\''`)}'`;
 
 /** Reads NAME='value' lines. A value may run over lines. A line that does not fit is skipped. */
 function parseEnvFile(text: string): Record<string, string> {
@@ -36,27 +35,6 @@ function readEnvFile(file: string): Record<string, string> {
   } catch {
     return {};
   }
-}
-
-/** The folder of login secrets (Control Center > Secrets) that agents load with load.sh; every machine keeps the same one. */
-export const secretsFolder = (env: Env) => env.LINECLEAR_SECRETS_FOLDER ?? join(env.HOME ?? homedir(), ".config", "control-center", "secrets");
-
-/** Every NAME the folder's .env files hold, sorted. Names only, so a comparison between machines never reads a value. */
-export function secretFolderNames(env: Env = process.env, only?: (file: string) => boolean): string[] {
-  const names = new Set<string>();
-  const walk = (dir: string) => {
-    for (const e of readdirSync(dir, { withFileTypes: true })) {
-      const file = join(dir, e.name);
-      if (e.isDirectory()) walk(file);
-      else if (e.name.endsWith(".env") && (only?.(file) ?? true)) for (const n of Object.keys(readEnvFile(file))) names.add(n);
-    }
-  };
-  try {
-    walk(secretsFolder(env));
-  } catch {
-    // no folder: no names
-  }
-  return [...names].sort();
 }
 
 /** An owner-only secret: never in a task's chain, so no agent loads it. */
@@ -161,17 +139,9 @@ export function secretNames(project: string, env: Env = process.env): string[] {
 /** Whether the text names the login (`M365_GA` as "m365 ga" or "M365_GA"), as a whole word. */
 const mentions = (text: string, login: string) => new RegExp(`(^|[^a-z0-9])${login.toLowerCase().replace(/_/g, "[ _]")}($|[^a-z0-9])`).test(text.toLowerCase());
 
-/** Every NAME an agent in the project loads: its secrets, and from the secrets folder what load.sh loads (common.env and the repo's own file). */
-function loadableNames(project: string | undefined, env: Env): string[] {
-  const repo = project === undefined ? undefined : readSettings(project, env as NodeJS.ProcessEnv);
-  const repoFile = typeof repo === "object" ? `${basename(repo.repo)}.env` : undefined;
-  const loaded = (file: string) => file === join(secretsFolder(env), "common.env") || basename(file) === repoFile;
-  return [...new Set([...(project === undefined ? [] : secretNames(project, env)), ...secretFolderNames(env, loaded)])];
-}
-
-/** The logins whose NAME_TOTP an agent in the project loads. */
+/** The logins whose NAME_TOTP is stored for the project. */
 export function loadableTotps(project: string | undefined, env: Env = process.env): string[] {
-  return loadableNames(project, env)
+  return (project === undefined ? [] : secretNames(project, env))
     .filter((n) => n.endsWith("_TOTP"))
     .map((n) => n.slice(0, -5))
     .sort();
@@ -199,7 +169,7 @@ export function totpAnswers(question: string, logins: string[], named?: string):
 
 /** What an agent does when a login is stored (a USER and PASSWORD pair the question names), instead of asking the owner. */
 const loginAdvice = (name: string, totp: boolean) =>
-  `a stored login exists: ${name}; load ~/.config/control-center/load.sh and use it (${name}_USER, ${name}_PASSWORD) without printing it${totp ? `, code from cc-totp ${name}` : ""}. The owner is not asked.`;
+  `a stored login exists: ${name}; use ${name}_USER and ${name}_PASSWORD with lineclear secret run, without printing them${totp ? `, code from lineclear totp ${name}` : ""}. The owner is not asked.`;
 
 /**
  * Why a wait or a question to the owner about a login is needless: the stored login (secret names only, never
@@ -207,7 +177,7 @@ const loginAdvice = (name: string, totp: boolean) =>
  */
 export function storedLoginAdvice(text: string, project: string | undefined, env: Env = process.env, named?: string): string | undefined {
   const totps = loadableTotps(project, env);
-  const pair = named === undefined ? storedLogin(text, loadableNames(project, env)) : undefined;
+  const pair = named === undefined ? storedLogin(text, project === undefined ? [] : secretNames(project, env)) : undefined;
   if (pair !== undefined && !/\bcaptcha\b/i.test(text)) return loginAdvice(pair, totps.includes(pair));
   const stored = totpAnswers(text, totps, named);
   return stored.length > 0 ? totpAdvice(stored) : undefined;
@@ -215,7 +185,7 @@ export function storedLoginAdvice(text: string, project: string | undefined, env
 
 /** What an agent does when a login has a stored TOTP, instead of asking the owner. */
 export const totpAdvice = (logins: string[]) =>
-  `${logins.map((l) => `${l}_TOTP`).join(", ")} is stored, so the owner is not asked. Never wait for a push or a number: choose the verification-code option ("Sign in another way" > "Use a verification code") and fill the code from \`cc-totp ${logins[0]}\` (or \`lineclear totp ${logins[0]}\`) in the same command, without printing it.`;
+  `${logins.map((l) => `${l}_TOTP`).join(", ")} is stored, so the owner is not asked. Never wait for a push or a number: choose the verification-code option ("Sign in another way" > "Use a verification code") and fill the code from \`lineclear totp ${logins[0]}\` in the same command, without printing it.`;
 
 /** What a task of `project` may not see: the owner-only names and every name kept where its chain does not reach. */
 function forbidden(project: string | undefined, env: Env) {
@@ -329,11 +299,6 @@ export async function secrets(
     for (const n of secretNames(project, env)) out(n);
     return 0;
   }
-  if (sub === "names" && rest.length === 0) {
-    // For doctor on another machine: which names the folder holds, never a value.
-    for (const n of secretFolderNames(env)) out(n);
-    return 0;
-  }
   if (sub === "env" && rest.length === 0) {
     const all = valuesOf(projectOfDir(resolve(cwd), env), env);
     for (const k of Object.keys(all).sort()) out(`export ${k}=${quote(all[k] ?? "")}`);
@@ -345,7 +310,7 @@ export async function secrets(
     return 0;
   }
   out(
-    "usage: lineclear secrets set <project> | --machine | --all | --owner <NAME> (value on stdin) | list <project> | names | env (import and deny are for Lineclear itself)",
+    "usage: lineclear secrets set <project> | --machine | --all | --owner <NAME> (value on stdin) | list <project> | env (import and deny are for Lineclear itself)",
   );
   return 2;
 }

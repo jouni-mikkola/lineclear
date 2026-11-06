@@ -442,7 +442,7 @@ describe('a chat from its log', () => {
   test.skip('news it answered with nothing shows no line', () => {
     const w = world('claude', () => 'idle')
     w.add(
-      user('u1', '<shepherdr><heartbeat>Look around.</heartbeat></shepherdr>', { origin: { kind: 'human' } }),
+      user('u1', '<lineclear><heartbeat>Look around.</heartbeat></lineclear>', { origin: { kind: 'human' } }),
       use('a1', 'toolu_1', 'Bash', { command: 'lineclear task list' }),
       result('u2', 'toolu_1', 'none'),
       said('a2', 'msg_r1', { type: 'text', text: '<no-reply>nothing to do</no-reply>' }, 'end_turn'),

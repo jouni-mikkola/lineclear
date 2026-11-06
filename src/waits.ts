@@ -1,5 +1,5 @@
 import { configDir } from "../pi/config.ts";
-import { serverBin } from "./paths.ts";
+import { readTasks } from "./task-read.ts";
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { writeAtomic } from "../pi/atomic.ts";
 import { dirname, join } from "node:path";
@@ -10,6 +10,7 @@ import { detectHeavy, listProjectNames, readSettings, type Settings } from "./pr
 import { checkTier } from "./check-tier.ts";
 import type { Tier } from "./check-runs.ts";
 import { day } from "./progress.ts";
+import { gitText } from "./git.ts";
 
 const waitKinds = ["owner", "login", "checks", "browser"] as const;
 /** The only things an owner wait may be for: a login code, money beyond the budget, or something that leaves the machine. */
@@ -39,7 +40,6 @@ const waitsDir = (env = process.env) => join(configDir(env), "waits");
 export const waitPath = (task: string, env = process.env) => join(waitsDir(env), `${task}.json`);
 
 export const limitOf = Q.limitOf;
-export const slotsOf = Q.slotsOf;
 export const lineOf = Q.lineOf;
 export const machineOf = Q.machineOf;
 
@@ -83,11 +83,6 @@ export function writeWait(w: Wait, env = process.env): void {
 
 export const clearWait = (task: string, env = process.env) => rmSync(waitPath(task, env), { force: true });
 
-const git = (cwd: string, ...args: string[]) => {
-  const p = Bun.spawnSync(["git", "-C", cwd, ...args], { stdin: "ignore", stderr: "ignore" });
-  return p.exitCode === 0 ? p.stdout.toString().trim() : undefined;
-};
-
 const real = (p: string) => {
   try {
     return realpathSync(p);
@@ -98,40 +93,30 @@ const real = (p: string) => {
 
 /** The task an agent's environment names, if it is an agent's. */
 const agentTask = (env: typeof process.env): string | undefined => {
-  const id = (env.LINECLEAR_TASK ?? (env.LINECLEAR_CHAT ?? env.SHEPHERDR_CHAT)?.split("/")[0]) || undefined;
+  const id = (env.LINECLEAR_TASK ?? env.LINECLEAR_CHAT?.split("/")[0]) || undefined;
   return id !== undefined && TASK_ID.test(id) ? id : undefined;
 };
 
 /** The task a worktree belongs to: from the environment, else from its branch `work/<n>-...` and the task list. */
 export function findTask(cwd: string, env = process.env): string | undefined {
-  const fromEnv = env.LINECLEAR_TASK ?? env.SHEPHERDR_CHAT?.split("/")[0];
+  const fromEnv = env.LINECLEAR_TASK ?? env.LINECLEAR_CHAT?.split("/")[0];
   if (fromEnv && TASK_ID.test(fromEnv)) return fromEnv;
-  const n = /^work\/(\d+)-/.exec(git(cwd, "rev-parse", "--abbrev-ref", "HEAD") ?? "")?.[1];
+  const n = /^work\/(\d+)-/.exec(gitText(cwd, "rev-parse", "--abbrev-ref", "HEAD") ?? "")?.[1];
   if (n === undefined) return undefined;
-  try {
-    const p = Bun.spawnSync([serverBin(env), "task", "list", "--json"], { stdin: "ignore", stderr: "ignore", env });
-    const tasks = JSON.parse(p.stdout.toString()) as { id?: string }[];
-    return tasks.find((t) => t.id?.endsWith(`-${n}`))?.id;
-  } catch {
-    return undefined;
-  }
+  const r = readTasks(env);
+  return "tasks" in r ? r.tasks.find((t) => t.id?.endsWith(`-${n}`))?.id : undefined;
 }
 
-/** The ids of the tasks in a space, as the rule loop sees them, or undefined when `shepherdr task list` cannot say. */
+/** The ids of the tasks in a space, as the rule loop sees them, or undefined when `lineclear task list` cannot say. */
 function taskIds(space: string, env = process.env): string[] | undefined {
-  try {
-    const p = Bun.spawnSync([serverBin(env), "task", "list", "--space", space, "--json"], { stdin: "ignore", stderr: "ignore" });
-    if (p.exitCode !== 0) return undefined;
-    return (JSON.parse(p.stdout.toString()) as { id?: string }[]).flatMap((t) => (t.id ? [t.id] : []));
-  } catch {
-    return undefined;
-  }
+  const r = readTasks(env, space);
+  return "tasks" in r ? r.tasks.flatMap((t) => (t.id ? [t.id] : [])) : undefined;
 }
 
 /** The project whose repo holds this folder or worktree. */
 export function findProject(cwd: string, env = process.env): string | undefined {
-  const common = git(cwd, "rev-parse", "--path-format=absolute", "--git-common-dir");
-  const roots = [common === undefined ? undefined : dirname(common), git(cwd, "rev-parse", "--show-toplevel")]
+  const common = gitText(cwd, "rev-parse", "--path-format=absolute", "--git-common-dir");
+  const roots = [common === undefined ? undefined : dirname(common), gitText(cwd, "rev-parse", "--show-toplevel")]
     .filter((r): r is string => r !== undefined)
     .map(real);
   return listProjectNames(env).find((name) => {
@@ -208,10 +193,18 @@ function waitReason(w: { full: boolean; noSlot: boolean; behindCheck: boolean; a
   return `waiting for ${w.cost > 1 ? `${Math.min(w.cost, w.slots)} check slots` : "a check slot"} on ${w.machine} (${w.slots} at once)`;
 }
 
-/** Runs the command in a process group of its own (the check's), its output on ours (and heard, when asked); `started` gets the process. */
+const SLOT_HELD = "LINECLEAR_SLOT_HELD"; // set in a slot's command: a check script it starts takes no second slot
+/** Runs the command (niced, so the board and herdr keep the CPU) in a process group of its own (the check's), its output on ours (and heard, when asked); `started` gets the process. */
 async function runChild(command: string, cwd: string, hear: CheckOptions["hear"], started: (c: ReturnType<typeof Bun.spawn>) => void): Promise<number> {
   const io = hear ? "pipe" : "inherit";
-  const child = Bun.spawn(["sh", "-c", command], { cwd, stdin: "ignore", stdout: io, stderr: io, detached: true });
+  const child = Bun.spawn(["nice", "-n", "15", "sh", "-c", command], {
+    cwd,
+    stdin: "ignore",
+    stdout: io,
+    stderr: io,
+    detached: true,
+    env: { ...process.env, [SLOT_HELD]: "1" },
+  });
   started(child);
   const watcher = guardGroup(child.pid, process.pid);
   try {
@@ -276,13 +269,15 @@ async function runInSlot(command: string, name: string, env = process.env, o: Ch
   // an agent's own wait (for the owner, say) is never written over
   const own = task !== undefined && existsSync(waitPath(task, env));
   const say = (n: number) => {
-    if (task === undefined || own) return;
+    if (own) return;
     const machine = Q.machineOf(env);
     const reason = releaseHeld
       ? `waiting for the release check on ${machine}`
       : waitReason({ full: turn !== undefined, noSlot, behindCheck, ahead: n, cost, slots, machine });
     if (mine && reason === said) return;
-    writeWait({ task, project: name, kind: "checks", reason, since }, env);
+    if (task === undefined)
+      console.error(`lineclear: ${reason}`); // shows a person at a terminal that nothing hung
+    else writeWait({ task, project: name, kind: "checks", reason, since }, env);
     mine = true;
     said = reason;
   };
@@ -390,6 +385,12 @@ export async function check(out: (l: string) => void, env = process.env, o: Chec
       waited,
     }),
   );
+}
+
+/** An agent's check script started by hand takes a check slot too, so all checks on the machine stay within its slots. Undefined: already in a slot or no project, just run. */
+export function ownSlot(command: string, cwd = process.cwd(), env = process.env): Promise<number> | undefined {
+  const name = env[SLOT_HELD] === undefined && agentTask(env) !== undefined && findProject(cwd, env); // the merge lane has no task: it holds its own turn
+  return name ? runInSlot(command, name, env, { cwd }) : undefined;
 }
 
 /** `lineclear slot <command>`: any heavy command, run in a check slot. */

@@ -1,6 +1,7 @@
 import { mkdirSync, readdirSync, readFileSync, readlinkSync, rmSync, statfsSync, statSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
+import { DAY } from "./time.ts";
 
 type Env = Record<string, string | undefined>;
 
@@ -70,9 +71,8 @@ export function trimCache(dir: string, maxBytes = COMPILE_CACHE_MAX_BYTES): numb
 
 /** The folders Lineclear's tests (and the browsers they start) make in the temp folder. Folders of live work (the pi extension's `lineclear-notes-` and `lineclear-cut-`, an autopilot's `shep-pilot-gateway-`) are not among them: their own time does not move while they are used. */
 const TEST_FOLDER =
-  /^(shep-(?!pilot-gateway-)|fake-shepherdr-inbox-|lineclear-(?!notes-|cut-)|lc-|lane-config|doctor-old-|playwright_chromiumdev_profile-|playwright-artifacts-)/;
+  /^(shep-(?!pilot-gateway-)|fake-lineclear-inbox-|lineclear-(?!notes-|cut-)|lc-|lane-config|doctor-old-|playwright_chromiumdev_profile-|playwright-artifacts-)/;
 
-const DAY_MS = 86_400_000;
 const FINISHED_RUN_MS = 2 * 3_600_000;
 
 /** Each cache folder's last sweep, so the loop looks at /tmp every 10 minutes, not every tick. */
@@ -110,7 +110,7 @@ export function sweepOldTemp(now: Date, env: Env = process.env): string[] {
 }
 
 /** Test folders in `dir` last touched more than `olderThan` ms ago (every one with 0). */
-export function testFolders(dir = tmpdir(), olderThan = DAY_MS, now = Date.now()): string[] {
+export function testFolders(dir = tmpdir(), olderThan = DAY, now = Date.now()): string[] {
   const found: string[] = [];
   let names: string[] = [];
   try {

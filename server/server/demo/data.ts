@@ -10,7 +10,7 @@ import type { PluginEntry } from '../plugin-list.ts'
 export const DEMO_HOST = 'vm-str'
 
 /** each machine's numbers: vm-str busy enough that a new task waits, mac's disk past its alert limit */
-export const HEALTH: Record<string, MachineHealth> = {
+const HEALTH: Record<string, MachineHealth> = {
   'vm-str': {
     meters: [
       { name: 'CPU', pct: 112, detail: 'load 17.9 on 16 cores', level: 'busy' },
@@ -86,7 +86,7 @@ export const GTM = 'p:vm-str:gtm'
 export const HP = 'p:vm-str:herdr-projects'
 export const LV = 'p:mac:lilla-varlden'
 
-export const agent = (task: string, cli: string, status: TaskAgent['status'], age: string, note: string): TaskAgent => ({
+const agent = (task: string, cli: string, status: TaskAgent['status'], age: string, note: string): TaskAgent => ({
   chat: `${task}/Agent`,
   role: 'Agent',
   cli,
@@ -371,7 +371,7 @@ export function settingStores() {
 /** the plugins of the demo install (a build with plugins of your own shows its own): the base ones, voice replaced by
  *  one of the human's own, and a stand-up plugin of theirs (none failing: the screen would say so at its top, over
  *  every screen the tests measure) */
-export const DEMO_PLUGINS: PluginEntry[] = [
+const DEMO_PLUGINS: PluginEntry[] = [
   ...['places', 'coordinators', 'tasks', 'chat', 'reactions', 'artifacts', 'terminal', 'worktree', 'browser', 'health', 'alerts', 'keyboard', 'autopilot'].map(
     (name) => ({ name, from: 'base' as const, on: true }),
   ),
@@ -438,6 +438,6 @@ export function secrets() {
 
 /** each machine's folders under home, for adding a project: a trailing * marks a repo */
 export const FOLDERS: Record<string, string[]> = {
-  'vm-str': ['dev/gtm*', 'dev/herdr-projects*', 'dev/shepherdr*', 'dev/website*', 'dev/scratch', 'dev/scratch/ideas', 'Documents', 'notes'],
+  'vm-str': ['dev/gtm*', 'dev/herdr-projects*', 'dev/lineclear*', 'dev/website*', 'dev/scratch', 'dev/scratch/ideas', 'Documents', 'notes'],
   mac: ['dev/lilla-varlden*', 'dev/recipes*', 'Desktop', 'Documents'],
 }

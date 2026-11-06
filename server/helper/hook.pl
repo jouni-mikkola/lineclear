@@ -1,7 +1,7 @@
 #!/usr/bin/perl
-# Records one Claude Code hook event on a machine Shepherdr runs from the main one: the hook's input as it came, with
+# Records one Claude Code hook event on a machine Lineclear runs from the main one: the hook's input as it came, with
 # when, one line per event. The main machine reads the file as it grows and cuts each event down (readers/hooks.ts).
-# The big parts of a tool call (its input and result) are left out here, except a question's. Put here by Shepherdr.
+# The big parts of a tool call (its input and result) are left out here, except a question's. Put here by Lineclear.
 use strict;
 use warnings;
 use Time::HiRes ();

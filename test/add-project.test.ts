@@ -22,7 +22,7 @@ function repo(path: string, files: Record<string, string> = {}): string {
 
 /** A board command that knows the spaces in `spaces.txt`, adds one, and starts a task as `Added NEW-1`. */
 function board(dir: string): string {
-  const bin = join(dir, "shepherdr");
+  const bin = join(dir, "lineclear");
   mkdirSync(dir, { recursive: true });
   writeFileSync(
     bin,
@@ -113,7 +113,7 @@ test("Start makes the space, saves the project, sets up the Dispatcher and has a
   const dir = join(root, "start");
   const bin = board(join(dir, "board"));
   const r = repo(join(dir, "shop"), { "package.json": JSON.stringify({ scripts: { test: "mocha" } }) });
-  const env = { HOME: dir, LINECLEAR_CONFIG: join(dir, "config"), LINECLEAR_HOME: join(dir, "data"), SHEPHERDR_BIN: bin, PI_BIN: "/nowhere/pi" };
+  const env = { HOME: dir, LINECLEAR_CONFIG: join(dir, "config"), LINECLEAR_HOME: join(dir, "data"), LINECLEAR_SERVER_BIN: bin, PI_BIN: "/nowhere/pi" };
   expect(detectProject(r, env)).toMatchObject({ name: "shop", check: "npm run test", roadmap: false, models: [] });
   expect(await saveProject({ repo: r, check: "npm run test", models: [] }, env)).toMatchObject({ status: 400, error: expect.stringContaining("/login") });
   expect(await saveProject({ repo: r, check: "", models: ["a/b"] }, env)).toMatchObject({ status: 400, error: expect.stringContaining("no tests") });
@@ -131,7 +131,7 @@ test("a repo with a roadmap starts with no planning task", async () => {
   const bin = board(join(dir, "board"));
   const r = repo(join(dir, "app"), { "docs/ROADMAP.md": "# Roadmap\n" });
   writeFileSync(join(dir, "board", "spaces.txt"), `app-space  ${r}\n`);
-  const env = { HOME: dir, LINECLEAR_CONFIG: join(dir, "config"), LINECLEAR_HOME: join(dir, "data"), SHEPHERDR_BIN: bin };
+  const env = { HOME: dir, LINECLEAR_CONFIG: join(dir, "config"), LINECLEAR_HOME: join(dir, "data"), LINECLEAR_SERVER_BIN: bin };
   expect(await saveProject({ repo: r, check: "make test", models: ["a/b"] }, env)).toEqual({ name: "app" });
   expect(readFileSync(join(dir, "board", "calls.log"), "utf8")).not.toContain("task add");
 });

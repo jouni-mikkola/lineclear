@@ -4,7 +4,7 @@ import { pushPayload } from '../shared/alerts.ts'
 import type { Alert } from '../shared/types.ts'
 import { readJson, writeJson } from './store.ts'
 
-export const DEFAULT_PUSH_CONTACT = 'https://github.com/eliasstravik/shepherdr'
+export const DEFAULT_PUSH_CONTACT = 'https://github.com/eliasstravik/herdr-projects'
 
 /** Reject local or malformed contacts before web-push signs anything. Existing keys stay unchanged. */
 export function pushContact(value = process.env.LINECLEAR_PUSH_CONTACT): string {

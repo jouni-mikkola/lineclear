@@ -7,8 +7,8 @@ import { backupProblem, readBackupSettings } from "./backup.ts";
 import { copiesProblem, runByNote } from "./store-copies.ts";
 import { follows, type ReleaseState, readRelease, releaseLines } from "./release.ts";
 import { tryLines } from "./try-instance.ts";
-import { cacheEnvFile, dataDir, extensionFile, INSTALL_URL, type Paths, SERVICE, SHEPHERDR_PLUGIN_ID, serverBin } from "./paths.ts";
-import { OLD_DIR_NAME, oldDir, oldFolders, oldFolderUsers } from "./old-install.ts";
+import { cacheEnvFile, dataDir, extensionFile, INSTALL_URL, type Paths, SERVICE, OLD_PLUGIN_ID, serverBin } from "./paths.ts";
+import { OLD_DIR_NAME, oldDir, pluginConfig, oldFolders, oldFolderUsers } from "./old-install.ts";
 import { archiveFolder } from "./old-archive.ts";
 import type { Relation } from "./remotes.ts";
 import { agentsOnOldName, helperApart } from "./helper.ts";
@@ -18,7 +18,6 @@ import { retiredChecks, skillRoots } from "./retire.ts";
 import { type Kit, kitDiff, kitOthers, type Wanted } from "./kit.ts";
 import { parts } from "./pack.ts";
 import { readModelFile } from "./models.ts";
-import { controlCenterCheck } from "./control-center.ts";
 import { findLeftovers, leftoverChecks, oldTests, tmpFull, type Leftovers } from "./leftovers.ts";
 import { checkoutPointers } from "./install-paths.ts";
 import { buildNames, buildProblem, buildsDir, installReleaseCommand, type RunFrom, unitCommand } from "./builds.ts";
@@ -41,7 +40,7 @@ export interface Check {
 /** What doctor asks of the machine, so a test can answer without one. */
 export interface Probe {
   paths: Paths;
-  /** Shepherdr 2.0's data folder. */
+  /** herdr-projects 2.0's data folder. */
   oldDir: string;
   /** Lineclear's data folder, and the folders agents read skills from. */
   dataDir?: string;
@@ -58,13 +57,13 @@ export interface Probe {
   machines?: { commit: string; stable?: string; others: { host: string; commit: string | null; relation?: Relation; helperApart?: boolean }[] };
   /** The running processes that still use the old folder (agents started before the move). Without it none is looked for. */
   oldUsers?: () => string[];
-  /** The old Shepherdr folders that still exist here. */
+  /** The old folders that still exist here. */
   oldFolders?: string[];
   /** Packs one to the archive folder and removes it (doctor --fix); returns the archive. */
   archiveFolder?: (dir: string) => string;
   /** Whether this machine's helper socket paths differ after migrate. */
   helperApart?: boolean;
-  /** Running agents that still call `shepherdr` (started before the rename). */
+  /** Running agents that still call the old command (started before the rename). */
   oldNameAgents?: () => string[];
   /** The exit code and last 20 lines of the latest command that failed, secrets masked. */
   failure?: string;
@@ -90,8 +89,6 @@ export interface Probe {
   herdr?: { tested: string; machines: { machine: string; version: string | null }[] };
   /** What pi loads here and on each other machine (a null diff: it cannot be read), and what the release wants. */
   kit?: { here: Kit; want: Wanted; others: { host: string; diff: string[] | null; own?: string[] }[] };
-  /** The secret names this machine holds, and those each other machine holds (null: cannot be read). Names only, never values. */
-  secrets?: { here: string[]; others: { host: string; names: string[] | null }[] };
   /** What is wrong with the backup, "" when it is fine or none is set. */
   backup?: string;
   /** The machine whose board runs this machine's tasks ("" when this one does). */
@@ -189,8 +186,8 @@ function extensionProblem(paths: Paths): string {
   }
 }
 
-/** Shepherdr 2.0 is retired: its server must not run beside the fork. */
-function shepherdr(p: Probe): Check {
+/** herdr-projects 2.0 is retired: its server must not run beside the fork. */
+function oldInstallStopped(p: Probe): Check {
   const name = "old install stopped";
   let pid: unknown;
   try {
@@ -199,7 +196,7 @@ function shepherdr(p: Probe): Check {
     return { name, problem: "", fix: "" }; // no server file: it never ran, or it was removed
   }
   if (typeof pid !== "number" || p.run(["kill", "-0", String(pid)]) === null) return { name, problem: "", fix: "" };
-  return { name, problem: `The old install is still running (process ${pid})`, fix: `herdr plugin disable ${SHEPHERDR_PLUGIN_ID}` };
+  return { name, problem: `The old install is still running (process ${pid})`, fix: `herdr plugin disable ${OLD_PLUGIN_ID}` };
 }
 
 function service(p: Probe): Check {
@@ -297,24 +294,6 @@ function machinesBehind(p: Probe): Check[] {
   });
 }
 
-/** Every machine holds each secret name this one does: an agent there that lacks a stored TOTP asks the owner for a push. */
-function secretsEverywhere(p: Probe): Check[] {
-  const { here = [], others = [] } = p.secrets ?? {};
-  return others.map(({ host, names }) => {
-    const missing = names === null ? [] : here.filter((n) => !names.includes(n));
-    return {
-      name: `secrets on ${host}`,
-      problem:
-        names === null
-          ? `the secret names on ${host} cannot be read`
-          : missing.length === 0
-            ? ""
-            : `${host} lacks ${missing.length} secret name(s) this machine has: ${missing.join(", ")}`,
-      fix: `lineclear machine update ${host}`,
-    };
-  });
-}
-
 /** The herdr version the contract test passed with: the adapter's pin, read as a file since the CLI may not import the server. */
 export function testedHerdr(): string {
   const adapter = readFileSync(join(import.meta.dir, "..", "server", "server", "live", "herdr.ts"), "utf8");
@@ -381,11 +360,11 @@ function oldFoldersArchived(p: Probe): Check {
 
 const oldNameAgents = (p: Probe): Check => ({
   name: "agents on the old command name",
-  problem: `${p.oldNameAgents?.().join(", ") ?? ""}`.replace(/^(.)/, "still call shepherdr: $1"),
+  problem: `${p.oldNameAgents?.().join(", ") ?? ""}`.replace(/^(.)/, "still call the old name: $1"),
   fix: "lineclear restart <task id>, or let the task end",
 });
 
-/** After migrate, an agent started under Shepherdr 2.0 reaches the server only if both helper socket paths lead to it. */
+/** After migrate, an agent started under herdr-projects 2.0 reaches the server only if both helper socket paths lead to it. */
 function helperPaths(p: Probe): Check[] {
   const name = "helper socket paths";
   const fix = "lineclear migrate --link-helper";
@@ -490,9 +469,9 @@ export function doctorChecks(probe: Probe): Check[] {
     tool(p, "rsync", "sudo apt install rsync"),
     tool(p, "herdr", "curl -fsSL https://herdr.dev/install.sh | sh"),
     tool(p, "pi", "curl -fsSL https://pi.dev/install.sh | sh"),
-    shepherdr(p),
+    oldInstallStopped(p),
+    { name: "plugin config.json", ...pluginConfig(p.dataDir ?? dataDir()) },
     ...retiredChecks(p),
-    controlCenterCheck(p),
     { name: "models.json", problem: readModelFile(p.dataDir ?? dataDir()).problem, fix: "fix or delete models.json in the data folder" },
     {
       name: "lineclear files",
@@ -525,7 +504,6 @@ export function doctorChecks(probe: Probe): Check[] {
     lingering(p),
     disk(p),
     ...machinesBehind(p),
-    ...secretsEverywhere(p),
     ...herdrPinned(p),
     ...helperPaths(p),
     oldNameAgents(p),

@@ -9,11 +9,11 @@ import { join } from "node:path";
 import { herdrLines } from "./herdr-health.ts";
 import { type CompactionGauge, compactionGauge } from "./compaction-gauge.ts";
 import { type Blocker, countSteps, lineOf, readPlan, type RoadmapLine, type Where } from "./progress.ts";
-import { roadmapSource, shepherdrAllTasks } from "./roadmap-source.ts";
+import { roadmapSource, lineclearAllTasks } from "./roadmap-source.ts";
 import { titledByStep } from "./task-steps.ts";
 import { keptBy, readJsonKept, readTasksKept, refsKey } from "./kept-read.ts";
 import { spaceStops, waitBlocker, waitingOf } from "./home-waits.ts";
-import { remoteTasks } from "./spread.ts";
+import { notReached, remoteTasks } from "./spread.ts";
 import { type Export, remoteExports } from "./remotes.ts";
 import { readWaits, type Wait, type WaitGroup, waitsForOwner } from "./waits.ts";
 import { type AccountUse, usageLimits } from "./limits.ts";
@@ -24,13 +24,15 @@ import { noteTokens, wasteLines } from "./waste-watch.ts";
 import { mainRefs } from "./main-branch.ts";
 import { rowFacts } from "./task-detail.ts";
 import { type MonthSpend, type PiSpend, monthSpend, piSpendAndUsage } from "./home-spend.ts";
+import { DAY } from "./time.ts";
+import { gitText } from "./git.ts";
 
 /** A parsed file or event read as it is: its shape is not ours to promise. */
 type Raw = any;
 
 export { type PiSpend, monthSpend, piSpendAndUsage, spendAndUsage } from "./home-spend.ts";
 
-/** What Home draws. Built from Shepherdr's files, pi's session files and git, with no AI. */
+/** What Home draws. Built from Lineclear's files, pi's session files and git, with no AI. */
 export interface HomeData {
   at: number;
   host: string; // this machine: the machine of a task that names none
@@ -83,8 +85,10 @@ export interface HomeTask {
   since: number;
   /** The other machine the task runs on, when it is not this one. */
   machine?: string;
-  /** Shepherdr saw no sign of life from it. */
+  /** Lineclear saw no sign of life from it. */
   stalled?: boolean;
+  /** The merge lane's word on it: a head stuck in a step, or "Released from the merge line: <reason>". */
+  lane?: string;
   last?: { text: string; at: number };
   files?: number;
   check?: "pass" | "fail";
@@ -92,6 +96,8 @@ export interface HomeTask {
   progress?: number;
   at: number;
   text?: string;
+  /** Its machine did not answer the last read: when it last did (ms). The row says so and the task counts as waiting for no one. */
+  silentSince?: number;
 }
 
 /** Why work waits in a project, in words: what runs now, what each paused task waits for, why a ready step has not started. */
@@ -132,10 +138,9 @@ export interface LooseTask extends HomeTask {
 }
 
 export type Env = Record<string, string | undefined>;
-const DAY = 86_400_000;
 
 /**
- * The state of one Shepherdr task: from `shepherdr task list` (`listed` is its status there) where it can say, else from
+ * The state of one Lineclear task: from `lineclear task list` (`listed` is its status there) where it can say, else from
  * what the task was last told. A chat card never decides it.
  */
 export function taskState(task: Raw, listed: string | undefined): TaskState | undefined {
@@ -172,7 +177,7 @@ export function stageSince(task: Raw, stage: Stage, now: number): number {
   return since;
 }
 
-/** The last card of each task, with its time, from Shepherdr's chat files. */
+/** The last card of each task, with its time, from Lineclear's chat files. */
 export function lastCards(files: Raw[]): Map<string, { at: number; text: string }> {
   const last = new Map<string, { at: number; text: string }>();
   for (const f of files) {
@@ -187,22 +192,17 @@ export function lastCards(files: Raw[]): Map<string, { at: number; text: string 
   return last;
 }
 
-const gitOut = (repo: string, ...args: string[]) => {
-  const p = Bun.spawnSync(["git", "-C", repo, ...args], { stdin: "ignore", stderr: "ignore" });
-  return p.exitCode === 0 ? p.stdout.toString() : undefined;
-};
-
 /** The head of main in a folder, or undefined when it has none. */
 const mainHead = (repo: string) => {
   const read = () => {
     const [origin, main] = mainRefs(repo);
-    return (gitOut(repo, "rev-parse", main) ?? gitOut(repo, "rev-parse", origin))?.trim();
+    return gitText(repo, "rev-parse", main) ?? gitText(repo, "rev-parse", origin);
   };
   const key = refsKey(repo);
   return key === undefined ? read() : keptBy(`head:${repo}`, key, read);
 };
 
-/** What a space is called: its name in Shepherdr's names file, else its repo's name, else its folder's name. */
+/** What a space is called: its name in Lineclear's names file, else its repo's name, else its folder's name. */
 function displayName(space: Raw, names: Record<string, string>, machine: string): string {
   const named = names[`p:${machine}:${space.name}`];
   if (typeof named === "string" && named.trim()) return named.trim();
@@ -282,7 +282,7 @@ function machineSpaces(dir: string, env: Env, now: number): HomeProject[] {
     owners.set(p.space, [...(owners.get(p.space) ?? []), { project: n, paused: p.paused === true }]);
     if (!spaces.some((s) => s.name === p.space)) strays.push({ name: p.space, key: "", path: p.repo });
   }
-  const every = spaces.length ? shepherdrAllTasks(env) : [];
+  const every = spaces.length ? lineclearAllTasks(env) : [];
   // tasks the server retired after 90 days are counted in archive/counts.json, by space key
   const retired = readJsonKept<Record<string, { merged: number; closed: number }>>(join(dir, "archive", "counts.json")) ?? {};
   const ctx: SpaceContext = { tasks, red, names, machine, waits, honest, cards, lists, every, retired, env, now };
@@ -301,22 +301,46 @@ interface SpaceContext {
   honest: Map<string, string>;
   cards: ReturnType<typeof lastCards>;
   lists: Map<string, Record<Role, string[]>>;
-  every: ReturnType<typeof shepherdrAllTasks>;
+  every: ReturnType<typeof lineclearAllTasks>;
   retired: Record<string, { merged: number; closed: number }>;
   env: Env;
   now: number;
 }
+
+/** A remote task's state line without the "on <machine>" tail the spread adds (`parseRoom` in spread.ts). */
+const withoutTail = (sub: string | undefined) => sub?.replace(/(?: · )?on [^ ]+$/, "") || undefined;
 
 /** Tasks that run on the project's other machines show beside the local ones. */
 function farTasks(space: Raw, env: Env, now: number): HomeTask[] {
   return remoteTasks(space.name, env)
     .filter((t) => t.id && (t.status === "work" || t.status === "need" || t.status === "queued"))
     .map((t): HomeTask => {
-      const state = t.status as TaskState;
+      // a silent machine's task is only what it said last: it is not waiting for you now
+      const state = (t.silentSince !== undefined && t.status === "need" ? "work" : t.status) as TaskState;
       const step = stepOf(t.title);
-      const stage = taskStage({}, state, t.sub);
+      const line = withoutTail(t.sub);
+      const stage = taskStage({}, state, line);
       const since = stageSince({ id: String(t.id) }, stage, now);
-      return { id: String(t.id), title: t.title, state, stage, ...(step ? { step } : {}), machine: String(t.id).split("@")[1], since, at: since };
+      return {
+        id: String(t.id),
+        title: t.title,
+        state,
+        stage,
+        ...(state === "need" && line ? { text: line } : {}),
+        ...(step ? { step } : {}),
+        machine: String(t.id).split("@")[1],
+        since,
+        at: since,
+        ...(t.silentSince !== undefined
+          ? {
+              silentSince: t.silentSince,
+              last: {
+                text: notReached(String(t.id).split("@")[1] ?? "", t.silentSince),
+                at: t.silentSince,
+              },
+            }
+          : {}),
+      };
     });
 }
 
@@ -331,6 +355,7 @@ function localRow(x: { t: Raw; state: TaskState }, space: Raw, roadmap: Roadmap,
   const full = step && roadmap?.titles.get(step);
   const result = step && roadmap?.results.get(step);
   const stage = taskStage(t, state, line);
+  const lane = state === "done" ? undefined : laneNote(t, now);
   const model = (stage === "review" ? t.reviewer?.model : t.agent?.model) as unknown;
   const list = ctx.lists.get(space.name)?.[stage === "review" ? "reviewer" : "worker"];
   const note = typeof model === "string" && model && list?.length ? modelNote(model, list) : undefined;
@@ -348,8 +373,10 @@ function localRow(x: { t: Raw; state: TaskState }, space: Raw, roadmap: Roadmap,
     since: stageSince(t, stage, now),
     ...(state !== "done" ? rowFacts(t, cards.get(t.id), stage !== "queued", env, now) : {}),
     ...(stage === "work" && typeof t.report?.progress === "number" ? { progress: Math.max(0, Math.min(1, t.report.progress / 100)) } : {}),
-    // Shepherdr keeps `stalled` after a stall ends; `life` is set only while the task is still quiet
+    // Lineclear keeps `stalled` after a stall ends; `life` is set only while the task is still quiet
     ...(typeof t.stalled?.life === "number" && (stage === "work" || stage === "review") ? { stalled: true } : {}),
+    // the row shows `last`, so the lane's word takes its place; a hanging head is stuck, whatever its stage
+    ...(lane !== undefined ? { lane, last: { text: lane, at: now }, ...(lane.startsWith("Stuck") ? { stalled: true } : {}) } : {}),
     at: t.doneAt ?? t.updated ?? t.created,
     ...(text !== undefined ? { text } : {}),
   };
@@ -467,3 +494,28 @@ export function homeData(env: Env = process.env, now = Date.now(), remote?: Expo
 }
 
 if (import.meta.main) console.log(JSON.stringify(homeData(), null, 2));
+
+// The merge lane's stall as the owner reads it: a head that hangs, and a task the lane let go.
+/** The lane lets a head go after this long without progress (server/server/live/engine/lane-watch.ts). */
+const LANE_IDLE_MS = 15 * 60_000;
+
+/** Steps a head only passes through: a check may run long, these do not. */
+const SHORT_STEPS: Record<string, string> = { rebase: "Rebasing", merge: "Merging" };
+
+const minutes = (ms: number) => Math.max(1, Math.round(ms / 60_000));
+
+/**
+ * What the lane says of one task: "Stuck in <step> for <n> min" for a head hanging in a short step, or
+ * "Released from the merge line: <reason>" once the lane let it go, until it joins the line again or merges.
+ */
+function laneNote(task: { landing?: { step?: string; at?: number }; mergeStopped?: string; merged?: boolean }, now: number): string | undefined {
+  if (task.merged) return undefined;
+  const { landing } = task;
+  if (landing) {
+    const step = SHORT_STEPS[landing.step ?? ""];
+    const quiet = typeof landing.at === "number" ? now - landing.at : 0;
+    return step && quiet >= LANE_IDLE_MS ? `Stuck in "${step}" for ${minutes(quiet)} min` : undefined;
+  }
+  const released = /^Your merge hung in (.*?),? so the merge lane released it/.exec(task.mergeStopped ?? "");
+  return released?.[1] ? `Released from the merge line: hung in ${released[1]}` : undefined;
+}

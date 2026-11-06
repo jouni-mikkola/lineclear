@@ -1,5 +1,5 @@
 // The UI bar on the Chat view (`/chat`), served by `lineclear run`. The pictures use the sample states (`?state=`);
-// the live tests talk to a stand-in for Shepherdr's server that answers as the Dispatcher would.
+// the live tests talk to a stand-in for Lineclear's server that answers as the Dispatcher would.
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -8,7 +8,7 @@ import { PAGE_STATES } from "./bar.ts";
 import { FIXTURE, UI_PORT } from "./fixture.ts";
 
 const CHAT_STATES = [...PAGE_STATES, "sending", "streaming", "offline", "none", "request"];
-const SHEPHERDR = join(FIXTURE, "shepherdr");
+const LINECLEAR = join(FIXTURE, "lineclear");
 const FAKE = UI_PORT + 1;
 const fake = (path: string) => `http://127.0.0.1:${FAKE}${path}`;
 
@@ -60,15 +60,15 @@ test("on a phone the composer stays at the bottom of the screen, and the tabs fi
   expect(tabs).toBe(true);
 });
 
-/** Starts the fake Shepherdr for each test of a live group and stops it after. */
-function useFakeShepherdr() {
+/** Starts the fake Lineclear for each test of a live group and stops it after. */
+function useFakeLineclear() {
   let server: ChildProcess | undefined;
 
   test.beforeEach(async () => {
-    rmSync(SHEPHERDR, { recursive: true, force: true });
-    mkdirSync(SHEPHERDR, { recursive: true });
-    server = spawn("bun", [join(import.meta.dirname, "fake-shepherdr-server.ts"), SHEPHERDR, String(FAKE)], { stdio: "inherit" });
-    await expect.poll(() => existsSync(join(SHEPHERDR, "server.json"))).toBe(true);
+    rmSync(LINECLEAR, { recursive: true, force: true });
+    mkdirSync(LINECLEAR, { recursive: true });
+    server = spawn("bun", [join(import.meta.dirname, "fake-lineclear-server.ts"), LINECLEAR, String(FAKE)], { stdio: "inherit" });
+    await expect.poll(() => existsSync(join(LINECLEAR, "server.json"))).toBe(true);
   });
   test.afterEach(async () => {
     const s = server;
@@ -88,7 +88,7 @@ const actions = async () => (await (await fetch(fake("/fake/actions"))).json()) 
 
 test.describe("live", () => {
   test.skip(({ viewport }) => viewport?.width !== 1440, "the live chat is checked once, at 1440 px");
-  useFakeShepherdr();
+  useFakeLineclear();
 
   test("an example question goes with one tap, the Dispatcher writes, and its answer shows as markdown", async ({ page }) => {
     await open(page);
@@ -123,9 +123,9 @@ test.describe("live", () => {
 
 test.describe("live 2", () => {
   test.skip(({ viewport }) => viewport?.width !== 1440, "the live chat is checked once, at 1440 px");
-  useFakeShepherdr();
+  useFakeLineclear();
 
-  test("files by the button, a paste and a drop reach the Dispatcher as paths in Shepherdr's inbox", async ({ page }) => {
+  test("files by the button, a paste and a drop reach the Dispatcher as paths in Lineclear's inbox", async ({ page }) => {
     await open(page);
     await page.locator("[data-picker]").setInputFiles({ name: "shot.png", mimeType: "image/png", buffer: PNG });
     await page.locator("[data-message-box]").evaluate((box, png) => {
@@ -146,9 +146,9 @@ test.describe("live 2", () => {
     const [sent] = await actions();
     expect(sent!.text).toBe("Here they are.");
     expect(sent!.attachments).toHaveLength(3);
-    for (const p of sent!.attachments) expect(p).toContain("fake-shepherdr-inbox-");
+    for (const p of sent!.attachments) expect(p).toContain("fake-lineclear-inbox-");
     expect(readFileSync(sent!.attachments[1]!, "utf8")).toBe("line one\nline two\n");
-    // the thread's pictures load from Shepherdr through this server
+    // the thread's pictures load from Lineclear through this server
     await expect
       .poll(() =>
         page
@@ -180,7 +180,7 @@ test.describe("live 2", () => {
 
 test.describe("live 3", () => {
   test.skip(({ viewport }) => viewport?.width !== 1440, "the live chat is checked once, at 1440 px");
-  useFakeShepherdr();
+  useFakeLineclear();
 
   test("a message that does not go says why, and goes again with one tap under its own id", async ({ page }) => {
     await open(page);
@@ -190,7 +190,7 @@ test.describe("live 3", () => {
     await page.locator("[data-retry]").click();
     await expect.poll(async () => (await actions()).length).toBe(2);
     const [a, b] = await actions();
-    // the same id: Shepherdr takes it once, so one that did go in is not sent twice
+    // the same id: Lineclear takes it once, so one that did go in is not sent twice
     expect(a!.cid).toBe(b!.cid);
   });
 

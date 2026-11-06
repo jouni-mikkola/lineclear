@@ -11,7 +11,7 @@ export class Machines extends MachinesActions {
   /** saved: herdr's list of machines; none (tests) runs only the workers adopt() names */
   constructor(saved: (() => Promise<Saved[]>) | null = savedMachines, status: typeof machineStatus = machineStatus) {
     super(saved, status)
-    // from the time Shepherdr was installed on every machine: the machines that announced themselves
+    // from the time Lineclear was installed on every machine: the machines that announced themselves
     rmSync(join(HOME, 'peers.json'), { force: true })
     if (saved) {
       // what each machine showed before a restart, at once; its worker is taken back or started again

@@ -1,7 +1,7 @@
 import { basename } from "node:path";
 import { listProjectNames, readSettings } from "./project.ts";
 
-/** A name or title without case, accents, Finnish ä and ö, spaces or punctuation: "Oma-Labra" and "webshop" match. */
+/** A name or title without case, accents, Finnish ä and ö, spaces or punctuation: "Web-Shop" and "webshop" match. */
 export const fold = (s: string) =>
   s
     .toLowerCase()
@@ -41,7 +41,7 @@ const refusal = (what: string, input: string, names: string[]) => {
 /**
  * Finds the one candidate that a loosely written `input` means, or says why not. A candidate is a list of the spellings
  * it goes by, the first being its name. It matches the exact spelling, then the folded one, then a Finnish ending on a
- * name ("webshopan") a start of a name of at least 4 characters ("omal") or a typo of 2 letters, when exactly one candidate fits.
+ * name ("webshopin") a start of a name of at least 4 characters ("webs") or a typo of 2 letters, when exactly one candidate fits.
  */
 export function resolveOne(what: string, input: string, candidates: string[][]): { name: string; loose: boolean } | { error: string } {
   const names = candidates.map((c) => c[0]!);

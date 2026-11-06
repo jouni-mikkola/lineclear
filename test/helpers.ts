@@ -26,12 +26,12 @@ export function tmp(prefix: string): string {
 export function freshWebApi(url?: string) {
   const dir = tmp("web");
   mkdirSync(join(dir, "config"), { recursive: true });
-  mkdirSync(join(dir, "shepherdr"), { recursive: true });
+  mkdirSync(join(dir, "lineclear"), { recursive: true });
   const env = {
     LINECLEAR_CONFIG: join(dir, "config"),
-    LINECLEAR_SHEPHERDR_DIR: join(dir, "shepherdr"),
+    LINECLEAR_HOME: join(dir, "lineclear"),
     HOME: dir,
-    ...(url ? { LINECLEAR_SHEPHERDR_URL: url } : {}),
+    ...(url ? { LINECLEAR_URL: url } : {}),
   };
   return { dir, env, handle: webApi(env) };
 }
@@ -59,12 +59,12 @@ export function makeStubs(root: string): { bin: string; state: string } {
     `case "$1 $2 $3" in
   "--version  ") echo "herdr ${testedHerdr()}" ;;
   "plugin list --json")
-    if [ -f "${state}/shepherdr" ]; then
+    if [ -f "${state}/lineclear" ]; then
       echo '{"result":{"plugins":[{"plugin_id":"herdr-projects","version":"2.0.0","enabled":true}]}}'
     else echo '{"result":{"plugins":[]}}'; fi ;;
   "plugin list "*)
-    if [ -f "${state}/shepherdr" ]; then echo "1 plugin installed:"; echo "- herdr-projects (Shepherdr) enabled [github:x]"; else echo "No plugins installed"; fi ;;
-  "plugin install "*) touch "${state}/shepherdr" ;;
+    if [ -f "${state}/lineclear" ]; then echo "1 plugin installed:"; echo "- herdr-projects (Lineclear) enabled [github:x]"; else echo "No plugins installed"; fi ;;
+  "plugin install "*) touch "${state}/lineclear" ;;
 esac`,
   );
   stub(
@@ -121,11 +121,11 @@ export function ownEnv(root: string, extra: Record<string, string>): Record<stri
 export const json = (path: string, body: unknown, headers: Record<string, string> = { "content-type": "application/json", "x-lineclear-token": PAGE_TOKEN }) =>
   new Request(`http://127.0.0.1:7420${path}`, { method: "POST", headers, body: JSON.stringify(body) });
 
-/** A temp folder laid out as the web tests need it: an inbox folder and a Shepherdr folder with the space "web-shop". */
+/** A temp folder laid out as the web tests need it: an inbox folder and a Lineclear folder with the space "web-shop". */
 export function webShopDir(prefix: string): string {
   const dir = mkdtempSync(join(tmpdir(), prefix));
   mkdirSync(join(dir, "config", "inbox"), { recursive: true });
-  mkdirSync(join(dir, "shepherdr"), { recursive: true });
-  writeFileSync(join(dir, "shepherdr", "spaces.json"), JSON.stringify([{ key: "WEB", name: "web-shop", path: join(dir, "none") }]));
+  mkdirSync(join(dir, "lineclear"), { recursive: true });
+  writeFileSync(join(dir, "lineclear", "spaces.json"), JSON.stringify([{ key: "WEB", name: "web-shop", path: join(dir, "none") }]));
   return dir;
 }

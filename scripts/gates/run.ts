@@ -5,18 +5,18 @@
 // over the whole repo. The nightly job and a release run --full.
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { borders, cycles } from "./borders.ts";
+import { borders } from "./borders.ts";
+import { codeRules } from "./code-rules.ts";
 import { comments } from "./comments.ts";
 import { copies } from "./copies.ts";
 import { deadCode } from "./dead-code.ts";
-import { herdrCalls } from "./herdr-calls.ts";
 import { lint } from "./lint.ts";
-import { modelNames } from "./model-names.ts";
+import { oldName } from "./old-name.ts";
 import { type Gate, judge, lower, readBaseline, within, writeBaseline } from "./ratchet.ts";
 import { size } from "./size.ts";
 import { changedSince } from "./tools.ts";
 
-export const GATES: Gate[] = [lint, deadCode, copies, borders, cycles, size, comments, modelNames, herdrCalls];
+export const GATES: Gate[] = [lint, deadCode, copies, borders, size, comments, codeRules, oldName];
 const SHOWN = 5;
 
 const args = process.argv.slice(2);
@@ -60,11 +60,13 @@ const results = await Promise.all(
 );
 
 let failed = false;
+const failedNames: string[] = [];
 for (const r of results) {
   const name = r.gate.name;
   if (r.error !== undefined || !r.faults) {
     console.error(`gates: ${name} could not run: ${r.error}`);
     failed = true;
+    failedNames.push(r.gate.name);
     continue;
   }
   const full = readBaseline(root, name);
@@ -82,8 +84,10 @@ for (const r of results) {
     );
     for (const s of stale.slice(0, SHOWN)) console.error(`  ${s.key}: ${s.found} found, the baseline has ${s.allowed}`);
   }
-  if (over.length > 0 || stale.length > 0) failed = true;
-  else {
+  if (over.length > 0 || stale.length > 0) {
+    failed = true;
+    failedNames.push(name);
+  } else {
     const where = r.scope ? ` in ${r.scope.length} changed file${r.scope.length === 1 ? "" : "s"}` : "";
     console.log(`${name}: ok (${r.faults.length} known${where}, ${r.seconds.toFixed(1)} s)`);
   }
@@ -96,4 +100,6 @@ if (limit !== undefined && took > limit) {
     failed = true;
   }
 }
+// the last line of a failed run: it is what the check logs as the failure, and `lineclear measure` counts each gate's catches from it (src/catches.ts)
+if (failedNames.length > 0) console.error(`gates failed: ${failedNames.join(", ")}`);
 process.exit(failed ? 1 : 0);

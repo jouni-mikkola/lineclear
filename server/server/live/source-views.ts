@@ -5,7 +5,6 @@ import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { BODY_MAX, clip, lastReply, openCards, TITLE_MAX } from '../../shared/alerts.ts'
 import type { Action, Alert, Artifact, CardAsk, Chat, Question, Snapshot } from '../../shared/types.ts'
-import { readJson, writeJson } from '../store.ts'
 import type { PilotRun } from './autopilot.ts'
 import { hidden } from './agents.ts'
 import { excerpt, line } from './chatlines.ts'
@@ -22,7 +21,6 @@ import { restartHint, type Harness } from './restart.ts'
 import { repositorySection } from './settings.ts'
 import { secretPages } from './secrets.ts'
 import { pluginSection } from '../plugins.ts'
-import { TOOK_OVER, type TookOver } from '../took-over.ts'
 import { STOPPED } from './source-helpers.ts'
 import { LiveSourceState } from './source-state.ts'
 
@@ -30,14 +28,6 @@ export class LiveSourceViews extends LiveSourceState {
   pushWarnings: () => string[] = () => []
   /** a worker's copy of its machine's agent logs, as they grow */
   mirror = BOX ? new Mirror(BOX) : null
-
-  /** once, after Shepherdr replaced herdr-projects here (scripts/take-over.ts): what it did, in the home space's chat */
-  protected sayTookOver() {
-    const rec = readJson<TookOver | null>(TOOK_OVER, null)
-    if (!rec || rec.said) return
-    this.chats.post(placeId.home(), { id: `took-over:${rec.at}`, text: rec.text })
-    writeJson(TOOK_OVER, { ...rec, said: true })
-  }
 
   /** a look at this machine: limits judged, held tasks started where there is room, the screen told of new numbers */
   healthTick(now = Date.now()) {

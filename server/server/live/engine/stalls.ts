@@ -90,7 +90,7 @@ export class EngineStalls extends EngineStatus {
     return Math.max(t.updated, this.wrote.get(t.id) ?? 0, this.heard.get(t.id) ?? 0, this.beat.get(t.id) ?? 0, this.agents.said(key)?.at ?? 0, ...logs)
   }
 
-  /** what Shepherdr saw of a stall: how long quiet (or past its estimate), its last status line, whether its agent runs */
+  /** what Lineclear saw of a stall: how long quiet (or past its estimate), its last status line, whether its agent runs */
   protected stallLine(t: TaskRec, now: number, quietSince?: number) {
     const key = this.key(t)
     const mins = (ms: number) => `${Math.max(0, Math.round(ms / 60_000))}m`

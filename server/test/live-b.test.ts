@@ -243,7 +243,7 @@ describe('settings', () => {
     expect(row('Tasks', 'Model').value).toBe('Opus 5.5')
     expect(row('Tasks', 'Effort').value).toBe('max')
     expect(s.harness('task')).toEqual({ kind: 'claude', model: 'claude-opus-5-5', effort: 'max' })
-    // a CLI Shepherdr passes neither to picks its own; the backup has its own model and effort
+    // a CLI Lineclear passes neither to picks its own; the backup has its own model and effort
     s.set('task.agent', 'Qwen')
     expect(row('Tasks', 'Model')).toMatchObject({ value: "Qwen's own", fixed: true })
     expect(row('Backup', 'Model').options![1]).toBe('GPT-6.1-Sol')

@@ -26,7 +26,7 @@ interface Opts {
   worker?: string[];
 }
 
-/** A fake clock, a fake shepherdr and a fake task list: every call the ladder makes is logged. */
+/** A fake clock, a fake lineclear and a fake task list: every call the ladder makes is logged. */
 function setup(o: Opts = {}) {
   const dir = tmp("stalls");
   dirs.push(dir);
@@ -85,7 +85,7 @@ test("a card is read from a chat file", () => {
 });
 
 test("each stall card moves the task one rung: reminder, restart, next model, Inbox", () => {
-  const t = setup();
+  const t = setup({ tasks: [{ id: "LIN-5", title: "A Alpha", status: "need", sub: "Waits for your reply" }] });
   t.tick(); // sets the time from which cards count
   const rungs: string[] = [];
   for (const id of ["c1", "c2", "c3", "c4"]) {
@@ -109,12 +109,26 @@ test("each stall card moves the task one rung: reminder, restart, next model, In
   expect(extra[extra.indexOf("--model") + 1]).toBe("openai-codex/gpt-6.1-sol");
   expect(readItems(t.env).map((i) => i.kind)).toEqual(["stuck"]);
   expect(t.decisions().filter(ladder)).toHaveLength(4); // each rung is in decisions.jsonl
-  expect(
-    t
-      .decisions()
-      .filter((d) => d.event === "stall")
-      .map((d) => d.class),
-  ).toContain("no-sign-of-life");
+});
+
+test("a working task silent for 20 minutes is stopped with an Inbox report and a wait, never reminded", () => {
+  const t = setup();
+  t.tick();
+  t.stall("c1");
+  t.clock.at = new Date(t.clock.at.getTime() + 60_000);
+  t.tick();
+  expect(t.log).toEqual(["stop LIN-5"]);
+  expect(readItems(t.env).map((i) => i.kind)).toEqual(["stuck"]);
+  expect(readWaits(t.env)).toMatchObject([{ task: "LIN-5", kind: "owner" }]);
+});
+
+test("a task at work past its wall-time limit is stopped with a report", () => {
+  const t = setup();
+  t.tick();
+  t.clock.at = new Date(t.clock.at.getTime() + 121 * 60_000);
+  t.tick();
+  expect(t.log).toContain("stop LIN-5");
+  expect(readItems(t.env)[0]?.question).toContain("wall-time limit");
 });
 
 test("a late card asks for a new estimate once and climbs only when a second one comes", () => {
@@ -161,7 +175,7 @@ test("a quiet card climbs with no sign of life and records no late stall", () =>
 test("the handover is one start: the same tick does not start the step again", () => {
   const t = setup();
   t.tick();
-  // the task list still shows the closed task as work, and then as done, as Shepherdr would
+  // the task list still shows the closed task as work, and then as done, as Lineclear would
   for (const id of ["c1", "c2", "c3"]) {
     t.stall(id);
     t.clock.at = new Date(t.clock.at.getTime() + 60_000);
@@ -235,7 +249,7 @@ test("an ended free account goes straight to rung 3", () => {
   expect(t.adds).toHaveLength(1);
 });
 
-test("a task Shepherdr left waiting for a login goes straight to rung 3", () => {
+test("a task Lineclear left waiting for a login goes straight to rung 3", () => {
   const t = setup({ tasks: [{ id: "LIN-5", title: "A Alpha", status: "need", sub: "Signed out" }] });
   t.tick();
   expect(t.log).toEqual(["close LIN-5"]);
@@ -511,6 +525,9 @@ test("an error the task got past is not read again", () => {
 
 test("a role whose last model is full waits until the reset", () => {
   const t = setup({ worker: ["anthropic/claude-sonnet-5-5"] });
+  // the wait spans hours: the wall-time limit is not what this test is about
+  const file = join(t.env.LINECLEAR_CONFIG!, "projects", "demo", "settings.json");
+  writeFileSync(file, JSON.stringify({ ...JSON.parse(readFileSync(file, "utf8")), taskLimitMin: 100_000 }));
   t.world.lastError = () => ({ text: SESSION, at: t.clock.at.getTime() });
   t.tick();
   expect(t.adds).toHaveLength(0);

@@ -1,6 +1,7 @@
 #!/usr/bin/perl
-# The lineclear command on a machine Shepherdr runs from the main one: it sends its words to Shepherdr through the
-# SSH tunnel the main machine keeps open to this folder (main.sock) and prints the answer. Put here by Shepherdr.
+# The lineclear command, the one client on every machine (perl is on each; bun is not). It sends its words to the
+# server and prints the answer: over LINECLEAR_URL or the server's port where the server runs, else through the SSH
+# tunnel the main machine keeps open to this folder (main.sock).
 use strict;
 use warnings;
 use Cwd ();
@@ -8,24 +9,50 @@ use File::Basename ();
 use File::Spec ();
 use Fcntl qw(O_WRONLY O_CREAT O_EXCL O_TRUNC);
 use IO::Select;
+use IO::Socket::INET;
 use IO::Socket::UNIX;
 use Encode ();
 use JSON::PP;
 
 my $dir = File::Basename::dirname(Cwd::abs_path($0));
-my $sock = "$dir/../main.sock";
-my $routing = "$dir/../route.pl";
-require $routing;
-my $route = session_route();
-$ENV{LINECLEAR_CHAT} = routed_chat($route) if $route;
-$ENV{LINECLEAR_SECRET_CAPABILITY} = $route ? ($route->{capability} // '') : '';
+my $home = $ENV{LINECLEAR_HOME} || "$ENV{HOME}/.lineclear";
+# route.pl, when it started this (a repo checkout), has set the chat and the capability already
+my ($routing) = grep { -e } "$dir/../route.pl", "$dir/route.pl";
+if (delete $ENV{LINECLEAR_ROUTED} || !$routing) {
+  $ENV{LINECLEAR_SECRET_CAPABILITY} //= '';
+} else {
+  require $routing;
+  my $route = session_route();
+  $ENV{LINECLEAR_CHAT} = routed_chat($route) if $route;
+  $ENV{LINECLEAR_SECRET_CAPABILITY} = $route ? ($route->{capability} // '') : '';
+}
+# Where the server is: the address in LINECLEAR_URL, else the port in LINECLEAR_PORT or server.json (the server runs
+# here), else a socket (a machine whose server runs elsewhere keeps a tunnel to it there), else the default port
+my ($host, $port, $sock, $url);
+my $server_port = $ENV{LINECLEAR_PORT};
+if (!$server_port && open(my $sj, '<', "$home/server.json")) {
+  my $c = eval { JSON::PP->new->decode(do { local $/; <$sj> }) };
+  $server_port = $c->{port} if ref $c eq 'HASH';
+}
+if (-S "$dir/../main.sock" || -e "$dir/../route.pl") {
+  $sock = "$dir/../main.sock";   # the installed helper: its own tunnel, whatever URL the caller inherited
+} elsif (length($ENV{LINECLEAR_URL} // '')) {
+  ($host, $port) = $ENV{LINECLEAR_URL} =~ m{^https?://([^/:]+)(?::(\d+))?} ? ($1, $2 // 80) : ('127.0.0.1', 7421);
+} elsif ($server_port) {
+  ($host, $port) = ('127.0.0.1', $server_port);
+} elsif (-S "$home/helper/main.sock") {
+  $sock = "$home/helper/main.sock";
+} else {
+  ($host, $port) = ('127.0.0.1', 7421);
+}
+$url = "http://$host:$port" unless $sock;
 
 my $proof = $ENV{LINECLEAR_SECRET_CAPABILITY} // '';
 delete $ENV{LINECLEAR_SECRET_CAPABILITY};
 my $authorization = $proof =~ /^[a-f0-9]{64}$/ ? "Authorization: Bearer $proof\r\n" : '';
 my $stdin;
-# lineclear secret run NAME … -- <command>: only the names go to Shepherdr; the command runs here, with the values in
-# its environment. lineclear secret env writes them to a file here. Neither prints a value (as server/cli.ts)
+# lineclear secret run NAME … -- <command>: only the names go to Lineclear; the command runs here, with the values in
+# its environment. lineclear secret env writes them to a file here. Neither prints a value
 my $secret = @ARGV && $ARGV[0] eq 'secret' ? ($ARGV[1] // '') : '';
 my @args = @ARGV;
 $args[0] = 'ask' if @args && $args[0] eq 'card';   # `lineclear card` is the chat card: `ask` is the Inbox's name in the full command
@@ -43,19 +70,19 @@ $body{chat} = $u->($ENV{LINECLEAR_CHAT}) if $ENV{LINECLEAR_CHAT};
 $body{stdin} = $u->($stdin) if defined $stdin;
 my $json = JSON::PP->new->utf8->canonical->encode(\%body);
 # lineclear merge waits for its merge to end, merged or stopped with a reason, however long the check line is. A call
-# with no answer (Shepherdr restarted, or the tunnel dropped and left this end open) is sent again: it joins the same
-# merge, or says it is merged already. After MERGE_TOTAL without an answer it stops, and says so. The same as server/cli.ts
+# with no answer (Lineclear restarted, or the tunnel dropped and left this end open) is sent again: it joins the same
+# merge, or says it is merged already. After MERGE_TOTAL without an answer it stops, and says so.
 my $merge = @ARGV && ($ARGV[0] eq 'merge' || ($ARGV[0] eq 'task' && ($ARGV[1] // '') eq 'merge'));
 my $wait = $merge ? ($ENV{LINECLEAR_MERGE_WAIT} // 30 * 60000) : 0;
 my $total = ($ENV{LINECLEAR_MERGE_TOTAL} // 3 * 3600000) / 1000;
 my $began = time;
-my $down = 0;   # since when it could not connect: a Shepherdr that restarts is waited for 120 s, no longer
+my $down = 0;   # since when it could not connect: a Lineclear that restarts is waited for 120 s, no longer
 my $res;
 while (1) {
-  my $s = IO::Socket::UNIX->new(Type => SOCK_STREAM(), Peer => $sock);
+  my $s = $sock ? IO::Socket::UNIX->new(Type => SOCK_STREAM(), Peer => $sock) : IO::Socket::INET->new(PeerAddr => $host, PeerPort => $port, Proto => 'tcp');
   if ($s) {
     $down = 0;
-    print $s "POST /api/cli HTTP/1.0\r\nHost: shepherdr\r\n${authorization}Content-Type: application/json\r\nContent-Length: " . length($json) . "\r\n\r\n$json";
+    print $s "POST /api/cli HTTP/1.0\r\nHost: lineclear\r\n${authorization}Content-Type: application/json\r\nContent-Length: " . length($json) . "\r\n\r\n$json";
     $res = eval {
       local $SIG{ALRM} = sub { die "no answer\n" };
       alarm(int(($wait + 999) / 1000)) if $wait;
@@ -69,7 +96,9 @@ while (1) {
   }
   if (!$merge) {
     unless ($s) {
-      print STDERR "Lineclear can't be reached from this machine right now (its link from the main machine is down). Check the machine in Lineclear, or run lineclear doctor on the main machine.\n";
+      print STDERR $sock
+        ? "Lineclear can't be reached from this machine right now (its link from the main machine is down). Check the machine in Lineclear, or run lineclear doctor on the main machine.\n"
+        : "Cannot reach the lineclear command at $url. Check the target URL or use this session's installed helper. Do not start another server to repair routing.\n";
       exit 2;
     }
     last;
@@ -100,7 +129,7 @@ print $j->{out} // '';
 exit($j->{code} // 0);
 
 # lineclear secret run: the command, with the values in its environment; what it prints comes through with each value
-# masked, as 1Password's op run does (values under 4 characters aren't: they would garble the rest), as server/cli.ts
+# masked, as 1Password's op run does (values under 4 characters aren't: they would garble the rest)
 sub run_masked {
   my ($secrets) = @_;
   my @values = sort { length($b) <=> length($a) } grep { length($_) >= 4 } map { Encode::encode('UTF-8', $_) } values %$secrets;

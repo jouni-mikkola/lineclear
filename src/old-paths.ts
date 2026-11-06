@@ -3,16 +3,16 @@ import { dirname, join } from "node:path";
 import { writeAtomic } from "../pi/atomic.ts";
 import { readJson } from "../pi/config.ts";
 
-// Records written under Shepherdr 2.0 hold its paths. The checks and the fix are here, with the other code that names the old folder.
+// Records written under herdr-projects 2.0 hold its paths. The checks and the fix are here, with the other code that names the old folder.
 
 type Rec = Record<string, unknown>;
 /** Where a profile must have been left alone for before it is copied: a browser in use writes into it. */
 const QUIET_MS = 10 * 60_000;
-/** The herdr plugin's checkout, where Shepherdr 2.0's own command and skills were: `<home>/.config/herdr/plugins/github-installations/herdr-projects-<id>/<n>/checkout`. */
+/** The herdr plugin's checkout, where herdr-projects 2.0's own command and skills were: `<home>/.config/herdr/plugins/github-installations/herdr-projects-<id>/<n>/checkout`. */
 const PLUGIN_CHECKOUT = /\/[^\s:"]*\/herdr-projects-[0-9a-f]+\/[^\s:"/]+\/checkout/g;
 
 export interface Roots {
-  /** Shepherdr 2.0's folder. */
+  /** herdr-projects 2.0's folder. */
   old: string;
   /** Lineclear's data folder. */
   now: string;

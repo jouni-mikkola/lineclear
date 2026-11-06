@@ -1,5 +1,4 @@
 export type {
-  Status,
   Mode,
   Place,
   Section,
@@ -16,7 +15,6 @@ export type {
   Artifact,
   ArtifactPost,
   Reaction,
-  ReplyQuote,
   CardAsk,
   UpdateCard,
 } from './types-core.ts'
@@ -39,7 +37,6 @@ export type {
   RestartCli,
   RestartInfo,
   TriggerRow,
-  SettingRow,
   SettingSection,
   Alert,
   FolderEntry,
@@ -47,7 +44,7 @@ export type {
   AddSpace,
   TreeFiles,
 } from './types-chat.ts'
-export { apart, machineName, doneNewestFirst, modeName, modeCard, cardMessage } from './types-chat.ts'
+export { apart, doneNewestFirst, modeCard, cardMessage } from './types-chat.ts'
 export type {
   FileText,
   DiffFile,

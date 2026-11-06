@@ -36,7 +36,7 @@ test("the format check reads the store this build writes and names what it would
   ]);
   // a newer build reading an older one's store: values it drops are its own upgrades, only a failure to read counts
   expect(unreadable(root, store, true)).toEqual(["tasks.json: no next or tasks list", expect.stringMatching(/^task-ids\.sqlite: /)]);
-});
+}, 180_000);
 
 const storeCount = (server: string, store: string) => JSON.parse(sh(["bun", join(server, "scripts", "store-formats.ts"), "count", store], { cwd: server }).out);
 
@@ -49,7 +49,7 @@ test("a store the candidate wrote is read whole after a rollback: no task, chat 
   // the previous build reads the same files: nothing unreadable, and the same counts
   expect(unreadable(root, store)).toEqual([]);
   expect(storeCount(server, store)).toEqual(wrote);
-});
+}, 180_000);
 
 test("a planted format change with no migration fails the check", () => {
   const store = join(root, "store");
@@ -61,7 +61,7 @@ test("a planted format change with no migration fails the check", () => {
   const tasks = JSON.parse(readFileSync(join(store, "tasks.json"), "utf8"));
   writeFileSync(join(store, "tasks.json"), JSON.stringify({ ...tasks, tasks: tasks.tasks.map(({ id, ...t }: { id: string }) => ({ ...t, key: id })) }));
   expect(unreadable(root, store, true)).toEqual(expect.arrayContaining([expect.stringContaining("tasks.json")]));
-});
+}, 180_000);
 
 test("the format check reads the task id database with the server's code, and names one it cannot read", () => {
   const store = join(root, "store");
@@ -72,26 +72,30 @@ test("the format check reads the task id database with the server's code, and na
   db.exec("DROP TABLE sequences; CREATE TABLE sequences (space TEXT PRIMARY KEY, code TEXT);");
   db.close();
   expect(unreadable(root, store, true)).toEqual([expect.stringMatching(/^task-ids\.sqlite: /)]);
-});
+}, 180_000);
 
 // Before a merge: the build this machine runs (stable) must read this tree's roadmap and a store this tree's server
 // wrote. Skipped where Lineclear is not installed; until stable has scripts/formats.ts it reads the roadmap only.
 const installed = join(process.env.XDG_DATA_HOME ?? join(homedir(), ".local", "share"), "lineclear");
-test.skipIf(!existsSync(join(installed, "bin", "lineclear")))("the stable build reads this tree's roadmap and store files", () => {
-  const store = join(root, "store");
-  const server = join(import.meta.dir, "..", "server");
-  expect(writeStore(server, store)).toBe(0);
-  expect(formatsOf(installed, join(import.meta.dir, ".."), store, { ...process.env, HOME: root, LINECLEAR_HOME: join(root, "data") })).toBe("");
-  // rolled back to stable: its own code finds every task, chat and Inbox item the candidate wrote
-  const stableServer = join(installed, "server");
-  const stableCount = join(stableServer, "scripts", "store-formats.ts");
-  // a stable build that predates the count verb has nothing to lose items with: the fixture test below stands for it
-  if (existsSync(stableCount) && readFileSync(stableCount, "utf8").includes('"count"')) {
-    const r = sh(["bun", stableCount, "count", store], { cwd: stableServer });
-    expect(r.code).toBe(0);
-    expect(JSON.parse(r.out)).toEqual(storeCount(server, store));
-  }
-});
+test.skipIf(!existsSync(join(installed, "bin", "lineclear")))(
+  "the stable build reads this tree's roadmap and store files",
+  () => {
+    const store = join(root, "store");
+    const server = join(import.meta.dir, "..", "server");
+    expect(writeStore(server, store)).toBe(0);
+    expect(formatsOf(installed, join(import.meta.dir, ".."), store, { ...process.env, HOME: root, LINECLEAR_HOME: join(root, "data") })).toBe("");
+    // rolled back to stable: its own code finds every task, chat and Inbox item the candidate wrote
+    const stableServer = join(installed, "server");
+    const stableCount = join(stableServer, "scripts", "store-formats.ts");
+    // a stable build that predates the count verb has nothing to lose items with: the fixture test below stands for it
+    if (existsSync(stableCount) && readFileSync(stableCount, "utf8").includes('"count"')) {
+      const r = sh(["bun", stableCount, "count", store], { cwd: stableServer });
+      expect(r.code).toBe(0);
+      expect(JSON.parse(r.out)).toEqual(storeCount(server, store));
+    }
+  },
+  180_000,
+);
 
 // test/fixtures/stable-store holds the files the last stable build wrote. A format change must update it in the same
 // change as its migration, so the candidate keeps reading the old files and this test names the change.
@@ -109,7 +113,7 @@ test("the candidate reads the store stable wrote: no task, chat or Inbox item lo
   const server = join(import.meta.dir, "..", "server");
   expect(unreadable(root, fixture, true)).toEqual([]);
   expect(storeCount(server, fixture)).toEqual({ tasks: 1, chats: 1, inbox: 1 });
-});
+}, 180_000);
 
 test("a stored format changed with no migration fails: the candidate writes what the stable store holds", () => {
   const store = join(root, "store");
@@ -119,4 +123,4 @@ test("a stored format changed with no migration fails: the candidate writes what
   const tasks = JSON.parse(readFileSync(join(store, "tasks.json"), "utf8"));
   writeFileSync(join(store, "tasks.json"), JSON.stringify({ ...tasks, tasks: tasks.tasks.map((t: object) => ({ ...t, renamed: 1 })) }));
   expect(shapes(store)).not.toEqual(shapes(fixture));
-});
+}, 180_000);

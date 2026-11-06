@@ -15,7 +15,7 @@ const put = (dir: string, name: string, value: unknown) => {
   writeFileSync(join(dir, name), typeof value === "string" ? value : JSON.stringify(value));
 };
 
-/** A Shepherdr 2.0 folder: one space, one open task and one done task, each with a chat, one artifact each. */
+/** A herdr-projects 2.0 folder: one space, one open task and one done task, each with a chat, one artifact each. */
 function oldWorld(dir: string) {
   put(dir, "spaces.json", [{ name: "demo", path: "/x/demo", key: "DEM", base: "main" }]);
   put(dir, "settings.json", { everywhere: { "task.agent": "pi" }, spaces: { demo: { "task.model": "m" } } });
@@ -175,7 +175,7 @@ test("to Lineclear, back and to Lineclear again loses no task, chat or artifact,
   expect(Object.keys(JSON.parse(readFileSync(join(from, "artifacts.json"), "utf8"))).sort()).toEqual(["aaaa", "bbbb", "cccc"]);
   expect(readFileSync(join(from, "artifacts/cccc/1.html"), "utf8")).toBe("new one");
 
-  // DEM-3 is finished on the Shepherdr 2.0 side meanwhile
+  // DEM-3 is finished on the herdr-projects 2.0 side meanwhile
   put(from, "tasks.json", { next: { DEM: 4 }, tasks: [...old.tasks.filter((t: any) => t.id !== "DEM-3"), { id: "DEM-3", told: "done" }], red: {} });
   const again = run([], from, to);
   expect(again.code).toBe(0);
@@ -206,9 +206,9 @@ test("a move that would be saved over by a running side is refused, and changes 
   const to = join(root, "h-new");
   oldWorld(from);
   expect(run([], from, to).code).toBe(0);
-  const noShepherdr: Busy = (side) => side === "shepherdr";
+  const noOld: Busy = (side) => side === "old";
   const before = files(from);
-  expect(run(["--back"], from, to, NOW, noShepherdr).code).toBe(1);
+  expect(run(["--back"], from, to, NOW, noOld).code).toBe(1);
   expect(files(from)).toEqual(before);
   expect(run(["--back"], from, to).code).toBe(0);
   const onlyLineclear: Busy = (side) => side === "lineclear";
@@ -287,7 +287,7 @@ test("a folder shaped like a real one moves forward and back with every file cou
   expect(Object.keys(JSON.parse(readFileSync(join(to, "artifacts.json"), "utf8"))).sort()).toEqual(["a001", "a002", "b001", "h001"]);
   expect(JSON.parse(readFileSync(join(to, "modes.json"), "utf8"))).toEqual({ "p:box:alpha": "regular", "p:box:": "regular" });
 
-  // back: into an emptied Shepherdr folder, everything returns
+  // back: into an emptied old folder, everything returns
   const gone = join(root, "r-gone");
   expect(run(["--back"], gone, to).code).toBe(0);
   for (const sub of ["chatlog", "heartbeat", "artifacts", "machines"]) expect(count(gone, sub)).toBe(count(from, sub));
@@ -296,15 +296,15 @@ test("a folder shaped like a real one moves forward and back with every file cou
   expect(Object.keys(JSON.parse(readFileSync(join(gone, "artifacts.json"), "utf8"))).sort()).toEqual(["a001", "a002", "b001", "h001"]);
 });
 
-test("a move is refused while Shepherdr 2.0 runs, and copies nothing", () => {
+test("a move is refused while herdr-projects 2.0 runs, and copies nothing", () => {
   const from = join(root, "s-old");
   const to = join(root, "s-new");
   realWorld(from);
-  const r = run([], from, to, NOW, (side) => side === "shepherdr");
+  const r = run([], from, to, NOW, (side) => side === "old");
   expect(r.code).toBe(1);
   expect(r.text).toContain("Stop its server first");
   expect(existsSync(to)).toBe(false);
-  expect(run(["--dry-run"], from, to, NOW, (side) => side === "shepherdr").code).toBe(0);
+  expect(run(["--dry-run"], from, to, NOW, (side) => side === "old").code).toBe(0);
 });
 
 test("per-space counts hold for a host name with a dash", () => {

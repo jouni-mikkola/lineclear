@@ -171,8 +171,8 @@ describe('the check', () => {
   })
   test('the page it opens has the frame policy and the probe first', () => {
     const html = wrapPage('<p>x</p>', { check: true, data: { a: 1 } })
-    expect(html.indexOf('Content-Security-Policy')).toBeLessThan(html.indexOf('__shepherdrCheck'))
-    expect(html.indexOf('__shepherdrCheck')).toBeLessThan(html.indexOf('window.shepherdr ='))
+    expect(html.indexOf('Content-Security-Policy')).toBeLessThan(html.indexOf('__lineclearCheck'))
+    expect(html.indexOf('__lineclearCheck')).toBeLessThan(html.indexOf('window.lineclear ='))
     expect(html).toContain('data = {"a":1}')
     expect(html).not.toContain('@font-face')
   })
@@ -181,12 +181,12 @@ describe('the check', () => {
 describe('the frame', () => {
   test("it opens in the app's own light or dark, and the device's mode when the app sends none (the check)", () => {
     const dark = wrapPage('<p>x</p>', { phone: true, theme: 'dark' })
-    expect(dark).toStartWith('<!doctype html><html class="phone shepherdr-dark"><head>')
-    expect(dark).toContain(':root.shepherdr-dark{color-scheme:dark;--bg:#0b0b0d')
+    expect(dark).toStartWith('<!doctype html><html class="phone lineclear-dark"><head>')
+    expect(dark).toContain(':root.lineclear-dark{color-scheme:dark;--bg:#0b0b0d')
     // the device's dark, unless the app said light; and the app's word again when it changes
-    expect(dark).toContain('@media(prefers-color-scheme:dark){:root:not(.shepherdr-light){--bg:#0b0b0d')
-    expect(dark).toContain("d.shepherdr === 'theme'")
-    expect(wrapPage('<p>x</p>', { theme: 'light' })).toStartWith('<!doctype html><html class="shepherdr-light">')
+    expect(dark).toContain('@media(prefers-color-scheme:dark){:root:not(.lineclear-light){--bg:#0b0b0d')
+    expect(dark).toContain("d.lineclear === 'theme'")
+    expect(wrapPage('<p>x</p>', { theme: 'light' })).toStartWith('<!doctype html><html class="lineclear-light">')
     expect(wrapPage('<p>x</p>')).toStartWith('<!doctype html><html><head>')
   })
   test("a page's own <html> keeps its classes; one without a head gets one", () => {

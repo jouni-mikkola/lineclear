@@ -14,7 +14,7 @@ export class DemoWorld extends DemoWorldActions implements Source {
       const desc = this.tasks.find((x) => x.id === t.id)?.desc
       if (first?.who === 'you' && t.desc && desc && first.text?.includes(t.desc)) first.text = first.text.replace(t.desc, desc)
     }
-    // timestamps: Shepherdr's update cards were posted before the messages now in the chats
+    // timestamps: Lineclear's update cards were posted before the messages now in the chats
     let at = 1
     const cards: Record<string, Message[]> = {}
     for (const t of this.tasks.filter((x) => !x.archived && (x.status === 'need' || x.status === 'ready' || x.status === 'done'))) {

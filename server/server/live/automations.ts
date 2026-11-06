@@ -43,7 +43,7 @@ function upgrade(a: Automation & { schedule?: string; when?: string }): Automati
   const { schedule, when, ...rest } = a
   const time = schedule ? fromSchedule(schedule) : undefined
   if (schedule && !time) return undefined
-  // a once not run yet that was due while Shepherdr was down still runs, as it did before
+  // a once not run yet that was due while Lineclear was down still runs, as it did before
   const since = time?.startsWith('once ') && !a.last ? { since: 0 } : {}
   return { ...rest, ...since, trigger: { ...(time ? { time } : {}), ...(when ? { on: [{ event: when as EventRule['event'] }] } : {}) } }
 }

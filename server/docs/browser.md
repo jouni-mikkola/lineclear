@@ -1,12 +1,12 @@
 # Shared browser
 
 - Every task has a shared browser, the Browser item of its side panel (a full-screen sheet on a phone). Its agent
-  drives it with Shepherdr's `bin/agent-browser`, to check its app or sign in to a site, and you watch it live. Take
+  drives it with Lineclear's `bin/agent-browser`, to check its app or sign in to a site, and you watch it live. Take
   over at any time (your mouse, keys, touches and the address bar go in; the agent is told to hold off) and hand it
   back. Fit sizes the page to the panel; Desktop goes back to 1280×720. Mark up: tap elements, write a note
   on each, and send them together into the task's chat; numbered pins mark them on the page, and the agent gets each
   element's selector, text, React components, box, key styles and a cropped shot. It runs on the task's machine: one
-  [agent-browser](https://github.com/vercel-labs/agent-browser) session per task (named after it, in the `shepherdr`
+  [agent-browser](https://github.com/vercel-labs/agent-browser) session per task (named after it, in the `lineclear`
   namespace, with a profile in `~/.lineclear/browser/<task>` that keeps its sign-ins), started when either side first
   uses it. agent-browser streams it on 127.0.0.1 only; the server relays that stream to the app, so the browser is as
   private as the app itself. A task that is Ready keeps it, to review in; stopping or archiving the task closes it

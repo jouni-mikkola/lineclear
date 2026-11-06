@@ -17,7 +17,7 @@ lowest priority (nice 19, idle disk, a systemd scope with the least CPU weight).
 On a machine where herdr runs as a systemd user service, give it (and the server and agents it holds) the CPU first:
 `systemctl --user set-property herdr.service CPUWeight=1000`.
 
-Agents working on Shepherdr: [AGENTS.md](../AGENTS.md) says what they check before merging.
+Agents working on Lineclear: [AGENTS.md](../AGENTS.md) says what they check before merging.
 
 The demo source (`LINECLEAR_SOURCE=demo`) holds a fictional world for reviewing every screen and case without real
 agents. Your data lives in `~/.lineclear` (`LINECLEAR_HOME` to move it).
@@ -27,9 +27,9 @@ server/            the web server, the demo source and the live source
   live/            herdr link, chats from logs (readers/), tasks (engine/), settings, machines (box, mirror, install), voice, browser
 src/               the screen's kernel, layout and shared pieces
 plugins/<name>/    each base plugin's parts (yours: ~/.lineclear/plugins/<name>/)
-skill/             what every agent is taught (shepherdr/), coordinators (shepherdr-coordinator/), task agents (shepherdr-agent/)
-helper/            what Shepherdr puts on another machine: its shepherdr command, hook recorder, log copier, health, browser relay
-bin/shepherdr      the command agents use
+skill/             what every agent is taught (lineclear/), coordinators (lineclear-coordinator/), task agents (lineclear-agent/)
+helper/            what Lineclear puts on another machine: its lineclear command, hook recorder, log copier, health, browser relay
+bin/lineclear      the command agents use
 bin/agent-browser  agent-browser at the pinned version, for each task's shared browser
 ```
 
@@ -39,7 +39,7 @@ the owning machine, including historical prefixes. Other machines may use the sa
 machine-qualified. Space display renames already preserve the key.
 
 The next number can stay put or move forward, never back. Skipped numbers remain reserved, including after changing
-prefix, so a space's worktree/branch numbers also never repeat. `task-ids.sqlite` in the owning machine's Shepherdr
+prefix, so a space's worktree/branch numbers also never repeat. `task-ids.sqlite` in the owning machine's Lineclear
 home is the durable reservation ledger; retain it when backing up or moving that home (with its WAL if running).
 It imports existing `tasks.json` counters and task history automatically. Reservations commit before task creation;
 a failed creation can leave a gap. `spaces.json` mirrors the current prefix; the ledger is authoritative after migration.

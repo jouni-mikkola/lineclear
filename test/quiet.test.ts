@@ -1,6 +1,7 @@
 import { afterAll, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { cpus } from "node:os";
+import { join } from "node:path";
 import { measure } from "../src/measure.ts";
 import { turnTimes } from "../src/session-text.ts";
 import { ownMark, tick } from "../src/rules.ts";
@@ -20,7 +21,8 @@ test("a burst of load, quota and status events sends no message to any agent and
     reviewer: ["anthropic/claude-opus-5-5", "openai-codex/gpt-6.1-sol"],
     loadPerCore: 1 / cpus().length,
   });
-  const env = { ...process.env, LINECLEAR_CONFIG: config };
+  // the tick copies the store each hour: keep its home and copies in the scratch folder, not the machine's real ones
+  const env = { ...process.env, LINECLEAR_CONFIG: config, LINECLEAR_HOME: join(dir, "home"), LINECLEAR_STORE_COPIES: join(dir, "copies") };
   const clock = { at: new Date("2026-06-01T10:00:00Z") };
   const agentCalls: string[] = [];
   const statuses = ["work", "need", "work", "queued", "work", "need", "done"];
@@ -67,12 +69,12 @@ const user = (text: string, at: number) =>
 test("measure counts the model turns that no step and no owner message started", () => {
   const session = [
     user("Task brief", 1000), // the step's brief
-    user("<shepherdr><go>Start</go></shepherdr>", 2000),
+    user("<lineclear><go>Start</go></lineclear>", 2000),
     user("Please also fix the typo", 3000), // the owner
     user("[lineclear:resume] Your wait is over", 4000),
     user("[lineclear:answer] A stored login exists", 5000),
-    user('<shepherdr><health kind="cpu">CPU load is high</health></shepherdr>', 6000),
-    user('<shepherdr><news task="LIN-9">LIN-9 is done</news></shepherdr>', 7000),
+    user('<lineclear><health kind="cpu">CPU load is high</health></lineclear>', 6000),
+    user('<lineclear><news task="LIN-9">LIN-9 is done</news></lineclear>', 7000),
     user("[lineclear] You may be stuck", 8000),
   ].join("\n");
   expect(turnTimes(session)).toEqual([6000, 7000, 8000]);

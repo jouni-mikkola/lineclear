@@ -6,7 +6,8 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "no
 import { join } from "node:path";
 import { loadMeter, recordStepTimes } from "../src/check-runs.ts";
 
-export const UNIT_LIMIT_S = 5;
+/** Seconds one test case may take (the owner's budget: every test under 2 s). */
+export const UNIT_LIMIT_S = 2;
 export const SPEC_LIMIT_S = 20;
 /** The budget run's measured time: its server start, the first view and one idle minute of two pages. */
 export const BUDGET_RUN_S = 100;
@@ -31,8 +32,12 @@ export function loadFactorMeter(read?: () => number[]): () => number {
   };
 }
 
-/** The factor right now: for a test that scales its own limits. */
-export const loadFactor = (): number => loadFactorMeter()();
+/** The factor right now, or for a given load and cores: for a test or script that scales its own limits. */
+export function loadFactor(load?: number, cores?: number): number {
+  if (load === undefined && cores === undefined) return loadFactorMeter()();
+  const now = loadMeter()();
+  return Math.max(1, (load ?? now.load) / Math.max(1, cores ?? now.cores));
+}
 
 /** Seconds per test file from `bun test --reporter=junit`. */
 export function junitTimes(xml: string): Times {
@@ -40,6 +45,16 @@ export function junitTimes(xml: string): Times {
   for (const m of xml.matchAll(/<testsuite name="([^"]+)"[^>]* time="([\d.]+)"/g)) {
     const [, file = "", seconds = "0"] = m;
     if (/\.test\.tsx?$/.test(file)) times.set(file, (times.get(file) ?? 0) + Number(seconds));
+  }
+  return times;
+}
+
+/** Seconds of the slowest test case in each file: the unit limit is per test, not per file. */
+export function junitSlowestCase(xml: string): Times {
+  const times: Times = new Map();
+  for (const m of xml.matchAll(/<testcase name="[^"]*"[^>]* time="([\d.]+)"[^>]* file="([^"]+)"/g)) {
+    const [, seconds = "0", file = ""] = m;
+    if (/\.test\.tsx?$/.test(file)) times.set(file, Math.max(times.get(file) ?? 0, Number(seconds)));
   }
   return times;
 }

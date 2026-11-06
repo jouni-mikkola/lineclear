@@ -15,13 +15,13 @@ export function shownAs(p: Parsed): { title?: string; text: string } | undefined
   return undefined
 }
 
-/** a line of yours the agent will answer: words of yours, not Shepherdr's hidden news and not only reactions */
+/** a line of yours the agent will answer: words of yours, not Lineclear's hidden news and not only reactions */
 export const yours = (text: string) =>
   stripHidden(text)
     .split('\n')
     .some((ln) => ln.trim() && !['react', 'unreact'].includes(parseUserLine(ln.trim())?.kind ?? ''))
 
-/** The turn the agent is in, by its log: one your message started ('yours'), one it started itself on Shepherdr's news,
+/** The turn the agent is in, by its log: one your message started ('yours'), one it started itself on Lineclear's news,
  *  an automation or its background work waking it ('own', with that turn's id), or none ('over': its reply ended the
  *  last one, and what herdr still sees working is background work: a subagent, a shell). No turn marks: 'unknown'. */
 export function turnOf(ev: LogEvent[], sent: { at: number }[]): { kind: 'yours' | 'own' | 'over' | 'unknown'; id?: string } {
@@ -59,7 +59,7 @@ export interface Shown {
   at: number
 }
 
-/** something Shepherdr posted into a chat */
+/** something Lineclear posted into a chat */
 export interface Posted {
   id: string
   at: number
@@ -70,7 +70,7 @@ export interface Posted {
   secret?: SecretAsk
   /** text shown with it, when it stands alone */
   text?: string
-  /** a line of yours Shepherdr shows for you (an answer typed as keys, or a command, which the log doesn't keep) */
+  /** a line of yours Lineclear shows for you (an answer typed as keys, or a command, which the log doesn't keep) */
   who?: 'you'
   answered?: string
   /** answered on the question's copy in a space's chat: a link there */
@@ -88,7 +88,7 @@ export interface ChatLog {
   said?: Record<string, { text?: string; chat?: true; space?: string }>
 }
 
-/** a card Shepherdr posted, with its answer: a choice card answered without a pick and no words typed on it was
+/** a card Lineclear posted, with its answer: a choice card answered without a pick and no words typed on it was
  *  answered by a message in the chat (closeAsks; older logs kept no words) */
 export function withAnswer(q: Question, l: ChatLog, place: (key: string) => Question['elsewhere']): Question {
   const sent = q.sent ?? l.answers[q.id]

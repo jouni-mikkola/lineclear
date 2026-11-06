@@ -1,4 +1,4 @@
-import { type Question, type ArtifactPost, type Reaction, type ReplyQuote, type UpdateCard, type Machine, type Task, type Mode, MODES } from './types-core.ts'
+import { type Question, type ArtifactPost, type Reaction, type ReplyQuote, type UpdateCard, type Task, type Mode, MODES } from './types-core.ts'
 
 /** what kind of step a tool call is, for its icon and its row */
 export type StepKind = 'run' | 'read' | 'edit' | 'search' | 'web' | 'agent' | 'other'
@@ -110,7 +110,7 @@ export interface Message {
   reply?: ReplyQuote
   /** a thin "New session" divider before this message */
   newSession?: boolean
-  /** Shepherdr's update card about a task, drawn as the card; its text ("SHE-4 is done: …") is what a reaction or a
+  /** Lineclear's update card about a task, drawn as the card; its text ("SHE-4 is done: …") is what a reaction or a
    *  reply quotes */
   card?: UpdateCard
   /** a turn's tool steps, as a few rows in plain words, just before its last reply */
@@ -159,22 +159,19 @@ export interface ActivityAsk {
 export type ActivityAnswer = { steps: Step[]; more?: number } | { output: string; cut?: boolean } | { error: string }
 
 /** Done tasks newest first, at the end; the rest keep their order (a stable sort) */
-/** a machine's name as the human reads it ("Mac mini"), from its key, a place's machine ("Mac") */
-export const machineName = (machines: Machine[] | undefined, machine?: string) => machines?.find((m) => m.machine === machine)?.name ?? machine ?? ''
-
 export const doneNewestFirst = <T extends Pick<Task, 'status' | 'doneAt'>>(ts: T[]): T[] => [
   ...ts.filter((t) => t.status !== 'done'),
   ...ts.filter((t) => t.status === 'done').sort((a, b) => (b.doneAt ?? 0) - (a.doneAt ?? 0)),
 ]
-
-/** a mode's name: "Coordinator timer" */
-export const modeName = (mode: Mode) => MODES.find(([m]) => m === mode)?.[1] ?? mode
 
 /** a mode card, coordinator timer switched on or off: "coordinator timer on · works on its own", "coordinator timer off · does what you ask" */
 export function modeCard(id: string, mode: Mode): UpdateCard {
   const what = MODES.find(([m]) => m === mode)?.[2] ?? ''
   return { id, mode: 'autopilot', text: `${mode === 'autopilot' ? 'on' : 'off'} · ${what.toLowerCase()}` }
 }
+
+/** a mode's name: "Coordinator timer" */
+const modeName = (mode: Mode) => MODES.find(([m]) => m === mode)?.[1] ?? mode
 
 /** an update card as a message in the chat: its words are what a reaction or a reply quotes */
 export const cardMessage = (card: UpdateCard, at?: number): Message => ({
@@ -214,7 +211,7 @@ export interface RestartHint {
 
 export interface Chat {
   key: string
-  /** the agent's and yours, and Shepherdr's update cards among them */
+  /** the agent's and yours, and Lineclear's update cards among them */
   messages: Message[]
   /** herdr says the agent works: the CLI takes what you send at its next step */
   working?: boolean
@@ -238,7 +235,7 @@ export interface Chat {
   restart?: RestartHint
 }
 
-/** a CLI the restart sheet offers; models and efforts where Shepherdr passes them (none: it runs on its own) */
+/** a CLI the restart sheet offers; models and efforts where Lineclear passes them (none: it runs on its own) */
 export interface RestartCli {
   kind: string
   name: string
@@ -269,7 +266,7 @@ export interface TriggerRow {
   presets: { label: string; value: string }[]
 }
 
-export interface SettingRow {
+interface SettingRow {
   label: string
   key: string
   value: string
@@ -321,7 +318,7 @@ export interface SettingSection {
   level?: string
   /** one for all machines and projects (alerts, voice): shown once, whatever level is picked */
   global?: boolean
-  /** only words in agents' prompts (What agents are told), not how Shepherdr runs */
+  /** only words in agents' prompts (What agents are told), not how Lineclear runs */
   told?: boolean
   /** the secrets kept at its level, by name (Secrets): added, replaced and removed in masked boxes */
   secrets?: { name: string; at: number }[]
@@ -347,7 +344,7 @@ export interface Alert {
 /** A folder on a machine, for adding a space from the sidebar (home only) */
 export interface FolderEntry {
   name: string
-  /** as the human writes it: ~/dev/shepherdr */
+  /** as the human writes it: ~/dev/lineclear */
   path: string
   /** has its own .git */
   repo: boolean

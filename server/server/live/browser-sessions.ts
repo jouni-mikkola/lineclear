@@ -41,7 +41,7 @@ export class BrowsersSessions extends BrowsersHubs {
 
   /* ---------- clean-up ---------- */
 
-  /** the sessions agent-browser runs for Shepherdr on this machine */
+  /** the sessions agent-browser runs for Lineclear on this machine */
   protected async sessions(): Promise<string[]> {
     const r = await this.run('_', ['session', 'list'])
     return r.ok ? ((r.data?.sessions ?? []) as string[]) : []

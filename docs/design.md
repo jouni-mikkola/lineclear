@@ -49,11 +49,11 @@ stays. `ui/test/errors.pw.ts` tests each.
 Home is at `/`, one page, built only from the parts below. Both read the
 server's data, again every 1.5 seconds, so a change shows within 3 s and whenever the page shows again, with no AI:
 
-- `GET /api/home`: each project's tasks from Shepherdr's files, its progress from its roadmap and git, and spend
+- `GET /api/home`: each project's tasks from Lineclear's files, its progress from its roadmap and git, and spend
   from pi's session files (rules below), and each account's limits from `limits.json`, which pi's extension writes.
   Projects are read at most once a second, spend once a minute.
-  - A task's state is its Shepherdr state, and "waits for you" when its last card asks for you. A project's main is
-    broken when Shepherdr marks it red: only then is anything red.
+  - A task's state is its Lineclear state, and "waits for you" when its last card asks for you. A project's main is
+    broken when Lineclear marks it red: only then is anything red.
   - Progress is roadmap steps merged on main when the project has `docs/ROADMAP.md`, else merged tasks.
   - Spend is the equivalent dollars of pi's session files per day, as in `lineclear measure`. Usage is how much of each
     account's session and week limit is used, with when each resets, as its provider last reported it. pi's Lineclear
@@ -185,7 +185,7 @@ A step whose task starts glows once (`task-start`), and a merged step slides to 
 
 The agents' browsers are at `/browsers`. It reads `GET /api/browsers`: each open
 [playwright-cli](https://github.com/microsoft/playwright-cli) session (`playwright-cli list --all --json`), named after its
-Shepherdr task with an optional suffix such as `-review`, with that task's plain title. Each is a card with a live
+Lineclear task with an optional suffix such as `-review`, with that task's plain title. Each is a card with a live
 picture, read through `playwright-cli run-code` at most once a second per session and two at a time, and only
 while the card is on screen. A session an
 Inbox login or code item names comes first and is marked "Waits for you", and that Inbox item links straight to it.
@@ -248,14 +248,14 @@ with one tap; any other file as a chip with its name and size. The composer stay
 keyboard, and takes words and files by paste, drop or its button; one tap sends. Enter sends with a keyboard; on a
 touch screen it is a new line.
 
-The page reads `GET /api/chat/events`, the chat as server-sent events. Each message shows the moment Shepherdr reads
-it, and while the Dispatcher works its current step shows under the dots. Shepherdr reads an answer whole, so the
+The page reads `GET /api/chat/events`, the chat as server-sent events. Each message shows the moment Lineclear reads
+it, and while the Dispatcher works its current step shows under the dots. Lineclear reads an answer whole, so the
 words of one message do not come one by one. A file goes first to `POST /api/chat/files`, at most 10 MB, and only
-images (PNG, JPEG, GIF, WebP), PDF and text, each checked by its first bytes. Lineclear hands it to Shepherdr's own
-upload, which saves it in Shepherdr's inbox on the Dispatcher's machine, and its path goes with the message
-(`POST /api/chat`): the same as an attachment in Shepherdr's chat, so each chat shows the other's files. An answer
+images (PNG, JPEG, GIF, WebP), PDF and text, each checked by its first bytes. Lineclear hands it to Lineclear's own
+upload, which saves it in Lineclear's inbox on the Dispatcher's machine, and its path goes with the message
+(`POST /api/chat`): the same as an attachment in Lineclear's chat, so each chat shows the other's files. An answer
 shows an image it names by its full path in the Dispatcher's folder or a project's repo, never one from the web: that
-is a link. Lineclear talks to the Dispatcher through Shepherdr's own server on the same machine.
+is a link. Lineclear talks to the Dispatcher through Lineclear's own server on the same machine.
 
 Empty shows one line on what the Dispatcher does and three questions to tap. A message on its way says Sending; one
 that did not go says why with Try again. While the Dispatcher writes, three grey dots beat (`chat-typing`) with what
@@ -277,7 +277,7 @@ it does now. Offline, a line says so and Send waits. A new message slides up int
 
 The UI bar for the views is `ui/test/views.pw.ts`, `ui/test/roadmap.pw.ts`, `ui/test/browsers.pw.ts`,
 `ui/test/settings.pw.ts` and `ui/test/chat.pw.ts`, with `ui/test/fake-playwright-cli` for playwright-cli, `ui/test/fake-ssh` for SSH
-and `ui/test/fake-shepherdr-server.ts` for Shepherdr's server. It writes the files the server reads (`ui/test/fixture.ts`) and
+and `ui/test/fake-lineclear-server.ts` for Lineclear's server. It writes the files the server reads (`ui/test/fixture.ts`) and
 checks each motion as on the test page.
 
 ### The line
@@ -327,8 +327,8 @@ You, Dispatcher, Roadmap, Rules, Worker, Reviewer, Main and Planner. `ui/brand/r
 
 ## The old UI's views
 
-The old UI is the Shepherdr 2.0 fork in `server/`, one row per plugin (`server/plugins.json`) or view. It goes only once each
-view still needed lives in Lineclear's UI. Each part gets one word: "Lineclear has it",
+The old UI was the herdr-projects 2.0 fork in `server/`, one row per plugin (`server/plugins.json`) or view. It is gone (L166; its size is in `docs/numbers.md`, "The old UI goes"). It went only once each
+view still needed lived in Lineclear's UI. Each part gets one word: "Lineclear has it",
 "moves" (needed, to be built as a Lineclear page from the parts here) or "goes" (not carried over).
 
 | Part | Verdict | Reason |
@@ -567,8 +567,7 @@ titles, five accounts, a broken machine and a failing service) and on the long-t
 
 Each check also runs on a planted fault (overflow, layout shift, missing focus state, small target, command text, a
 stray pixel value, a bare time, an unlabeled image) and must find it. The pictures of the real board at 390, 768 and
-1440 px are written to `ui/test/real-shots/` for the reviewer. After each service update, `scripts/smoke.ts shots` takes
-the live pages at the same widths into `<data>/ui-shots/<commit>/`.
+1440 px are written to `ui/test/real-shots/` for the reviewer.
 
 ### Reference products
 
@@ -611,15 +610,15 @@ Machine news never wakes an AI (idea.md principles 1 and 4). Load, memory, disk,
 cut-offs, check slots and task status changes are handled by rules and shown on the status line and Usage. They never
 become a message to an agent. Only the lines below reach an agent's chat or start a model turn. Each is a step's own
 line, an owner's, or a rule resuming work that stopped. `lineclear measure` counts every other model turn per day
-(column `turns`, goal 0); it reads the agent's pi session and skips the brief, owner messages, `<shepherdr><go>` and
+(column `turns`, goal 0); it reads the agent's pi session and skips the brief, owner messages, `<lineclear><go>` and
 the two marks below.
 
 Marks in an agent's log: `[lineclear:resume]` goes on with the step's own work, `[lineclear:answer]` is a rule answering
-the agent's own question. A `[lineclear]` line with no kind, and any `<shepherdr>` line other than `go`, is counted.
+the agent's own question. A `[lineclear]` line with no kind, and any `<lineclear>` line other than `go`, is counted.
 
 | Where | Trigger | Kind |
 |---|---|---|
-| `src/rules.ts` `tickProject`, `shepherdr task add` | A step is ready, a slot and a model have room | Step: its brief |
+| `src/rules.ts` `tickProject`, `lineclear task add` | A step is ready, a slot and a model have room | Step: its brief |
 | `src/stalls.ts` `handover` | The account of the task's model is out, or it left the task signed out | Step: a new task with the brief and the old branch |
 | `src/rules.ts` `serviceWaits` | A declared wait ends: its time came or the task it waits for is done | Resume, once per wait |
 | `src/stalls.ts` `climb` | A "may be stuck" card: a reminder (rung 1), a restart (rung 2) | Resume, one rung per card |
@@ -630,7 +629,7 @@ the agent's own question. A `[lineclear]` line with no kind, and any `<shepherdr
 | `server/server/live/engine/engine.ts` `go`, `tell`, `youWrote` | A task starts, or the owner writes to a task not started | Step / owner |
 | `server/server/live/retry.ts` `Retries` | A turn cut off by a passing provider error (overloaded, dropped connection): carry on after 1, 2, 4, 8 minutes | Resume, at most four |
 | `server/server/live/engine/engine.ts` github, queue, `sendBack` | News of the task's own pull request (a failed check, a review), a queue line when the owner or a coordinator queues the task, a refused merge sent back | Step. github and queue lines are counted by `measure`; `sendBack` is plain text, so it is not |
-| `server/server/live/engine/engine.ts` `tell`, `source.ts` `send` | The owner or a coordinator runs `shepherdr task tell` or writes in a task's chat | Owner. A coordinator is an AI, so there is none by default |
+| `server/server/live/engine/engine.ts` `tell`, `source.ts` `send` | The owner or a coordinator runs `lineclear task tell` or writes in a task's chat | Owner. A coordinator is an AI, so there is none by default |
 | `server/server/live/source.ts` `relaunch` | An agent that was working stopped (herdr restarted, its CLI exited) and is started again | Resume: a `restart` line, once per restart. `measure` counts it |
 | `server/server/live/source.ts` browsers `tell` | The human took the shared browser over or handed it back | Step: a `browser` line. `measure` counts it |
 | `server/server/live/source.ts` `wakePilot` | A coordinator's heartbeat by its schedule, or the owner's Run now (the coordinator timer, off unless `LINECLEAR_COORDINATOR_TIMER=on`) | Owner or schedule: its own checklist, no news in it |

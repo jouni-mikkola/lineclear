@@ -162,3 +162,13 @@ test("without the runs record no runtime folder is touched", () => {
   mkdirSync(join(m.data, "autopilot-runtime", "r", "k", "home"), { recursive: true });
   expect(findLeftovers(m.vars).removable).toEqual([]);
 });
+
+test("doctor --fix removes the ui-shots folder of old updates", () => {
+  const m = machine();
+  mkdirSync(join(m.data, "ui-shots", "abc123"), { recursive: true });
+  writeFileSync(join(m.data, "ui-shots", "abc123", "home-390.png"), "x");
+  const lines: string[] = [];
+  expect(fixLeftovers(probe(m.vars), (l) => lines.push(l))).toBe(0);
+  expect(existsSync(join(m.data, "ui-shots"))).toBe(false);
+  expect(lines[0]).toContain("Removed screenshots");
+});

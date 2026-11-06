@@ -477,14 +477,14 @@ test("run stays up when a tick has nothing to do or throws, and ends on SIGTERM 
   }
 });
 
-test("a tick that hangs on shepherdr does not hold up /api/home", async () => {
+test("a tick that hangs on lineclear does not hold up /api/home", async () => {
   const { EventEmitter } = await import("node:events");
   const { webApi } = await import("../src/web.ts");
   const t = setup({ steps: [step("A", "none")] });
   const started = join(t.fake, "started");
   const release = join(t.fake, "release");
   const finished = join(t.fake, "finished");
-  // the tick's first shepherdr call hangs until the test lets it go, however slow the machine is
+  // the tick's first lineclear call hangs until the test lets it go, however slow the machine is
   writeFileSync(
     join(t.dir, "bin", "lineclear"),
     `#!/bin/sh\n[ -e "${started}" ] || { touch "${started}"; while [ ! -e "${release}" ]; do sleep 0.05; done; touch "${finished}"; }\necho '[]'\n`,

@@ -21,14 +21,13 @@ test("no source file writes a state file in place", () => {
   const allowed = new Set(["atomic.ts", "browsers.ts"]);
   // Appends are for the logs only (a cut leaves at most one partial last line, which readers skip).
   const plain = /\b(writeFileSync|writeFile|Bun\.write|createWriteStream|appendFileSync|cpSync)\(/;
-  // `lineclear migrate` copies Shepherdr 2.0's files once, and can be run again, so a cut copy is copied again.
+  // `lineclear migrate` copies herdr-projects 2.0's files once, and can be run again, so a cut copy is copied again.
   const logs = new Set([
     "rules.ts",
     "full.ts",
     "plan.ts",
     "check-runs.ts",
     "api-latency.ts",
-    "events.ts",
     "stall-class.ts",
     "track.ts",
     "stall-ladder.ts",
@@ -44,14 +43,18 @@ test("no source file writes a state file in place", () => {
     readFileSync(join(src, f), "utf8")
       .split("\n")
       .forEach((l, i) => {
-        if (plain.test(l) && !(logs.has(f) && l.includes("appendFileSync(")) && !((f === "migrate.ts" || f === "old-paths.ts") && l.includes("cpSync(")))
+        if (
+          plain.test(l) &&
+          !(logs.has(f) && l.includes("appendFileSync(")) &&
+          !((f === "migrate.ts" || f === "old-paths.ts" || f === "update.ts") && l.includes("cpSync("))
+        )
           found.push(`${f}:${i + 1}: ${l.trim()}`);
       });
   }
   expect(found).toEqual([]);
 });
 
-/** A project with a roadmap, a fake shepherdr that can be taken "down", and the folders a service keeps state in. */
+/** A project with a roadmap, a fake lineclear that can be taken "down", and the folders a service keeps state in. */
 function machine() {
   const dir = mkdtempSync(join(tmpdir(), "lc-recovery-"));
   temps.push(dir);
@@ -99,7 +102,7 @@ esac`,
     LINECLEAR_CONFIG: config,
     LINECLEAR_HOME: join(dir, "data"),
     LINECLEAR_PORT: "0",
-    SHEPHERDR_BIN: join(bin, "lineclear"),
+    LINECLEAR_SERVER_BIN: join(bin, "lineclear"),
     PI_BIN: join(bin, "pi"),
     PI_CODING_AGENT_DIR: join(dir, "pi"),
     LINECLEAR_NET_CHECK: "off",

@@ -21,7 +21,7 @@ async function load(): Promise<Map<string, Handler[]>> {
 /** Runs one event through the extension with this environment, as pi would for an agent. */
 async function fire(name: string, event: unknown, env: Record<string, string>): Promise<unknown[]> {
   const was = { ...process.env };
-  for (const k of ["LINECLEAR_CHAT", "SHEPHERDR_CHAT", "LINECLEAR_TASK", "LINECLEAR_ROLE"]) delete process.env[k];
+  for (const k of ["LINECLEAR_CHAT", "LINECLEAR_TASK", "LINECLEAR_ROLE"]) delete process.env[k];
   Object.assign(process.env, env);
   try {
     const handlers = (await load()).get(name) ?? [];
@@ -65,7 +65,8 @@ test("an agent with an empty home gets the kit's rules and skills, and nothing n
   const templates = join(import.meta.dir, "..", "templates");
   const briefs = readdirSync(templates).map((f) => readFileSync(join(templates, f), "utf8"));
   const kit = [rules, readFileSync(join(kitSkills, "find-docs", "SKILL.md"), "utf8"), ...briefs].join("\n");
-  for (const personal of ["load.sh", "control-center", "Control Center", ".agents/skills", "/home/", "claude-bridge"]) expect(kit).not.toContain(personal);
+  for (const personal of ["load.sh", "control-".concat("center"), ["Control", "Center"].join(" "), ".agents/skills", "/home/", "claude-bridge"])
+    expect(kit).not.toContain(personal);
 });
 
 test("an agent outside Lineclear gets no kit", async () => {

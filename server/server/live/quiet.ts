@@ -2,12 +2,12 @@
 // puts text into an agent (Agents.send) asks here first, so no caller can add a path around it.
 // The list of everything that does write to an agent is in docs/design.md.
 
-/** the tags of Shepherdr's own lines that are machine news */
+/** the tags of Lineclear's own lines that are machine news */
 export const MACHINE_NEWS = ['news', 'health'] as const
 
-/** which kind of machine news a line is, or none: `<shepherdr><health ...>…</health></shepherdr>` */
+/** which kind of machine news a line is, or none: `<lineclear><health ...>…</health></lineclear>` */
 export function machineNews(text: string): (typeof MACHINE_NEWS)[number] | undefined {
-  const m = /^\s*<shepherdr>\s*<([a-z][\w-]*)[\s>/]/.exec(text)
+  const m = /^\s*<lineclear>\s*<([a-z][\w-]*)[\s>/]/.exec(text)
   return MACHINE_NEWS.find((k) => k === m?.[1])
 }
 

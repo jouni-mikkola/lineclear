@@ -24,6 +24,8 @@ const redRun = async (name: string, output: string, code: number) => {
     vars,
     dir,
     async (_c, _t, hear) => (hear(output), code),
+    // a calm machine: a loaded one would not rerun, and the test would depend on the load of the run
+    () => [0, 0, 0],
   );
 };
 
@@ -32,7 +34,13 @@ test("a gate, a test and a timeout are each named in the red run", async () => {
   await redRun("test", "test/a.test.ts:\n(fail) adds two [3.00ms]\n 1 fail\n", 1);
   await redRun("timeout", "\nbuild started\n", 124);
   const runs = readRuns(dir, 0, vars);
-  expect(runs.map((r) => r.causes)).toEqual([["gate: types: src/a.ts(1,1): error TS2322"], ["test: test/a.test.ts: adds two"], ["timeout: exit 124"]]);
+  expect(runs.map((r) => r.causes)).toEqual([
+    ["gate: types: src/a.ts(1,1): error TS2322"],
+    ["test: test/a.test.ts: adds two"],
+    ["timeout: exit 124"],
+    ["timeout: exit 124"],
+  ]);
+  // a merge-tier failure that names nothing is rerun once, so the timeout shows twice
   expect(runs.every((r) => (r.causes?.length ?? 0) > 0)).toBe(true);
 });
 
@@ -53,6 +61,7 @@ test("a red run that names nothing still lists its exit", async () => {
 
 test("the red share is counted by first cause", () => {
   const r = redByCause(readRuns(dir, 0, vars));
-  expect(r.red).toBe(6);
+  // the rerun of each unnamed failure (timeout, slow, silent) is a red run of its own
+  expect(r.red).toBe(9);
   expect(r.causes.map(([c]) => c).sort()).toEqual(["exit", "gate types", "test", "timeout"]);
 });

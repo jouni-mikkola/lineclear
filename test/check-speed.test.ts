@@ -1,6 +1,18 @@
 import { expect, test } from "bun:test";
 import { cpus } from "node:os";
-import { BUDGET_S, junitTimes, loadFactorMeter, lowered, overBudget, slowFails, slowFaults, specTimes, split, table } from "../scripts/check-speed.ts";
+import {
+  BUDGET_S,
+  junitSlowestCase,
+  junitTimes,
+  loadFactorMeter,
+  lowered,
+  overBudget,
+  slowFails,
+  slowFaults,
+  specTimes,
+  split,
+  table,
+} from "../scripts/check-speed.ts";
 
 test("junit times add up per test file, other suites are not files", () => {
   const xml = `<testsuites><testsuite name="test/a.test.ts" tests="2" time="1.5"></testsuite><testsuite name="describe x" time="9"></testsuite><testsuite name="test/a.test.ts" time="0.5"></testsuite></testsuites>`;
@@ -23,7 +35,7 @@ test("a file over its limit fails by name, slowest first; a known slow file may 
     ["test/a.test.ts", 8],
     ["test/b.test.ts", 9],
     ["test/c.test.ts", 90],
-    ["test/d.test.ts", 4],
+    ["test/d.test.ts", 2],
   ]);
   const faults = slowFaults("unit", times, { "test/c.test.ts": 80 }, 1);
   expect(faults.map((f) => f.split(":")[0])).toEqual(["test/b.test.ts", "test/a.test.ts"]);
@@ -89,4 +101,9 @@ test("a slow file fails the run, except in a release run where load decides the 
   expect(slowFails(faults, false)).toBe(true);
   expect(slowFails(faults, true)).toBe(false);
   expect(slowFails([], false)).toBe(false);
+});
+
+test("the slowest test case of a file is what the unit limit judges", () => {
+  const xml = `<testcase name="a" classname="" time="0.5" file="test/a.test.ts" line="1" /><testcase name="b" classname="" time="2.5" file="test/a.test.ts" line="9" />`;
+  expect([...junitSlowestCase(xml)]).toEqual([["test/a.test.ts", 2.5]]);
 });

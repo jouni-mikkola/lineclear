@@ -48,7 +48,7 @@ interface Result {
   did: Did;
 }
 
-const READ_ONLY = /^\s*(ls|cat|head|tail|grep|rg|echo|pwd|find|wc|for|while|lineclear|shepherdr)\b/;
+const READ_ONLY = /^\s*(ls|cat|head|tail|grep|rg|echo|pwd|find|wc|for|while|lineclear)\b/;
 
 function parseEvent(line: string): Raw {
   if (!line.startsWith("{")) return undefined;

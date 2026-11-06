@@ -13,7 +13,7 @@ export type Aside = (what: "spend" | "reads" | "heal" | "fix" | "dispatcher" | "
 /** Runs one read in a child process with `env`, and gives its JSON. A failed read throws with its last words;
  * one that takes over a minute (ten for the reads walk) is stopped, so a hung read never holds the server's value for good. */
 export function readAside(env: Env): Aside {
-  // the child finds git and shepherdr as this process does
+  // the child finds git and lineclear as this process does
   const childEnv = { PATH: process.env.PATH, HOME: process.env.HOME, ...env };
   return async (what, arg) => {
     // the fixes live in heal.ts: the server needs the doctor's modules only in a process of its own

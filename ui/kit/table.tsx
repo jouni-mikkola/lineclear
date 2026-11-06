@@ -192,7 +192,6 @@ function TableRow<R extends { id: string }>({
       <tr
         data-row-id={row.id}
         onClick={onToggle}
-        aria-expanded={onToggle ? open : undefined}
         className={`min-h-11 border-t border-line first:border-t-0 ${onToggle ? "cursor-pointer hover:bg-raised2" : ""}`}
       >
         {columns.map((c, i) => (

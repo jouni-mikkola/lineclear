@@ -1,4 +1,4 @@
-// Only task worktrees Shepherdr made are trusted here. A human-picked space always keeps its CLI's first-run prompt.
+// Only task worktrees Lineclear made are trusted here. A human-picked space always keeps its CLI's first-run prompt.
 // mfs routes config reads and atomic replacement to the worker's machine over SSH, just like its other own files.
 import { dirname, join } from 'node:path'
 import { BOX, boxHome } from './box.ts'
@@ -64,7 +64,7 @@ export function trustWorktree(path: string, kind: string, env: Record<string, st
     renameSync(tmp, file)
   } catch (e) {
     // A config we cannot update stays untouched: its trust prompt will be shown in the chat instead.
-    console.warn(`shepherdr: could not trust task worktree ${path}: ${(e as Error).message}`)
+    console.warn(`lineclear: could not trust task worktree ${path}: ${(e as Error).message}`)
   } finally {
     if (tmp) rmSync(tmp, { force: true })
   }

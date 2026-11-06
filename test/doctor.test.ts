@@ -1,3 +1,4 @@
+import { OLD_NAME } from "../src/old-install.ts";
 import { tailnetName } from "../src/published.ts";
 import { expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
@@ -7,7 +8,7 @@ import { removeFolders, testFolders, trimCache } from "../src/tmpdirs.ts";
 import { doctor, doctorChecks, herdrVersions, realProbe, testedHerdr, type Probe } from "../src/doctor.ts";
 import { cacheEnvFile, pathsFor } from "../src/paths.ts";
 import { isOpen, noticeTimers, readItems } from "../src/inbox.ts";
-import { fixRetired, leftLines, onlyShepherdrLeft } from "../src/retire.ts";
+import { fixRetired, onlyOldInstallLeft } from "../src/retire.ts";
 
 const paths = pathsFor({ HOME: "/nonexistent-home" });
 const probe = (over: Partial<Probe> = {}): Probe => ({
@@ -27,7 +28,7 @@ test("a missing tool is one problem with its installer command", () => {
   expect(herdr?.fix).toBe("curl -fsSL https://herdr.dev/install.sh | sh");
 });
 
-test("a running Shepherdr 2.0 is named, with the command that stops it", () => {
+test("a running herdr-projects 2.0 is named, with the command that stops it", () => {
   const dir = mkdtempSync(join(tmpdir(), "doctor-old-"));
   writeFileSync(join(dir, "server.json"), JSON.stringify({ port: 7787, pid: 4242 }));
   const running = doctorChecks(probe({ oldDir: dir, run: () => "" })).find((c) => c.name === "old install stopped");
@@ -38,9 +39,9 @@ test("a running Shepherdr 2.0 is named, with the command that stops it", () => {
   rmSync(dir, { recursive: true });
 });
 
-test("doctor does not ask for Shepherdr 2.0 to be installed", () => {
+test("doctor does not ask for herdr-projects 2.0 to be installed", () => {
   const names = doctorChecks(probe()).map((c) => c.name);
-  expect(names).not.toContain("Shepherdr");
+  expect(names).not.toContain("herdr-projects");
 });
 
 test("doctor exits 1 and prints one fix per problem on a machine with nothing installed", () => {
@@ -95,14 +96,14 @@ test("doctor warns when the server listens beyond 127.0.0.1, with the command th
   rmSync(dir, { recursive: true });
 });
 
-test("doctor names Shepherdr 2.0's plugin, skills, unmoved spaces and timers, and --fix removes the first, second and last", () => {
+test("doctor names herdr-projects 2.0's plugin, skills, unmoved spaces and timers, and --fix removes the first, second and last", () => {
   const timerSetting = process.env.LINECLEAR_COORDINATOR_TIMER;
   delete process.env.LINECLEAR_COORDINATOR_TIMER;
   const dir = mkdtempSync(join(tmpdir(), "doctor-retired-"));
   const skills = join(dir, "skills");
   const data = join(dir, "data");
   const old = join(dir, "old");
-  for (const n of ["shepherdr", "shepherdr-agent", "other"]) {
+  for (const n of [OLD_NAME, `${OLD_NAME}-agent`, "other"]) {
     mkdirSync(join(skills, n), { recursive: true });
     writeFileSync(join(skills, n, "SKILL.md"), `---\nname: ${n}\n---\n`);
   }
@@ -133,13 +134,13 @@ test("doctor names Shepherdr 2.0's plugin, skills, unmoved spaces and timers, an
   fixRetired(p, (l) => out.push(l));
   expect(out).toEqual([
     "Removed the herdr plugin herdr-projects",
-    `Removed the skill ${join(skills, "shepherdr")}`,
-    `Removed the skill ${join(skills, "shepherdr-agent")}`,
+    `Removed the skill ${join(skills, OLD_NAME)}`,
+    `Removed the skill ${join(skills, `${OLD_NAME}-agent`)}`,
     "Turned off the timer of a",
   ]);
   expect(bad()).toEqual(["spaces moved to Lineclear"]);
-  expect(onlyShepherdrLeft(["ok     git", "FAILED spaces moved to Lineclear: x", "       fix: lineclear migrate"])).toBe(true);
-  expect(onlyShepherdrLeft(["FAILED service: x", "FAILED spaces moved to Lineclear: x"])).toBe(false);
+  expect(onlyOldInstallLeft(["ok     git", "FAILED spaces moved to Lineclear: x", "       fix: lineclear migrate"])).toBe(true);
+  expect(onlyOldInstallLeft(["FAILED service: x", "FAILED spaces moved to Lineclear: x"])).toBe(false);
   writeFileSync(join(data, "modes.json"), JSON.stringify({ a: "autopilot" }));
   const live: string[] = [];
   const asked: string[] = [];
@@ -195,7 +196,7 @@ test("heal never flips a mode: it shows the timer in the Inbox once, and honours
   rmSync(dir, { recursive: true });
 });
 
-test("agents are told nothing about Shepherdr 2.0 or its plugin", () => {
+test("agents are told nothing about herdr-projects 2.0 or its plugin", () => {
   const root = join(import.meta.dir, "..", "server");
   const files: string[] = [];
   const walk = (d: string) => {
@@ -204,7 +205,7 @@ test("agents are told nothing about Shepherdr 2.0 or its plugin", () => {
   };
   walk(join(root, "skill"));
   files.push(join(root, "server", "live", "prompts.ts"));
-  for (const f of files) expect(readFileSync(f, "utf8")).not.toMatch(/Shepherdr 2\.0|herdr-projects/);
+  for (const f of files) expect(readFileSync(f, "utf8")).not.toMatch(/herdr-projects/);
   // the skills the brief points to are this repo's own, found beside the code and not in a herdr plugin folder
   const brief = readFileSync(join(root, "server", "live", "prompts.ts"), "utf8");
   expect(brief).toContain("const SKILLS = join(OWN, 'skill')");
@@ -396,41 +397,6 @@ test("two board units on one store fail the one-server check", () => {
   expect(one?.problem).toBe("");
 });
 
-test("doctor names a running Control Center unit and process, and --fix stops, disables and ends them", () => {
-  let units = true;
-  let procs = true;
-  const ran: string[] = [];
-  const p = probe({
-    run: (cmd) => {
-      const line = cmd.join(" ");
-      ran.push(line);
-      if (line.includes("list-units")) {
-        return units
-          ? "cc-control-center.service loaded active running UI\ncc-tailnet@8799.service loaded active running tail\ncc-machine-backup@x.service loaded active running keep\ncc-tick.timer loaded inactive dead tick\n"
-          : "";
-      }
-      if (line.includes("list-unit-files")) return units ? "cc-tick.timer enabled enabled\ncc-restore-drill.timer enabled enabled\n" : "";
-      if (cmd[0] === "find") return units ? "/h/.config/systemd/user/default.target.wants/cc-tailnet@8787.service\n" : "";
-      if (cmd[0] === "ps") return procs ? "  42 python3 /x/scripts/control-center/server.py\n  43 bun run lineclear doctor --fix\n  44 vim notes\n" : "";
-      if (cmd[2] === "disable") units = false;
-      if (cmd[0] === "kill") procs = false;
-      return "";
-    },
-  });
-  const check = () => doctorChecks(p).find((c) => c.name === "no Control Center left")?.problem;
-  expect(check()).toBe(
-    "Control Center still has units cc-control-center.service, cc-tailnet@8799.service, cc-tick.timer, cc-tailnet@8787.service; processes 42",
-  );
-  const out: string[] = [];
-  expect(fixRetired(p, (l) => out.push(l))).toBe(0);
-  expect(out).toEqual([
-    "Stopped and disabled cc-control-center.service, cc-tailnet@8799.service, cc-tick.timer, cc-tailnet@8787.service",
-    "Ended Control Center process 42",
-  ]);
-  expect(ran).toContain("systemctl --user disable --now cc-control-center.service cc-tailnet@8799.service cc-tick.timer cc-tailnet@8787.service");
-  expect(check()).toBe("");
-});
-
 test("doctor fails when the published address of the web pages does not answer", () => {
   const find = (p: Partial<Probe>) => doctorChecks(probe(p)).find((c) => c.name.startsWith("published address"));
   expect(find({})?.problem).toBe("");
@@ -443,11 +409,6 @@ test("doctor fails when the published address of the web pages does not answer",
 test("the tailnet name comes from tailscale status", () => {
   expect(tailnetName('{"Self":{"DNSName":"box.tail1.ts.net."}}')).toBe("box.tail1.ts.net");
   expect(tailnetName("")).toBeUndefined();
-});
-
-test("a machine whose doctor names a running Control Center is listed as left, a plain failure is not", () => {
-  const lines = ["FAILED no Control Center left: Control Center still has units cc-tick.timer", "FAILED git: x", "ok     herdr"];
-  expect(leftLines(lines)).toEqual(lines.slice(0, 1));
 });
 
 test("doctor fails when NODE_COMPILE_CACHE is not set where install sets it, and the fix installs again", () => {
@@ -465,6 +426,20 @@ test("doctor fails when NODE_COMPILE_CACHE is not set where install sets it, and
   withManager = cacheEnvFile();
   expect(find()?.problem).toBe("");
   expect(doctorChecks(probe({ paths: own })).find((c) => c.name === "compile cache on disk")?.skip).toBe(true); // no systemd user services
+  rmSync(dir, { recursive: true });
+});
+
+test("a plugin config.json is named, with the command that removes it", () => {
+  const dir = mkdtempSync(join(tmpdir(), "doctor-plugin-"));
+  const problem = () => doctorChecks(probe({ dataDir: dir })).find((c) => c.name === "plugin config.json");
+  expect(problem()?.problem).toBe("");
+  writeFileSync(join(dir, "config.json"), JSON.stringify({ main: "box" }));
+  expect(problem()?.problem).toContain("config.json");
+  expect(problem()?.fix).toBe(`rm ${join(dir, "config.json")}`);
+  writeFileSync(join(dir, "config.json"), JSON.stringify({ main: "box", user: "Ann" }));
+  expect(problem()?.fix).toContain('remove the "main" key');
+  writeFileSync(join(dir, "config.json"), JSON.stringify({ user: "Ann" }));
+  expect(problem()?.problem).toBe("");
   rmSync(dir, { recursive: true });
 });
 

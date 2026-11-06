@@ -92,7 +92,7 @@ export function fit(p: Parsed, flag: '' | 'reviewer-', kind: string, model?: str
   return Object.fromEntries(Object.entries({ model: pick(m === undefined ? undefined : (found?.id ?? m)), effort: pick(e) }).filter(([, v]) => v !== undefined))
 }
 
-/** a worker's shepherdr command run by the main machine's Shepherdr, as the main machine's own */
+/** a worker's lineclear command run by the main machine's Lineclear, as the main machine's own */
 export async function mainCli(args: string[]): Promise<{ out: string; code: number }> {
   try {
     const { port } = JSON.parse(readFileSync(join(process.env.LINECLEAR_MAIN_HOME ?? '', 'server.json'), 'utf8')) as { port: number }

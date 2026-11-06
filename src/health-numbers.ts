@@ -2,13 +2,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { writeAtomic } from "../pi/atomic.ts";
 import type { Decision } from "./rules.ts";
 import { median, summarize } from "./stall-class.ts";
+import { DAY, MIN } from "./time.ts";
 
 // Whether Lineclear stays on the rails, as five numbers: the share of task time spent waiting on the system (a stall,
 // not the owner), stalls per day, minutes from a stall to its remedy, merges per day and tokens per merged step.
 // `lineclear measure <project> --since <day> --health` writes them to docs/numbers.md under "Health".
-
-const DAY = 86_400_000;
-const MIN = 60_000;
 
 export interface Health {
   since: string;

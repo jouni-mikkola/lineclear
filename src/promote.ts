@@ -5,7 +5,7 @@ import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readlinkSyn
 import { join } from "node:path";
 import { configDir, decisionsPath } from "../pi/config.ts";
 import { buildNames, buildsDir, isRejected, liftHold, pointBuild } from "./builds.ts";
-import { dataDir } from "./paths.ts";
+import { dataDir, lockFile } from "./paths.ts";
 import { readRelease, run } from "./release.ts";
 import { restartService, smoke } from "./rollback.ts";
 import { cacheDir } from "./tmpdirs.ts";
@@ -14,7 +14,6 @@ type Env = Record<string, string | undefined>;
 
 const REQUIRED = ["check", "smoke", "canary", "store"];
 const LOCK_STALE_MS = 60 * 60_000;
-const lockFile = (env: Env) => join(configDir(env), "promote.lock");
 
 export interface Promotion {
   version: string;
@@ -51,13 +50,13 @@ export function changesSince(from: string | null, to: string, env: Env = process
 function lock(env: Env): (() => void) | undefined {
   mkdirSync(configDir(env), { recursive: true });
   try {
-    if (Date.now() - statSync(lockFile(env)).mtimeMs > LOCK_STALE_MS) rmSync(lockFile(env), { force: true });
+    if (Date.now() - statSync(lockFile(env, "promote")).mtimeMs > LOCK_STALE_MS) rmSync(lockFile(env, "promote"), { force: true });
   } catch {}
   try {
-    const fd = openSync(lockFile(env), "wx");
+    const fd = openSync(lockFile(env, "promote"), "wx");
     return () => {
       closeSync(fd);
-      rmSync(lockFile(env), { force: true });
+      rmSync(lockFile(env, "promote"), { force: true });
     };
   } catch {
     return undefined;

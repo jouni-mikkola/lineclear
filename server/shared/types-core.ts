@@ -1,5 +1,5 @@
 /** Status marks: red needs you, green ready, green ring merging, amber working, grey idle, queued, to do or done, dashed unreachable. */
-export type Status = 'need' | 'ready' | 'merging' | 'work' | 'idle' | 'queued' | 'todo' | 'done' | 'off'
+type Status = 'need' | 'ready' | 'merging' | 'work' | 'idle' | 'queued' | 'todo' | 'done' | 'off'
 
 /** regular, always the fallback: the coordinator does what the human asks; or coordinator timer, a switch on top of it */
 export type Mode = 'regular' | 'autopilot'
@@ -67,7 +67,7 @@ export interface Place {
   chat: string
   /** its machine can't be reached: when it went quiet, as shown ("14:02") */
   unreachableSince?: string
-  /** its machine hasn't been reached yet since Shepherdr started (an update): what it showed last, while it connects */
+  /** its machine hasn't been reached yet since Lineclear started (an update): what it showed last, while it connects */
   connecting?: boolean
   /** does its repo have a GitHub remote */
   githubRemote?: boolean
@@ -88,7 +88,7 @@ export interface Section {
   spaces: string[]
 }
 
-/** what Shepherdr measures on a machine, as one level each: a share of what it has (CPU: its 1-minute load over its
+/** what Lineclear measures on a machine, as one level each: a share of what it has (CPU: its 1-minute load over its
  *  cores, so over 100 means more work than cores) */
 export type HealthLevel = 'ok' | 'busy' | 'over'
 
@@ -111,7 +111,7 @@ export interface MachineHealth {
   /** tasks at work now, and how many may be (none: no limit by number) */
   working: number
   max?: number
-  /** tasks Shepherdr holds until there is room, and why the first one waits */
+  /** tasks Lineclear holds until there is room, and why the first one waits */
   held: number
   heldWhy?: string
   /** when it was sampled ("08:41") */
@@ -127,7 +127,7 @@ export interface Machine {
   name: string
   /** the emoji the human gave it, before its name as a Slack section's (none: a server icon) */
   emoji?: string
-  /** off: Shepherdr can't reach it */
+  /** off: Lineclear can't reach it */
   status: 'idle' | 'off'
   unreachableSince?: string
   connecting?: boolean
@@ -171,7 +171,7 @@ export interface Report {
 
 /** need: its agent asks or waits for you; ready: finished, waits for you to merge it; merging: finished and on its way
  * into main, nothing for you to do (GitHub's checks run, it is rebased or merged); work: its agent is at it; queued:
- * it waits for other tasks to be done, then Shepherdr tells its agent to go; todo: its agent waits for a go, or is
+ * it waits for other tasks to be done, then Lineclear tells its agent to go; todo: its agent waits for a go, or is
  * starting and not yet at work on its brief; done: merged */
 export type TaskStatus = 'need' | 'ready' | 'merging' | 'work' | 'queued' | 'todo' | 'done'
 
@@ -374,7 +374,7 @@ export interface CardAsk {
   open?: boolean
 }
 
-/** One small update card Shepherdr posts in a project's coordinator chat. */
+/** One small update card Lineclear posts in a project's coordinator chat. */
 export interface UpdateCard {
   id: string
   /** the task it is about; none on a mode card */

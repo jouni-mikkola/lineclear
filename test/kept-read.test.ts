@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readTasksKept } from "../src/kept-read.ts";
 
-test("Shepherdr's tasks are tasks.json with the old ones of its append log; tasks.json wins, a gone line drops one", () => {
+test("Lineclear's tasks are tasks.json with the old ones of its append log; tasks.json wins, a gone line drops one", () => {
   const dir = mkdtempSync(join(tmpdir(), "lc-kept-"));
   writeFileSync(
     join(dir, "tasks.json"),

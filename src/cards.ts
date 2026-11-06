@@ -1,10 +1,10 @@
-// Reading a Shepherdr needs-you card: what it is about, and whether its agent only ended its turn.
+// Reading a Lineclear needs-you card: what it is about, and whether its agent only ended its turn.
 
 /** What a needs-you card is about. */
 export const askKinds = ["allowance", "merge-chat", "login", "permission", "plan", "question", "report"] as const;
 export type AskKind = (typeof askKinds)[number];
 
-/** The slice of a Shepherdr chat card these rules read. */
+/** The slice of a Lineclear chat card these rules read. */
 export interface Card {
   id?: string;
   task?: string;
@@ -25,7 +25,7 @@ export function askKind(c: Card): AskKind {
   const text = `${c.text ?? ""}\n${replyText(c)}`;
   // a card with a question is never an allowance notice, whatever its words
   if (c.ask?.questions === undefined && /out of allowance|hit your (session|usage) limit/i.test(text)) return "allowance";
-  if (/(shepherdr|lineclear) merge/i.test(replyText(c)) && /new message|uusi viesti/i.test(replyText(c))) return "merge-chat";
+  if (/lineclear merge/i.test(replyText(c)) && /new message|uusi viesti/i.test(replyText(c))) return "merge-chat";
   const q = c.ask?.questions?.[0];
   if (q === undefined) return "report";
   if (/terminal is waiting/i.test(q.title ?? "")) return "permission";

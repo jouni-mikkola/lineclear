@@ -36,7 +36,7 @@ export const LEVELS = Object.keys(RANK)
 
 const CLAUDE_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max']
 const PI_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']
-/** the CLIs Shepherdr passes a model and effort to, with the levels each takes before it is asked */
+/** the CLIs Lineclear passes a model and effort to, with the levels each takes before it is asked */
 const LEVELS_OF: Record<string, string[]> = { claude: CLAUDE_LEVELS, codex: [...CLAUDE_LEVELS, 'ultra'], pi: PI_LEVELS }
 
 /** Claude Code's families as its /model menu offers them, newest of each; its aliases (opus, haiku) name these too */
@@ -51,7 +51,7 @@ let registryAt = 0
 const asking = new Set<string>()
 const looked = new Map<string, number>()
 
-/** what this CLI takes; nothing for a CLI Shepherdr passes no model or effort to */
+/** what this CLI takes; nothing for a CLI Lineclear passes no model or effort to */
 export function modelsOf(kind: string): CliModels | undefined {
   const levels = LEVELS_OF[kind]
   if (!levels) return undefined

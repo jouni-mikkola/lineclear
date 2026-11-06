@@ -30,7 +30,7 @@ export type LogEvent =
 
   /** a new log file (session) starts */
   | { kind: 'session'; id: string; at: number; sessionId: string; file?: string }
-  /** something the human (or Shepherdr on their behalf) typed */
+  /** something the human (or Lineclear on their behalf) typed */
   | { kind: 'user'; id: string; at: number; text: string }
   /** a reply the agent wrote (markdown). Can come again with the same id and longer text when the CLI writes the rest
    * of that reply after a read: keep the latest per id. */

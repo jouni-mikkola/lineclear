@@ -296,22 +296,13 @@ export async function detect(repo: string, sample: boolean): Promise<Detection |
 /** The git repos in the home's usual folders that are no project yet. On a sample page, two samples. */
 export async function findRepos(sample: boolean): Promise<Repo[]> {
   if (sample) return sampleRepos;
-  try {
-    const r = await fetch("/api/repos", { headers: { accept: "application/json" } });
-    return r.ok ? (((await r.json()) as { repos?: Repo[] }).repos ?? []) : [];
-  } catch {
-    return [];
-  }
+  const r = await call<{ repos?: Repo[] }>("/api/repos");
+  return r.ok ? (r.data.repos ?? []) : [];
 }
 
 /** Starts a project as the CLI adds one, with its first roadmap when it has none. Resolves to the server's reason when it fails. */
 export async function addProject(p: NewProject, sample: boolean): Promise<Started> {
   if (sample) return { planning: false };
-  try {
-    const r = await fetch("/api/projects", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(p) });
-    const body = (await r.json().catch(() => ({}))) as { error?: string; planning?: boolean };
-    return r.ok ? { planning: !!body.planning } : { error: body.error ?? `The server answered ${r.status}.` };
-  } catch {
-    return { error: "The server did not answer. Try again." };
-  }
+  const r = await post<{ planning?: boolean }>("/api/projects", p);
+  return r.ok ? { planning: !!r.data.planning } : { error: r.error };
 }

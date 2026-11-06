@@ -44,7 +44,7 @@ function deny(cwd: string, env: Env): Deny {
 
 // Loose on purpose: a quote, a path or a wrapper (sh -c, bin/lineclear, bun src/cli.ts) must not get past them.
 const INBOX_ANSWER = /\binbox\s+(answer|undo)\b|\binbox\/\d+(\.json)?\b/;
-const MERGE = /\b(?:lineclear|shepherdr)\s+merge\b|\bgit\b[^;&|\n]*\s(merge|pull)\b|\bgh\s+pr\s+merge\b/;
+const MERGE = /\blineclear\s+merge\b|\bgit\b[^;&|\n]*\s(merge|pull)\b|\bgh\s+pr\s+merge\b/;
 
 /** True in the Dispatcher: its role is set, or it runs in its folder (<config>/dispatcher). */
 export function inDispatcher(cwd: string, env: Env): boolean {
@@ -184,7 +184,7 @@ export function recordCall(account: string, status: number, env: Env = process.e
 const KIT = join(dirname(realpathSync(fileURLToPath(import.meta.url))), "..", "kit");
 
 /** True in an agent Lineclear or its board started: a task's chat, a task id or a role is set. */
-export const lineclearAgent = (env: Env) => !!(env.LINECLEAR_CHAT || env.SHEPHERDR_CHAT || env.LINECLEAR_TASK || env.LINECLEAR_ROLE);
+export const lineclearAgent = (env: Env) => !!(env.LINECLEAR_CHAT || env.LINECLEAR_TASK || env.LINECLEAR_ROLE);
 
 /** The kit's skills, and the skill playwright-cli ships when it is installed (its own, so it fits its version). */
 export function kitSkills(env: Env = process.env): string[] {
@@ -204,13 +204,13 @@ export function kitSkills(env: Env = process.env): string[] {
 export const NUDGES_IN_A_ROW = 2;
 
 /** True in a task's agent: its chat is `<task>/Agent`. The Dispatcher, reviewers and a hand-run pi are never nudged. */
-export const taskAgent = (env: Env) => /\/Agent$/.test(env.LINECLEAR_CHAT ?? env.SHEPHERDR_CHAT ?? "");
+export const taskAgent = (env: Env) => /\/Agent$/.test(env.LINECLEAR_CHAT ?? "");
 
 /** Beats a little under the 5 minutes the server may go without a sign of life. */
 export const BEAT_MS = 4 * 60_000;
 
 /** The task id of a task agent: its chat is `<task>/Agent`. */
-const taskOf = (env: Env) => /^(.+)\/Agent$/.exec(env.LINECLEAR_CHAT ?? env.SHEPHERDR_CHAT ?? "")?.[1];
+const taskOf = (env: Env) => /^(.+)\/Agent$/.exec(env.LINECLEAR_CHAT ?? "")?.[1];
 
 type Pi = {
   on: (event: string, handler: (event: any, ctx: any) => unknown) => void;

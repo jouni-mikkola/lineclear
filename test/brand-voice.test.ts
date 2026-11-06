@@ -25,7 +25,7 @@ const NEVER = never(readFileSync(join(root, "docs", "brand.md"), "utf8"));
 
 test("the voice's list is there and the check finds a word of it", () => {
   expect(NEVER.length).toBeGreaterThan(10);
-  expect(NEVER).toContain("Shepherdr");
+  expect(NEVER).toContain("How it works");
   expect(offVoice("A seamless way to work.", NEVER)).toHaveLength(1);
   expect(offVoice("You decide. The rest runs on its own.", NEVER)).toEqual([]);
 });

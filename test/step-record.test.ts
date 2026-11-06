@@ -19,7 +19,7 @@ function project() {
   git("add", ".");
   git("commit", "-q", "-m", "Roadmap");
   git("commit", "-q", "--allow-empty", "-m", "OF-1: S1 Step S1");
-  const dir = join(root, "shepherdr");
+  const dir = join(root, "lineclear");
   const asks = join(root, "cfg", `in${"box"}`);
   mkdirSync(join(root, "cfg", "projects", "proj"), { recursive: true });
   mkdirSync(asks, { recursive: true });
@@ -41,7 +41,7 @@ function project() {
     join(asks, "4.json"),
     JSON.stringify({ n: 4, kind: "step", task: "OF-5", project: "proj", question: "Pick A or B?", choices: ["A", "B"], since: "2026-01-05T09:12:00.000Z" }),
   );
-  const env = { LINECLEAR_SHEPHERDR_DIR: dir, PI_CODING_AGENT_DIR: join(root, "pi"), LINECLEAR_CONFIG: join(root, "cfg"), SHEPHERDR_BIN: "true" };
+  const env = { LINECLEAR_HOME: dir, PI_CODING_AGENT_DIR: join(root, "pi"), LINECLEAR_CONFIG: join(root, "cfg"), LINECLEAR_SERVER_BIN: "true" };
   const live = [
     { id: "OF-2", title: "S2 Step S2", status: "work" },
     { id: "OF-5", title: "S5 Step S5", status: "need", sub: "Pick A or B" },

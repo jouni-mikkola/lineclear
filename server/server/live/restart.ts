@@ -19,7 +19,7 @@ const effortOf = (h: Harness) => (!h.effort || h.effort === 'default' ? '' : (ef
 
 export const sameHarness = (a: Harness, b: Harness) => a.kind === b.kind && modelOf(a) === modelOf(b) && effortOf(a) === effortOf(b)
 
-/** a harness as Shepherdr passes it: a model by its id, a level its model takes; nothing for the CLI's own */
+/** a harness as Lineclear passes it: a model by its id, a level its model takes; nothing for the CLI's own */
 export function fitHarness(h: Harness): Harness {
   const model = modelOf(h) || undefined
   const effort = effortOf(h) || undefined
@@ -54,7 +54,7 @@ export function restartHint(on: Harness, set: Harness | undefined, want: Harness
   return { on: `${effortOf(on) || 'default'} effort`, want: `${effortOf(want) || 'default'} effort` }
 }
 
-/** each CLI the sheet offers: its models (with the levels each takes) where Shepherdr passes them */
+/** each CLI the sheet offers: its models (with the levels each takes) where Lineclear passes them */
 export function restartClis(kinds: string[]): RestartCli[] {
   return kinds
     .filter((kind) => !chatProblem(kind))

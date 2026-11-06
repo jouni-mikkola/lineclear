@@ -3,7 +3,7 @@ import { existsSync, openSync, readSync, closeSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { connect, createServer } from 'node:net'
 const relay = createServer((socket) => {
-  const upstream = connect('/run/shepherdr/gateway.sock')
+  const upstream = connect('/run/lineclear/gateway.sock')
   socket.pipe(upstream).pipe(socket)
   socket.on('error', () => upstream.destroy())
   upstream.on('error', () => socket.destroy())

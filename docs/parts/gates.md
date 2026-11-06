@@ -19,16 +19,17 @@ names:
 - `src/parts.ts`: `Part`, `readParts`, `ownerOf`, `stepParts`, `stepFiles`, `stepLocks`, `holdsPartsWhole`, `stepHeld`, `stepNeeds`, `fileClash`, `unblockedByFiles`, `stepPartFaults`, `HEALTH_TAG`
 - `src/parts-check.ts`: `partsMain`
 - `src/nightly.ts`: `nightlyTasks`, `slowFailures`
+- `scripts/check-speed.ts`: `loadFactor`
 
 ## Files
 
-- code: `scripts/gates/`, `scripts/check.ts`, `scripts/check-speed.ts`, `scripts/dash-check.ts`, `scripts/words-check.ts`, `src/dashes.ts`, `src/parts.ts`, `src/parts-check.ts`, `scripts/coverage.ts`, `scripts/under-load.ts`, `scripts/changed.ts`, `scripts/load-map.ts`, `test/load-map-preload.ts`, `scripts/flaky.ts`, `scripts/fast-gates.ts`, `scripts/ui-changed.ts`, `src/nightly.ts`, `scripts/nightly.ts`
+- code: `scripts/gates/`, `scripts/personal-scan.ts`, `scripts/personal-words.ts`, `scripts/public-tree.ts`, `scripts/check.ts`, `scripts/check-speed.ts`, `scripts/result-cache.ts`, `scripts/dash-check.ts`, `scripts/words-check.ts`, `src/dashes.ts`, `src/parts.ts`, `src/parts-check.ts`, `scripts/coverage.ts`, `scripts/under-load.ts`, `scripts/changed.ts`, `scripts/load-map.ts`, `test/load-map-preload.ts`, `scripts/flaky.ts`, `scripts/fast-gates.ts`, `scripts/ui-changed.ts`, `src/nightly.ts`, `scripts/nightly.ts`
 - config: `biome.json`, `knip.jsonc`
-- tests: `test/gates.test.ts`, `test/dashes.test.ts`, `test/one-word.test.ts`, `test/parts.test.ts`, `test/coverage-floor.test.ts`, `test/bin-lineclear.test.ts`, `test/changed.test.ts`, `test/flaky.test.ts`, `test/check-speed.test.ts`, `test/check-steps.test.ts`, `test/nightly.test.ts`
+- tests: `test/gates.test.ts`, `test/result-cache.test.ts`, `test/personal-scan.test.ts`, `test/prose.test.ts`, `test/dashes.test.ts`, `test/one-word.test.ts`, `test/parts.test.ts`, `test/coverage-floor.test.ts`, `test/bin-lineclear.test.ts`, `test/changed.test.ts`, `test/flaky.test.ts`, `test/check-speed.test.ts`, `test/check-steps.test.ts`, `test/nightly.test.ts`
 
 ## Tests
 
-- `test/gates.test.ts`, `test/dashes.test.ts`, `test/parts.test.ts`, `test/coverage-floor.test.ts`, `test/bin-lineclear.test.ts`, `test/nightly.test.ts`, `test/contracts/gates.test.ts`
+- `test/gates.test.ts`, `test/result-cache.test.ts`, `test/dashes.test.ts`, `test/parts.test.ts`, `test/coverage-floor.test.ts`, `test/bin-lineclear.test.ts`, `test/nightly.test.ts`, `test/contracts/gates.test.ts`
 
 ## Debts
 

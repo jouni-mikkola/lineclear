@@ -18,6 +18,7 @@
     "dispatcher:eval": "bun test/dispatcher-eval/run.ts",
     "dashes": "bun scripts/dash-check.ts",
     "words": "bun scripts/words-check.ts",
+    "scan": "bun scripts/personal-scan.ts",
     "shots:check": "bun scripts/shots-check.ts",
     "direction": "bun scripts/direction-check.ts",
     "gates": "bun scripts/gates/run.ts",

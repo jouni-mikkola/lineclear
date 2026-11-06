@@ -191,7 +191,7 @@ async function mergesTo(repo: string, into: string, ref: string, is: string) {
 /** merging `ref` into `base` goes through without a conflict: what GitHub calls mergeable */
 export const mergesCleanly = async (repo: string, base: string, ref: string) => (await git(repo, 'merge-tree', '--write-tree', base, ref)).ok
 
-/** the commits on `base` a task's squash merge made: by Shepherdr's subject, "<id>: <title>" */
+/** the commits on `base` a task's squash merge made: by Lineclear's subject, "<id>: <title>" */
 export async function squashesOf(repo: string, base: string, id: string) {
   const r = await git(repo, 'log', '--format=%H %s', '-n', '5000', base)
   return r.ok
@@ -373,7 +373,7 @@ export async function mergeHere(repo: string, branch: string, base: string, mess
     return squash ? git(repo, 'commit', '-q', '-m', message) : m
   }
   // base is not checked out here: merge in a scratch worktree, then move the branch
-  const tmp = join(repo, '.git', `shepherdr-merge-${Date.now()}`)
+  const tmp = join(repo, '.git', `lineclear-merge-${Date.now()}`)
   const add = await git(repo, 'worktree', 'add', '--detach', tmp, base)
   if (!add.ok) return add
   try {

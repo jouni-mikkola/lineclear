@@ -65,7 +65,7 @@ export const NAME = machineName()
 const HOME_KEY = '~'
 
 /** the herdr agent of this machine's home space's coordinator (no space's is called so: theirs start shep-) */
-const HOME_AGENT = 'shepherdr-home'
+const HOME_AGENT = 'lineclear-home'
 
 /** the herdr space it runs in, and the one the machine's and All machines' coordinators shared before */
 export const HOME_SPACE = { label: 'home', was: 'Coordinators' }
@@ -106,7 +106,7 @@ export class Places {
    *  never a folder, repo, herdr space or task id */
   names: Record<string, string> = readJson('names.json', {})
 
-  /** a fresh store has no spaces.json yet: it starts empty and the file is written, so takeOver sees a store */
+  /** a fresh store has no spaces.json yet: it starts empty and the file is written, so a store is told from none */
   private loadSpaces(): Space[] {
     if (!existsSync(join(HOME, 'spaces.json'))) writeJson('spaces.json', [])
     const spaces = readJson<unknown>('spaces.json', [])

@@ -11,7 +11,7 @@ const env: Record<string, string | undefined> = { ...process.env };
 if (fake > 0) {
   const n = Number(process.argv[fake + 1] ?? 10);
   const dir = mkdtempSync(join(tmpdir(), "lc-speed-"));
-  mkdirSync(join(dir, "shepherdr"), { recursive: true });
+  mkdirSync(join(dir, "lineclear"), { recursive: true });
   mkdirSync(join(dir, "config"), { recursive: true });
   writeFileSync(
     join(dir, "browsers.json"),
@@ -20,7 +20,7 @@ if (fake > 0) {
   Object.assign(env, {
     LINECLEAR_PLAYWRIGHT_CLI: join(import.meta.dir, "..", "ui", "test", "fake-playwright-cli"),
     LINECLEAR_FAKE_DELAY: String(Number(process.argv[fake + 2] ?? 1000) / 1000),
-    LINECLEAR_SHEPHERDR_DIR: join(dir, "shepherdr"),
+    LINECLEAR_HOME: join(dir, "lineclear"),
     LINECLEAR_CONFIG: join(dir, "config"),
   });
 }

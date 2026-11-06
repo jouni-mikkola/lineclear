@@ -109,7 +109,7 @@ export class Settings {
     return l === 'all' ? this.d.everywhere : l === 'machine' ? this.d.machine : (this.d.spaces[l.space] ?? {})
   }
 
-  /** a key's value at a level and where it comes from: that level, one above it, or Shepherdr's own default */
+  /** a key's value at a level and where it comes from: that level, one above it, or Lineclear's own default */
   pick(key: string, l: Level = 'machine'): { value: string; from: LevelKind | 'default' } {
     const ok = levelsOf(key)
     const chain: Level[] = l === 'all' ? ['all'] : l === 'machine' ? ['machine', 'all'] : [l, 'machine', 'all']
@@ -216,10 +216,11 @@ export class Settings {
       rounds: Number.isFinite(rounds) && rounds > 0 ? rounds : 3,
       merge: merge === 'ask me first' ? merge : 'on its own',
       waitChecks: merge === 'after GitHub checks',
+      checkWhere: get('check.where') === 'github' ? 'github' : 'local',
     }
   }
 
-  /** who set each line of a brief's Settings block that differs from Shepherdr's own default, for a space (none: this
+  /** who set each line of a brief's Settings block that differs from Lineclear's own default, for a space (none: this
    *  machine): the coordinator for this one task (set), else the most specific level it comes from */
   setBy(space?: string, set: Values = {}): Partial<Record<Said, SetBy>> {
     return this.setByAt(space ? { space } : 'machine', set)
@@ -414,7 +415,7 @@ export class Settings {
             ...r,
             value: devices.length ? devices.join(', ') : 'No device yet',
             warn: pushWarnings.length
-              ? `${pushWarnings.length} device${pushWarnings.length === 1 ? '' : 's'} could not receive the last alert.\n${pushWarnings.slice(0, 3).join('\n')}${pushWarnings.length > 3 ? '\nMore details: shepherdr doctor' : ''}`
+              ? `${pushWarnings.length} device${pushWarnings.length === 1 ? '' : 's'} could not receive the last alert.\n${pushWarnings.slice(0, 3).join('\n')}${pushWarnings.length > 3 ? '\nMore details: lineclear doctor' : ''}`
               : undefined,
           }
         const p = this.pick(r.key, l)

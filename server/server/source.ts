@@ -50,7 +50,7 @@ export interface Source extends Emitter<SourceEvents> {
   attachment(chat: string, path: string): Promise<Blob | null>
   /** a machine's folders, for adding a project: only folders in the human's home on it */
   folders?(machine: string, path: string): Promise<Folders>
-  /** add a project from the sidebar, as `shepherdr project add` does (made a new repo first with create); its place */
+  /** add a project from the sidebar, as `lineclear project add` does (made a new repo first with create); its place */
   addSpace?(req: AddSpace): Promise<{ place: string }>
   /** a task's worktree, read only, for its side panel: its files, a file, its diff against its base, a file's diff,
    *  its pull request. Never anything outside that worktree. */

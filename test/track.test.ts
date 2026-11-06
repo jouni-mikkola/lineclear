@@ -181,11 +181,11 @@ test("the track's project add passes the space, so it needs no detection", () =>
 test("the track adds its space when the board has none, and leaves it when it has", () => {
   const dir = tmp("track-space");
   const log = join(dir, "calls.log");
-  const bin = join(dir, "shepherdr");
+  const bin = join(dir, "lineclear");
   writeFileSync(bin, `#!/bin/sh\necho "$@" >> ${log}\n[ "$1 $2" = "space list" ] && [ -f ${dir}/have ] && printf 'lineclear-track  /r\\n'\nexit 0\n`, {
     mode: 0o755,
   });
-  const env = { ...process.env, SHEPHERDR_BIN: bin };
+  const env = { ...process.env, LINECLEAR_SERVER_BIN: bin };
   expect(ensureTrackSpace("/r", env)).toBeUndefined();
   expect(readFileSync(log, "utf8")).toContain("space add /r --name lineclear-track");
   writeFileSync(join(dir, "have"), "");
@@ -229,9 +229,9 @@ function thirdWorld() {
   const pi = join(dir, "pi");
   mkdirSync(pi);
   copyFileSync(join(THIRD, "models-store.json"), join(pi, "models-store.json"));
-  const bin = join(dir, "shepherdr");
+  const bin = join(dir, "lineclear");
   writeFileSync(bin, '#!/bin/sh\n[ "$1 $2" = "space list" ] && printf \'lineclear-track  /r\\n\'\nexit 0\n', { mode: 0o755 });
-  const env = { ...process.env, LINECLEAR_CONFIG: config, PI_CODING_AGENT_DIR: pi, SHEPHERDR_BIN: bin };
+  const env = { ...process.env, LINECLEAR_CONFIG: config, PI_CODING_AGENT_DIR: pi, LINECLEAR_SERVER_BIN: bin };
   const models = { worker: registry, reviewer: registry, planner: registry };
   for (const name of ["lineclear", "lineclear-track"]) {
     mkdirSync(join(config, "projects", name), { recursive: true });

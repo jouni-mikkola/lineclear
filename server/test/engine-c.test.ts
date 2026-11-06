@@ -136,7 +136,7 @@ describe('restarting a task agent', () => {
     expect(s).toHaveLength(2)
     expect(s[1]).toMatchObject({ kind: 'claude', model: 'claude-sonnet-5-5', effort: 'low', cwd: t.worktree })
     // a hidden line, not the brief again
-    expect(s[1].first).toStartWith('<shepherdr><restart>')
+    expect(s[1].first).toStartWith('<lineclear><restart>')
     expect(s[1].first).toContain('restarted you on Claude Code (Sonnet 5.5, low), with your session as it was')
     expect(t.agent).toEqual({ kind: 'claude', model: 'claude-sonnet-5-5', effort: 'low' })
     expect(w.posted.find((p) => p.key === key && p.id.startsWith('restart:'))?.card).toMatchObject({

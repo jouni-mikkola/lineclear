@@ -12,7 +12,7 @@ describe('EngineStalls', () => {
     const later = (min: number) => Date.now() + min * 60_000
     w.engine.checkStalls(later(STALL_QUIET / 60_000 - 1))
     expect(stalled()).toEqual([])
-    // quiet too long: what Shepherdr saw, once
+    // quiet too long: what Lineclear saw, once
     w.engine.checkStalls(later(STALL_QUIET / 60_000 + 1))
     expect(stalled().length).toBe(1)
     expect(stalled()[0]).toContain(`${t.id} may have stalled: its agent shows as working, but nothing has changed for 21m`)

@@ -12,7 +12,7 @@ export interface WaitingTask {
   task: string;
   project: string;
   machine?: string;
-  /** The text of its last card, else why Shepherdr says it waits. */
+  /** The text of its last card, else why Lineclear says it waits. */
   text: string;
   title?: string;
   /** What the task gives once it lands, in one sentence (its step's result). */

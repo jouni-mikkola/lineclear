@@ -152,7 +152,7 @@ export function commandFaults(page: Page): Promise<string[]> {
   return page.evaluate(() => {
     const out: string[] = [];
     const cmd =
-      /(^|\s)(\$ |bun (run|add|install|x)\b|bunx |npm (i|install|run)\b|systemctl |curl -|sudo |lineclear (run|doctor|project|serve|update|install)\b|shepherdr [a-z-]+ |git (clone|pull|push|checkout|rebase)\b|chmod |brew install)/;
+      /(^|\s)(\$ |bun (run|add|install|x)\b|bunx |npm (i|install|run)\b|systemctl |curl -|sudo |lineclear (run|doctor|project|serve|update|install)\b|lineclear [a-z-]+ |git (clone|pull|push|checkout|rebase)\b|chmod |brew install)/;
     for (const el of document.querySelectorAll<HTMLElement>("body *")) {
       if (!el.checkVisibility() || el.closest("[data-command-ok]")) continue;
       const text = [...el.childNodes]
@@ -250,6 +250,10 @@ const DRAWN: Record<string, string[]> = {
   "ui/kit/parts.tsx": ["3px", "7px", "9px", "11px", "58px"], // the dashed track and the spend chart
   "ui/kit/chat.tsx": ["-3px"], // a motion's offset
   "ui/web/roadmap/line.tsx": ["3px"], // the track's label
+  "ui/web/roadmap/chain.tsx": ["9px"], // the dot sits on the rail's centre
+  "ui/kit/spend-charts.tsx": ["3px"], // the gap of the bars
+  "ui/kit/settings.tsx": ["38px"], // the height of a one-line hint, so the form does not jump
+  "ui/web/roadmap/goals-print.ts": ["3px", "10px", "13px"], // the print sheet's own type scale
 };
 
 /** Pixel values in the source of ui/ that are on no token: below 100 px, not 1 or 2 (lines) or a multiple of the 4 px unit. */

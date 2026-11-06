@@ -227,7 +227,7 @@ export class AgentsDelivery extends AgentsState {
 
   protected changed(key: string, status: AgentStatus | 'gone', was: AgentStatus | 'gone' = 'gone') {
     const r = this.records[key]
-    // a first look after Shepherdr started (was gone) must not wipe what was saved: a restored pane shows idle
+    // a first look after Lineclear started (was gone) must not wipe what was saved: a restored pane shows idle
     if (r && status !== 'gone' && status !== 'blocked' && (status === 'working' || was !== 'gone') && !!r.working !== (status === 'working')) {
       r.working = status === 'working'
       this.save()
@@ -258,7 +258,7 @@ export class AgentsDelivery extends AgentsState {
     for (const ms of [1500, 5000, 15000, 60000, 180000]) setTimeout(look, ms)
   }
 
-  /** an agent already running in herdr that Shepherdr should treat as this chat */
+  /** an agent already running in herdr that Lineclear should treat as this chat */
   adopt(key: string, a: AgentInfo, kind: string, workspace: string) {
     if (this.records[key]?.name === a.name) return
     this.records[key] = { key, name: a.name!, kind, cwd: a.cwd ?? '', workspace, logs: [], started: Date.now() }
@@ -329,7 +329,7 @@ export class AgentsDelivery extends AgentsState {
     applySpec(r, spec)
     this.codexState.delete(spec.key)
     r.launch = randomUUID()
-    if (fresh) this.outbox = this.outbox.filter((item) => item.key !== spec.key || item.cid || !item.text.startsWith('<shepherdr>'))
+    if (fresh) this.outbox = this.outbox.filter((item) => item.key !== spec.key || item.cid || !item.text.startsWith('<lineclear>'))
     r.started = Date.now()
     if (!resume) r.sessionId = r.kind === 'codex' ? undefined : randomUUID()
     // a run of its own: what its hooks record starts over
@@ -423,7 +423,7 @@ export class AgentsDelivery extends AgentsState {
     if (r.kind === 'claude') {
       if (resume && r.sessionId) a.push('--resume', r.sessionId)
       else if (r.sessionId) a.push('--session-id', r.sessionId)
-      // its hooks tell Shepherdr what it does (readers/hooks.ts), from a settings file of its own: yours stay untouched
+      // its hooks tell Lineclear what it does (readers/hooks.ts), from a settings file of its own: yours stay untouched
       if (!r.isolation) {
         const h = hookSettings(HOOKS_DIR, r.name)
         r.hooks = h.events
@@ -444,9 +444,9 @@ export class AgentsDelivery extends AgentsState {
       const env = r.isolation
         ? {
             LINECLEAR_CHAT: r.key,
-            LINECLEAR_COMMAND: '/run/shepherdr/bin/lineclear',
+            LINECLEAR_COMMAND: '/run/lineclear/bin/lineclear',
             LINECLEAR_URL: 'http://127.0.0.1:18765',
-            PATH: '/run/shepherdr/bin:/usr/local/bin:/usr/bin:/bin',
+            PATH: '/run/lineclear/bin:/usr/local/bin:/usr/bin:/bin',
           }
         : { ...r.env, ...agentEnv(r.key, ROOT) }
       a.push(
@@ -475,7 +475,7 @@ export class AgentsDelivery extends AgentsState {
     return f
   }
 
-  /** the files Shepherdr starts its CLI with now, by flag: its hooks' settings and its instructions. One started with
+  /** the files Lineclear starts its CLI with now, by flag: its hooks' settings and its instructions. One started with
    *  others (herdr restored an older command after it restarted) runs without them */
   filesOf(r: AgentRecord): Record<string, string> {
     if (r.isolation) return {} // host paths differ from the namespace; the wrapper is verified before every launch

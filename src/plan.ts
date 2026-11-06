@@ -3,7 +3,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { dispatcherDir } from "./dispatcher.ts";
 import { applyPlan, type PartsContext, partProblems, planProblems, plansAreAuto, readiness, stepFormProblems } from "./autoplan.ts";
-import { chatFiles, findSpace, shepherdrDir, spaceTasks } from "./measure.ts";
+import { chatFiles, findSpace, lineclearDir, spaceTasks } from "./measure.ts";
 import { partHealth, taskSignals, worstParts } from "./part-health.ts";
 import { readParts } from "./parts.ts";
 import { addItem, isOpen, readItems } from "./inbox.ts";
@@ -18,6 +18,7 @@ import type { Decision } from "./rules.ts";
 import { configDir } from "../pi/config.ts";
 import { clearWait, findProject, findTask, writeWait } from "./waits.ts";
 import { mainBranch, mainRef } from "./main-branch.ts";
+import { git } from "./git.ts";
 
 const USAGE = ['usage: lineclear plan [--url <url>] <project> "<goal>"', "       lineclear plan [--url <url>] submit"];
 
@@ -29,9 +30,7 @@ function serverIsDown(env: NodeJS.ProcessEnv): boolean {
   return p.exitCode === 2 && p.stderr.toString().startsWith("Cannot reach the lineclear command");
 }
 
-const shepherdr = serverBin;
-const git = (cwd: string, ...a: string[]) => Bun.spawnSync(["git", "-C", cwd, ...a], { stdin: "ignore" });
-
+const lineclear = serverBin;
 /** `lineclear plan <project> "<goal>"` starts a planning task. `lineclear plan submit` sends its roadmap change to the Inbox. */
 export function planMain(raw: string[], out: (l: string) => void, baseEnv = process.env, cwd = process.cwd(), now: () => Date = () => new Date()): number {
   // the flag first, then the environment, then the data folder's record: the server's own command reads the last two
@@ -54,7 +53,7 @@ export function planMain(raw: string[], out: (l: string) => void, baseEnv = proc
   const title = fitTitle(head && head.length + 6 <= TITLE_MAX ? `Plan: ${head}` : `Plan: ${goal.trim()}`);
   const p = Bun.spawnSync(
     [
-      shepherdr(env),
+      lineclear(env),
       "task",
       "add",
       title,
@@ -96,7 +95,7 @@ export function planMain(raw: string[], out: (l: string) => void, baseEnv = proc
 function partsContext(repo: string, roadmap: string, space: string | undefined, env: NodeJS.ProcessEnv): PartsContext {
   const parts = readParts(repo);
   if (parts.length === 0) return { parts, worst: [] };
-  const dir = shepherdrDir(env);
+  const dir = lineclearDir(env);
   const s = space ? findSpace(dir, space, repo) : undefined;
   const tasks = (s ? spaceTasks(dir, s) : []).map((t) => ({
     id: String(t.id),
@@ -114,17 +113,17 @@ function submit(out: (l: string) => void, env: NodeJS.ProcessEnv, cwd: string, n
   if (task === undefined) return fail("cannot tell which task this is, run it inside the planning task's worktree");
   const project = findProject(cwd, env);
   const top = git(cwd, "rev-parse", "--show-toplevel");
-  if (top.exitCode !== 0) return fail("this folder is not a git repository");
-  const root = top.stdout.toString().trim();
+  if (!top.ok) return fail("this folder is not a git repository");
+  const root = top.out.trim();
   const file = join(root, "docs", "ROADMAP.md");
   if (!existsSync(file)) return fail("docs/ROADMAP.md does not exist");
-  if (git(root, "status", "--porcelain", "--", "docs/ROADMAP.md").stdout.toString().trim() !== "") return fail("commit your change to docs/ROADMAP.md first");
+  if (git(root, "status", "--porcelain", "--", "docs/ROADMAP.md").out.trim() !== "") return fail("commit your change to docs/ROADMAP.md first");
   const base = mainRef(root);
   if (base === undefined) return fail(`cannot find ${mainBranch(root)} to compare with`);
-  const fork = git(root, "merge-base", base, "HEAD").stdout.toString().trim() || base;
+  const fork = git(root, "merge-base", base, "HEAD").out.trim() || base;
   const was = git(root, "show", `${fork}:docs/ROADMAP.md`);
   const text = readFileSync(file, "utf8");
-  const missing = stepFormProblems(was.exitCode === 0 ? was.stdout.toString() : "", text);
+  const missing = stepFormProblems(was.ok ? was.out : "", text);
   if (missing.length > 0) {
     logDecision(task, project, `plan sent back, a step is not whole: ${missing.join(" | ")}`, env, now);
     return fail(
@@ -133,20 +132,20 @@ function submit(out: (l: string) => void, env: NodeJS.ProcessEnv, cwd: string, n
   }
   const errors = checkRoadmap(text).errors;
   if (errors.length > 0) return fail(`the roadmap does not pass the check:\n${errors.map((e) => `docs/ROADMAP.md:${e.line}: ${e.message}`).join("\n")}`);
-  const diff = git(root, "diff", `${base}...HEAD`, "--", "docs/ROADMAP.md").stdout.toString();
+  const diff = git(root, "diff", `${base}...HEAD`, "--", "docs/ROADMAP.md").out;
   if (diff.trim() === "") return fail("docs/ROADMAP.md has no change from main");
-  const files = git(root, "diff", "--name-only", `${base}...HEAD`).stdout.toString().trim().split("\n");
+  const files = git(root, "diff", "--name-only", `${base}...HEAD`).out.trim().split("\n");
   if (files.some((f) => f !== "docs/ROADMAP.md")) return fail("a plan changes docs/ROADMAP.md only, undo the change to the other files");
   if (readItems(env).some((i) => i.kind === "plan" && i.task === task && isOpen(i))) return fail("this plan waits for the owner already");
-  const head = git(root, "rev-parse", "HEAD").stdout.toString().trim();
+  const head = git(root, "rev-parse", "HEAD").out.trim();
   const round = readItems(env).filter((i) => i.kind === "plan" && i.task === task).length + 1;
   if (round > 2) return fail("the plan was already sent back once; this task ends");
   // the part rules hold whether the owner approves or the plan applies by itself: the owner is not the one to count parts
   const settings = project ? readSettings(project, env) : undefined;
   const ctx = partsContext(root, text, typeof settings === "object" ? settings.space : undefined, env);
-  const parts = partProblems(checkRoadmap(was.exitCode === 0 ? was.stdout.toString() : "").parsed.steps, checkRoadmap(text).parsed.steps, ctx);
+  const parts = partProblems(checkRoadmap(was.ok ? was.out : "").parsed.steps, checkRoadmap(text).parsed.steps, ctx);
   if (parts.length > 0) return fail(`the part rules refuse this plan, fix these, commit and run 'lineclear plan submit' again:\n${parts.join("\n")}`);
-  const before = was.exitCode === 0 ? was.stdout.toString() : "";
+  const before = was.ok ? was.out : "";
   const planner = typeof settings === "object" ? settings.models.planner[0] : undefined;
   const reviewers = typeof settings === "object" ? settings.models.reviewer : [];
   const read = stepCheckOf(settings, { task, root, before, after: text, planner, reviewers, env });
@@ -189,7 +188,7 @@ function endPlan(
 ): number {
   const reason = `step ${r.step} stayed unclear after ${NOGO_ROUNDS} rounds: ${r.why}`;
   logDecision(task, project, `planning task ended, ${reason}`, env, now);
-  Bun.spawnSync([shepherdr(env), "task", "close", task], { stdin: "ignore" });
+  Bun.spawnSync([lineclear(env), "task", "close", task], { stdin: "ignore" });
   clearWait(task, env);
   out(`report: ${task} ended with no plan. ${reason}`);
   return 0;
@@ -224,9 +223,9 @@ interface Auto {
 function autoApply(a: Auto, out: (l: string) => void, env: NodeJS.ProcessEnv, now: () => Date): number {
   const fail = (m: string) => (out(`lineclear plan submit: ${m}`), 1);
   // compare with where the branch left main, so steps main gained since do not look removed
-  const fork = git(a.root, "merge-base", a.base, a.head).stdout.toString().trim() || a.base;
+  const fork = git(a.root, "merge-base", a.base, a.head).out.trim() || a.base;
   const was = git(a.root, "show", `${fork}:docs/ROADMAP.md`);
-  const problems = planProblems(was.exitCode === 0 ? was.stdout.toString() : "", a.text);
+  const problems = planProblems(was.ok ? was.out : "", a.text);
   if (problems.length > 0) return fail(`the rule checks refuse this plan, fix these, commit and run 'lineclear plan submit' again:\n${problems.join("\n")}`);
   const verdict = readiness(a.diff, a.project, env);
   if (!verdict.go) return fail(`the readiness check says no-go: ${verdict.why}. Fix that, commit and run 'lineclear plan submit' again.`);

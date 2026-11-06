@@ -8,10 +8,10 @@ import { tmp } from "./helpers.ts";
 
 const git = (cwd: string, ...a: string[]) => Bun.spawnSync(["git", "-C", cwd, "-c", "user.name=t", "-c", "user.email=t@t", ...a], { stdout: "pipe" });
 
-/** Two tasks of one project; both last said "Waits for your reply". The fake `shepherdr task list` says AL-1 works and AL-2 needs you. */
+/** Two tasks of one project; both last said "Waits for your reply". The fake `lineclear task list` says AL-1 works and AL-2 needs you. */
 function world() {
   const root = tmp("amber");
-  const dir = join(root, "shepherdr");
+  const dir = join(root, "lineclear");
   mkdirSync(join(dir, "chatlog"), { recursive: true });
   const path = join(root, "alpha");
   mkdirSync(join(path, "docs"), { recursive: true });
@@ -43,7 +43,7 @@ function world() {
   ];
   const bin = join(root, "task-list.sh");
   writeFileSync(bin, `#!/bin/sh\necho '${JSON.stringify(listed)}'\n`, { mode: 0o755 });
-  const vars = { LINECLEAR_SHEPHERDR_DIR: dir, PI_CODING_AGENT_DIR: join(root, "pi"), LINECLEAR_CONFIG: config, SHEPHERDR_BIN: bin };
+  const vars = { LINECLEAR_HOME: dir, PI_CODING_AGENT_DIR: join(root, "pi"), LINECLEAR_CONFIG: config, LINECLEAR_SERVER_BIN: bin };
   return { vars, listed };
 }
 

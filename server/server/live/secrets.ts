@@ -4,7 +4,7 @@
 // Everywhere ('all'), a machine (m:<machine>) or a space (p:<machine>:<space>); the most specific one wins.
 // All of them are kept in one file on the main machine, readable by you only (vault.json). A worker for another machine
 // (machines.ts) reads it there, on the same disk; a value leaves the main machine only when an agent on another machine
-// uses it, over the SSH link to that machine (its shepherdr's tunnel), and never lands in a chat, a log or the
+// uses it, over the SSH link to that machine (its lineclear's tunnel), and never lands in a chat, a log or the
 // snapshot: those have names only.
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -31,7 +31,7 @@ interface Kept {
 type Store = Record<string, Record<string, Kept>>
 
 export class Vault {
-  /** home: the main machine's Shepherdr folder; seed: kept in memory only (tests) */
+  /** home: the main machine's Lineclear folder; seed: kept in memory only (tests) */
   constructor(
     private home: string,
     private seed?: Store,

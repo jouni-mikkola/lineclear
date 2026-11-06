@@ -9,7 +9,7 @@ import { inboxMain } from "./inbox-answer.ts";
 import { projectDecisions, readItems } from "./inbox.ts";
 import { installMachine, type machinesView, removeMachine } from "./machines.ts";
 import { HOST, readMachines } from "./machine-list.ts";
-import { shepherdrDir, worktreeCost } from "./measure.ts";
+import { lineclearDir, worktreeCost } from "./measure.ts";
 import type { Pusher } from "./notify.ts";
 import type { Aside } from "./read-aside.ts";
 import { type AskBefore, changeSettings, listProjectNames, type Role, setupRoles } from "./project.ts";
@@ -21,7 +21,6 @@ import { saveOffered, setupView } from "./setup.ts";
 import type { RoadmapRead } from "./roadmap-view.ts";
 import { searchAnswer } from "./search.ts";
 import { remoteLineclear } from "./ssh.ts";
-import { stallsReply } from "./stall-class.ts";
 import { changesReply } from "./task-changes.ts";
 import { taskDetailReply } from "./task-detail.ts";
 import { taskLiveApi, type taskTerminalLinks } from "./task-live.ts";
@@ -30,7 +29,6 @@ import { browserApi, chatApi } from "./web-chat-api.ts";
 import { type Env, json, ownPage } from "./web-guard.ts";
 import { accountSettings, projectSettings, type SettingsData } from "./web-settings.ts";
 import { doctorProblems } from "./home-doctor.ts";
-import { eventsAnswer } from "./events.ts";
 import { appliedChanges, inboxView, planCard, waitingView } from "./web-views.ts";
 
 /** What the routes share: the kept reads, the caches a write clears, and the pieces that talk to the machine. */
@@ -77,16 +75,13 @@ const taskLiveRoute: Route = (c, req, url) => {
 
 const changesRoute: Route = (c, req, url) => {
   const changes = new RegExp(`^/api/task/(${ID})/changes$`).exec(url.pathname);
-  return req.method === "GET" && changes ? changesReply(changes[1] ?? "", shepherdrDir(c.env), json) : undefined;
+  return req.method === "GET" && changes ? changesReply(changes[1] ?? "", lineclearDir(c.env), json) : undefined;
 };
 
 const searchRoute: Route = async (c, req, url) =>
   req.method === "GET" && url.pathname === "/api/search"
     ? json(await searchAnswer(url.searchParams.get("q") ?? "", await c.readProjects(c.now()), listProjectNames(c.env), (n) => c.roadmap(n).ready(60_000)))
     : undefined;
-
-const eventsRoute: Route = (c, req, url) =>
-  req.method === "GET" && url.pathname === "/api/events" ? json(eventsAnswer(c.env, readItems(c.env as NodeJS.ProcessEnv), c.dispatcher().view())) : undefined;
 
 const homeRoute: Route = async (c, req, url) => {
   if (req.method !== "GET" || url.pathname !== "/api/home") return undefined;
@@ -244,14 +239,11 @@ const pushSubscribeRoute: Route = async (c, req, url) => {
   return json({ ok: true });
 };
 
-const stallsRoute: Route = (c, req, url) =>
-  req.method === "GET" && url.pathname === "/api/stalls" ? stallsReply(url.searchParams.get("hours"), c.env as NodeJS.ProcessEnv, c.now(), json) : undefined;
-
 const taskDetailRoute: Route = (c, req, url) =>
   req.method === "GET" && url.pathname.startsWith("/api/task/")
     ? taskDetailReply(
         url.pathname.slice("/api/task/".length),
-        { shepherdr: shepherdrDir(c.env), costSoFar: (w) => worktreeCost(w, c.env) },
+        { lineclear: lineclearDir(c.env), costSoFar: (w) => worktreeCost(w, c.env) },
         c.env,
         c.now(),
         json,
@@ -319,7 +311,6 @@ const ROUTES: Route[] = [
   taskLiveRoute,
   changesRoute,
   searchRoute,
-  eventsRoute,
   homeRoute,
   detectRoute,
   reposRoute,
@@ -334,7 +325,6 @@ const ROUTES: Route[] = [
   stepRoute,
   pushKeyRoute,
   pushSubscribeRoute,
-  stallsRoute,
   taskDetailRoute,
   plansRoute,
   inboxRoute,

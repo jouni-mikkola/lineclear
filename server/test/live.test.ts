@@ -212,15 +212,15 @@ describe('chat lines', () => {
     expect(findQuoted(msgs, 'Nothing like it')).toBeUndefined()
     expect(matches('Hello there', 'there')).toBe(false)
   })
-  test("Shepherdr's own words never show in the chat", () => {
+  test("Lineclear's own words never show in the chat", () => {
     expect(hidden('GTM-15 was merged', 'news', { task: 'GTM-15', event: 'merged' })).toBe(
-      '<shepherdr><news task="GTM-15" event="merged">GTM-15 was merged</news></shepherdr>',
+      '<lineclear><news task="GTM-15" event="merged">GTM-15 was merged</news></lineclear>',
     )
-    expect(hidden('Go on', 'automation', { name: 'Fresh "board"' })).toBe('<shepherdr><automation name="Fresh “board”">Go on</automation></shepherdr>')
-    expect(hidden('only instructions')).toBe('<shepherdr>only instructions</shepherdr>')
+    expect(hidden('Go on', 'automation', { name: 'Fresh "board"' })).toBe('<lineclear><automation name="Fresh “board”">Go on</automation></lineclear>')
+    expect(hidden('only instructions')).toBe('<lineclear>only instructions</lineclear>')
     expect(stripHidden(`${hidden('GTM-15 is ready', 'news')}\nhello`)).toBe('hello')
     expect(stripHidden(`${hidden('a > b', 'automation', { name: 'x > y' })}hello`)).toBe('hello')
-    expect(stripHidden(`<shepherdr>[news] GTM-15 is ready</shepherdr>\nhello`)).toBe('hello')
+    expect(stripHidden(`<lineclear>[news] GTM-15 is ready</lineclear>\nhello`)).toBe('hello')
     expect(stripHidden(hidden('only instructions'))).toBe('')
   })
 })
@@ -474,7 +474,7 @@ describe('automations', () => {
       ['On merge', { on: [{ event: 'merged' }] }],
       ['Missed', { time: 'once 2026-10-27 09:00' }],
     ])
-    // a once missed while Shepherdr was down still runs; a daily one counts from now
+    // a once missed while Lineclear was down still runs; a daily one counts from now
     expect(a.dueNow(Z, at('2026-10-28T10:00:00Z')).map((x) => x.name)).toEqual(['Missed'])
     expect(readJson<unknown[]>('automations.json', []).some((x) => 'schedule' in (x as object))).toBe(false)
     writeJson('automations.json', [])

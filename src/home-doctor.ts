@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 /** One problem `lineclear doctor` finds, with the command that fixes it. */
@@ -41,9 +42,21 @@ async function look(vars: Vars): Promise<DoctorProblem[]> {
   }
 }
 
+/** The problems a test or demo run states in its LINECLEAR_DOCTOR_FILE, so a screenshot never shows the host's own findings; undefined when there is no such file. */
+function stated(vars: Vars): DoctorProblem[] | undefined {
+  if (!vars.LINECLEAR_DOCTOR_FILE) return undefined;
+  try {
+    return JSON.parse(readFileSync(vars.LINECLEAR_DOCTOR_FILE, "utf8")) as DoctorProblem[];
+  } catch {
+    return undefined;
+  }
+}
+
 /** The problems of the last look (none when `LINECLEAR_NO_DOCTOR` is set: a timed test must not leave a doctor running); a look is started after the answer, so a page never waits for the doctor. */
 export function doctorProblems(vars: Vars, now = Date.now()): DoctorProblem[] {
   if (vars.LINECLEAR_NO_DOCTOR) return [];
+  const fixed = stated(vars);
+  if (fixed) return fixed;
   const key = vars.LINECLEAR_CONFIG ?? vars.HOME ?? "";
   const last = seen.get(key);
   if (!last || now - last.at >= EVERY_MS) {

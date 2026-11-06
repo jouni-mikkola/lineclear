@@ -1,4 +1,4 @@
-// Module borders and import cycles. The modules and which may import which come from the table in
+// Module borders and import cycles, one gate: both read the same import graph. The modules and which may import which come from the table in
 // docs/architecture.md, so the doc and the check cannot differ.
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, normalize } from "node:path";
@@ -13,7 +13,7 @@ export interface Module {
 
 const ARCHITECTURE = "docs/architecture.md";
 // the server's tsconfig paths
-const ALIASES: Record<string, string> = { "@shared/": "server/shared/", "@client/": "server/src/", "@plugins/": "server/plugins/" };
+const ALIASES: Record<string, string> = { "@shared/": "server/shared/", "@plugins/": "server/plugins/" };
 const CODE = (s: string) => [...s.matchAll(/`([^`]+)`/g)].map((m) => m[1] ?? "");
 
 /** The rows of the modules table: | `name` | `folder/`, `file.ts` | owns | `a`, `b` or none | */
@@ -119,7 +119,7 @@ export const borders: Gate = {
       if (!a || !b || a === b || a.imports.includes(b.name)) continue;
       faults.push({ key: `${e.from} > ${e.to}`, text: `${e.from}:${e.line} imports ${e.to}: ${a.name} may not import ${b.name} (${ARCHITECTURE})` });
     }
-    return faults;
+    return [...faults, ...(await cycleFaults(root))];
   },
 };
 
@@ -157,18 +157,15 @@ export function cyclesOf(graph: Map<string, string[]>): string[][] {
   return groups;
 }
 
-export const cycles: Gate = {
-  name: "cycles",
-  async find(root) {
-    const { edges } = await scan(root);
-    const runtime = edges.filter((e) => !e.typeOnly);
-    const graph = new Map<string, string[]>();
-    for (const e of runtime) graph.set(e.from, [...(graph.get(e.from) ?? []), e.to]);
-    const groupOf = new Map<string, string[]>();
-    for (const group of cyclesOf(graph)) for (const f of group) groupOf.set(f, group);
-    // one fault per import inside a cycle, so breaking one import of a big cycle lowers the count and moves nothing
-    return runtime
-      .filter((e) => groupOf.get(e.from) !== undefined && groupOf.get(e.from) === groupOf.get(e.to))
-      .map((e) => ({ key: `${e.from} > ${e.to}`, text: `${e.from}:${e.line} imports ${e.to}, in a cycle of ${groupOf.get(e.from)?.length} files` }));
-  },
-};
+async function cycleFaults(root: string): Promise<Fault[]> {
+  const { edges } = await scan(root);
+  const runtime = edges.filter((e) => !e.typeOnly);
+  const graph = new Map<string, string[]>();
+  for (const e of runtime) graph.set(e.from, [...(graph.get(e.from) ?? []), e.to]);
+  const groupOf = new Map<string, string[]>();
+  for (const group of cyclesOf(graph)) for (const f of group) groupOf.set(f, group);
+  // one fault per import inside a cycle, so breaking one import of a big cycle lowers the count and moves nothing
+  return runtime
+    .filter((e) => groupOf.get(e.from) !== undefined && groupOf.get(e.from) === groupOf.get(e.to))
+    .map((e) => ({ key: `cycle ${e.from} > ${e.to}`, text: `${e.from}:${e.line} imports ${e.to}, in a cycle of ${groupOf.get(e.from)?.length} files` }));
+}

@@ -10,7 +10,7 @@ done. The rules will read it, so it follows its own format.
   ids or says `none`. A step that is no longer wanted gets a fifth line `dropped: <reason>`. It then counts as done
   for the steps after it.
 - A step is done when a commit on main has a subject `<TASK>: <id> ...`, or a line `Step: <id>` in its message.
-- A step that needs you asks once and waits: `shepherdr ask` until L7, then `lineclear ask`.
+- A step that needs you asks once and waits: `lineclear ask` until L7, then `lineclear ask`.
 - A trial (24 h, 48 h, a week) is waited with `lineclear wait until <time>` (L7). The task merges when it passes.
 - From phase 2 on, each phase is measured before and after with `lineclear measure` (L4). The numbers go to
   `docs/numbers.md` without project names.
@@ -38,8 +38,8 @@ Why: every later step needs a repo, a check, and an install that anyone can run.
 - result: You install Lineclear with one command, and a broken setup tells you how to fix itself.
 - why: every pilot installs with one command, and a broken setup says how to fix itself.
 - done when:
-  - `curl -fsSL <repo>/raw/main/install.sh | sh` first installs the missing tools among git, Bun, herdr and pi. Then it adds Shepherdr 2.0 as a herdr plugin held at `v2.0.0` until the migration (L15) replaces
-    it. It installs Shepherdr from its own repo, so nothing is redistributed. Last it adds Lineclear with its pi
+  - `curl -fsSL <repo>/raw/main/install.sh | sh` first installs the missing tools among git, Bun, herdr and pi. Then it adds herdr-projects 2.0 as a herdr plugin held at `v2.0.0` until the migration (L15) replaces
+    it. It installs Lineclear from its own repo, so nothing is redistributed. Last it adds Lineclear with its pi
     extension and its systemd user service. It uses curl because `bunx` needs Bun first.
   - Until later steps fill them, the service runs a `lineclear run` that stays up and does nothing, and the pi
     extension is empty. L6 and L9 fill them.
@@ -71,7 +71,7 @@ Why: the rules and the numbers can only work from a plan they read without guess
     - an `after` that is unknown or circular
   - `lineclear roadmap status <repo> --space <name> [--json]` gives each step one of five states. Done comes from
     the commits on origin/main as the format says. Dropped comes from the `dropped` line. In work means an open task
-    in that Shepherdr space whose title starts with the id and a space, so `L1` never matches `L10`. Ready means
+    in that Lineclear space whose title starts with the id and a space, so `L1` never matches `L10`. Ready means
     every step in its `after` is done. Waiting is all the rest. L6 passes the space from L5's settings.
   - Tests: a test repo covers every state and every error kind, and this file passes. A generated roadmap of 400
     steps over 12 phases is checked in under 1 s.
@@ -99,7 +99,7 @@ Why: the rules and the numbers can only work from a plan they read without guess
 - why: the before and after of every phase.
 - done when:
   - `lineclear measure <project> --since <date> [--json]` prints, for each day:
-    - asks: needs-you cards in Shepherdr's chat files, and Inbox items once the Inbox exists
+    - asks: needs-you cards in Lineclear's chat files, and Inbox items once the Inbox exists
     - wait: the median minutes from the merge that made a step ready (its last `after`) to the start of its task
     - cost: the equivalent $ per merged step. It is the tokens in its tasks' pi session files at the price of the
       same model in pi's model data. A model with no price there is named, not guessed. A task with no session
@@ -114,10 +114,10 @@ Why: the rules and the numbers can only work from a plan they read without guess
 - why: the rules need to know each project's settings, and none of them may be guessed.
 - done when:
   - `lineclear project add <repo>` writes `~/.config/lineclear/projects/<name>/settings.json` with these fields:
-    - the repo path and its Shepherdr space
+    - the repo path and its Lineclear space
     - the check command, and an optional health command for main
     - an ordered model list for each of the three roles in idea.md
-  - It fills in what it can detect: the space from `shepherdr space list`, the check command from a `check` script
+  - It fills in what it can detect: the space from `lineclear space list`, the check command from a `check` script
     in `package.json` or a `check` target in a `Makefile`. It asks only for what is still missing.
   - `lineclear project list`, `lineclear project remove <name>` and `lineclear project check <name>` work. The check
     says whether the repo exists and its check command runs.
@@ -136,7 +136,7 @@ Why: an AI coordinator that wakes on a timer spends tokens when nothing changed.
   - `lineclear run` ticks every 30 s as the user service from L1. `lineclear run --once --dry-run` prints the
     decisions of one tick and changes nothing.
   - Each tick, for each project: a ready step whose locks are free starts with
-    `shepherdr task add "<id> <title>" --brief <brief> --space <space>` when the space has a free slot. The brief is
+    `lineclear task add "<id> <title>" --brief <brief> --space <space>` when the space has a free slot. The brief is
     made from `templates/brief.md` with the step's why, its done-when and the project's check command.
   - The brief asks for a review before the merge by the first model in L5's reviewer list that comes from another
     company than the worker's model, and tells the agent to merge once that review passes. The reviewer reads the
@@ -148,7 +148,7 @@ Why: an AI coordinator that wakes on a timer spends tokens when nothing changed.
   - When the project's health command fails after a merge, it starts one fix task with the command's output in its
     brief. A second failure in a row stops new starts in that project, and shows in `lineclear status`.
   - Each start, and each reason a ready step did not start, goes to `decisions.jsonl` once, with its reason.
-  - Tests with a fake `shepherdr` cover locks, after, a full space, a broken roadmap, a failing health command and
+  - Tests with a fake `lineclear` cover locks, after, a full space, a broken roadmap, a failing health command and
     a reviewer from the worker's company being skipped.
 - locks: rules
 - after: L1, L2, L5
@@ -160,9 +160,9 @@ Why: an AI coordinator that wakes on a timer spends tokens when nothing changed.
   - `lineclear wait <owner|login|checks|browser> "<reason>"`, `lineclear wait until <time> "<reason>"`,
     `lineclear ask "<question>" --choice <a> --choice <b>` and `lineclear resume` work from inside a task. They find
     the task from its worktree. Each wait and its reason show in `lineclear status`.
-  - An `until` wait holds no slot. The rule loop stops the task with `shepherdr task stop`. At the time it wakes the
-    task with `shepherdr task tell`, which resumes its agent. Until the Inbox (L12) `lineclear ask` posts the
-    question as a `shepherdr ask` card.
+  - An `until` wait holds no slot. The rule loop stops the task with `lineclear task stop`. At the time it wakes the
+    task with `lineclear task tell`, which resumes its agent. Until the Inbox (L12) `lineclear ask` posts the
+    question as a `lineclear ask` card.
   - `lineclear check` runs the project's check command. At most N checks run at once on a machine (a machine
     setting, 2 if unset). A check that waits for its turn is a `checks` wait.
   - A load limit (a machine setting, the number of CPU cores if unset): while the machine's load average is above
@@ -176,7 +176,7 @@ Why: an AI coordinator that wakes on a timer spends tokens when nothing changed.
 - result: A real project runs on the rules for a week and its numbers are written down.
 - why: the proof that rules can replace the AI coordinator.
 - done when:
-  - You pick one project (asked once). Its coordinator is set to regular (`shepherdr mode <space> regular`). It is
+  - You pick one project (asked once). Its coordinator is set to regular (`lineclear mode <space> regular`). It is
     told in its chat that rules now run the project, and its standing requests are cleared. Then `lineclear
     run` drives the project for 48 h.
   - The decisions log for those 48 h shows that no ready step waited more than 5 min for a free slot, and that at
@@ -222,9 +222,9 @@ Why: you are asked only for real decisions, and stalls are cleared without you.
     - a login or a code, with the name of the agent's live playwright-cli browser session to take over
     - an outward action
     - a task stuck after every automatic try
-  - `lineclear inbox answer <n> <choice>` answers one. The answer reaches the task with `shepherdr task tell`.
-  - `lineclear ask` adds an item to the Inbox instead of a `shepherdr ask` card.
-  - Each new item reaches the phone once, with `shepherdr alert`. Nothing else from Lineclear alerts you.
+  - `lineclear inbox answer <n> <choice>` answers one. The answer reaches the task with `lineclear task tell`.
+  - `lineclear ask` adds an item to the Inbox instead of a `lineclear ask` card.
+  - Each new item reaches the phone once, with `lineclear alert`. Nothing else from Lineclear alerts you.
   - The brief template tells workers to raise an outward action with `lineclear ask`.
   - Tests cover each of the five kinds and an answer that reaches its task.
 - locks: inbox
@@ -234,21 +234,21 @@ Why: you are asked only for real decisions, and stalls are cleared without you.
 - result: A stalled agent is nudged and restarted by a rule before it ever asks you.
 - why: a stall is cleared by a rule, not by you.
 - done when:
-  - Shepherdr's `checkStalls` posts a "may be stuck" card after 20 min with no sign of life. Each such card moves its
+  - Lineclear's `checkStalls` posts a "may be stuck" card after 20 min with no sign of life. Each such card moves its
     task to the next rung, unless the task has a declared wait. The rungs in order:
-    1. a reminder with `shepherdr task tell`
-    2. a restart that resumes its session: `shepherdr task stop`, then `shepherdr task tell`
-    3. its role's next model from L5's list: the task is closed with `shepherdr task close`, which keeps a branch
-       with unmerged work, and the step starts again with `shepherdr task add ... --model <next>`. Its brief names
+    1. a reminder with `lineclear task tell`
+    2. a restart that resumes its session: `lineclear task stop`, then `lineclear task tell`
+    3. its role's next model from L5's list: the task is closed with `lineclear task close`, which keeps a branch
+       with unmerged work, and the step starts again with `lineclear task add ... --model <next>`. Its brief names
        the old branch to go on from. Rung 3 runs inside the rule loop's tick, so the loop never starts the step a
        second time. A test shows one start.
     4. an Inbox item
-  - Shepherdr itself handles a task that is out of allowance, signed out or without its provider: its backup agent
-    takes over once when it is another CLI (Shepherdr `server/live/engine/engine.ts:1158-1164`). When Shepherdr
+  - Lineclear itself handles a task that is out of allowance, signed out or without its provider: its backup agent
+    takes over once when it is another CLI (Lineclear `server/live/engine/engine.ts:1158-1164`). When Lineclear
     leaves such a task waiting for you, it goes straight to rung 3.
   - Accounts: a task whose subscription is full, or whose free or extra account ran out, goes straight to rung 3
     with no wait. A model on a paid API key is used only after you allowed it in the Inbox, once per key.
-  - Each rung goes to `decisions.jsonl`. Tests use a fake clock and a fake `shepherdr`, and cover a full
+  - Each rung goes to `decisions.jsonl`. Tests use a fake clock and a fake `lineclear`, and cover a full
     subscription, an ended free account and a paid key that is not yet allowed.
 - locks: rules
 - after: L12
@@ -257,7 +257,7 @@ Why: you are asked only for real decisions, and stalls are cleared without you.
 - result: Routine questions from agents are answered by a rule and never reach you.
 - why: an ask that a rule can answer should never reach you.
 - done when:
-  - The needs-you cards of the last week in Shepherdr's chat files are sorted into kinds in `docs/asks.md`, each
+  - The needs-you cards of the last week in Lineclear's chat files are sorted into kinds in `docs/asks.md`, each
     with its count.
   - The three most frequent kinds that a rule can answer each get that rule and a test, and no longer reach you.
   - The other kinds are listed in `docs/asks.md` with the Inbox kind they become.
@@ -266,29 +266,29 @@ Why: you are asked only for real decisions, and stalls are cleared without you.
 
 ## Phase 5: Own fork
 
-Why: a merge lane with its own rules, and fixes for Shepherdr's known faults, need changes inside Shepherdr.
+Why: a merge lane with its own rules, and fixes for Lineclear's known faults, need changes inside Lineclear.
 
-### L14 Fork Shepherdr 2.0
-- result: Lineclear changes its own server code instead of waiting on Shepherdr 2.0.
+### L14 Fork herdr-projects 2.0
+- result: Lineclear changes its own server code instead of waiting on herdr-projects 2.0.
 - why: from here on, Lineclear changes the server itself.
 - done when:
-  - Shepherdr 2.0 at `ebb17d5` (MIT) is in `server/`, with its LICENSE and a NOTICE that names it.
+  - herdr-projects 2.0 at `ebb17d5` (MIT) is in `server/`, with its LICENSE and a NOTICE that names it.
   - Only names change. Env vars become `LINECLEAR_*` and the data folder becomes `~/.lineclear`. The command is
     `lineclear serve`. The one other change is that each en or em dash in its files becomes a plain mark, so L0's
     dash check passes.
   - Its own tests and type check pass inside `bun run check`. L0's time limit grows by the measured time of the
     server's own check, and the new limit is written in the check.
-  - `lineclear serve --port <free port>` starts beside a running Shepherdr 2.0 and shows an empty board.
+  - `lineclear serve --port <free port>` starts beside a running herdr-projects 2.0 and shows an empty board.
 - locks: server
 - after: L8
 
-### L20 Fix Shepherdr's known faults
-- result: The known faults of Shepherdr 2.0 are gone, so no workaround is left to run.
+### L20 Fix Lineclear's known faults
+- result: The known faults of herdr-projects 2.0 are gone, so no workaround is left to run.
 - why: a fork that keeps its base's faults keeps their workarounds too, and each workaround is one more part to run.
 - done when:
-  - `docs/known-faults.md` lists every fault seen in Shepherdr 2.0 before the fork, each with how it shows and the
+  - `docs/known-faults.md` lists every fault seen in herdr-projects 2.0 before the fork, each with how it shows and the
     workaround people use for it. It includes at least: an agent loses its herdr name right after start, so its
-    brief never arrives and its merge is blocked by messages it never read; `shepherdr ready` without an id crashes;
+    brief never arrives and its merge is blocked by messages it never read; `lineclear ready` without an id crashes;
     a task keeps waiting for a task that is already merged; a merge can land conflict markers on main; a brief typed while pi is still starting is never sent, and the task shows as waiting for you.
   - Each fault has a test that fails on `ebb17d5` and passes on the fork.
   - Each workaround in the list is no longer needed, and the list says so per line.
@@ -296,17 +296,17 @@ Why: a merge lane with its own rules, and fixes for Shepherdr's known faults, ne
 - locks: server
 - after: L14
 
-### L15 Migrate from Shepherdr 2.0
+### L15 Migrate from herdr-projects 2.0
 - result: Your work moves to Lineclear with nothing lost, and one command takes you back.
 - why: your work moves over without loss, and you can go back.
 - done when:
-  - `lineclear migrate --dry-run` lists what it copies from `~/.shepherdr`. That is every space with its settings,
+  - `lineclear migrate --dry-run` lists what it copies from the old data folder. That is every space with its settings,
     and the open tasks with their chats and artifacts. `lineclear migrate` copies them to `~/.lineclear` and never
-    changes `~/.shepherdr`, so Shepherdr 2.0 can start again.
-  - The rule loop, the waits and the Inbox talk to the fork instead of Shepherdr 2.0.
+    changes the old data folder, so herdr-projects 2.0 can start again.
+  - The rule loop, the waits and the Inbox talk to the fork instead of herdr-projects 2.0.
   - Every project runs on the fork for 24 h. Its main-red, needs-you and stall cards are no more than in the 24 h
-    before on Shepherdr 2.0.
-  - Shepherdr 2.0 is stopped, and `lineclear doctor` says so. `install.sh` no longer adds it, and `lineclear
+    before on herdr-projects 2.0.
+  - herdr-projects 2.0 is stopped, and `lineclear doctor` says so. `install.sh` no longer adds it, and `lineclear
     doctor` no longer checks for it.
 - locks: server
 - after: L20
@@ -316,7 +316,7 @@ Why: a merge lane with its own rules, and fixes for Shepherdr's known faults, ne
 - why: with the coordinator gone, a rule decides how each merge lands, and main stays green.
 - done when:
   - A task's agent merges its own task once its review passed, and every merge goes through the lane.
-  - A branch is merged as it is when no commit on main since its base touches its files (Shepherdr 2.0 already
+  - A branch is merged as it is when no commit on main since its base touches its files (herdr-projects 2.0 already
     merges a branch behind main as it is). Otherwise the project's check runs on the merged result first.
   - A conflict goes back to its worker with the conflicting files.
   - After two failed health commands in a row on main, the last merge is reverted, and an Inbox item says so.
@@ -345,7 +345,7 @@ Why: a new project or a change of plan takes one conversation and one approval.
 - why: one chat to ask and steer across projects, with no coordinator per project.
 - done when:
   - The Dispatcher is the coordinator chat of its own space in regular mode, with pi as its agent. That space has
-    no tasks and is not the home space, so no news reaches it (Shepherdr `README.md:371-376`). Its prompt is
+    no tasks and is not the home space, so no news reaches it (Lineclear `README.md:371-376`). Its prompt is
     `templates/dispatcher.md`.
   - Its tools are the commands `lineclear status`, `lineclear plan`, `lineclear move` and `lineclear inbox`.
     `lineclear move <project> <step> --after <ids>` sends a plan change to the Inbox for approval. Its status comes
@@ -384,7 +384,7 @@ brand.
 - result: You see three finished Home designs and pick the look.
 - why: choose the look from finished pictures, not from sketches.
 - done when:
-  - Three finished Home pictures are made at 1440 px with real data from Shepherdr's files, in the stack and the
+  - Three finished Home pictures are made at 1440 px with real data from Lineclear's files, in the stack and the
     one dark graphite theme of idea.md, on U0's tokens. Nothing is asked.
   - Each is graphic first: project progress as tracks, usage and spend as charts, task states as shapes. Text says
     only what a graphic cannot. Each shows answers instead of headings, and the state colours only with their
@@ -421,7 +421,7 @@ brand.
 
 ### U3 Home and Inbox views
 - result: You run your day from Home and the Inbox in the browser.
-- why: these two views replace Shepherdr's UI for daily use.
+- why: these two views replace Lineclear's UI for daily use.
 - done when:
   - Lineclear serves Home at `/` and the Inbox at `/inbox`, built only from U2's parts.
   - Home answers "is all clear?" first, with each project as a progress track and each task as a state shape with
@@ -481,9 +481,9 @@ brand.
 
 ### U5 A week on the new UI
 - result: The new views replace the old UI only after you have judged them.
-- why: the new views replace Shepherdr's UI only when daily use shows that nothing is missing.
+- why: the new views replace Lineclear's UI only when daily use shows that nothing is missing.
 - done when: you use Home, the Inbox, the roadmap view, the agent browsers and Settings for a week, and are asked
-  once what you still opened Shepherdr's UI for. Each thing you name goes to `backlog.md`, or becomes a step
+  once what you still opened Lineclear's UI for. Each thing you name goes to `backlog.md`, or becomes a step
   through the planner.
 - locks: trial
 - after: U3, U4, U7, U8

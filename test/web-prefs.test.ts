@@ -12,15 +12,15 @@ type Answer = { projects: { name: string }[]; usage: { account: string }[]; mont
 const api = () => {
   const dir = mkdtempSync(join(tmpdir(), "lc-prefs-"));
   mkdirSync(join(dir, "config", "projects", "web-shop"), { recursive: true });
-  mkdirSync(join(dir, "shepherdr"), { recursive: true });
-  writeFileSync(join(dir, "shepherdr", "spaces.json"), JSON.stringify([{ key: "WEB", name: "web-shop", path: join(dir, "none") }]));
-  writeFileSync(join(dir, "shepherdr", "tasks.json"), JSON.stringify({ tasks: [], red: {} }));
+  mkdirSync(join(dir, "lineclear"), { recursive: true });
+  writeFileSync(join(dir, "lineclear", "spaces.json"), JSON.stringify([{ key: "WEB", name: "web-shop", path: join(dir, "none") }]));
+  writeFileSync(join(dir, "lineclear", "tasks.json"), JSON.stringify({ tasks: [], red: {} }));
   writeFileSync(join(dir, "config", "projects", "web-shop", "settings.json"), JSON.stringify({ space: "web-shop", repo: join(dir, "none") }));
   const conf = {
     LINECLEAR_CONFIG: join(dir, "config"),
-    LINECLEAR_SHEPHERDR_DIR: join(dir, "shepherdr"),
+    LINECLEAR_HOME: join(dir, "lineclear"),
     PI_CODING_AGENT_DIR: join(dir, "pi"),
-    SHEPHERDR_BIN: "true",
+    LINECLEAR_SERVER_BIN: "true",
     HOME: dir,
   };
   return { dir, handle: webApi(conf) };
@@ -75,9 +75,9 @@ test("paused projects and the test space leave Home until Settings asks for them
 test("/api/home lists the projects of `project list` (paused shown), not the Dispatcher's space, and the loose task of another", async () => {
   const dir = mkdtempSync(join(tmpdir(), "lc-exact-"));
   const spaces = ["a", "b", "c", "Dispatcher", "orphan"];
-  mkdirSync(join(dir, "shepherdr"), { recursive: true });
-  writeFileSync(join(dir, "shepherdr", "spaces.json"), JSON.stringify(spaces.map((name, i) => ({ name, key: `K${i}`, path: join(dir, name) }))));
-  writeFileSync(join(dir, "shepherdr", "tasks.json"), JSON.stringify({ tasks: [{ id: "K4-1", title: "Loose work", created: 1, updated: 2 }], red: {} }));
+  mkdirSync(join(dir, "lineclear"), { recursive: true });
+  writeFileSync(join(dir, "lineclear", "spaces.json"), JSON.stringify(spaces.map((name, i) => ({ name, key: `K${i}`, path: join(dir, name) }))));
+  writeFileSync(join(dir, "lineclear", "tasks.json"), JSON.stringify({ tasks: [{ id: "K4-1", title: "Loose work", created: 1, updated: 2 }], red: {} }));
   for (const n of ["a", "b", "c"]) {
     mkdirSync(join(dir, "config", "projects", n), { recursive: true });
     writeFileSync(
@@ -89,9 +89,9 @@ test("/api/home lists the projects of `project list` (paused shown), not the Dis
   writeFileSync(bin, `#!/bin/sh\necho '[{"id":"K4-1","status":"work"}]'\n`, { mode: 0o755 });
   const conf = {
     LINECLEAR_CONFIG: join(dir, "config"),
-    LINECLEAR_SHEPHERDR_DIR: join(dir, "shepherdr"),
+    LINECLEAR_HOME: join(dir, "lineclear"),
     PI_CODING_AGENT_DIR: join(dir, "pi"),
-    SHEPHERDR_BIN: bin,
+    LINECLEAR_SERVER_BIN: bin,
   };
   const handle = webApi(conf);
   await handle(json("/api/prefs", { showPaused: true }));
@@ -109,12 +109,12 @@ test("/api/home lists exactly `project list` less the paused and the test space,
   const dir = mkdtempSync(join(tmpdir(), "lc-except-"));
   const bin = join(dir, "task-list.sh");
   writeFileSync(bin, "#!/bin/sh\necho '[]'\n", { mode: 0o755 });
-  mkdirSync(join(dir, "shepherdr"), { recursive: true });
+  mkdirSync(join(dir, "lineclear"), { recursive: true });
   writeFileSync(
-    join(dir, "shepherdr", "spaces.json"),
+    join(dir, "lineclear", "spaces.json"),
     JSON.stringify(["a", "b", "c", "Dispatcher"].map((name, i) => ({ name, key: `K${i}`, path: join(dir, name) }))),
   );
-  writeFileSync(join(dir, "shepherdr", "tasks.json"), JSON.stringify({ tasks: [], red: {} }));
+  writeFileSync(join(dir, "lineclear", "tasks.json"), JSON.stringify({ tasks: [], red: {} }));
   for (const [n, extra] of [
     ["a", {}],
     ["b", {}],
@@ -129,9 +129,9 @@ test("/api/home lists exactly `project list` less the paused and the test space,
   }
   const conf = {
     LINECLEAR_CONFIG: join(dir, "config"),
-    LINECLEAR_SHEPHERDR_DIR: join(dir, "shepherdr"),
+    LINECLEAR_HOME: join(dir, "lineclear"),
     PI_CODING_AGENT_DIR: join(dir, "pi"),
-    SHEPHERDR_BIN: bin,
+    LINECLEAR_SERVER_BIN: bin,
   };
   const handle = webApi(conf);
   const listed = async () =>

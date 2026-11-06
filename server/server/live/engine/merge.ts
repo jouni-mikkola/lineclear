@@ -4,8 +4,11 @@ import type { Space } from '../places.ts'
 import * as G from './git.ts'
 import * as GH from './github.ts'
 import * as Lane from './lane.ts'
-import { type TaskRec, ended, ANSWER_GRACE } from './engine-helpers.ts'
+import { type TaskRec, ended, ANSWER_GRACE, CHECKS_EVERY } from './engine-helpers.ts'
 import { EngineHandoff } from './engine-handoff.ts'
+
+/** how long a merge waits for a merge queue to run its check and merge the pull request */
+const QUEUE_WAIT_MS = 15 * 60_000
 
 export class EngineLand extends EngineHandoff {
   /**
@@ -101,7 +104,7 @@ export class EngineLand extends EngineHandoff {
   }
 
   /**
-   * Shepherdr stops (an update restarts it, as one right after a merge into its own repo does): the merges on their
+   * Lineclear stops (an update restarts it, as one right after a merge into its own repo does): the merges on their
    * way finish first, at most their deadline, so none is cut halfway (merged on GitHub, never marked, its agent never
    * told). A caller whose merge goes on longer asks again; that joins the merge or finds it merged. No new one starts meanwhile. True when there was one to wait for.
    */
@@ -222,6 +225,14 @@ export class EngineLand extends EngineHandoff {
     const [wt, base] = [t.worktree!, t.base!]
     if ((await G.aheadCount(wt, base)) === 0 || (await G.landed(wt, 'HEAD', base))) return undefined
     const command = Lane.projectCheck(p.path)
+    // the full check runs on GitHub, on the pull request (mergeOnGitHub waits for it): nothing runs here
+    if (this.settings.ways(p.name).checkWhere === 'github') {
+      if (await this.hub(p)) return undefined
+      return {
+        ok: false,
+        error: `Setting Full check runs is github, but ${p.name} has no GitHub remote gh can use here (gh auth login). Nothing was merged.`,
+      }
+    }
     // no check set for the project: nothing is assumed about its tools, and the merge goes on as before
     if (!command) return undefined
     // one full check at a time in this repo; a real change by the task (not a message) makes it leave the line
@@ -258,7 +269,7 @@ export class EngineLand extends EngineHandoff {
    * Through the pull request, as herdr-projects lands one: the branch pushed as it is, rebased on GitHub's main only
    * when it conflicts with it (its pull request opened if the agent didn't), GitHub's checks passed at exactly that
    * commit, then squash-merged on GitHub only while its head is still that commit, its branch there deleted, and main here brought up to GitHub's (which
-   * is what Shepherdr's own update watches). Failed checks go back to the agent.
+   * is what Lineclear's own update watches). Failed checks go back to the agent.
    */
   protected async mergeOnGitHub(t: TaskRec, p: Space, g: G.GitHub, self: boolean): Promise<{ ok: boolean; error?: string; note?: string }> {
     const wt = t.worktree!
@@ -318,7 +329,8 @@ export class EngineLand extends EngineHandoff {
       if (pr.isDraft) await GH.readyPr(g, wt, pr.number)
     }
     const n = t.pr!.number
-    const wait = t.waitChecks ?? this.settings.ways(p.name).waitChecks
+    const ways = this.settings.ways(p.name)
+    const wait = ways.checkWhere === 'github' || (t.waitChecks ?? ways.waitChecks)
     // not waited for (Settings): its own quick checks passed, and GitHub's run on, here and then on main
     // (watchMain); only a failure GitHub already shows at this very commit stops it
     const now = wait || pushing ? undefined : await GH.prChecks(g, wt, n)
@@ -342,7 +354,15 @@ export class EngineLand extends EngineHandoff {
       return { ok: false, error: `${why} Sent back to ${t.id}'s agent to fix.` }
     }
     const m = await GH.mergePr(g, wt, n, head, `${t.id}: ${t.title} (#${n})`, [t.said, t.facts && `Facts: ${t.facts}`].filter(Boolean).join('\n\n'))
-    if ((await GH.viewPr(g, wt, n))?.state !== 'MERGED') {
+    let state = (await GH.viewPr(g, wt, n))?.state
+    // a repo with a merge queue only queues the pull request: GitHub's full check runs there and merges it when green
+    if (state !== 'MERGED' && /merge queue|automatically merged|auto-merge/i.test(`${m.out}\n${m.err}`)) {
+      for (const t0 = Date.now(); state === 'OPEN' && Date.now() - t0 < QUEUE_WAIT_MS; ) {
+        await Bun.sleep(CHECKS_EVERY)
+        state = (await GH.viewPr(g, wt, n))?.state
+      }
+    }
+    if (state !== 'MERGED') {
       const said = (m.err || m.out || 'it did not say why').split('\n')[0]
       // main moved on GitHub since it was fetched: merging again rebases it if it now conflicts (Merging meanwhile)
       if (/conflict|not mergeable/i.test(said)) this.land(t, 'rebase')
@@ -357,7 +377,7 @@ export class EngineLand extends EngineHandoff {
     return this.mergedOnGitHub(t, p, `merged PR #${n} on GitHub${wait ? '' : ', not waiting for its checks'}`)
   }
 
-  /** main here comes up to GitHub's, so the merge is here too (and Shepherdr's own update sees it), then it is marked */
+  /** main here comes up to GitHub's, so the merge is here too (and Lineclear's own update sees it), then it is marked */
   protected async mergedOnGitHub(t: TaskRec, p: Space, note: string) {
     const up = await G.catchUp(p.path, t.base!)
     return this.markMerged(t, up.ok ? note : `${note}; ${t.base} here is not up to date: ${up.err}`)

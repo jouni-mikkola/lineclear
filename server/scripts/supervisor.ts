@@ -94,7 +94,7 @@ export class Supervisor {
     })
     if (!r) return
     if (r.state === 'failed') {
-      this.d.log(`update to ${r.commit.slice(0, 7)} failed; the running Shepherdr stays as it was\n${r.error}`)
+      this.d.log(`update to ${r.commit.slice(0, 7)} failed; the running Lineclear stays as it was\n${r.error}`)
       return this.save({ ...r, release: this.current })
     }
     // a restart would cut a voice call short: wait until none is on, with new ones stopped from that moment on
@@ -130,7 +130,7 @@ export class Supervisor {
       state: 'failed',
       commit: r.commit,
       subject: r.subject,
-      error: "the new version stopped as it started:\nsee Shepherdr's server.log",
+      error: "the new version stopped as it started:\nsee Lineclear's server.log",
     })
     this.trial = null
   }

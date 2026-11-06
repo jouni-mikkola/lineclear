@@ -18,7 +18,7 @@ const KEPT_START = 160;
 const MARK = "[Result of ";
 
 export const NEVER = new Set(["write", "edit"]);
-const CHAT = /(?:^|[\s;&|("'])(?:\S*\/)?(?:shepherdr|lineclear)\s+(?:chat|ask|reply|say|wait|resume)\b/;
+const CHAT = /(?:^|[\s;&|("'])(?:\S*\/)?lineclear\s+(?:chat|ask|reply|say|wait|resume)\b/;
 const NOTES = /lineclear-notes-/;
 
 function configuredAfter(env: Env): number {

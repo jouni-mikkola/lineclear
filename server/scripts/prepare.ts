@@ -26,7 +26,7 @@ export function dependenciesPresent(root: string): boolean {
 export async function prepare(root: string, bun = process.execPath): Promise<string | null> {
   // A manifest cannot prove that nested imports or native dependencies survived an interrupted install.
   // Reuse the release's server check before taking down an older server; a healthy checkout needs no install.
-  if (existsSync(join(root, 'dist', 'index.html')) && dependenciesPresent(root) && !(await checkServer(root, bun))) return null
+  if (dependenciesPresent(root) && !(await checkServer(root, bun))) return null
   const installed = await run([bun, 'install', '--frozen-lockfile'], root)
   if (!installed.ok) return `bun install failed:\n${installed.out}`
   if (!dependenciesPresent(root)) return 'bun install finished without the required dependencies; startup stopped.'

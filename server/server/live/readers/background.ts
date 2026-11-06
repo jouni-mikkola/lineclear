@@ -161,7 +161,7 @@ const PROC_MS = 2000
 /**
  * The headless reviewers that run for each chat: a reviewer of another CLI is a shell to Claude Code, but it will wake
  * the agent once it ends, like a subagent, however long it takes. Its environment says whose it is (LINECLEAR_CHAT,
- * which every agent Shepherdr starts has, and its shells after it): read from /proc, or where there is none (macOS)
+ * which every agent Lineclear starts has, and its shells after it): read from /proc, or where there is none (macOS)
  * from `ps -E`, which prints each command with its environment after it.
  */
 /** a headless CLI that runs: its words, since when, and its process (where /proc tells) */

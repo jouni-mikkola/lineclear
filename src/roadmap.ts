@@ -59,6 +59,8 @@ export interface Task {
   closedBy?: "done" | "close";
   /** Its worktree is gone and its agent has been dead for over 2 h: nothing runs for it, so it holds no locks. */
   orphaned?: boolean;
+  /** The owner stopped it: writing to it starts it again, so no rule writes to it. */
+  stopped?: boolean;
 }
 
 const HEADING = /^### (\S+)(?: (.*))?$/;

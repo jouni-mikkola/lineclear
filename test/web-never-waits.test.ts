@@ -9,13 +9,13 @@ const dir = tmp("never-waits");
 let server: ReturnType<typeof serveWeb>;
 
 beforeAll(async () => {
-  for (const d of ["config", "shepherdr", "dist"]) mkdirSync(join(dir, d), { recursive: true });
+  for (const d of ["config", "lineclear", "dist"]) mkdirSync(join(dir, d), { recursive: true });
   writeFileSync(join(dir, "dist", "index.html"), "<!doctype html><title>x</title>");
   writeFileSync(join(dir, "dist", "favicon.ico"), "ico");
   // a doctor file marks a test run: a real server also starts the heal child at once, which takes the CPU the timed requests need
   const settings = {
     LINECLEAR_CONFIG: join(dir, "config"),
-    LINECLEAR_SHEPHERDR_DIR: join(dir, "shepherdr"),
+    LINECLEAR_HOME: join(dir, "lineclear"),
     LINECLEAR_DOCTOR_FILE: join(dir, "none.json"),
     HOME: dir,
   };

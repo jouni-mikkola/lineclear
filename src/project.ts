@@ -24,6 +24,8 @@ export type Settings = {
   models: Record<Role, string[]>;
   /** Review rounds a worker may use before the step asks the owner. 2 if unset. */
   reviewRounds?: number;
+  /** Wall time in minutes a task may run before it is stopped with a report. 120 if unset. */
+  taskLimitMin?: number;
   /** `spend` (default) holds no step for pace, only for a full account; `even` holds off-critical steps when every account is ahead of its weekly pace. */
   pace?: "spend" | "even";
   /** Other machines (SSH hosts) that may run this project's steps when this one has no room. */
@@ -107,7 +109,7 @@ export function setupGate(env = process.env): string | undefined {
   return missing.length ? `no model chosen for the ${missing.join(", ")}: run 'lineclear setup'` : undefined;
 }
 
-/** The space whose folder is this repo, from `shepherdr space list`, or undefined. */
+/** The space whose folder is this repo, from `lineclear space list`, or undefined. */
 export function detectSpace(repo: string, env = process.env): string | undefined {
   let listing: string;
   try {
@@ -115,7 +117,7 @@ export function detectSpace(repo: string, env = process.env): string | undefined
     if (p.exitCode !== 0) return undefined;
     listing = p.stdout.toString();
   } catch {
-    return undefined; // no shepherdr to ask
+    return undefined; // no lineclear to ask
   }
   for (const line of listing.split("\n")) {
     const cols = line.trim().split(/\s{2,}/);

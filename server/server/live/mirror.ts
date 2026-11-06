@@ -2,7 +2,7 @@ import { LinkBackoff } from './recovery.ts'
 // The main machine's copy of another machine's agent logs, kept as they grow: the helper's mirror.pl there sends what
 // each followed file gains, over one SSH connection, and it is written here under the worker's store (mfs.mirrored).
 // The readers then read these copies as they read this machine's own logs: Claude Code's, Codex's and pi's
-// transcripts, Claude Code's session files, and the hook events of the agents Shepherdr started there.
+// transcripts, Claude Code's session files, and the hook events of the agents Lineclear started there.
 import { closeSync, mkdirSync, openSync, readdirSync, statSync, writeSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { helperDir, spawnOn, type BoxInfo } from './box.ts'
@@ -39,7 +39,7 @@ export class Mirror {
     if (lines.length) this.write([...kept, ...lines])
   }
 
-  /** how much of a newly followed folder's files (or file) is here already, from before Shepherdr started again: only
+  /** how much of a newly followed folder's files (or file) is here already, from before Lineclear started again: only
    *  the rest is sent, so what the agents write now isn't stuck behind days of logs sent again */
   private kept(path: string, dir: boolean): string[] {
     const lines: string[] = []

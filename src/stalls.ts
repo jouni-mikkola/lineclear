@@ -1,4 +1,5 @@
-import { chatFiles, findSpace, shepherdrDir } from "./measure.ts";
+import { closeWithReport, limitWallTime } from "./stall-close.ts";
+import { chatFiles, findSpace, lineclearDir } from "./measure.ts";
 import { herdrArgv } from "./herdr.ts";
 import { addItem, isOpen, readItems } from "./inbox.ts";
 import { resultFlag, type Step, stepOfTask, type Task } from "./roadmap.ts";
@@ -16,6 +17,7 @@ import { stepBrief } from "./brief.ts";
 import { rankByRoom } from "./pace.ts";
 import { failedChecks } from "./routine.ts";
 import type { Decision, State, World } from "./rules.ts";
+import { DAY } from "./time.ts";
 export interface StallCard {
   id: string;
   task: string;
@@ -24,7 +26,7 @@ export interface StallCard {
   late?: boolean;
 }
 
-/** The "may be stuck" cards Shepherdr's `checkStalls` posted, oldest first. */
+/** The "may be stuck" cards Lineclear's `checkStalls` posted, oldest first. */
 export function stallCards(files: any[]): StallCard[] {
   const seen = new Map<string, StallCard>();
   for (const f of files) {
@@ -43,7 +45,7 @@ export function stallCards(files: any[]): StallCard[] {
 }
 
 export function realStallCards(space: string, repo: string, env = process.env): StallCard[] {
-  const dir = shepherdrDir(env);
+  const dir = lineclearDir(env);
   const s = findSpace(dir, space, repo);
   return s ? stallCards(chatFiles(dir, s)) : [];
 }
@@ -70,7 +72,7 @@ function chatCards(files: any[]): ChatCard[] {
 }
 
 export function realChatCards(space: string, repo: string, env = process.env): ChatCard[] {
-  const dir = shepherdrDir(env);
+  const dir = lineclearDir(env);
   const s = findSpace(dir, space, repo);
   return s ? chatCards(chatFiles(dir, s)) : [];
 }
@@ -131,7 +133,7 @@ export function askKey(model: string, _world: World, now: Date, env = process.en
   const question = keyQuestion(provider);
   if (readItems(env).some((i) => i.question === question && isOpen(i))) return undefined;
   const last = keyAnswer(provider, env);
-  if (last?.answer === "Not now" && now.getTime() - new Date(last.answeredAt ?? 0).getTime() < DAY_MS) return undefined;
+  if (last?.answer === "Not now" && now.getTime() - new Date(last.answeredAt ?? 0).getTime() < DAY) return undefined;
   addItem({ kind: "outward", task: "-", question, choices: ["Allow", "Not now"], since: now.toISOString() }, env);
   return `asked in the Inbox before using the paid key of ${provider}`;
 }
@@ -219,7 +221,6 @@ function markLimitedReviewers(a: Args): void {
 // ---- the ladder ----
 
 const MAX_RUNG = 4;
-const DAY_MS = 86_400_000;
 const LEFT_WAITING = /^signed out/i;
 
 /** What the task list shows for a task in Needs you that asks nothing (the server's `NEED.reply`). */
@@ -392,10 +393,8 @@ function climb(p: Pass, t: Task, rung: number, why: string): boolean {
   const { world, dryRun, note } = p.a;
   const id = t.id!;
   if (rung !== 1 && rung !== 2) return rung === 3 ? handover(p, t, why) : ask(p, t, why);
-  if (dryRun) {
-    note("stall", `rung ${rung}: would ${rung === 1 ? "remind" : "restart"} ${id} (${why})`, id);
-    return true;
-  }
+  if (rung === 1 && t.status === "work" && why.startsWith("no sign")) return closeWithReport(p.a, p.now, p.ladderOf(id), p.gone, t, why);
+  if (dryRun) return (note("stall", `rung ${rung}: would ${rung === 1 ? "remind" : "restart"} ${id} (${why})`, id), true);
   const err = rung === 1 ? world.tellTask(id, REMINDER, "resume") : restartTask(world, id);
   if (err) {
     note("skip", `rung ${rung} for ${id} failed: ${err}`, id);
@@ -454,7 +453,7 @@ function escalateRoutine(p: Pass): void {
   }
 }
 
-/** Tasks that cannot go on: a full account, or Shepherdr left them waiting for you. Straight to rung 3, no waiting. */
+/** Tasks that cannot go on: a full account, or Lineclear left them waiting for you. Straight to rung 3, no waiting. */
 function handOverStuck(p: Pass): void {
   const { env } = p.a;
   for (const t of p.a.tasks) {
@@ -555,6 +554,7 @@ export function serviceStalls(a: Args): Set<string> {
   const skip = new Set([...[...p.waiting].filter((id) => !failed.has(id)), ...p.gone]);
   serviceStarts({ project, world, state, dryRun, tasks: a.tasks, skip, failed, note, env });
 
+  limitWallTime(p.a, p.now, p.ladderOf, p.gone, p.waiting);
   climbStalled(p);
   return p.restarted;
 }
@@ -590,7 +590,7 @@ export function pickReviewer(
   return reviewers.find((m) => ok(m) && company(m) !== company(worker)) ?? reviewers.find((m) => ok(m) && m !== worker);
 }
 
-/** The reviewer of a started task: Shepherdr's Settings first, then the project's list. */
+/** The reviewer of a started task: Lineclear's Settings first, then the project's list. */
 export function reviewerFor(worker: string, settings: Settings, world: World, offered: Set<string> | undefined, env = process.env, now = world.now()) {
   const first = world.reviewerSetting(settings.space);
   const list = first === undefined ? settings.models.reviewer : [first, ...settings.models.reviewer.filter((m) => m !== first)];

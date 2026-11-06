@@ -97,7 +97,7 @@ describe('Queued after other tasks', () => {
     const { w, a, b, bkey } = await chain('queued')
     expect(b.after).toEqual([a.t.id])
     const first = w.started.find((s) => s.key === bkey)!.first!
-    // the brief, with the default way of working Shepherdr ends it with, then the wait
+    // the brief, with the default way of working Lineclear ends it with, then the wait
     expect(first.startsWith('Second\n\nAdd b.txt.\n\nSettings:')).toBe(true)
     expect(first).toContain('\n\nQueued: this task waits for')
     expect(first).toContain(a.t.id)
@@ -116,7 +116,7 @@ describe('Queued after other tasks', () => {
     expect(w.engine.statusOf(b)).toBe('queued')
     expect((await w.engine.merge(a.t.id, { self: true })).ok).toBe(true)
     const go = w.sent.find((s) => s.key === bkey)!
-    expect(go.text).toBe(`<shepherdr><go>Go: ${a.t.id} is done, start now.\n${a.t.id} (First): Added a.txt.</go></shepherdr>`)
+    expect(go.text).toBe(`<lineclear><go>Go: ${a.t.id} is done, start now.\n${a.t.id} (First): Added a.txt.</go></lineclear>`)
     expect(w.posted.some((x) => x.key === bkey && x.id.startsWith('go:'))).toBe(true)
     expect(b.after).toBeUndefined()
     expect(w.engine.statusOf(b)).toBe('work')
@@ -216,7 +216,7 @@ describe('Queued after other tasks', () => {
     w.engine.queue(b.id, [a.t.id, c.id], { self: true })
     expect(w.sent.length).toBe(n)
     expect(w.engine.queue(b.id, [])).toEqual({ queued: [], went: true })
-    expect(w.sent.at(-1)!.text).toBe(`<shepherdr><go>Go: you no longer wait for ${a.t.id}, ${c.id}, start now.</go></shepherdr>`)
+    expect(w.sent.at(-1)!.text).toBe(`<lineclear><go>Go: you no longer wait for ${a.t.id}, ${c.id}, start now.</go></lineclear>`)
     expect(w.engine.statusOf(b)).toBe('work')
     // nothing to clear
     expect(w.engine.queue(b.id, [])).toEqual({ queued: [] })
@@ -280,7 +280,7 @@ describe('Queued after other tasks', () => {
     expect(w.engine.statusOf(w.engine.task(id(2))!)).toBe('queued')
     w.engine.resumeQueue()
     expect(w.engine.statusOf(w.engine.task(id(2))!)).toBe('queued')
-    expect(w.sent.find((x) => x.key === `${id(3)}/Agent`)?.text).toBe('<shepherdr><go>Go: X-1 is done, start now.</go></shepherdr>')
+    expect(w.sent.find((x) => x.key === `${id(3)}/Agent`)?.text).toBe('<lineclear><go>Go: X-1 is done, start now.</go></lineclear>')
     // seen at work: it is not sent again
     w.agentIs(`${id(3)}/Agent`, 'working')
     expect(w.engine.task(id(3))!.going).toBeUndefined()
@@ -308,7 +308,7 @@ describe('Queued after other tasks', () => {
     theirs = { id: 'ELA-3', name: 'Their API', status: 'ready', outcome: 'done', said: 'The API is up.' }
     w.engine.recheck()
     expect(w.sent.find((s) => s.key === `${t.id}/Agent`)!.text).toBe(
-      '<shepherdr><go>Go: vm-x:ELA-3 is done, start now.\nvm-x:ELA-3 (Their API): The API is up.</go></shepherdr>',
+      '<lineclear><go>Go: vm-x:ELA-3 is done, start now.\nvm-x:ELA-3 (Their API): The API is up.</go></lineclear>',
     )
   })
 

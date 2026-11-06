@@ -1,4 +1,4 @@
-// Reads a shepherdr command line: positional words and --options (repeatable ones collect into lists).
+// Reads a lineclear command line: positional words and --options (repeatable ones collect into lists).
 import { splitFacts, STATUS_MAX, SUMMARY_MAX, TITLE_MAX } from '../../shared/types.ts'
 
 export interface Parsed {
@@ -65,7 +65,8 @@ Spaces (a folder on a machine with a name and its own coordinator; each machine 
                                                  the heartbeat); the human edits it in Settings → coordinator timer too
 
 Tasks (coordinators add them; only when the human asks, or on coordinator timer)
-  lineclear task add "<title>" --brief "<the brief>" [--result "<one sentence: what the owner sees or does once it lands>"] [--space NAME] [--base BRANCH] [--after SHE-12,SHE-13] [--later]
+  lineclear room [MACHINE]    a machine's load, cores, free memory, tasks at work and slots, as JSON
+  lineclear task add "<title>" --brief "<the brief>" [--result "<one sentence: what the owner sees or does once it lands>"] [--space NAME] [--base BRANCH] [--after SHE-12,SHE-13] [--later] [--on MACHINE]
                                                  [--set KEY=VALUE ...] [--agent CLI] [--model ID] [--effort LEVEL]
                                                  [--reviewer CLI] [--reviewer-model ID] [--reviewer-effort LEVEL]
                                                  the title at most ${TITLE_MAX} characters (it fits one line on a phone);
@@ -231,7 +232,7 @@ Settings and automations
 
 Setup
   lineclear secret elevenlabs                    store the ElevenLabs key for voice calls (reads it from stdin)
-  shepherdr doctor                               check every machine saved in herdr; put its helper there again (main machine)
+  lineclear doctor                               check every machine saved in herdr; put its helper there again (main machine)
   lineclear status                               spaces, open tasks, herdr, and done tasks that kept work
                                                  (with a task's id: that task's progress, above)
 `

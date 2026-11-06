@@ -12,7 +12,7 @@ const name = () => 'a phone'
 beforeEach(() => writeJson('push.json', []))
 
 test('valid contact, stable keys and per-instance signing options', async () => {
-  for (const bad of ['mailto:shepherdr@localhost', 'https://localhost', 'https://127.0.0.1', 'http://example.com', 'garbage'])
+  for (const bad of ['mailto:lineclear@localhost', 'https://localhost', 'https://127.0.0.1', 'http://example.com', 'garbage'])
     expect(pushContact(bad)).toBe(DEFAULT_PUSH_CONTACT)
   expect(pushContact('mailto:admin@example.com')).toBe('mailto:admin@example.com')
   expect(pushContact('https://example.com/contact')).toBe('https://example.com/contact')
@@ -21,7 +21,7 @@ test('valid contact, stable keys and per-instance signing options', async () => 
     calls.push(opts!)
     return response
   }
-  const a = new Push('mailto:shepherdr@localhost', sender)
+  const a = new Push('mailto:lineclear@localhost', sender)
   a.subscribe(sub('a'), 'private browser user agent')
   const keys = readJson('vapid.json', {})
   const b = new Push('mailto:admin@example.com', sender)

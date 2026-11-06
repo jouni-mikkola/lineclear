@@ -33,7 +33,6 @@ if (args[0] === 'install') {
   }
 } else if (args[0] === 'run') {
   if (mode === 'build fails') { console.error('broken screen'); process.exit(1); }
-  if (mode !== 'no screen') { mkdirSync('dist', { recursive: true }); writeFileSync('dist/index.html', 'screen'); }
 } else if (mode === 'nested missing' && !existsSync('installed')) { console.error('missing nested import'); process.exit(1);
 } else if (mode === 'server fails') { console.error('missing server import'); process.exit(1); }
 `,
@@ -48,14 +47,11 @@ test('clean first start installs before building and checks the server', async (
   expect(await prepare(f.root, f.bun)).toBeNull()
   expect(f.calls().split('\n').slice(0, 2)).toEqual(['install --frozen-lockfile', 'run build'])
   expect(f.calls()).toContain('build ')
-  expect(existsSync(join(f.root, 'dist/index.html'))).toBe(true)
 })
 
-test('an empty node_modules is incomplete, including when a screen exists', async () => {
+test('an empty node_modules is incomplete', async () => {
   const f = fixture()
   mkdirSync(join(f.root, 'node_modules'))
-  mkdirSync(join(f.root, 'dist'))
-  writeFileSync(join(f.root, 'dist/index.html'), 'old screen')
   expect(dependenciesPresent(f.root)).toBe(false)
   expect(await prepare(f.root, f.bun)).toBeNull()
   expect(f.calls()).toStartWith('install --frozen-lockfile\nrun build\n')
@@ -73,7 +69,6 @@ for (const [mode, message] of [
   ['install fails', 'registry unavailable'],
   ['install incomplete', 'without the required dependencies'],
   ['build fails', 'broken screen'],
-  ['no screen', 'the build failed'],
   ['server fails', "server code doesn't load"],
 ])
   test(`${mode} stops preparation clearly`, async () => {
@@ -129,7 +124,7 @@ test('failed preparation leaves an existing server answering and reports failure
     })
     const [code, stderr] = await Promise.all([command.exited, new Response(command.stderr).text()])
     expect(code).toBe(1)
-    expect(stderr).toContain('Shepherdr preparation failed')
+    expect(stderr).toContain('Lineclear preparation failed')
     expect(stderr).toContain('broken-checkout')
     expect(old.exitCode).toBeNull()
     expect((await fetch(`http://127.0.0.1:${port}/api/snapshot`)).ok).toBe(true)
@@ -151,8 +146,6 @@ test('an exports-only package with missing files is incomplete', async () => {
 
 test('a missing nested server import is repaired even with an existing screen and package entry', async () => {
   const f = fixture('nested missing')
-  mkdirSync(join(f.root, 'dist'))
-  writeFileSync(join(f.root, 'dist/index.html'), 'screen')
   mkdirSync(join(f.root, 'node_modules/example'), { recursive: true })
   writeFileSync(join(f.root, 'node_modules/example/package.json'), '{"main":"index.js"}')
   writeFileSync(join(f.root, 'node_modules/example/index.js'), '')

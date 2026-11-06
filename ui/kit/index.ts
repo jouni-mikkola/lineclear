@@ -5,7 +5,7 @@ export { Lightbox } from "./chat-files.tsx";
 export * from "./no-dispatcher.tsx";
 export * from "./markdown.tsx";
 export * from "./motion.ts";
-export * from "./charts.tsx";
+export * from "./spend-charts.tsx";
 export * from "./parts.tsx";
 export * from "./project.tsx";
 export * from "./settings.tsx";

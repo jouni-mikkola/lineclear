@@ -5,6 +5,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadMeter } from "../src/check-runs.ts";
+import { loadFactor } from "./check-speed.ts";
 
 export interface Numbers {
   [name: string]: number | string[];
@@ -15,9 +16,6 @@ export interface Numbers {
 // (size, layout shift, memory) do not depend on the load and stay absolute. The server's idle CPU does grow with it:
 // on a busy machine its timers run in cold caches, so it is read against the load too.
 const TIMES = new Set(["firstViewMs", "largestPaintMs", "homeAnswerMs", "idleCpuPercent"]);
-
-/** How much longer than on an idle machine a run may take: the run's load per core, never below 1. */
-export const loadFactor = (load: number, cores: number): number => Math.max(1, load / Math.max(1, cores));
 
 /** The numbers of a run over their limits, as one line each; none when all hold. `factor` stretches the time limits. */
 export function broken(budgets: Record<string, unknown>, got: Numbers, factor = 1): string[] {

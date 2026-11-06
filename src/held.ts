@@ -6,11 +6,11 @@ import type { Task } from "./roadmap.ts";
 
 const HELD_SUB = "Waiting for a free slot";
 
-/** The brief of a task as the owner wrote it, from `shepherdr task show --json`: Shepherdr ends every brief with its own Settings block, which the new task gets again. */
+/** The brief of a task as the owner wrote it, from `lineclear task show --json`: Lineclear ends every brief with its own Settings block, which the new task gets again. */
 export function briefOf(showJson: string): string | undefined {
   try {
     const desc = JSON.parse(showJson)?.desc;
-    return typeof desc === "string" ? desc.replace(/\n+Settings: \(from shepherdr show[\s\S]*$/, "").trim() : undefined;
+    return typeof desc === "string" ? desc.replace(/\n+Settings: \(from lineclear show[\s\S]*$/, "").trim() : undefined;
   } catch {
     return undefined;
   }

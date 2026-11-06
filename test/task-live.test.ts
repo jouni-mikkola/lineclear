@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { PAGE_TOKEN } from "../src/web.ts";
-import { startFakeShepherdr } from "../ui/test/fake-shepherdr-server.ts";
+import { startFakeLineclear } from "../ui/test/fake-lineclear-server.ts";
 import { freshWebApi, until } from "./helpers.ts";
 
 const origin = "http://127.0.0.1:7420";
@@ -13,7 +13,7 @@ const post = (path: string, body: unknown, token = true) =>
   });
 
 test("a task lists only its own artifacts and passes a sealed page on", async () => {
-  const fake = startFakeShepherdr({ task: true });
+  const fake = startFakeLineclear({ task: true });
   try {
     const { handle } = freshWebApi(fake.url);
     const list = (await (await handle(get("/api/task/WEB-3/artifacts"))).json()) as { id: string; versions: { n: number }[] }[];
@@ -30,7 +30,7 @@ test("a task lists only its own artifacts and passes a sealed page on", async ()
 });
 
 test("the terminal shows the screen and takes words and keys from own pages only", async () => {
-  const fake = startFakeShepherdr({ task: true });
+  const fake = startFakeLineclear({ task: true });
   try {
     const { handle } = freshWebApi(fake.url);
     let view: { state: string; ansi: string } = { state: "", ansi: "" };

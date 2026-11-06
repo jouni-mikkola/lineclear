@@ -171,7 +171,7 @@ export function limitOf(machine: unknown, cores: number): number {
 }
 
 /** The check slots of a machine: `checkSlots` when set, else one per 1 / slotsPerCore cores (slotsPerCore 0.5 if unset), at least 1. */
-export function slotsOf(machine: unknown, cores: number): number {
+function slotsOf(machine: unknown, cores: number): number {
   const set = positive((machine as { checkSlots?: unknown } | null)?.checkSlots)
   if (set !== undefined) return Math.floor(set) || 1
   const per = positive((machine as { slotsPerCore?: unknown } | null)?.slotsPerCore)
@@ -262,7 +262,7 @@ export const dropReleaseHold = (env: Env = process.env) => {
 }
 
 /** Slots held by a live process now. */
-function slotsHeld(env: Env): number {
+export function slotsHeld(env: Env): number {
   try {
     return readdirSync(slotsDir(env)).filter((f) => {
       if (!f.startsWith('slot-')) return false

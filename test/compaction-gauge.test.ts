@@ -9,7 +9,7 @@ const DAY = 86_400_000;
 
 test("Home's compaction card counts the last 14 days of the notes' log and divides the tokens by the tasks merged in them", () => {
   const root = tmp("gauge");
-  const env = { HOME: root, LINECLEAR_STATE: join(root, "state"), LINECLEAR_SHEPHERDR_DIR: join(root, "store") };
+  const env = { HOME: root, LINECLEAR_STATE: join(root, "state"), LINECLEAR_HOME: join(root, "store") };
   expect(compactionGauge(1_000, env, NOW)).toEqual({ compactions: 0, fellBack: 0, tasks: 0, tokensPerTask: null });
   mkdirSync(join(root, "state", "pack"), { recursive: true });
   const at = (days: number) => new Date(NOW - days * DAY).toISOString();

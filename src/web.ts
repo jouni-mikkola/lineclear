@@ -4,10 +4,8 @@ import { browsers } from "./browsers.ts";
 import type { HomeData, PiSpend } from "./home-data.ts";
 import { type ProjectsFeed, projectsFeed, readProjects as readProjectsNow } from "./projects-feed.ts";
 import { machinesView } from "./machines.ts";
-import { readMachines } from "./machine-list.ts";
 import type { RoadmapRead } from "./roadmap-view.ts";
 import { type Aside, readAside } from "./read-aside.ts";
-import { syncSecretsIfChanged } from "./secret-sync.ts";
 import { type Pusher, realPush, watchInbox } from "./notify.ts";
 import { refreshRemotes } from "./remotes.ts";
 import { dispatcherChat, taskChatLinks } from "./chat.ts";
@@ -67,11 +65,10 @@ function keptAside<T>(read: () => Promise<T>, ms: number, now: () => number): Ke
  * order of a role's models, in the files the CLI writes.
  * `GET /api/chat/events` streams the Dispatcher's chat as server-sent events, `POST /api/chat` with
  * `{"text": "...", "files": [ids], "cid": "..."}` sends it a message, `POST /api/chat/files` with `{"name": "...", "data": base64}` attaches a
- * file through Shepherdr and gives its id, `GET /api/chat/file?path=` reads a file of the chat from Shepherdr, and
+ * file through Lineclear and gives its id, `GET /api/chat/file?path=` reads a file of the chat from Lineclear, and
  * `GET /api/chat/image?path=` shows an image the Dispatcher names from its own folders. `POST /api/chat/answer` with
  * `{"question": id, "choice": n}` answers a card the Dispatcher asked with. `/api/task/<id>/chat` and its `/events`, `/file`, `/image`, `/files`, `/answer`, `/react` are the same for the chat of one task with its agent. `GET /api/plans` lists each plan started
  * with `lineclear plan`, newest first: its goal, where it stands, the steps it adds, and its open Inbox item.
- * `GET /api/stalls?hours=24` gives the stalls of the last hours by class, with the minutes lost (`lineclear stalls`).
  * Projects are read again at most once a second. The slow reads run aside, in a process of their own, and answer
  * with the last value while a new one is read: each roadmap at most once a second (one older than a minute is waited
  * for), spend and usage, from pi's session files, once a minute. `/api/home` never waits for a slow read: spend and usage are
@@ -124,7 +121,7 @@ export function webApi(
     }
     return k;
   };
-  // Home and the Inbox read the tasks from the same copy: reading them runs shepherdr and git, so a server with a feed
+  // Home and the Inbox read the tasks from the same copy: reading them runs lineclear and git, so a server with a feed
   // takes them from the feed's thread and never waits; one without reads them here, once a second (tests, the demo)
   const readProjects = async (t: number) => {
     if (feed) return feed.ready();
@@ -218,17 +215,6 @@ export function serveWeb(dir: string, address = webAddress(), env: Env = process
     (p) => (unwatch = watchInbox(p, env as NodeJS.ProcessEnv)),
     (e) => console.error(`lineclear: no push: ${(e as Error).message}`),
   );
-  // a change in the login secrets folder reaches every machine, so none asks the owner for what it could answer itself
-  const resend = setInterval(
-    () =>
-      void syncSecretsIfChanged(
-        readMachines(env)
-          .filter((m) => m.state === "ready")
-          .map((m) => m.host),
-        env,
-      ),
-    30_000,
-  );
   let server: ReturnType<typeof Bun.serve>;
   try {
     server = Bun.serve({
@@ -252,7 +238,6 @@ export function serveWeb(dir: string, address = webAddress(), env: Env = process
   } catch (e) {
     // a port in use must not leave the feed's thread reading
     projects?.stop();
-    clearInterval(resend);
     throw e;
   }
   const stop = server.stop.bind(server);
@@ -261,7 +246,6 @@ export function serveWeb(dir: string, address = webAddress(), env: Env = process
     unwatchFolder();
     clearTimeout(changed);
     projects?.stop();
-    clearInterval(resend);
     return stop(force);
   };
   return server;

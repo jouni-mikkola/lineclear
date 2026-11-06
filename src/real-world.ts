@@ -2,14 +2,15 @@ import { mkdtempSync, rmSync, statSync } from "node:fs";
 import { loadavg, tmpdir } from "node:os";
 import { join } from "node:path";
 import { herdrWorld, readServers } from "./herdr-world.ts";
-import { codeCommit, codeVersion, serverBin } from "./paths.ts";
+import { serverBin } from "./paths.ts";
+import { forgetTaskReads, readTasks } from "./task-read.ts";
 import { briefOf } from "./held.ts";
 import { piHarness } from "./harness-pi.ts";
-import { shepherdrDir } from "./measure.ts";
+import { lineclearDir } from "./measure.ts";
 import { mainRefs } from "./main-branch.ts";
 import { readProofs } from "./doneproof.ts";
 import { proveStep } from "./doneproof-run.ts";
-import { fitTitle, type Task } from "./roadmap.ts";
+import { fitTitle } from "./roadmap.ts";
 import { readRoom, startOn } from "./spread.ts";
 import { agentLastError, realChatCards, realStallCards } from "./stalls.ts";
 import { agentStart, nudgePane } from "./starts.ts";
@@ -44,9 +45,9 @@ const run: Run = (cmd, cwd) => {
   }
 };
 
-/** What a tick reads once: `shepherdr` reads until a command changes a task, and the memos until the next tick. */
+/** What a tick reads once: `lineclear` reads until a command changes a task, and the memos until the next tick. */
 function readers() {
-  // `shepherdr task list` and `show` each start a process of their own: read each once, until a command changes a task.
+  // `lineclear task list` and `show` each start a process of their own: read each once, until a command changes a task.
   let reads = new Map<string, ReturnType<Run>>();
   // chat files and main's refs are read once a tick: the ladder and the stall detectors both look at them
   let memos = new Map<string, unknown>();
@@ -59,6 +60,7 @@ function readers() {
     },
     change(cmd: string[]) {
       reads = new Map();
+      forgetTaskReads();
       return run(cmd);
     },
     memo<T>(key: string, f: () => T): T {
@@ -66,6 +68,7 @@ function readers() {
     },
     newTick() {
       reads = new Map();
+      forgetTaskReads();
       memos = new Map();
     },
   };
@@ -147,52 +150,47 @@ function gitWorld(
   };
 }
 
-/** The `shepherdr` side of the world: tasks, slots, and the commands that change a task. */
+/** The `lineclear` side of the world: tasks, slots, and the commands that change a task. */
 function taskWorld(
-  shepherdr: string,
+  lineclear: string,
   io: Readers,
   env: NodeJS.ProcessEnv,
 ): Pick<World, "tasks" | "maxTasks" | "reviewerSetting" | "briefOf" | "stopTask" | "tellTask" | "closeTask" | "addTask" | "addTaskOn"> {
   // a done task has no pane: refused here, before the server and herdr are asked
   const doneTask = (id: string) =>
-    taskStatus(run([shepherdr, "task", "show", id, "--json"]).out) === "done" ? `${id} is Done already: it has no agent, so nothing is sent to it.` : undefined;
+    taskStatus(run([lineclear, "task", "show", id, "--json"]).out) === "done" ? `${id} is Done already: it has no agent, so nothing is sent to it.` : undefined;
   return {
     tasks(space, archived) {
-      const r = io.read([shepherdr, "task", "list", "--space", space, "--json", ...(archived ? ["--archived"] : [])]);
-      if (r.code !== 0) return `task list failed: ${(r.err || r.out).trim()}`;
-      try {
-        return JSON.parse(r.out) as Task[];
-      } catch {
-        return "task list did not give JSON";
-      }
+      const r = readTasks(env, space, archived);
+      return "tasks" in r ? r.tasks : `task list failed: ${r.why}`;
     },
     maxTasks(space) {
-      const r = io.read([shepherdr, "show", "--space", space]);
+      const r = io.read([lineclear, "show", "--space", space]);
       const m = /^machine\.maxTasks\s+(\d+)/m.exec(r.out);
       return r.code === 0 && m ? Number(m[1]) : undefined;
     },
     reviewerSetting(space) {
-      const r = io.read([shepherdr, "show", "--space", space]);
+      const r = io.read([lineclear, "show", "--space", space]);
       const m = /^reviewer\.model\s+(\S+\/\S+)/m.exec(r.out);
       return r.code === 0 && m ? m[1] : undefined;
     },
-    briefOf: (id) => briefOf(run([shepherdr, "task", "show", id, "--json"]).out),
-    stopTask: (id) => doneTask(id) ?? failure(io.change([shepherdr, "task", "stop", id])),
+    briefOf: (id) => briefOf(run([lineclear, "task", "show", id, "--json"]).out),
+    stopTask: (id) => doneTask(id) ?? failure(io.change([lineclear, "task", "stop", id])),
     // The mark tells the agent's log apart from a message of the owner (see ownerWrote), and a resume from other lines.
-    tellTask: (id, text, kind) => doneTask(id) ?? failure(io.change([shepherdr, "task", "tell", id, `${ownMark(kind)} ${text}`])),
-    closeTask: (id) => failure(io.change([shepherdr, "task", "close", id, "--force"])),
-    addTask: (space, title, brief, extra) => failure(io.change([shepherdr, "task", "add", fitTitle(title), "--brief", brief, "--space", space, ...extra])),
+    tellTask: (id, text, kind) => doneTask(id) ?? failure(io.change([lineclear, "task", "tell", id, `${ownMark(kind)} ${text}`])),
+    closeTask: (id) => failure(io.change([lineclear, "task", "close", id, "--force"])),
+    addTask: (space, title, brief, extra) => failure(io.change([lineclear, "task", "add", fitTitle(title), "--brief", brief, "--space", space, ...extra])),
     addTaskOn(host, settings, title, brief, extra, project) {
       const o = run(["git", "-C", settings.repo, "remote", "get-url", "origin"]);
       if (o.code !== 0) return `${settings.repo} has no origin to clone on ${host}`;
-      return startOn(host, settings.space, o.out.trim(), fitTitle(title), brief, extra, env, project ? { name: project, check: settings.check } : undefined);
+      return startOn(host, settings.space, o.out.trim(), fitTitle(title), brief, extra, env, project ? { name: project } : undefined);
     },
   };
 }
 
 /** The agents' side of the world: their sessions, panes, stall cards and chat. */
 function agentWorld(io: Readers, env: NodeJS.ProcessEnv): Pick<World, "stallCards" | "chatCards" | "started" | "lastError" | "nudge" | "ownerWrote" | "clean"> {
-  const tasksFile = join(shepherdrDir(env), "tasks.json");
+  const tasksFile = join(lineclearDir(env), "tasks.json");
   const sessionsOf = (worktree: string) => piHarness.sessionFolderPath(worktree, env);
   return {
     stallCards: (space, repo) => io.memo(`stall\0${space}\0${repo}`, () => realStallCards(space, repo, env)),
@@ -231,7 +229,7 @@ export function realWorld(env = process.env): World {
     newTick: io.newTick,
     offered: offeredModels(env),
     load: () => loadavg()[0] ?? 0,
-    room: (host, space) => readRoom(host, space, env, { version: codeVersion(), commit: codeCommit() }),
+    room: (host, space) => readRoom(host, space, env),
     proofs: (repo) => readProofs(repo, env),
     proveStep: (settings, step, head, tools) =>
       proveStep({ repo: settings.repo, step, ref: refsOf(settings.repo)[0], head, reviewers: settings.models.reviewer, env, now: new Date(), tools }),

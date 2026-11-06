@@ -1,6 +1,5 @@
 import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { secretsFolder } from "./secrets.ts";
 
 /** The nearest folder above a path that is a git checkout (a repo or a worktree), or null. The home folder never counts. */
 function checkoutOf(path: string, home: string): string | null {
@@ -23,13 +22,12 @@ function entries(dir: string): string[] {
 }
 
 /** Every file Lineclear's install writes or pi reads for it: the paths inside each, and where a link leads. */
-function installedFiles(unitDir: string, piDir: string, data: string, bin: string, env: Record<string, string | undefined>): string[] {
+function installedFiles(unitDir: string, piDir: string, data: string, bin: string): string[] {
   return [
     ...entries(unitDir).filter((f) => /^lineclear.*\.(service|timer)$/.test(f.slice(unitDir.length + 1))),
     ...entries(join(piDir, "extensions")).filter((f) => /^lineclear/.test(f.slice(join(piDir, "extensions").length + 1))),
     join(piDir, "settings.json"),
     ...entries(join(data, "helper", "bin")),
-    join(dirname(secretsFolder(env)), "load.sh"),
     bin,
   ];
 }
@@ -38,7 +36,7 @@ function installedFiles(unitDir: string, piDir: string, data: string, bin: strin
 export function checkoutPointers(unitDir: string, piDir: string, data: string, bin: string, env: Record<string, string | undefined> = process.env): string[] {
   const home = env.HOME ?? "";
   const found: string[] = [];
-  for (const file of installedFiles(unitDir, piDir, data, bin, env)) {
+  for (const file of installedFiles(unitDir, piDir, data, bin)) {
     let stat: ReturnType<typeof lstatSync>;
     try {
       stat = lstatSync(file);

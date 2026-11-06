@@ -26,8 +26,8 @@ function draw(d){
   document.getElementById('b').innerHTML = d.merged.map(function(v, i){ return '<i style="height:' + Math.max(6, Math.round(v / max * 100)) + '%"' + (v === max ? ' class="hi"' : '') + '></i>' }).join('');
   document.getElementById('d').innerHTML = d.days.map(function(x){ return '<span>' + x + '</span>' }).join('');
 }
-draw(shepherdr.data);
-document.addEventListener('shepherdr:data', function(e){ draw(e.detail) });
+draw(lineclear.data);
+document.addEventListener('lineclear:data', function(e){ draw(e.detail) });
 </script>`
 
 const DISK = `<style>
@@ -81,8 +81,8 @@ button{font:inherit;font-weight:500;height:32px;padding:0 12px;border:0;border-r
 <div class="sent" id="s" hidden><svg viewBox="0 0 16 16"><path fill-rule="evenodd" d="M12.416 3.376a.75.75 0 0 1 .208 1.04l-5 7.5a.75.75 0 0 1-1.154.114l-3-3a.75.75 0 0 1 1.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 0 1 1.04-.207Z" clip-rule="evenodd"/></svg><span id="t"></span></div>
 <script>
 function done(text){ var v = String(text).split(': ').pop(); document.getElementById('f').hidden = true; document.getElementById('s').hidden = false; document.getElementById('t').textContent = 'Sent: Pinned colour =\\u00a0' + v }
-if (shepherdr.sent) done(shepherdr.sent);
-document.addEventListener('shepherdr:sent', function(e){ done(e.detail.text) });
+if (lineclear.sent) done(lineclear.sent);
+document.addEventListener('lineclear:sent', function(e){ done(e.detail.text) });
 </script>`
 
 /** a deck: one slide inline, every slide and arrows full screen */

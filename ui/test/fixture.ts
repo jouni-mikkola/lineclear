@@ -1,4 +1,4 @@
-// The files the views read in the UI bar's tests: Shepherdr's spaces and tasks, and Lineclear's Inbox.
+// The files the views read in the UI bar's tests: Lineclear's spaces and tasks, and Lineclear's Inbox.
 import { expect, type Page } from "@playwright/test";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -16,7 +16,7 @@ export interface FixtureTask {
   title: string;
   told?: string;
   merged?: boolean;
-  /** Its status line in `shepherdr task list`, such as "in review". */
+  /** Its status line in `lineclear task list`, such as "in review". */
   sub?: string;
 }
 
@@ -49,7 +49,7 @@ export function writeTasks(tasks: FixtureTask[], o: { need?: string[]; red?: str
     return repo;
   };
   write(
-    join(FIXTURE, "shepherdr", "spaces.json"),
+    join(FIXTURE, "lineclear", "spaces.json"),
     names.map(([key, name]) => ({ key, name, path: path(name) })),
   );
   // Home lists Lineclear projects, so each space has its project
@@ -60,14 +60,14 @@ export function writeTasks(tasks: FixtureTask[], o: { need?: string[]; red?: str
       check: "true",
       models: { worker: [], reviewer: [], planner: [] },
     });
-  write(join(FIXTURE, "shepherdr", "tasks.json"), {
+  write(join(FIXTURE, "lineclear", "tasks.json"), {
     tasks: tasks.map((t, i) => ({ ...t, updated: i + 1, ...(t.merged ? { doneAt: i + 1 } : {}) })),
     red: marks,
   });
-  write(join(FIXTURE, "shepherdr", "chatlog", "cards.json"), {
+  write(join(FIXTURE, "lineclear", "chatlog", "cards.json"), {
     posted: need.map((task, i) => ({ at: i + 1, card: { task, status: "need", text: `Card of ${task}` } })),
   });
-  // what `shepherdr task list` says: a task waits for you when it is in `need`
+  // what `lineclear task list` says: a task waits for you when it is in `need`
   for (const [key, name] of names) {
     const status = (t: FixtureTask) => (need.includes(t.id) ? "need" : t.merged ? "done" : t.told === "work" ? "work" : "queued");
     writeSpaceTasks(
@@ -86,7 +86,7 @@ export function writeItem(
 
 function clearFixture() {
   for (const d of [
-    "shepherdr",
+    "lineclear",
     "config/inbox",
     "config/machines.json",
     "config/machine.json",
@@ -94,9 +94,10 @@ function clearFixture() {
     "browsers.json",
     "browser-inputs.log",
     "ssh.log",
-    "doctor.json",
   ])
     rmSync(join(FIXTURE, d), { recursive: true, force: true });
+  // the doctor of the run finds nothing, so no picture shows the host's own findings
+  write(join(FIXTURE, "doctor.json"), []);
 }
 
 // The agents' browsers: the open playwright-cli sessions that ui/test/fake-playwright-cli lists, and the code it ran.
@@ -229,7 +230,7 @@ function recordSteps(project: string, tasks: { id: string; title: string }[]) {
 }
 
 export function writeSpaceTasks(space: string, tasks: { id: string; title: string; status: string; sub?: string }[]) {
-  write(join(FIXTURE, "shepherdr", `task-list-${space}.json`), tasks);
+  write(join(FIXTURE, "lineclear", `task-list-${space}.json`), tasks);
 }
 
 /** A merge on origin/main, as a task's merge makes it, with what changed in the repo's folder. */
@@ -346,7 +347,7 @@ const BILLING = `# Roadmap
 
 /** billing-api as a project with a roadmap of one step, its tasks as the fixture wrote them: a link to its roadmap then finds one. */
 export function writeBillingRoadmap() {
-  const tasks = JSON.parse(readFileSync(join(FIXTURE, "shepherdr", "task-list-billing-api.json"), "utf8"));
+  const tasks = JSON.parse(readFileSync(join(FIXTURE, "lineclear", "task-list-billing-api.json"), "utf8"));
   writeRoadmapProject("billing-api", BILLING, [{ subject: "API-1: B0 Webhooks that retry", at: T0 }], tasks);
 }
 
@@ -451,8 +452,8 @@ export function startEmpty() {
   writeFileSync(join(NEW_REPO, "package.json"), JSON.stringify({ scripts: { check: "true" } }));
   writeFileSync(join(NEW_REPO, "bun.lock"), "");
   writeFileSync(join(NEW_REPO, "docs", "ROADMAP.md"), "# Roadmap\n");
-  mkdirSync(join(FIXTURE, "shepherdr"), { recursive: true });
-  writeFileSync(join(FIXTURE, "shepherdr", "space-list.txt"), `new-shop  ${NEW_REPO}\n`);
+  mkdirSync(join(FIXTURE, "lineclear"), { recursive: true });
+  writeFileSync(join(FIXTURE, "lineclear", "space-list.txt"), `new-shop  ${NEW_REPO}\n`);
 }
 
 /** Merges a roadmap web-shop's check refuses, has the page read again, and waits until the server answers 422 for it. */

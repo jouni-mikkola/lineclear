@@ -1,4 +1,4 @@
-// Shepherdr's own small files: what herdr can't tell it (projects, modes, update cards, drafts, push devices).
+// Lineclear's own small files: what herdr can't tell it (projects, modes, update cards, drafts, push devices).
 // One folder, ~/.lineclear unless LINECLEAR_HOME says otherwise; each file is plain JSON, written whole.
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'

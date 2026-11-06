@@ -1,4 +1,4 @@
-// L76 on L31's fresh machine: installs this commit with install.sh into an empty HOME, then runs scripts/one-name.ts
+// On a fresh machine: installs this commit with install.sh into an empty HOME, then runs scripts/one-name.ts
 // there. Exits 1 when a user sees the old product's name.
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";

@@ -8,7 +8,7 @@ import { IDLE_TEXT } from "./cards.ts";
 import { fileOutsideFixes } from "./outside-fix.ts";
 import { fileFixes } from "./self-fix.ts";
 import { decisionsPath } from "../pi/config.ts";
-import { CLASS_INFO, type Observation, rotateDecisions, type StallClass, taskObservations, watchStalls, writeDaily } from "./stall-class.ts";
+import { CLASS_INFO, type Observation, type StallClass, cutDecisionsDaily, taskObservations, watchStalls } from "./stall-class.ts";
 import { readWaits } from "./waits.ts";
 import { watchWaste } from "./waste-watch.ts";
 
@@ -133,12 +133,11 @@ function unanswered(starts: State["starts"] = {}): Record<string, { since: numbe
   return Object.fromEntries(Object.entries(starts).flatMap(([id, s]) => (!s.acted && s.rung > 0 ? [[id, { since: s.since }]] : [])));
 }
 
-/** After every project's tick: the fixes to file, then once a day the summary and the archive. The new decisions. */
+/** After every project's tick: the fixes to file, then once a day the archive. The new decisions. */
 export function afterTick(world: World, all: Decision[], env = process.env): Decision[] {
   const filed = [...fileFixes(world, decisionsPath(env), all, env), ...watchWaste(world, env)];
   fileOutsideFixes(world, env);
   if (filed.length > 0) appendFileSync(decisionsPath(env), `${filed.map((d) => JSON.stringify(d)).join("\n")}\n`);
-  // once a day, with the daily summary, old lines go to the archive
-  if (writeDaily(decisionsPath(env), world.now(), env)) rotateDecisions(decisionsPath(env), world.now());
+  cutDecisionsDaily(decisionsPath(env), world.now());
   return filed;
 }

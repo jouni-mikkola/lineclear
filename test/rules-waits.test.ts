@@ -57,7 +57,7 @@ test("an outward ask for an action on this machine alone reaches no owner: the t
   expect(ask(t, ["Publish the release after a reboot?", "--choice", "Go", "--choice", "No", "--kind", "outward"]).code).toBe(0);
 });
 
-test("ask adds an Inbox item, calls no shepherdr alert, and declares a wait; no shepherdr ask card", () => {
+test("ask adds an Inbox item, calls no lineclear alert, and declares a wait; no lineclear ask card", () => {
   const t = setup();
   expect(ask(t, ["Which one?", "--choice", "a", "--choice", "b", "--kind", "outward"]).code).toBe(0);
   expect(t.calls()).toEqual([]);
@@ -213,14 +213,16 @@ test("a wait for the owner without a kind is refused, and so is a kind that is n
   }
 });
 
+/** Stores logins where every task of the project can load them. */
+function storeLogins(t: ReturnType<typeof setup>, values: Record<string, string>) {
+  const home = t.env.LINECLEAR_HOME as string;
+  mkdirSync(home, { recursive: true });
+  writeFileSync(join(home, "vault.json"), JSON.stringify({ all: Object.fromEntries(Object.entries(values).map(([k, value]) => [k, { value, at: 1 }])) }));
+}
+
 test("an ask or a wait about a login with a loadable TOTP is refused, and one without names the missing NAME", () => {
   const t = setup();
-  const folder = t.env.LINECLEAR_SECRETS_FOLDER as string;
-  mkdirSync(join(folder, "machine"), { recursive: true });
-  writeFileSync(join(folder, "common.env"), "M365_GA_TOTP='JBSWY3DPEHPK3PXP'\n");
-  // a TOTP kept in another repo's file is not loaded here, so it does not stand in for this login's
-  mkdirSync(join(folder, "owner"), { recursive: true });
-  writeFileSync(join(folder, "owner", "other-repo.env"), "ZZ_TOTP='JBSWY3DPEHPK3PXP'\n");
+  storeLogins(t, { M365_GA_TOTP: "JBSWY3DPEHPK3PXP" });
   expect(ask(t, ["Approve the push for ZZ", "--choice", "Done", "--choice", "No", "--kind", "login", "--login", "ZZ"], "LIN-7").code).toBe(0);
   const push = ["Approve the push, number 65?", "--choice", "Done", "--choice", "No", "--kind", "login"];
   const refused = ask(t, [...push, "--login", "M365_GA"]);
@@ -242,17 +244,15 @@ test("an ask or a wait about a login with a loadable TOTP is refused, and one wi
 
 test("a login wait for the owner is refused when the TOTP is loadable, and must name the missing NAME", async () => {
   const t = setup();
-  const folder = t.env.LINECLEAR_SECRETS_FOLDER as string;
-  mkdirSync(folder, { recursive: true });
-  writeFileSync(join(folder, "common.env"), "M365_GA_TOTP='JBSWY3DPEHPK3PXP'\n");
+  storeLogins(t, { M365_GA_TOTP: "JBSWY3DPEHPK3PXP" });
   const refused = await run(t, "wait", ["owner", "--kind", "login", "M365_GA_TOTP is not stored"]);
   expect(refused.code).toBe(1);
-  expect(refused.text).toContain("cc-totp M365_GA");
+  expect(refused.text).toContain("lineclear totp M365_GA");
   expect((await run(t, "wait", ["owner", "--kind", "login", "Approve the push, number 65"])).code).toBe(1);
   // no login named and a TOTP stored: sent back to it
   const entra = await run(t, "wait", ["owner", "--kind", "login", "Sign in to Entra"]);
   expect(entra.code).toBe(1);
-  expect(entra.text).toContain("cc-totp M365_GA");
+  expect(entra.text).toContain("lineclear totp M365_GA");
   expect((await run(t, "wait", ["owner", "--kind", "login", "JIRA_TOTP is not stored"])).code).toBe(0);
   // the plain login wait is the same door, and a captcha stays the owner's
   expect((await run(t, "wait", ["login", "Approve the push, number 65"])).code).toBe(1);
@@ -272,15 +272,13 @@ test("a cheap command named to lineclear check takes no turn; a bun test of a wh
 
 test("a login wait is sent back to a stored USER and PASSWORD login its text names, and reaches the owner when none matches", async () => {
   const t = setup();
-  const folder = t.env.LINECLEAR_SECRETS_FOLDER as string;
-  mkdirSync(folder, { recursive: true });
-  writeFileSync(join(folder, "common.env"), "JIRA_USER='me'\nJIRA_PASSWORD='hunter2hunter2'\n");
+  storeLogins(t, { JIRA_USER: "me", JIRA_PASSWORD: "hunter2hunter2" });
   const sent = await run(t, "wait", ["owner", "--kind", "login", "Sign in to Jira"]);
   expect(sent.code).toBe(1);
   expect(sent.text).toContain("a stored login exists: JIRA");
-  expect(sent.text).toContain("load.sh");
+  expect(sent.text).toContain("lineclear secret run");
   expect(sent.text).not.toContain("hunter2");
-  expect(sent.text).not.toContain("cc-totp");
+  expect(sent.text).not.toContain("lineclear totp");
   // no stored login matches the site and no TOTP exists: the wait must say what is missing, and then it stands
   expect((await run(t, "wait", ["owner", "--kind", "login", "Sign in to Entra"])).code).toBe(2);
   expect((await run(t, "wait", ["owner", "--kind", "login", "ENTRA_TOTP is not stored"])).code).toBe(0);

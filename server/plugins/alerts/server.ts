@@ -8,4 +8,4 @@ export default definePlugin({
 // Alerts: push notifications to the installed web app. All machines' coordinator (on coordinator timer or not) picks what
 // buzzes and says why.
 // They only buzz when the app is closed or in the background: with the app on screen, alerts show nothing.
-// What an alert says and where it opens: shared/alerts.ts; showing them: public/sw.js.
+// What an alert says and where it opens: shared/alerts.ts.

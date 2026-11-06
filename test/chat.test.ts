@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { checkUpload, dispatcherChat, MAX_FILE_BYTES, MAX_FILES, parseSend, taskChatLinks } from "../src/chat.ts";
 import { PAGE_TOKEN, type webApi } from "../src/web.ts";
-import { DISPATCHER_KEY, startFakeShepherdr } from "../ui/test/fake-shepherdr-server.ts";
+import { DISPATCHER_KEY, startFakeLineclear } from "../ui/test/fake-lineclear-server.ts";
 import { freshWebApi, until } from "./helpers.ts";
 
 const dirs: string[] = [];
@@ -48,8 +48,8 @@ test("an upload is refused when too big, empty, of a type not taken, or not what
   expect(checkUpload("latin.txt", new Uint8Array([0xff, 0xfe, 0x41]))).toEqual({ error: "latin.txt is not text." });
 });
 
-test("POST /api/chat/files saves a file through Shepherdr for the Dispatcher, checked, and only from its own pages", async () => {
-  const fake = startFakeShepherdr();
+test("POST /api/chat/files saves a file through Lineclear for the Dispatcher, checked, and only from its own pages", async () => {
+  const fake = startFakeLineclear();
   try {
     const { handle } = api(fake.url);
     await viewWhen(handle, (v) => v.state === "ready");
@@ -57,11 +57,11 @@ test("POST /api/chat/files saves a file through Shepherdr for the Dispatcher, ch
     expect(r.status).toBe(201);
     const saved = (await r.json()) as any;
     expect(saved).toMatchObject({ name: "screen shot.png", size: PNG.length, image: true });
-    // Shepherdr saved it in its inbox, for the Dispatcher's chat
+    // Lineclear saved it in its inbox, for the Dispatcher's chat
     const path = decodeURIComponent(saved.url.replace("/api/chat/file?path=", ""));
     expect(path.startsWith(fake.inbox)).toBe(true);
     expect(readFileSync(path)).toEqual(Buffer.from(PNG));
-    // read back from Shepherdr: an image inline, never sniffed
+    // read back from Lineclear: an image inline, never sniffed
     const back = await handle(req(saved.url));
     expect(back.status).toBe(200);
     expect(back.headers.get("content-type")).toBe("image/png");
@@ -113,8 +113,8 @@ test("POST /api/chat/files saves a file through Shepherdr for the Dispatcher, ch
   }
 });
 
-test("a message and its files reach the Dispatcher's chat in Shepherdr, with each file's path", async () => {
-  const fake = startFakeShepherdr();
+test("a message and its files reach the Dispatcher's chat in Lineclear, with each file's path", async () => {
+  const fake = startFakeLineclear();
   try {
     const { handle } = api(fake.url);
     await viewWhen(handle, (v) => v.state === "ready");
@@ -123,7 +123,7 @@ test("a message and its files reach the Dispatcher's chat in Shepherdr, with eac
     expect(r.status).toBe(202);
     const path = decodeURIComponent(up.url.replace("/api/chat/file?path=", ""));
     expect(fake.actions).toEqual([{ type: "send", chat: DISPATCHER_KEY, text: "Read this, please", attachments: [path], cid: "c1" }]);
-    // the Dispatcher reads it where the path says, in Shepherdr's inbox
+    // the Dispatcher reads it where the path says, in Lineclear's inbox
     expect(readFileSync(fake.actions[0].attachments[0], "utf8")).toBe("# Plan\n");
     expect(dirname(dirname(path))).toBe(fake.inbox);
 
@@ -134,7 +134,7 @@ test("a message and its files reach the Dispatcher's chat in Shepherdr, with eac
     expect(v.messages[0]).toMatchObject({ who: "you", text: "Read this, please", cid: "c1" });
     expect(v.messages[1]).toMatchObject({ who: "you", cid: "c1", file: { name: "notes.md", image: false, size: 7, url: up.url } });
     expect(v.messages[2]).toMatchObject({ who: "dispatcher", text: expect.stringContaining("Line clear.") });
-    // a file attached in Shepherdr's own chat shows here too, read through Shepherdr
+    // a file attached in Lineclear's own chat shows here too, read through Lineclear
     fake.setChat({ messages: [{ id: "s1", who: "you", file: { name: "shot.png", path: join(dirname(path), "zz1-shot.png") } }] });
     const theirs = await viewWhen(handle, (v) => v.messages.length === 1);
     expect(theirs.messages[0].file).toEqual({
@@ -155,11 +155,11 @@ test("a message and its files reach the Dispatcher's chat in Shepherdr, with eac
   }
 });
 
-test("a send Shepherdr is slow to take says so, not offline", async () => {
-  const fake = startFakeShepherdr({ slowMs: 300 });
+test("a send Lineclear is slow to take says so, not offline", async () => {
+  const fake = startFakeLineclear({ slowMs: 300 });
   const dir = mkdtempSync(join(tmpdir(), "lc-chat-"));
   dirs.push(dir);
-  const chat = dispatcherChat({ LINECLEAR_CONFIG: dir, LINECLEAR_SHEPHERDR_URL: fake.url, HOME: dir }, 3000, 100);
+  const chat = dispatcherChat({ LINECLEAR_CONFIG: dir, LINECLEAR_URL: fake.url, HOME: dir }, 3000, 100);
   try {
     chat.listen(() => {});
     await until(() => !(chat.view().state !== "ready"), 30);
@@ -174,7 +174,7 @@ test("a send Shepherdr is slow to take says so, not offline", async () => {
 });
 
 test("a message is checked before it goes: words or files, limits, files that exist, own pages only", async () => {
-  const fake = startFakeShepherdr();
+  const fake = startFakeLineclear();
   try {
     const { handle } = api(fake.url);
     await viewWhen(handle, (v) => v.state === "ready");
@@ -190,7 +190,7 @@ test("a message is checked before it goes: words or files, limits, files that ex
         .status,
     ).toBe(403);
     expect(fake.actions).toEqual([]);
-    // Shepherdr refuses it: the page hears why
+    // Lineclear refuses it: the page hears why
     const r = await handle(req("/api/chat", { text: "fail please" }));
     expect(r.status).toBe(502);
     expect(((await r.json()) as any).error).toBe("The Dispatcher could not take it.");
@@ -199,8 +199,8 @@ test("a message is checked before it goes: words or files, limits, files that ex
   }
 });
 
-test("with no Dispatcher's space the chat is none, and with no Shepherdr it is offline", async () => {
-  const fake = startFakeShepherdr({ dispatcher: false });
+test("with no Dispatcher's space the chat is none, and with no Lineclear it is offline", async () => {
+  const fake = startFakeLineclear({ dispatcher: false });
   try {
     const { handle } = api(fake.url);
     const v = await viewWhen(handle, (v) => v.state !== "loading");
@@ -216,7 +216,7 @@ test("with no Dispatcher's space the chat is none, and with no Shepherdr it is o
 });
 
 test("a missing Dispatcher is made once by the server itself", async () => {
-  const fake = startFakeShepherdr({ dispatcher: false });
+  const fake = startFakeLineclear({ dispatcher: false });
   try {
     const { env } = api(fake.url);
     let made = 0;
@@ -234,8 +234,8 @@ test("a missing Dispatcher is made once by the server itself", async () => {
   }
 });
 
-test("a dropped link to Shepherdr shows offline, keeps the history, and comes back", async () => {
-  const fake = startFakeShepherdr();
+test("a dropped link to Lineclear shows offline, keeps the history, and comes back", async () => {
+  const fake = startFakeLineclear();
   const port = fake.port;
   const { handle } = api(fake.url);
   fake.setChat({ messages: [{ id: "a1", who: "agent", text: "Hello" }] });
@@ -243,7 +243,7 @@ test("a dropped link to Shepherdr shows offline, keeps the history, and comes ba
   fake.stop();
   const off = await viewWhen(handle, (v) => v.state === "offline");
   expect(off.messages).toHaveLength(1);
-  const again = startFakeShepherdr({ port });
+  const again = startFakeLineclear({ port });
   try {
     again.setChat({
       messages: [
@@ -290,7 +290,7 @@ test("a reply keeps the id it quotes, and a long one is dropped", () => {
 });
 
 test("a task's chat is served at its own address, says it has none, and the oldest of many is closed", async () => {
-  const fake = startFakeShepherdr();
+  const fake = startFakeLineclear();
   try {
     const { handle } = api(fake.url);
     let none: { state?: string } = {};

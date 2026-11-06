@@ -1,5 +1,5 @@
 // The tasks engine's test world, shared by the engine*.test.ts files: a real git repo, the agents stubbed, herdr a
-// stand-in that makes and removes real git worktrees. Each file that imports it gets its own Shepherdr home.
+// stand-in that makes and removes real git worktrees. Each file that imports it gets its own Lineclear home.
 import { afterEach } from 'bun:test'
 import { execSync } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -100,7 +100,7 @@ export function world(herdr = fakeHerdr(), o: { boot?: string } = {}) {
   /** agents whose turn was interrupted before a restart */
   const stopped: string[] = []
   const posted: { key: string; id: string; question?: { kind: string; steps?: string[] }; card?: { text: string; restart?: boolean } }[] = []
-  /** what the agent's chat holds: its last reply, an open card of Shepherdr's, its CLI's own question */
+  /** what the agent's chat holds: its last reply, an open card of Lineclear's, its CLI's own question */
   const chat: {
     reply?: string
     card?: 'plan' | 'ask'

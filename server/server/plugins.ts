@@ -25,7 +25,7 @@ for (const [name, load] of user)
     console.log(`plugin ${name} didn't load on the server, so it is skipped there: ${failed[name]}`)
   }
 
-/** Turn a plugin on or off (the human's list, ~/.lineclear/plugins.json): Shepherdr restarts with it in seconds. */
+/** Turn a plugin on or off (the human's list, ~/.lineclear/plugins.json): Lineclear restarts with it in seconds. */
 export function setPluginOn(name: string, on: boolean): { ok: boolean; error?: string } {
   if (!catalog.some((p) => p.name === name)) return { ok: false, error: `No plugin ${name}.` }
   const off = readOff(HOME).filter((n) => n !== name)

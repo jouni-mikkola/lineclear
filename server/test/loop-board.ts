@@ -59,7 +59,7 @@ export async function startBoard() {
         started: now,
       } as AgentRecord
   }
-  const app = startApp({ source: src, dist: '/nonexistent', port: 0, log: () => undefined })
+  const app = startApp({ source: src, port: 0, log: () => undefined })
   const base = `http://127.0.0.1:${app.port}`
   const sockets = Array.from({ length: BOARD.clients }, () => new WebSocket(`${base.replace('http', 'ws')}/api/ws`))
   sockets.forEach((s) => s.addEventListener('message', () => undefined))

@@ -56,3 +56,5 @@ from `lineclear totp NAME` when `NAME_TOTP` is stored. Ask the owner only for an
 Waiting: when you wait for a login, a browser or a trial, say so with `lineclear wait <login|browser> "<reason>"`; a wait
 for the owner needs its kind, `lineclear wait owner --kind <login|money|outward> "<reason>"`, and is refused for any other; `lineclear wait task <id> "<reason>"` for another task's merge (the rule loop wakes you once it is
 done), or `lineclear wait until <time> "<reason>"` for a timed wait (the rule loop stops you and wakes you at the time). A task with a declared wait is not nudged. When the wait is over, run `lineclear resume`.
+
+Writing: Commit messages, pull request titles and bodies, review comments and changelog lines: short plain English, one point per line, no en or em dashes, no semicolons, and none of these words: across, leverage, robust, seamless, delve, comprehensive, ensure.

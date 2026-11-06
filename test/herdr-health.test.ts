@@ -72,6 +72,15 @@ test("a herdr outside its service is restarted under it", () => {
   expect(s.log).toEqual(["restart"]);
 });
 
+test("a herdr that holds too much memory is restarted under the service", () => {
+  const s = setup();
+  s.facts.servers = [{ pid: 7, cpuSeconds: 1, inService: true, rssMb: 4000 }];
+  expect(s.next()).toEqual([]);
+  expect(s.next()).toEqual([]);
+  expect(s.next().map((d) => d.reason)).toEqual(["restarted herdr under herdr.service: herdr server 7 holds 4000 MB of memory"]);
+  expect(s.log).toEqual(["restart"]);
+});
+
 test("the workspace of a closed or done task is closed, an open task's and another repo's are not", () => {
   const s = setup([
     { id: "LIN-5", title: "A", status: "closed" },

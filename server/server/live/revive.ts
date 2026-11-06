@@ -1,7 +1,7 @@
-// A coordinator or task agent that stopped, or runs without the files Shepherdr starts it with now, started again by
-// Shepherdr itself with its session. After herdr restarts it restores each pane's last command, which may name files
+// A coordinator or task agent that stopped, or runs without the files Lineclear starts it with now, started again by
+// Lineclear itself with its session. After herdr restarts it restores each pane's last command, which may name files
 // that moved since (hooks and prompts once lived in ~/.lineclear, now in ~/.lineclear/helper): that CLI exits at once,
-// or runs without the hooks that tell Shepherdr what it does. Tried a few times, further apart each time, then left to
+// or runs without the hooks that tell Lineclear what it does. Tried a few times, further apart each time, then left to
 // the human: a start that keeps failing never loops.
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
@@ -20,7 +20,7 @@ const hashOf = (path: string) => {
   }
 }
 
-/** whether a flag's value is what Shepherdr wants: the same path, or for instructions the same content (a temp copy, or
+/** whether a flag's value is what Lineclear wants: the same path, or for instructions the same content (a temp copy, or
  *  the text itself, runs the same agent) */
 function sameValue(flag: string, got: string, want: string) {
   if (got === want) return true
@@ -38,7 +38,7 @@ export function paneWrong(kind: string, p: ProcessInfo, want: Record<string, str
   return staleFlag(kind, p, want) ? 'stale' : undefined
 }
 
-/** the first flag its CLI runs without, or with another value than Shepherdr starts it with now */
+/** the first flag its CLI runs without, or with another value than Lineclear starts it with now */
 export function staleFlag(kind: string, p: ProcessInfo, want: Record<string, string>): string | undefined {
   const argv = p.foreground_processes?.find((x) => x.argv?.some((a) => basename(a) === kind))?.argv
   if (!argv) return undefined

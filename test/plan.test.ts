@@ -14,7 +14,7 @@ afterAll(() => temps.forEach((d) => rmSync(d, { recursive: true, force: true }))
 const step = (id: string) =>
   `### ${id} Title ${id}\n- result: Title ${id} works.\n- why: because ${id}\n- done when:\n  - first ${id}\n- locks: none\n- after: none\n- files: src/${id}.ts\n`;
 
-/** A project repo with a roadmap, a planning worktree, and a fake shepherdr that logs its calls. */
+/** A project repo with a roadmap, a planning worktree, and a fake lineclear that logs its calls. */
 function setup() {
   const dir = mkdtempSync(join(tmpdir(), "lc-plan-"));
   temps.push(dir);
@@ -56,7 +56,7 @@ function setup() {
   const env = {
     ...process.env,
     LINECLEAR_CONFIG: config,
-    SHEPHERDR_BIN: join(bin, "lineclear"),
+    LINECLEAR_SERVER_BIN: join(bin, "lineclear"),
     LINECLEAR_TASK: "LIN-5",
     LINECLEAR_STEPCHECK: join(bin, "model"),
   };
@@ -336,11 +336,11 @@ function fakeServer(dir: string, port: number) {
 
 /** The real server command (not a fake) reading only its own data folder. */
 function serverEnv(home: string, base: Record<string, string | undefined>) {
-  const { LINECLEAR_URL, LINECLEAR_PORT, LINECLEAR_TASK, SHEPHERDR_CHAT, LINECLEAR_CHAT, ...rest } = base;
+  const { LINECLEAR_URL, LINECLEAR_PORT, LINECLEAR_TASK, LINECLEAR_CHAT, ...rest } = base;
   const bin = join(home, "lineclear");
-  writeFileSync(bin, `#!/bin/sh\nexec ${process.execPath} ${join(import.meta.dir, "..", "server", "server", "cli.ts")} "$@"\n`);
+  writeFileSync(bin, `#!/bin/sh\nexec perl ${join(import.meta.dir, "..", "server", "helper", "lineclear")} "$@"\n`);
   chmodSync(bin, 0o755);
-  return { ...rest, LINECLEAR_HOME: home, SHEPHERDR_BIN: bin };
+  return { ...rest, LINECLEAR_HOME: home, LINECLEAR_SERVER_BIN: bin };
 }
 
 test("plan submit finds the running server in the data folder with no flag", async () => {

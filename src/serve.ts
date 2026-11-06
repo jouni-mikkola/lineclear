@@ -33,7 +33,7 @@ export async function serveMain(args: string[], out: (line: string) => void): Pr
   }
   const step = async (cmd: string[]) => (await Bun.spawn(cmd, { cwd: server, stdin: "ignore", stdout: "inherit", stderr: "inherit" }).exited) === 0;
   if (!existsSync(join(server, "node_modules")) && !(await step(["bun", "install", "--frozen-lockfile"]))) return 1;
-  if (!existsSync(join(server, "dist")) && !(await step(["bun", "run", "build"]))) return 1;
+  if (!(await step(["bun", "run", "build"]))) return 1;
   piByDefault();
   const env = { ...process.env, ...(port === undefined ? {} : { LINECLEAR_PORT: port }) };
   const child = Bun.spawn(["bun", "main.ts"], { cwd: join(server, "server"), env, stdin: "ignore", stdout: "inherit", stderr: "inherit" });
@@ -71,7 +71,7 @@ const SHARED_WORDS: Record<string, (rest: string[]) => boolean> = {
   status: (rest) => !rest.includes("--local") && ((!rest[0]?.startsWith("-") && rest.length >= 2) || rest.includes("--done") || rest.includes("--left")),
   plan: (rest) => rest.some((a) => a === "--step" || a.startsWith("--step=")),
 };
-const OWN_LINES = /^ {2}(shepherdr|lineclear) (doctor|status)\b(?! <id>)/;
+const OWN_LINES = /^ {2}lineclear (doctor|status)\b(?! <id>)/;
 
 /** True when `lineclear <name> <rest>` is the board's job: one of its own commands, or a shared word told by its arguments. */
 export const isBoardJob = (name: string, rest: string[]): boolean => BOARD_COMMANDS.includes(name) || SHARED_WORDS[name]?.(rest) === true;
@@ -85,20 +85,13 @@ export function brandedHelp(text: string): string {
     else if (skipping && !/^ {4,}/.test(l)) skipping = false;
     if (!skipping) kept.push(l);
   }
-  return kept
-    .join("\n")
-    .replace(/(shepherdr|lineclear) ask /g, "lineclear card ")
-    .replace(/Shepherdr/g, "Lineclear")
-    .replace(/shepherdr/g, "lineclear");
+  return kept.join("\n").replace(/lineclear ask /g, "lineclear card ");
 }
 
 /** Any other answer of the board: the name, and the commands that are Lineclear's too. Data (`--json`) and a command's own output are left as they are. */
 export function brandedAnswer(text: string): string {
-  const board = new RegExp(`\\bshepherdr (${[...BOARD_COMMANDS, ...Object.keys(SHARED_WORDS)].join("|")})\\b`, "g");
-  return text
-    .replace(/Shepherdr/g, "Lineclear")
-    .replace(/\bshepherdr ask\b/g, "lineclear card")
-    .replace(board, "lineclear $1");
+  const board = new RegExp(`\\blineclear (${[...BOARD_COMMANDS, ...Object.keys(SHARED_WORDS)].join("|")})\\b`, "g");
+  return text.replace(/\blineclear ask\b/g, "lineclear card").replace(board, "lineclear $1");
 }
 
 /** `lineclear space add`, `lineclear task list` and the rest of the board's commands: run by the board's own command, its words said as Lineclear. */

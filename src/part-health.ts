@@ -33,7 +33,7 @@ export const scoreOf = (h: Omit<Health, "part" | "score">) =>
 
 const FINDINGS = /(\d+)\s+(?:critical|major|minor)\b/gi;
 
-/** A card as Shepherdr posts it in a chat file. */
+/** A card as Lineclear posts it in a chat file. */
 interface Posted {
   id?: unknown;
   card?: { id?: unknown; task?: unknown; text?: unknown; summary?: unknown };

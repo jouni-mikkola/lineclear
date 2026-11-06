@@ -1,6 +1,6 @@
 #!/bin/sh
-# Shepherdr runs on Bun. herdr runs plugin commands with its own environment, so look in the usual places too. With
-# none, get one pinned Bun (its checksum checked) into Shepherdr's own folder, once: the user installs nothing. Bun's
+# Lineclear runs on Bun. herdr runs plugin commands with its own environment, so look in the usual places too. With
+# none, get one pinned Bun (its checksum checked) into Lineclear's own folder, once: the user installs nothing. Bun's
 # folder goes on the PATH too, for package.json's scripts (bun run build).
 run() {
   PATH="$(dirname "$1"):$PATH"
@@ -15,7 +15,7 @@ VERSION=1.4.2
 dir="${LINECLEAR_HOME:-$HOME/.lineclear}/bun/$VERSION"
 if [ -x "$dir/bun" ]; then run "$dir/bun" "$@"; fi
 
-say() { echo "Shepherdr: $*" >&2; }
+say() { echo "Lineclear: $*" >&2; }
 need() {
   say "$1. Install Bun by hand: curl -fsSL https://bun.sh/install | bash"
   exit 1

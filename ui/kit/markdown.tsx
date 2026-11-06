@@ -164,7 +164,7 @@ function fenceBlock(lines: string[], i: number, k: number): Parsed {
   let j = i + 1;
   while (j < lines.length && !(lines[j] ?? "").trim().startsWith(fence[1] ?? "")) body.push(lines[j++] ?? "");
   return [
-    <pre key={k} className="overflow-x-auto rounded-sm border border-line bg-base p-3 text-sm leading-5" data-lang={fence[2] || undefined}>
+    <pre key={k} className="overflow-x-auto rounded-sm border border-line bg-base p-3 text-sm leading-5" tabIndex={0} data-lang={fence[2] || undefined}>
       <code className="font-mono text-fg">{body.join("\n")}</code>
     </pre>,
     j + 1,

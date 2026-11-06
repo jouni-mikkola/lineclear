@@ -5,23 +5,22 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { Check, Probe } from "./doctor.ts";
 import { readJson } from "../pi/config.ts";
-import { SHEPHERDR_PLUGIN_ID } from "./paths.ts";
-import { oldDir } from "./old-install.ts";
+import { OLD_PLUGIN_ID } from "./paths.ts";
+import { OLD_NAME, oldDir } from "./old-install.ts";
 import { archiveFolder } from "./old-archive.ts";
 import { copyBrowsers, uncopiedBrowsers, oldPathRecords, rewriteOldPaths, type Roots } from "./old-paths.ts";
 import { remoteLineclear } from "./ssh.ts";
 import { readMachines } from "./machine-list.ts";
-import { fixControlCenter } from "./control-center.ts";
 import { fixLeftovers } from "./leftovers.ts";
 import { timerAllowed } from "../server/server/live/timer-rule.ts";
 
 type Env = Record<string, string | undefined>;
 type Out = (line: string) => void;
 
-/** The skills Shepherdr 2.0 and its herdr plugin install for agents. */
-const OLD_SKILLS = ["shepherdr", "shepherdr-agent", "shepherdr-coordinator", SHEPHERDR_PLUGIN_ID];
+/** The skills herdr-projects 2.0 and its herdr plugin install for agents. */
+const OLD_SKILLS = [OLD_NAME, `${OLD_NAME}-agent`, `${OLD_NAME}-coordinator`, OLD_PLUGIN_ID];
 
-/** The folders where agent programs read skills, and the helper folder Shepherdr 2.0 keeps its own in. */
+/** The folders where agent programs read skills, and the helper folder herdr-projects 2.0 keeps its own in. */
 export function skillRoots(env: Env = process.env): string[] {
   const home = env.HOME ?? homedir();
   return [
@@ -33,7 +32,7 @@ export function skillRoots(env: Env = process.env): string[] {
   ];
 }
 
-/** Skill folders of Shepherdr 2.0: named like one and holding a SKILL.md of the same name. */
+/** Skill folders of herdr-projects 2.0: named like one and holding a SKILL.md of the same name. */
 function oldSkills(roots: string[]): string[] {
   const found: string[] = [];
   for (const root of roots) {
@@ -46,13 +45,13 @@ function oldSkills(roots: string[]): string[] {
   return found;
 }
 
-/** Whether herdr has Shepherdr 2.0's plugin installed. */
+/** Whether herdr has herdr-projects 2.0's plugin installed. */
 function pluginInstalled(p: Probe): boolean {
   const text = p.which("herdr") ? p.run(herdrArgv(["plugin", "list", "--json"])) : null;
   if (text === null) return false;
   try {
     const plugins = JSON.parse(text)?.result?.plugins;
-    return Array.isArray(plugins) && plugins.some((x: any) => x?.plugin_id === SHEPHERDR_PLUGIN_ID);
+    return Array.isArray(plugins) && plugins.some((x: any) => x?.plugin_id === OLD_PLUGIN_ID);
   } catch {
     return false;
   }
@@ -65,7 +64,7 @@ function timerSpaces(dir: string, env: Env = process.env): string[] {
   return Object.keys(modes).filter((id) => modes[id] === "autopilot");
 }
 
-/** Spaces still only in Shepherdr 2.0's folder: it has spaces and Lineclear has not moved them. */
+/** Spaces still only in herdr-projects 2.0's folder: it has spaces and Lineclear has not moved them. */
 function unmoved(p: Probe): boolean {
   if (!existsSync(join(p.oldDir, "spaces.json"))) return false;
   return !p.dataDir || !existsSync(join(p.dataDir, "migrated.json"));
@@ -82,7 +81,7 @@ export function retiredChecks(p: Probe): Check[] {
   return [
     {
       name: "old install plugin removed",
-      problem: pluginInstalled(p) ? `the herdr plugin ${SHEPHERDR_PLUGIN_ID} is still installed` : "",
+      problem: pluginInstalled(p) ? `the herdr plugin ${OLD_PLUGIN_ID} is still installed` : "",
       fix: FIX,
     },
     {
@@ -173,9 +172,9 @@ function archiveOldFolders(p: Probe, out: Out): number {
 export function fixRetired(p: Probe, out: Out, reportTimers?: (spaces: string[]) => void): number {
   let code = 0;
   if (pluginInstalled(p)) {
-    if (p.run(herdrArgv(["plugin", "uninstall", SHEPHERDR_PLUGIN_ID])) !== null) out(`Removed the herdr plugin ${SHEPHERDR_PLUGIN_ID}`);
+    if (p.run(herdrArgv(["plugin", "uninstall", OLD_PLUGIN_ID])) !== null) out(`Removed the herdr plugin ${OLD_PLUGIN_ID}`);
     else {
-      out(`Could not remove the herdr plugin ${SHEPHERDR_PLUGIN_ID}.`);
+      out(`Could not remove the herdr plugin ${OLD_PLUGIN_ID}.`);
       code = 1;
     }
   }
@@ -183,7 +182,6 @@ export function fixRetired(p: Probe, out: Out, reportTimers?: (spaces: string[])
     rmSync(dir, { recursive: true, force: true });
     out(`Removed the skill ${dir}`);
   }
-  code = Math.max(code, fixControlCenter(p, out));
   if (p.dataDir) code = Math.max(code, fixTimers({ ...p, dataDir: p.dataDir }, out, reportTimers));
   const roots = rootsOf(p);
   const pathsCode = roots ? fixPaths(p, roots, out) : 0;
@@ -218,8 +216,8 @@ export async function fixAll(p: Probe, out: Out, env: Env = process.env, here = 
   return bad;
 }
 
-/** A machine that has Lineclear installed and only Shepherdr 2.0 left is installed: moving it is the next step. */
-export function onlyShepherdrLeft(doctorLines: string[]): boolean {
+/** A machine that has Lineclear installed and only herdr-projects 2.0 left is installed: moving it is the next step. */
+export function onlyOldInstallLeft(doctorLines: string[]): boolean {
   const failed = doctorLines.filter((l) => l.startsWith("FAILED "));
   return failed.length > 0 && failed.every((l) => OURS.some((n) => l.startsWith(`FAILED ${n}`)));
 }
@@ -228,18 +226,18 @@ const OURS = [
   "old folders archived",
   "old install plugin removed",
   "old install skills removed",
-  "Shepherdr 2.0 plugin removed",
-  "Shepherdr 2.0 skills removed",
+  "herdr-projects 2.0 plugin removed",
+  "herdr-projects 2.0 skills removed",
   "spaces moved to Lineclear",
   "no coordinator on a timer",
 ];
 
-/** The failing lines of a machine's `doctor --here` that name what the move to Lineclear left: Shepherdr 2.0 and Control Center. */
-export function leftLines(doctorLines: string[]): string[] {
-  return doctorLines.filter((l) => [...OURS, "no Control Center left"].some((n) => l.startsWith(`FAILED ${n}`)));
+/** The failing lines of a machine's `doctor --here` that name what the move to Lineclear left of herdr-projects 2.0. */
+function leftLines(doctorLines: string[]): string[] {
+  return doctorLines.filter((l) => OURS.some((n) => l.startsWith(`FAILED ${n}`)));
 }
 
-/** What other machines still have of Shepherdr 2.0 or Control Center, from their own `lineclear doctor --here`: the failing lines. Returns the count. */
+/** What other machines still have of herdr-projects 2.0, from their own `lineclear doctor --here`: the failing lines. Returns the count. */
 export async function remoteLeft(out: Out, env: Env = process.env): Promise<number> {
   let left = 0;
   for (const { host } of readMachines(env)) {

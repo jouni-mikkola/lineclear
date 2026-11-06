@@ -3,9 +3,10 @@ import { join } from "node:path";
 import { writeAtomic } from "../pi/atomic.ts";
 import { undoApplied } from "./autoplan.ts";
 import { applyMove } from "./dispatcher.ts";
-import { answerCard, isOpen, type Item, itemPath, KIND_LABEL, readItems, shepherdr, usage, waitReason } from "./inbox.ts";
+import { answerCard, isOpen, type Item, itemPath, KIND_LABEL, readItems, lineclear, usage, waitReason } from "./inbox.ts";
 import { readSettings } from "./project.ts";
 import { clearWait } from "./waits.ts";
+import { gitText } from "./git.ts";
 
 const describe = (i: Item) =>
   `${i.n}  ${KIND_LABEL[i.kind]}  ${i.task}${i.project ? ` (${i.project})` : ""}\n   ${i.question}\n` +
@@ -90,7 +91,7 @@ function deliverAnswer(
   resend: boolean,
   env: NodeJS.ProcessEnv,
 ): { line: string; code: number } | undefined {
-  const run = (...a: string[]) => Bun.spawnSync([shepherdr(env), ...a], { stdin: "ignore" });
+  const run = (...a: string[]) => Bun.spawnSync([lineclear(env), ...a], { stdin: "ignore" });
   const said = (p: { stderr?: Buffer; stdout?: Buffer }) => (p.stderr?.toString() || p.stdout?.toString() || "").trim();
   let message = `Your answer to "${item.question}": ${choice}. Go on.`;
   let p: { exitCode: number; stderr?: Buffer; stdout?: Buffer } = { exitCode: 0 };
@@ -127,9 +128,7 @@ function staleBranch(item: Item, env: NodeJS.ProcessEnv): string | undefined {
   const repo = item.project ? readSettings(item.project, env) : undefined;
   const n = /-(\d+)$/.exec(item.task)?.[1];
   if (!item.head || typeof repo !== "object" || !n) return undefined;
-  const now = Bun.spawnSync(["git", "-C", repo.repo, "for-each-ref", "--format=%(objectname)", `refs/heads/work/${n}-*`], { stdin: "ignore" })
-    .stdout.toString()
-    .trim();
+  const now = gitText(repo.repo, "for-each-ref", "--format=%(objectname)", `refs/heads/work/${n}-*`) ?? "";
   return now === item.head ? undefined : "lineclear inbox: the branch changed after the plan was sent, ask the planner to run 'lineclear plan submit' again";
 }
 

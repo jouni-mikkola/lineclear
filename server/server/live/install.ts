@@ -1,14 +1,14 @@
-// Putting Shepherdr's small helper on another machine, and checking that machine (shepherdr doctor). Runs on the main
-// machine. A machine saved in herdr's Remote needs only herdr, git, perl and the agent CLIs: Shepherdr copies the rest
-// over SSH into ~/.lineclear/helper there, and again whenever Shepherdr's own copy of it changed (an update):
-//   bin/lineclear        the lineclear command for agents there: it talks to Shepherdr through an SSH tunnel
+// Putting Lineclear's small helper on another machine, and checking that machine (lineclear doctor). Runs on the main
+// machine. A machine saved in herdr's Remote needs only herdr, git, perl and the agent CLIs: Lineclear copies the rest
+// over SSH into ~/.lineclear/helper there, and again whenever Lineclear's own copy of it changed (an update):
+//   bin/lineclear        the lineclear command for agents there: it talks to Lineclear through an SSH tunnel
 //   bin/agent-browser    the pinned agent-browser for that machine's system (bin/agent-browser-bin), for the task's
 //                        shared browser, marking when an agent last used it (helper/agent-browser)
 //   hook.pl              records a Claude Code hook event (readers/hooks.ts)
 //   mirror.pl            sends the agents' log files to the main machine as they grow (mirror.ts)
 //   health.pl            how loaded the machine is (health.ts)
 //   relay.pl             shares a task's browser stream on the tailnet straight from there (browser.ts)
-//   skill/               Shepherdr's skills, which agents there read
+//   skill/               Lineclear's skills, which agents there read
 import { createHash } from 'node:crypto'
 import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -62,8 +62,6 @@ export interface Probe {
   helper: string
   /** the agent-browser there, by its version file: it is sent again only when it changed (it is large) */
   browser: string
-  /** an old full install of Shepherdr there, from before (its config named a main machine) */
-  oldInstall: boolean
 }
 
 const PROBE = `
@@ -79,7 +77,6 @@ for t in herdr git perl gh claude codex pi tar; do if command -v $t >/dev/null 2
 perl -MJSON::PP -e1 2>/dev/null && echo "tool.jsonpp=1"
 cat "$HOME/.lineclear/helper/version" 2>/dev/null | sed 's/^/helper=/'
 cat "$HOME/.lineclear/helper/browser-version" 2>/dev/null | sed 's/^/browser=/'
-grep -q '"main"' "$HOME/.lineclear/config.json" 2>/dev/null && echo "old=1"
 true
 `
 
@@ -107,7 +104,6 @@ export async function probe(target: string): Promise<Probe> {
     tools,
     helper: kv.helper ?? '',
     browser: kv.browser ?? '',
-    oldInstall: kv.old === '1',
   }
 }
 
@@ -131,9 +127,6 @@ function browserBinary(os: string, arch: string) {
   return existsSync(f) ? f : null
 }
 
-/** The old names, as links, for agents started before the rename: they still find the command and read the skills they were told to */
-const OLD_LINKS = 'ln -s lineclear "$d/bin/shepherdr"; for s in "" -agent -coordinator; do ln -s "lineclear$s" "$d/skill/shepherdr$s"; done'
-
 /** every file of the helper: where it goes in the helper's folder, and where it comes from here */
 export function helperFiles(os: string, arch: string): [string, string][] {
   const files: [string, string][] = [
@@ -149,7 +142,7 @@ export function helperFiles(os: string, arch: string): [string, string][] {
   const walk = (dir: string) => {
     for (const n of readdirSync(dir)) {
       const f = join(dir, n)
-      if (lstatSync(f).isSymbolicLink()) continue // the old names are links for agents started before the rename: the remote makes its own
+      if (lstatSync(f).isSymbolicLink()) continue
       if (statSync(f).isDirectory()) walk(f)
       else files.push([join('skill', relative(join(ROOT, 'skill'), f)), f])
     }
@@ -158,7 +151,7 @@ export function helperFiles(os: string, arch: string): [string, string][] {
   return files
 }
 
-/** what this Shepherdr's helper is: its files' contents, so any change means an update */
+/** what this Lineclear's helper is: its files' contents, so any change means an update */
 const versions = new Map<string, string>()
 export function helperVersion(os: string, arch: string) {
   const k = `${os}/${arch}`
@@ -233,15 +226,11 @@ export async function installHelper(target: string, p: Probe) {
     version,
     browser,
   )
-  const clear = keep ? '"$d/skill" "$d/bin/lineclear" "$d/bin/shepherdr" "$d/bin/agent-browser"' : '"$d/skill" "$d/bin"'
-  const r = await onMachine(
-    target,
-    `set -e; d=${q(dir)}; mkdir -p "$d"; rm -rf ${clear}; tar xf - -C "$d"; ${OLD_LINKS}; mkdir -p "$d/hooks" "$d/inbox" "$d/prompts"`,
-    {
-      stdin: tar,
-      timeoutMs: 180_000,
-    },
-  )
+  const clear = keep ? '"$d/skill" "$d/bin/lineclear" "$d/bin/agent-browser"' : '"$d/skill" "$d/bin"'
+  const r = await onMachine(target, `set -e; d=${q(dir)}; mkdir -p "$d"; rm -rf ${clear}; tar xf - -C "$d"; mkdir -p "$d/hooks" "$d/inbox" "$d/prompts"`, {
+    stdin: tar,
+    timeoutMs: 180_000,
+  })
   if (r.code !== 0) throw new Error(`Could not put the helper on the machine: ${r.err || `exit ${r.code}`}`)
   return version
 }
@@ -252,7 +241,7 @@ export function boxInfo(m: Saved, p: Probe): BoxInfo {
   return { label: m.label, target: m.target, session: m.session, herdr: herdrPath(m.id, p.herdr), home: p.home, path: `${bin}:${p.path}`, os: p.os }
 }
 
-/** what a machine lacks for Shepherdr, in words: nothing when all is there */
+/** what a machine lacks for Lineclear, in words: nothing when all is there */
 export function lacks(p: Probe): string[] {
   const out: string[] = []
   if (!p.tools.herdr) out.push('herdr')

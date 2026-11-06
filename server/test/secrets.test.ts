@@ -119,7 +119,7 @@ describe('the lineclear secret command', () => {
   test('headers and localhost never replace proof, and body scope cannot broaden it', async () => {
     const { startApp } = await import('../server/app.ts')
     const { createServer, connect } = await import('node:net')
-    const server = startApp({ source: src, dist: '/nonexistent', port: 0 })
+    const server = startApp({ source: src, port: 0 })
     const proxy = createServer((incoming) => {
       const upstream = connect(server.port!, '127.0.0.1')
       incoming.pipe(upstream).pipe(incoming)
@@ -179,7 +179,7 @@ describe('the lineclear secret command', () => {
     copyFileSync(join(root, 'helper', 'route.pl'), join(helper, 'route.pl'))
     copyFileSync(join(root, 'helper', 'lineclear'), join(helper, 'bin', 'lineclear'))
     const credentialFile = join(helper, 'credentials', randomUUID())
-    const server = startApp({ source: src, dist: '/nonexistent', port: 0 })
+    const server = startApp({ source: src, port: 0 })
     // main.sock is the same byte-preserving HTTP transport as the SSH remote forward.
     const socket = Bun.serve({
       unix: join(helper, 'main.sock'),

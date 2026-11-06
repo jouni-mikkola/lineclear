@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { readAccounts } from "./full.ts";
 import { configDir, readJson } from "../pi/config.ts";
 import type { Limits, Window } from "../pi/extension.ts";
+import { DAY } from "./time.ts";
 
 /** An account as Home's Usage card draws it: how full its session and its week are, as far as its provider reports. */
 export interface AccountUse {
@@ -14,7 +15,6 @@ export interface AccountUse {
   unreported?: true;
 }
 
-const DAY = 86_400_000;
 export const WEEK_DAYS = 7;
 const WEEK = WEEK_DAYS * DAY;
 /** An account may run this many points of its week ahead of an even spend before it counts as ahead: a first burst is not a pace. */

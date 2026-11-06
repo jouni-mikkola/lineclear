@@ -13,6 +13,7 @@ import { buildsDir } from "./builds.ts";
 import { dataDir, pathsFor } from "./paths.ts";
 import { projectsDir } from "./project.ts";
 import { cacheDir } from "./tmpdirs.ts";
+import { gitWith } from "./git.ts";
 
 type Env = Record<string, string | undefined>;
 
@@ -96,11 +97,6 @@ export function tryLines(env: Env = process.env): string[] {
   return [`test    ${s.version}${s.commit ? ` (${s.commit.slice(0, 7)})` : ""} on port ${s.port}, ${state}`];
 }
 
-function git(cwd: string, ...args: string[]): { ok: boolean; out: string } {
-  const r = spawnSync("git", args, { cwd, encoding: "utf8", timeout: 300_000 });
-  return { ok: r.status === 0, out: `${r.stdout ?? ""}${r.stderr ?? ""}`.trim() };
-}
-
 function runIn(cwd: string, cmd: string[]): string {
   const r = spawnSync(cmd[0] as string, cmd.slice(1), { cwd, encoding: "utf8", timeout: 20 * 60_000 });
   return r.status === 0 ? "" : `${cmd.join(" ")}: ${`${r.stdout}${r.stderr}`.trim().split("\n").slice(-4).join("; ")}`;
@@ -111,16 +107,16 @@ function buildRelease(ref: string, version: string | undefined, env: Env): { ver
   const builds = buildsDir(dataDir(env));
   if (version && existsSync(join(builds, version, ".release"))) return { version };
   const app = pathsFor(env).app;
-  const origin = git(app, "remote", "get-url", "origin");
-  if (!origin.ok) return `no origin to build from: ${origin.out}`;
+  const origin = gitWith({ timeout: 300_000 }, app, "remote", "get-url", "origin");
+  if (!origin.ok) return `no origin to build from: ${origin.err}`;
   mkdirSync(builds, { recursive: true });
   const part = join(builds, `.try-${process.pid}`);
   rmSync(part, { recursive: true, force: true });
   try {
-    const clone = git(builds, "clone", "-q", origin.out, part);
-    if (!clone.ok) return `could not get ${ref}: ${clone.out}`;
-    const checkout = git(part, "checkout", "-q", "--detach", ref);
-    if (!checkout.ok) return `could not get ${ref}: ${checkout.out}`;
+    const clone = gitWith({ timeout: 300_000 }, builds, "clone", "-q", origin.out.trim(), part);
+    if (!clone.ok) return `could not get ${ref}: ${clone.err}`;
+    const checkout = gitWith({ timeout: 300_000 }, part, "checkout", "-q", "--detach", ref);
+    if (!checkout.ok) return `could not get ${ref}: ${checkout.err}`;
     const name = version ?? `${readJson(join(part, "package.json"))?.version ?? "0.0.0"}-${ref.slice(0, 7)}`;
     const failed =
       runIn(part, ["bun", "install", "--frozen-lockfile", "--silent"]) ||
@@ -146,7 +142,7 @@ interface Space {
 
 /** Clones a project's repo into the instance's folder, with a bare copy as its remote. Returns the clone's path, or undefined when `repo` is no repository. */
 function cloneProject(repo: string, world: string, taken: Set<string>): string | undefined {
-  if (!git(repo, "rev-parse", "--git-dir").ok) return undefined;
+  if (!gitWith({ timeout: 300_000 }, repo, "rev-parse", "--git-dir").ok) return undefined;
   let name = repo.split("/").filter(Boolean).pop() ?? "repo";
   while (taken.has(name)) name += "-";
   taken.add(name);
@@ -154,10 +150,10 @@ function cloneProject(repo: string, world: string, taken: Set<string>): string |
   const clone = join(world, "repos", name);
   mkdirSync(join(world, "bare"), { recursive: true });
   mkdirSync(join(world, "repos"), { recursive: true });
-  if (!git(world, "clone", "-q", "--bare", "--no-local", repo, bare).ok) return undefined;
-  if (!git(world, "clone", "-q", bare, clone).ok) return undefined;
+  if (!gitWith({ timeout: 300_000 }, world, "clone", "-q", "--bare", "--no-local", repo, bare).ok) return undefined;
+  if (!gitWith({ timeout: 300_000 }, world, "clone", "-q", bare, clone).ok) return undefined;
   // the bare copy must not name the real repo as its own origin
-  git(world, "-C", bare, "remote", "remove", "origin");
+  gitWith({ timeout: 300_000 }, world, "-C", bare, "remote", "remove", "origin");
   return clone;
 }
 

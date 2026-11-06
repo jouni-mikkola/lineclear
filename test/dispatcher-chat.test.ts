@@ -8,7 +8,7 @@ import { planMain } from "../src/plan.ts";
 import { status } from "../src/status.ts";
 import { webApi } from "../src/web.ts";
 import { chatClient, step } from "./chat-client.ts";
-import { startFakeShepherdr } from "../ui/test/fake-shepherdr-server.ts";
+import { startFakeLineclear } from "../ui/test/fake-lineclear-server.ts";
 
 // The owner writes in the web chat; the Dispatcher (played here by a script, as no model runs in a test) runs the
 // lineclear command its prompt names and answers with what it printed. Each command is the real one.
@@ -21,7 +21,7 @@ test("the web chat gets answers to status, plan and move from the Dispatcher", a
   const repo = join(dir, "demo");
   mkdirSync(join(repo, "docs"), { recursive: true });
   writeFileSync(join(repo, "docs", "ROADMAP.md"), `# Roadmap\n\n## Phase 0\n\n${step("A")}\n${step("B")}\n`);
-  const bin = join(dir, "shepherdr");
+  const bin = join(dir, "lineclear");
   const log = join(dir, "calls.log");
   writeFileSync(
     bin,
@@ -34,7 +34,7 @@ test("the web chat gets answers to status, plan and move from the Dispatcher", a
     join(config, "projects", "demo", "settings.json"),
     JSON.stringify({ repo, space: "demo", check: "true", askBefore: { plans: true }, models: { worker: [], reviewer: [], planner: [] } }),
   );
-  const env = { ...process.env, LINECLEAR_CONFIG: config, SHEPHERDR_BIN: bin };
+  const env = { ...process.env, LINECLEAR_CONFIG: config, LINECLEAR_SERVER_BIN: bin };
 
   const run = async (f: (out: (l: string) => void) => number) => {
     const lines: string[] = [];
@@ -43,7 +43,7 @@ test("the web chat gets answers to status, plan and move from the Dispatcher", a
   };
   // the script stands for the Dispatcher only while its brief names these commands
   for (const c of ["lineclear status", "lineclear plan", "lineclear move"]) expect(dispatcherPrompt()).toContain(c);
-  const fake = startFakeShepherdr({
+  const fake = startFakeLineclear({
     reply: (text) => {
       if (text.startsWith("status")) return run((o) => status(o, env, "demo"));
       if (text.startsWith("plan")) return run((o) => planMain(["demo", "Add a login step"], o, env));
@@ -51,7 +51,7 @@ test("the web chat gets answers to status, plan and move from the Dispatcher", a
     },
   });
   try {
-    const handle = webApi({ LINECLEAR_CONFIG: config, LINECLEAR_SHEPHERDR_DIR: join(dir, "sh"), HOME: dir, LINECLEAR_SHEPHERDR_URL: fake.url });
+    const handle = webApi({ LINECLEAR_CONFIG: config, LINECLEAR_HOME: join(dir, "sh"), HOME: dir, LINECLEAR_URL: fake.url });
     const { view, send } = chatClient(handle);
     await view((v) => v.state === "ready");
     const ask = async (text: string, n: number) => {

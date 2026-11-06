@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
-/** Shepherdr's data folder, where the human's own plugins and their list live */
+/** Lineclear's data folder, where the human's own plugins and their list live */
 export const userHome = () => process.env.LINECLEAR_HOME || join(homedir(), '.lineclear')
 
 /** the plugins the human turned off (~/.lineclear/plugins.json) */

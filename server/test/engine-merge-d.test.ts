@@ -77,7 +77,7 @@ describe('on GitHub: news, checks and the default way in', () => {
     expect(w.sent.length).toBe(1)
     const told = w.sent[0]
     expect(told.key).toBe(key)
-    expect(told.text).toMatch(/^<shepherdr><github task="[^"]+" pr="1">GitHub news on PR #1 \(https:\/\/github.com\/acme\/app\/pull\/1\)/)
+    expect(told.text).toMatch(/^<lineclear><github task="[^"]+" pr="1">GitHub news on PR #1 \(https:\/\/github.com\/acme\/app\/pull\/1\)/)
     expect(told.text).toContain(
       '- Check failed: test (https://github.com/acme/app/actions/runs/7/job/9). Its log ends:\n    ok 1\n    expected 1 to be 2\n    ##[error]Process completed with exit code 1.\n- ',
     )
@@ -236,7 +236,7 @@ describe('on GitHub: news, checks and the default way in', () => {
     expect(await w.engine.merge(t.id, { self: true })).toEqual({ ok: true, note: `${t.id} is merged already` })
   })
 
-  test('Shepherdr stopping for an update lets a merge on its way finish and answer first, and starts no new one', async () => {
+  test('Lineclear stopping for an update lets a merge on its way finish and answer first, and starts no new one', async () => {
     const w = world()
     const g = onGitHub()
     const { t } = await started(w, g.dir, 'mergedrain')

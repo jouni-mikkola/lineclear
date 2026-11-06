@@ -12,7 +12,7 @@ afterAll(() => {
 });
 
 /**
- * A machine whose SSH shell has a bare PATH (no ~/.bun/bin, no ~/.local/bin), with no project repo and old Shepherdr
+ * A machine whose SSH shell has a bare PATH (no ~/.bun/bin, no ~/.local/bin), with no project repo and old Lineclear
  * leftovers. Its `lineclear` works only when the caller puts those folders on the PATH itself.
  */
 function setup() {
@@ -33,7 +33,7 @@ function setup() {
     `${needBun}
 echo "lineclear $*" >> "${log}"
 case "$*" in
-  "doctor --fix --here") echo "Removed the skill $HOME/.pi/agent/skills/shepherdr"; touch "$HOME/fixed" ;;
+  "doctor --fix --here") echo "Removed the skill $HOME/.pi/agent/skills/lineclear"; touch "$HOME/fixed" ;;
   doctor) if [ -f "$HOME/fixed" ]; then echo "ok     skills"; else echo "FAILED old install skills removed: old skills"; echo "       fix: lineclear doctor --fix"; exit 1; fi ;;
 esac`,
   );

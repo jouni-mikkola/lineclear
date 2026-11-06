@@ -179,7 +179,7 @@ describe("every machine's news reaches the main machine's home space", () => {
       chat: () => undefined,
       watch: () => {},
     })
-    const app = startApp({ source: worker as never, dist: '/nonexistent', port: 0 })
+    const app = startApp({ source: worker as never, port: 0 })
     // news from before the main machine's link (its server restarting) waits for it
     worker.emit('news', { place: 'p:faraway:shop', line: 'FS-0 is ready to merge', kind: 'ready', about: { task: 'FS-0', event: 'ready' } })
     const home = placeId.home()
@@ -289,7 +289,7 @@ describe("Coordinator timer's heartbeat", () => {
       src.heartbeat(t0 + 32 * min)
       expect(beats()).toHaveLength(1)
       const beat = beats()[0].text
-      expect(beat).toStartWith('<shepherdr><heartbeat>Heartbeat. Go through your HEARTBEAT.md: ')
+      expect(beat).toStartWith('<lineclear><heartbeat>Heartbeat. Go through your HEARTBEAT.md: ')
       expect(beat).toContain('Your HEARTBEAT.md:\n# Heartbeat')
       expect(beat).not.toContain('BE-1')
       expect(beat).not.toContain('News since the last heartbeat')

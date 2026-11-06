@@ -32,7 +32,7 @@ export function costGoalFailure(g: CostGoal): string | undefined {
   return `cost per merged step is $${g.perStep.toFixed(2)} over ${g.steps} steps, the goal is $${COST_GOAL.toFixed(2)} or less; largest share: ${g.largestCause ?? "none recorded"}`;
 }
 
-/** The line `docs/numbers.md` gets under "L242" for one run. */
+/** The line `docs/numbers.md` gets for one run. */
 export function costGoalLine(g: CostGoal, today: string): string {
   return `- ${today}: ${g.perStep === null ? "-" : `$${g.perStep.toFixed(2)}`} per merged step over ${g.steps} steps`;
 }

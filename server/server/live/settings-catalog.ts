@@ -192,7 +192,7 @@ export const CATALOG: Section[] = [
     ],
   },
   {
-    // what Shepherdr adds to the end of every new task's brief
+    // what Lineclear adds to the end of every new task's brief
     name: 'How tasks work',
     told: true,
     about: "Each new task's brief ends with these in its Settings block, each as the line shown. To change one for a single task, tell its coordinator.",
@@ -209,6 +209,12 @@ export const CATALOG: Section[] = [
       // only words in the brief's Reviewer line: the task's agent has its change reviewed however it sees fit
       ...agentRows('Reviewer', 'reviewer', [...REVIEWERS], 'default', 'default'),
     ],
+  },
+  {
+    name: 'Checks',
+    about:
+      "Where a task's full check runs before it lands. Local: on this machine, in the merge line. GitHub: the task's pull request is opened or updated and lineclear merge waits for the checks GitHub runs on it (and its merge queue).",
+    rows: [{ label: 'Full check runs', key: 'check.where', value: 'local', options: ['local', 'github'] }],
   },
   {
     // which agent (CLI), model and effort each kind of agent starts with
@@ -320,7 +326,7 @@ export const LINECLEAR_MODELS = new Set(['task.model', 'reviewer.model', 'backup
 
 /** a role's Model and Effort rows as its CLI has them, by these settings (r.value is the row's own): a pick of its
  *  models and of the levels its model takes, each showing what it starts with (a level the model lacks shows as the
- *  nearest it has); a CLI that can't list its models takes any id; one Shepherdr passes neither to picks its own */
+ *  nearest it has); a CLI that can't list its models takes any id; one Lineclear passes neither to picks its own */
 export function agentRow(r: Row, get: (key: string) => string): Row {
   const [role, what] = r.key.split('.') as [Role, string]
   if (!ROLES.includes(role) || (what !== 'model' && what !== 'effort')) return r

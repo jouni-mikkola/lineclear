@@ -4,7 +4,6 @@ import { createInterface } from "node:readline/promises";
 import { asksMain } from "./asks.ts";
 import { backupMain } from "./backup.ts";
 import { storeMain } from "./store-copies.ts";
-import { eventMain } from "./events.ts";
 import { dispatcherMain, moveMain } from "./dispatcher.ts";
 import { doctor, herdrVersions, realProbe, testedHerdr } from "./doctor.ts";
 import { fixAll, remoteLeft } from "./retire.ts";
@@ -26,6 +25,7 @@ import { codeCommit, pathsFor } from "./paths.ts";
 import { candidateMain } from "./candidate-check.ts";
 import { promoteMain } from "./promote-cmd.ts";
 import { readRelease, releaseMain, releaseTry } from "./release.ts";
+import { fillSetup } from "./loop-guard.ts";
 import { type Ask, setupGate } from "./project.ts";
 import { setupMain } from "./setup.ts";
 import { project } from "./project-cli.ts";
@@ -35,14 +35,15 @@ import { partsMain } from "./parts-check.ts";
 import { decisionsPath, realWorld, runMain } from "./rules.ts";
 import { fileFixNow } from "./self-fix.ts";
 import { startWeb } from "./web.ts";
-import { remoteSecretNames } from "./secret-sync.ts";
-import { secretFolderNames, secrets, totp } from "./secrets.ts";
+import { secrets, totp } from "./secrets.ts";
 import { stallsMain } from "./stall-class.ts";
 import { trackMain } from "./track.ts";
 import { migrateAll, migrateMain } from "./migrate.ts";
+import { updateMain } from "./update.ts";
 import { boardMain, isBoardJob, serveMain } from "./serve.ts";
 import { waitsMain } from "./waits.ts";
 import { realRemover, uninstall } from "./uninstall.ts";
+import { gitText } from "./git.ts";
 
 export const commands: Record<string, string> = {
   export: "Print what this machine holds as JSON, for the machine that shows all of them",
@@ -58,6 +59,7 @@ export const commands: Record<string, string> = {
   setup: "Choose a model for the worker, reviewer, planner and step checker from the logged-in harnesses (the reviewer from another company than the worker)",
   run: "Run the rule loop and serve the web pages (--once, --dry-run; --board <port> also starts herdr and the board where no service does), or only serve them on fixed demo data (--demo)",
   serve: "Serve the board (the web server): serve --port <port>",
+  update: "Move the old folders into Lineclear's own folder and keep a copy (--back returns it)",
   migrate:
     "Copy spaces, settings and open tasks from the old install to Lineclear's own server (--dry-run lists, --check after a run, --all moves every machine, --back returns to the old install and loses nothing)",
   space: "The board's spaces: space add <path> --name <name>, space list, space rename, space remove",
@@ -120,8 +122,7 @@ export function versionLine(dir: string = root): string {
   const version = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")).version;
   let commit = "unknown";
   if (existsSync(join(dir, ".git"))) {
-    const p = Bun.spawnSync(["git", "-C", dir, "rev-parse", "--short", "HEAD"]);
-    if (p.exitCode === 0) commit = p.stdout.toString().trim() || "unknown";
+    commit = gitText(dir, "rev-parse", "--short", "HEAD") || "unknown";
   }
   return `lineclear ${version} ${commit}`;
 }
@@ -170,7 +171,9 @@ async function dispatch(args: string[], out: (line: string) => void = console.lo
     }
   }
   if (name === "setup") return setupMain(rest, out, ask);
-  const stop = (name === "project" && rest[0] === "add") || (name === "run" && rest[0] === "--once") ? setupGate() : undefined;
+  const gated = (name === "project" && rest[0] === "add") || (name === "run" && rest[0] === "--once");
+  if (gated) fillSetup();
+  const stop = gated ? setupGate() : undefined;
   if (stop) return (out(`lineclear ${name === "run" ? "run" : "add"}: ${stop}`), 1);
   if (name === "project") return project(rest, ask, out);
   if (isBoardJob(name, rest)) return boardMain(args, out);
@@ -211,6 +214,7 @@ const COMMANDS: Record<string, (rest: string[], out: Out) => number | Promise<nu
   run: (rest, out) => (rest[0] === "--demo" ? demoMain(rest.slice(1), out) : runMain(rest, out, undefined, { web: startWeb })),
   serve: serveMain,
   export: (_rest, out) => exportMain(out),
+  update: (rest, out) => updateMain(rest, out),
   migrate: (rest, out) => (rest.includes("--all") ? migrateAll(rest, out) : migrateMain(rest, out)),
   secrets,
   totp,
@@ -231,7 +235,6 @@ const COMMANDS: Record<string, (rest: string[], out: Out) => number | Promise<nu
   ask: askMain,
   asks: (rest, out) => asksMain(rest, out),
   inbox: inboxCommand,
-  event: eventMain,
   kit: kitMain,
   pack: packMain,
 };
@@ -257,7 +260,6 @@ async function installCommand(name: "doctor" | "uninstall", rest: string[], out:
           return { host, commit: e?.commit ?? null, ...(e ? { relation: relationOf(codeCommit(), e.commit) } : {}), helperApart: e?.helperApart };
         }),
       };
-    if (hosts.length > 0) probe.secrets = { here: secretFolderNames(), others: hosts.map((host) => ({ host, names: remoteSecretNames(host) })) };
     probe.kit = { here: readKit(), want: wantedKit(), others: here ? [] : remoteKitDiffs() };
     const code = doctor(probe, out);
     if (here) return code;

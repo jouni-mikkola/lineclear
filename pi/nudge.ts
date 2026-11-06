@@ -16,7 +16,7 @@ type Part = { type?: string; name?: string; text?: string; arguments?: { command
 type Message = { role?: string; content?: string | Part[] };
 
 /** A command that ends a turn on purpose: a report, a close, a question or a declared wait. */
-const ENDS_TURN = /\b(shepherdr|lineclear)\s+(ready|done|ask|wait)\b/;
+const ENDS_TURN = /\blineclear\s+(ready|done|ask|wait)\b/;
 
 const parts = (m: Message): Part[] => (Array.isArray(m.content) ? m.content : []);
 

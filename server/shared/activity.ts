@@ -309,7 +309,7 @@ const WEIGHT: Record<StepKind, number> = { edit: 0, run: 1, agent: 2, web: 3, ot
 const names = (xs: string[]) => xs.slice(0, 3).join(', ') + (xs.length > 3 ? ` +${xs.length - 3}` : '')
 
 /** a step's own line: its words, and a test run's outcome */
-export const stepText = (s: Pick<Step, 'title' | 'result'>) => (s.result ? `${s.title}: ${s.result}` : s.title)
+const stepText = (s: Pick<Step, 'title' | 'result'>) => (s.result ? `${s.title}: ${s.result}` : s.title)
 
 /**
  * A turn's steps grouped into rows, in the order they first happened: the files it read in one row ("Read 3 files:
@@ -371,15 +371,9 @@ export function took(ms: number, seconds = true) {
   return `${Math.floor(m / 60)}h ${m % 60}m`
 }
 
-export type JobCounts = Partial<Record<Job['kind'], number>>
-
-export const countJobs = (jobs: Job[]): JobCounts => {
-  const c: JobCounts = {}
-  for (const j of jobs) c[j.kind] = (c[j.kind] ?? 0) + 1
-  return c
-}
-
 /** "2 subagents working", "1 shell running", "1 subagent · 2 shells": headless agents it runs count as subagents too */
+type JobCounts = Partial<Record<Job['kind'], number>>
+
 export function jobsWords(c: JobCounts) {
   const parts = [
     [(c.agent ?? 0) + (c.headless ?? 0), 'subagent'],

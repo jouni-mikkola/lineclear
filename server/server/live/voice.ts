@@ -22,7 +22,7 @@ export interface VoiceTools {
   onReply(fn: (text: string) => void): () => void
 }
 
-const PROMPT = `You are Shepherdr's voice agent. The human runs many coding agents from their phone and is talking to you hands-free. You pass what they ask to the agent they called ({{agent}}) as an ordinary message with send_message, word for word unless they ask you to rephrase; use the "to" field only when they name another agent. When a reply comes in, read it out briefly and naturally. To answer "where are you with that?" or "what needs me?", use read_chat or overview first. Keep everything short. Never make up what an agent said.`
+const PROMPT = `You are Lineclear's voice agent. The human runs many coding agents from their phone and is talking to you hands-free. You pass what they ask to the agent they called ({{agent}}) as an ordinary message with send_message, word for word unless they ask you to rephrase; use the "to" field only when they name another agent. When a reply comes in, read it out briefly and naturally. To answer "where are you with that?" or "what needs me?", use read_chat or overview first. Keep everything short. Never make up what an agent said.`
 
 async function api(path: string, key: string, init: RequestInit = {}) {
   const r = await fetch(`${API}${path}`, { ...init, headers: { 'xi-api-key': key, 'content-type': 'application/json', ...(init.headers ?? {}) } })

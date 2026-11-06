@@ -80,9 +80,9 @@ export class DemoWorldState extends Emitter<SourceEvents> {
         working: () => false,
         tell: () => undefined,
         env: (task) => ({
-          AGENT_BROWSER_NAMESPACE: 'shepherdr-demo',
+          AGENT_BROWSER_NAMESPACE: 'lineclear-demo',
           AGENT_BROWSER_SESSION: task,
-          AGENT_BROWSER_PROFILE: join(tmpdir(), 'shepherdr-demo', 'browser', task),
+          AGENT_BROWSER_PROFILE: join(tmpdir(), 'lineclear-demo', 'browser', task),
         }),
       })
     : null
@@ -212,7 +212,7 @@ export class DemoWorldState extends Emitter<SourceEvents> {
     }
   }
 
-  /** when each coordinator's chat last had something from it or Shepherdr (tasks' chats count for nothing here) */
+  /** when each coordinator's chat last had something from it or Lineclear (tasks' chats count for nothing here) */
   protected last() {
     const out: Record<string, number> = {}
     for (const c of Object.values(this.chats)) {

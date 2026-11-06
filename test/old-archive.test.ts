@@ -1,3 +1,4 @@
+import { OLD_NAME } from "../src/old-install.ts";
 import { expect, test } from "bun:test";
 import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -15,19 +16,19 @@ function home() {
 
 test("a folder is packed to <name>-<date>.tgz and removed; a hard link into ~/.lineclear stays whole", () => {
   const { root, env } = home();
-  const old = join(root, ".shepherdr");
+  const old = join(root, `.${OLD_NAME}`);
   const kept = join(root, ".lineclear");
   mkdirSync(join(old, "helper"), { recursive: true });
   mkdirSync(kept);
   writeFileSync(join(old, "helper", "secret.json"), "whole file");
   linkSync(join(old, "helper", "secret.json"), join(kept, "secret.json"));
   const file = archiveFolder(old, env, new Date("2026-11-04T10:00:00Z"));
-  expect(file).toBe(join(root, "archive", "shepherdr-2026-11-04.tgz"));
+  expect(file).toBe(join(root, "archive", `${OLD_NAME}-2026-11-04.tgz`));
   expect(existsSync(file)).toBe(true);
   expect(existsSync(old)).toBe(false);
   expect(readFileSync(join(kept, "secret.json"), "utf8")).toBe("whole file");
   const list = Bun.spawnSync(["tar", "-tzf", file]).stdout.toString();
-  expect(list).toContain(".shepherdr/helper/secret.json");
+  expect(list).toContain(`.${OLD_NAME}/helper/secret.json`);
 });
 
 test("a second archive on one day keeps the first", () => {
@@ -56,7 +57,7 @@ const probe = (over: Partial<Probe>): Probe => ({
 
 test("doctor names the old folders and --fix archives them unless a process uses one", () => {
   const { root, env } = home();
-  const a = join(root, ".shepherdr");
+  const a = join(root, `.${OLD_NAME}`);
   const b = join(root, ".herdr-projects");
   mkdirSync(a);
   mkdirSync(b);
@@ -77,7 +78,7 @@ test("doctor names the old folders and --fix archives them unless a process uses
 
 test("--fix keeps the old folders while a browser profile is not copied out yet", () => {
   const { root, env } = home();
-  const old = join(root, ".shepherdr");
+  const old = join(root, `.${OLD_NAME}`);
   mkdirSync(join(old, "browser", "T1"), { recursive: true });
   writeFileSync(join(old, "browser", "T1.used"), "");
   const p = probe({ oldDir: old, dataDir: join(root, "lc"), oldFolders: [old], archiveFolder: (d) => archiveFolder(d, env) });

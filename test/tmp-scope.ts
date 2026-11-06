@@ -29,11 +29,11 @@ for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const)
     remove();
     process.exit(1);
   });
-// No test reaches the Shepherdr that runs on this machine: a shepherdr command a test starts without a server of its own
+// No test reaches the Lineclear that runs on this machine: a lineclear command a test starts without a server of its own
 // fails at once on a closed port, where the live one would answer as slowly as the machine is busy.
 process.env.LINECLEAR_URL = "http://127.0.0.1:9";
 // the folders, port and name of the board's server that runs a check are not the tests'; a command a test runs would refuse them as the stable ones
-for (const k of ["LINECLEAR_CHAT", "LINECLEAR_COMMAND", "SHEPHERDR_CHAT", "LINECLEAR_TASK", "LINECLEAR_PORT", "LINECLEAR_WEB_PORT", "LINECLEAR_BOX"])
+for (const k of ["LINECLEAR_CHAT", "LINECLEAR_COMMAND", "LINECLEAR_CHAT", "LINECLEAR_TASK", "LINECLEAR_PORT", "LINECLEAR_WEB_PORT", "LINECLEAR_BOX"])
   delete process.env[k];
 for (const k of ["LINECLEAR_HOME", "LINECLEAR_MACHINE", "LINECLEAR_SHARED_HOME"]) delete process.env[k];
 // the secrets vault the CLI reads (src/secrets.ts): never the owner's real one

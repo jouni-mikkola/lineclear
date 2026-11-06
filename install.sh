@@ -193,7 +193,8 @@ install_lineclear() {
     git -C "$app" remote add origin "$repo"
     changed=1
   else
-    git -C "$app" remote set-url origin "$repo"
+    # set-url rewrites .git/config even when the URL is the same: a second install changes no file
+    [ "$(git -C "$app" remote get-url origin 2>/dev/null)" = "$repo" ] || git -C "$app" remote set-url origin "$repo"
     want=$(remote_commit)
     [ -n "$want" ] || want=$ref
     if [ "$(git -C "$app" rev-parse HEAD 2>/dev/null || true)" = "$want" ]; then
@@ -241,11 +242,16 @@ UNIT
   fi
 }
 
+# The board's port: the one its data folder records, else 7421.
+board_port() {
+  board=$(sed -n 's/.*"port": *\([0-9][0-9]*\).*/\1/p' "${LINECLEAR_HOME:-${LINECLEAR_HOME:-$HOME/.lineclear}}/server.json" 2>/dev/null || true)
+  echo "${board:-7421}"
+}
+
 # Task links open the web pages (and the board) from your phone, so both ports must be published on the tailnet.
 publish_ports() {
   command -v tailscale >/dev/null 2>&1 || return 0
-  board=$(sed -n 's/.*"port": *\([0-9][0-9]*\).*/\1/p' "${LINECLEAR_HOME:-${LINECLEAR_SHEPHERDR_DIR:-$HOME/.lineclear}}/server.json" 2>/dev/null || true)
-  for port in "${LINECLEAR_WEB_PORT:-${LINECLEAR_PORT:-7420}}" "${board:-7421}"; do
+  for port in "${LINECLEAR_WEB_PORT:-${LINECLEAR_PORT:-7420}}" "$(board_port)"; do
     tailscale serve --bg --https="$port" "http://127.0.0.1:$port" >/dev/null 2>&1 \
       || say "Tailscale: port $port was not published. Run 'tailscale serve --bg --https=$port http://127.0.0.1:$port'."
   done
@@ -273,8 +279,9 @@ install_service() {
   install_compile_cache
   write_unit "$unit" Lineclear "$(command -v bun) $code/bin/lineclear run"
   # The board (tasks, chats, merges) and herdr (the agents' terminals) get a unit too, unless they already have one.
-  if ! ls "$units"/lineclear-serve-*.service >/dev/null 2>&1 && curl -s -o /dev/null --max-time 2 http://127.0.0.1:7421/ 2>/dev/null; then
-    say "Service: a board already answers on port 7421, so it gets no unit of its own."
+  # asks the port the data folder records: a board on another port, or a test's own, is still a board
+  if ! ls "$units"/lineclear-serve-*.service >/dev/null 2>&1 && curl -s -o /dev/null --max-time 2 "http://127.0.0.1:$(board_port)/" 2>/dev/null; then
+    say "Service: a board already answers on port $(board_port), so it gets no unit of its own."
   elif ! ls "$units"/lineclear-serve-*.service >/dev/null 2>&1; then
     write_unit "$units/lineclear-serve-7421.service" "Lineclear board" "$(command -v bun) $code/bin/lineclear serve --port 7421"
     systemctl --user enable --now lineclear-serve-7421.service >/dev/null 2>&1 || say "Service: the board did not start. See 'systemctl --user status lineclear-serve-7421.service'."
@@ -354,7 +361,7 @@ save_projects() {
   return 0
 }
 
-# The board's Shepherdr server runs as its own unit (lineclear-serve-<port>), so a new version needs it restarted too.
+# The board's Lineclear server runs as its own unit (lineclear-serve-<port>), so a new version needs it restarted too.
 restart_all() {
   systemctl --user restart lineclear.service || return 1
   for u in $(systemctl --user list-units --state=active --plain --no-legend 'lineclear-serve-*.service' 2>/dev/null | awk '{print $1}'); do
@@ -374,13 +381,13 @@ restore_projects() {
   return 0
 }
 
-# Whether the Shepherdr API answers now (so a machine that does not run it is not rolled back for lacking it).
+# Whether the Lineclear API answers now (so a machine that does not run it is not rolled back for lacking it).
 api_up() {
-  port=$(sed -n 's/.*"port": *\([0-9][0-9]*\).*/\1/p' "${LINECLEAR_HOME:-${LINECLEAR_SHEPHERDR_DIR:-$HOME/.lineclear}}/server.json" 2>/dev/null || true)
+  port=$(sed -n 's/.*"port": *\([0-9][0-9]*\).*/\1/p' "${LINECLEAR_HOME:-$HOME/.lineclear}/server.json" 2>/dev/null || true)
   curl -fsS -m 3 -o /dev/null "http://127.0.0.1:${port:-7421}/api/snapshot" >/dev/null 2>&1
 }
 
-data_dir() { printf '%s' "${LINECLEAR_HOME:-${LINECLEAR_SHEPHERDR_DIR:-$HOME/.lineclear}}"; }
+data_dir() { printf '%s' "${LINECLEAR_HOME:-$HOME/.lineclear}"; }
 copies_dir() { printf '%s' "${LINECLEAR_STORE_COPIES:-$app/store-copies}"; }
 
 # store_tasks <data folder>: how many tasks it holds (the hot ones and the cold log's ids).
@@ -484,7 +491,7 @@ on_exit() {
 
 fail_update() { if is_release; then rollback_release "$1"; else rollback "$1"; fi; }
 
-# After the restart: the web pages, the Shepherdr API and a chat message must work within 2 minutes, and each project
+# After the restart: the web pages, the Lineclear API and a chat message must work within 2 minutes, and each project
 # must be Running or Paused as it was.
 smoke() {
   say "Lineclear: checking the new version (up to 2 minutes)"
@@ -493,7 +500,7 @@ smoke() {
       fail_update "the task store holds $(store_tasks "$(data_dir)") tasks, it held $tasks_before before the update"
       exit 1
     fi
-    say "Lineclear: the new version works"; bun "$code/scripts/smoke.ts" shots "$(git -C "$code" rev-parse --short HEAD 2>/dev/null || echo "${ref#v}")" >/dev/null 2>&1 || true; return 0; }
+    say "Lineclear: the new version works"; return 0; }
   fail_update "$(printf '%s' "$failed" | tr '\n' ';' | sed 's/;$//;s/;/; /g')"
   exit 1
 }

@@ -5,7 +5,7 @@ export const PROJECTS = ["lineclear", "webshop", "budget", "kauppa"];
 
 /** One command the model ran: the program and its arguments. */
 export interface Ran {
-  program: "lineclear" | "shepherdr";
+  program: "lineclear";
   args: string[];
 }
 
@@ -30,7 +30,7 @@ const project = (name: string | undefined) => {
 export function toCall(r: Ran): Call | string | undefined {
   const [verb, ...rest] = r.args;
   if (r.args.includes("--help") || r.args.includes("-h")) return undefined;
-  if (r.program === "shepherdr") return verb === "ask" ? { c: "ask" } : `shepherdr ${r.args.join(" ")}`;
+  if (verb === "ask") return { c: "ask" };
   if (verb === "card") return { c: "ask" };
   if (verb === "dispatcher" && rest[0] === "projects") return undefined;
   if (verb === "status" && rest[0] === "--plan") return { c: "status-plan", ...(rest[1] ? { task: rest[1].toUpperCase() } : {}) };
@@ -126,7 +126,7 @@ function describe(calls: Call[]): string {
         case "move":
           return `move ${c.project} ${c.step} --after ${c.after.join(",")}`;
         case "ask":
-          return "shepherdr ask";
+          return "lineclear ask";
       }
     })
     .join("; ");

@@ -344,7 +344,7 @@ describe('coordinator timer from the command', () => {
     const { place } = await workedTask('piloting')
     src.places.setMode(place, 'autopilot')
     try {
-      // the coordinator, on its own: Shepherdr adds what it asks; the machine's max tasks at once bounds the rest
+      // the coordinator, on its own: Lineclear adds what it asks; the machine's max tasks at once bounds the rest
       expect((await src.cli(['task', 'add', 'Fix the typo', '--desc', 'Fix it.'], { chat: place })).out).toContain('Added')
       expect((await src.cli(['task', 'add', 'Fix the link', '--desc', 'Fix it.'], { chat: place })).out).toContain('Added')
       for (const s of src.snapshot().settings.filter((x) => x.name === 'Coordinator timer')) {

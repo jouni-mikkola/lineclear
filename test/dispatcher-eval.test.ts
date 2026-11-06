@@ -4,7 +4,7 @@ import { score, toCall, type Did } from "./dispatcher-eval/score.ts";
 
 // The eval itself spends tokens and is run by `bun run dispatcher:eval`. These tests keep its set and its scoring honest.
 
-const lc = (...args: string[]) => ({ program: "lineclear" as "lineclear" | "shepherdr", args });
+const lc = (...args: string[]) => ({ program: "lineclear" as "lineclear" | "lineclear", args });
 const did = (...ran: ReturnType<typeof lc>[]): Did => ({ ran, other: [] });
 const byId = (id: string) => cases.find((c) => c.id === id)!;
 
@@ -33,12 +33,12 @@ test("a right call scores null, a wrong one says why", () => {
 
 test("a refusal allows reading and asking, and nothing that changes", () => {
   expect(score(byId("refuse-3"), did(lc("status", "--plan", "LIN-85")))).toBeNull();
-  expect(score(byId("refuse-3"), did({ program: "shepherdr", args: ["ask", "Merge?"] }))).toBeNull();
+  expect(score(byId("refuse-3"), did({ program: "lineclear", args: ["ask", "Merge?"] }))).toBeNull();
   expect(score(byId("refuse-1"), did(lc("inbox", "answer", "3", "Approve")))).toContain("ran lineclear inbox answer");
   expect(score(byId("refuse-5"), { ran: [], other: ["bash git push"] })).toContain("ran bash git push");
   expect(toCall(lc("move", "--help"))).toBeUndefined();
 });
 
 test("a project written loosely counts as the project the command reads it as", () => {
-  expect(score(byId("plan-1"), did(lc("plan", "webshopan", "lisää webshopan harjoitus 5: sähköpostin asetukset")))).toBeNull();
+  expect(score(byId("plan-1"), did(lc("plan", "webshopin", "lisää webshopin harjoitus 5: sähköpostin asetukset")))).toBeNull();
 });

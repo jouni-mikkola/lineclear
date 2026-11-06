@@ -1,0 +1,30 @@
+name: nightly
+
+# The heavy suites no pull request or merge waits for: the whole-repo gates, the coverage floors and the browser suite.
+# (cold-start and the model evals spend tokens and run on the owner's machines.)
+on:
+  schedule:
+    - cron: "37 2 * * *"
+  workflow_dispatch:
+
+jobs:
+  nightly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: git fetch --no-tags origin main:main
+        if: github.ref_name != 'main'
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', 'server/bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+      - run: bun install --frozen-lockfile
+      - run: bunx playwright install --with-deps chromium
+      - run: bun run gates:full
+      - run: bun run coverage
+      - run: bun run ui:test

@@ -114,7 +114,6 @@ export class LiveSource extends LiveSourceUpkeep implements Source {
     this.agents.start()
     // the space the machine's and All machines' coordinators shared is the home space's now; their agents close
     void this.agents.space(HOME_SPACE.label, HOME_SPACE.was).catch(() => undefined)
-    this.sayTookOver()
     // watched chats: read new log lines once a second; schedules once a minute
     this.timers.push(setInterval(() => held('rule poll chats', () => this.pollChats()), 1000))
     // a reply in a turn that goes on (or one only background work follows) changes no status: looked for here

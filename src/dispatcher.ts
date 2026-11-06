@@ -10,14 +10,12 @@ import { looseNote, resolveProject, resolveStep } from "./resolve.ts";
 import { projectsMain } from "./requests.ts";
 import { checkRoadmap } from "./roadmap.ts";
 import { configDir } from "../pi/config.ts";
+import { gitAsLineclear } from "./git.ts";
 
 export const DISPATCHER_SPACE = "dispatcher";
 const USAGE = ["usage: lineclear move <project> <step> --after <ids|none>", "       lineclear dispatcher setup | projects"];
 
-const shepherdr = serverBin;
-const git = (cwd: string, ...a: string[]) =>
-  Bun.spawnSync(["git", "-C", cwd, "-c", "user.name=Lineclear", "-c", "user.email=lineclear@localhost", ...a], { stdin: "ignore" });
-
+const lineclear = serverBin;
 /** The folder of the Dispatcher's space. */
 export const dispatcherDir = (env = process.env) => join(configDir(env), DISPATCHER_SPACE);
 
@@ -89,10 +87,10 @@ export function moveMain(args: string[], out: (l: string) => void, env = process
     // the project does not ask before plans: the rule checks decide, and the owner can undo it
     const problems = planProblems(old, changed.text);
     if (problems.length > 0) return fail(`the rule checks refuse this move: ${problems.join("; ")}`);
-    const base = git(settings.repo, "rev-parse", "HEAD").stdout.toString().trim();
+    const base = gitAsLineclear(settings.repo, "rev-parse", "HEAD").out.trim();
     const problem = applyMove({ move: { step, after }, project: name } as Item, env);
     if (problem) return fail(problem);
-    const commit = git(settings.repo, "rev-parse", "HEAD").stdout.toString().trim();
+    const commit = gitAsLineclear(settings.repo, "rev-parse", "HEAD").out.trim();
     const done = recordApplied(
       { kind: "plan", task: "-", project: name, question, choices: ["Approve", "Reject"], diff, move: { step, after }, since: now().toISOString() },
       base,
@@ -127,21 +125,21 @@ export function applyMove(item: Item, env = process.env): string | undefined {
   const settings = readSettings(item.project, env);
   if (typeof settings === "string") return settings;
   const repo = settings.repo;
-  if (git(repo, "rev-parse", "--abbrev-ref", "HEAD").stdout.toString().trim() !== "main") return `${repo} is not on main, switch it to main and answer again`;
-  if (git(repo, "status", "--porcelain", "--", "docs/ROADMAP.md").stdout.toString().trim() !== "")
+  if (gitAsLineclear(repo, "rev-parse", "--abbrev-ref", "HEAD").out.trim() !== "main") return `${repo} is not on main, switch it to main and answer again`;
+  if (gitAsLineclear(repo, "status", "--porcelain", "--", "docs/ROADMAP.md").out.trim() !== "")
     return "docs/ROADMAP.md has uncommitted changes, commit or undo them and answer again";
   const file = join(repo, "docs", "ROADMAP.md");
   const changed = withAfter(readFileSync(file, "utf8"), item.move.step, item.move.after);
   if ("error" in changed) return changed.error;
   writeAtomic(file, changed.text);
-  const c = git(repo, "commit", "-q", "-m", `Lineclear: move ${item.move.step} after ${item.move.after.join(", ")}`, "--", "docs/ROADMAP.md");
-  if (c.exitCode !== 0) return `git commit failed: ${c.stderr.toString().trim()}`;
+  const c = gitAsLineclear(repo, "commit", "-q", "-m", `Lineclear: move ${item.move.step} after ${item.move.after.join(", ")}`, "--", "docs/ROADMAP.md");
+  if (!c.ok) return `git commit failed: ${c.err}`;
   // Lineclear pushes this one commit itself (agents never push), so main and the project's remote stay level.
-  if (git(repo, "remote", "get-url", "origin").exitCode === 0) {
-    const p = git(repo, "push", "-q", "origin", "main");
-    if (p.exitCode !== 0) {
-      git(repo, "reset", "-q", "--hard", "HEAD~1");
-      return `git push failed, nothing changed: ${p.stderr.toString().trim()}`;
+  if (gitAsLineclear(repo, "remote", "get-url", "origin").ok) {
+    const p = gitAsLineclear(repo, "push", "-q", "origin", "main");
+    if (!p.ok) {
+      gitAsLineclear(repo, "reset", "-q", "--hard", "HEAD~1");
+      return `git push failed, nothing changed: ${p.err}`;
     }
   }
   return undefined;
@@ -166,12 +164,12 @@ export function dispatcherMain(args: string[], out: (l: string) => void, env = p
   mkdirSync(dir, { recursive: true });
   writeAtomic(join(dir, "AGENTS.md"), dispatcherPrompt());
   if (!existsSync(join(dir, ".git"))) {
-    const i = Bun.spawnSync(["git", "-C", dir, "init", "-q", "-b", "main"], { stdin: "ignore" });
-    if (i.exitCode !== 0) return (out(`lineclear dispatcher: git init failed: ${i.stderr.toString().trim()}`), 1);
+    const i = gitAsLineclear(dir, "init", "-q", "-b", "main");
+    if (!i.ok) return (out(`lineclear dispatcher: git init failed: ${i.err}`), 1);
   }
-  git(dir, "add", "AGENTS.md");
-  git(dir, "commit", "-q", "-m", "Dispatcher prompt", "--", "AGENTS.md");
-  const run = (...a: string[]) => Bun.spawnSync([shepherdr(env), ...a], { stdin: "ignore" });
+  gitAsLineclear(dir, "add", "AGENTS.md");
+  gitAsLineclear(dir, "commit", "-q", "-m", "Dispatcher prompt", "--", "AGENTS.md");
+  const run = (...a: string[]) => Bun.spawnSync([lineclear(env), ...a], { stdin: "ignore" });
   const listing = run("space", "list");
   const exists =
     listing.exitCode === 0 &&

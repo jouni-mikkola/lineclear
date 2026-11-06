@@ -7,6 +7,7 @@ import { piHarness } from "./harness-pi.ts";
 import { reviewerRound, type Usage } from "./session-text.ts";
 import { addCall, type Band, emptyBands, mergeBands } from "./measure-bands.ts";
 import { lockHeldAfterEnd, waitCauses, type StepDecision, type StepWait, type Window } from "./wait-causes.ts";
+import { DAY } from "./time.ts";
 
 export { sessionFolder } from "./harness-pi.ts";
 
@@ -107,7 +108,6 @@ interface ReviewCost {
   dollars: number;
 }
 
-export const DAY = 86_400_000;
 const dayOf = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
 export function median(values: number[]): number {
@@ -354,7 +354,7 @@ export function measure(m: Measured, since: string): Numbers {
 
 // ---- reading the files ----
 
-export function shepherdrDir(env: Env): string {
+export function lineclearDir(env: Env): string {
   return dataDir(env);
 }
 

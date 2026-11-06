@@ -1,4 +1,5 @@
 // gh for tasks: login, pull requests, their checks and comments, and the runs of a branch.
+import * as Runs from '../../../../src/check-runs.ts'
 import { gh, git, type GitHub, R } from './git.ts'
 
 /**
@@ -86,7 +87,12 @@ export const closePr = (g: GitHub, cwd: string, n: number, comment: string) => g
 
 export const readyPr = (g: GitHub, cwd: string, n: number) => gh(g, cwd, 'pr', 'ready', String(n), ...R(g))
 
-export type PrChecks = { state: 'pending' | 'pass' | 'fail' | 'none' | 'error'; passed: number; failed: { name: string; link?: string }[]; error?: string }
+export type PrChecks = {
+  state: 'pending' | 'pass' | 'fail' | 'none' | 'error'
+  passed: number
+  failed: { name: string; link?: string; tests?: string[] }[]
+  error?: string
+}
 
 /** a check as gh pr checks buckets it: pass, fail, pending, skipping or cancel */
 export type Check = { name: string; bucket: string; link?: string }
@@ -301,10 +307,15 @@ export async function prComments(g: GitHub, cwd: string, n: number): Promise<PrC
   ].sort((a, b) => a.at.localeCompare(b.at))
 }
 
-/** the last lines a failed check's job logged before its last error (after it come clean-up steps), from its link
- *  (…/actions/runs/1/job/2, or a run's: its first failed job); nothing when gh can't tell. Read through the API, as
- *  gh run view's own calls skip a GitHub proxy (GH_HOST) for the jobs. */
-export async function failedLog(g: GitHub, cwd: string, link: string, lines = 15): Promise<string | undefined> {
+/** the names of the tests a failed check's job log shows as failed (the check's own report, read by check-runs); none when gh can't tell */
+export async function failedTestNames(g: GitHub, cwd: string, link: string): Promise<string[]> {
+  const said = await jobLines(g, cwd, link)
+  return said ? Runs.failedTests(said.join('\n')) : []
+}
+
+/** the lines a failed check's job logged, from its link (…/actions/runs/1/job/2, or a run's: its first failed job);
+ *  nothing when gh can't tell. Read through the API, as gh run view's own calls skip a GitHub proxy (GH_HOST) for the jobs. */
+async function jobLines(g: GitHub, cwd: string, link: string): Promise<string[] | undefined> {
   const run = link.match(/\/actions\/runs\/(\d+)/)?.[1]
   let job = link.match(/\/actions\/runs\/\d+\/job\/(\d+)/)?.[1]
   if (!job && run) {
@@ -325,7 +336,7 @@ export async function failedLog(g: GitHub, cwd: string, link: string, lines = 15
   if (!r.ok && /unknown flag/i.test(r.err)) r = await gh(g, cwd, 'api', `repos/${g.repo}/actions/jobs/${job}/logs`)
   if (!r.ok || !r.out.trim()) return undefined
   // each line is "time message" (gh run view's: "job<TAB>step<TAB>time message"): the message is what matters
-  const said = r.out
+  return r.out
     .split('\n')
     .map((l) =>
       l
@@ -336,6 +347,12 @@ export async function failedLog(g: GitHub, cwd: string, link: string, lines = 15
         .trimEnd(),
     )
     .filter((l) => l.trim())
+}
+
+/** the last lines a failed check's job logged before its last error (after it come clean-up steps) */
+export async function failedLog(g: GitHub, cwd: string, link: string, lines = 15): Promise<string | undefined> {
+  const said = await jobLines(g, cwd, link)
+  if (!said) return undefined
   const err = said.findLastIndex((l) => l.includes('##[error]'))
   const tail = said
     .slice(0, err < 0 ? undefined : err + 1)

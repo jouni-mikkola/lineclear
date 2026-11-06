@@ -2,7 +2,7 @@
 import { expect, test } from "@playwright/test";
 
 const VIEWS = ["/", "/web-shop/roadmap", "/chat", "/settings"];
-const OLD = /shepherdr/i;
+const OLD = /lineclear/i;
 
 test("no view shows the old name", async ({ page }) => {
   const seen: string[] = [];

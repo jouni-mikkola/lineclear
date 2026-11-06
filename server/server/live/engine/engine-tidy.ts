@@ -74,7 +74,7 @@ export class EngineTidy extends EngineMerge {
       return { held: r.why }
     }
     if (!t.worktree && !this.starting.has(t.id)) {
-      // above the defaults Shepherdr ended the brief with, so it wins over them like the rest of the brief
+      // above the defaults Lineclear ended the brief with, so it wins over them like the rest of the brief
       const [work, how] = splitBrief(t.desc)
       t.desc = [work, text, how].filter(Boolean).join('\n\n')
       // a message is the go, as for one at work

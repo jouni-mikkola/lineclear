@@ -1,7 +1,7 @@
 # Architecture
 
 Lineclear is a CLI with a rules loop (`src/`), a web UI (`ui/`), a pi extension (`pi/`) and a server (`server/`, the
-fork of Shepherdr 2.0 that runs the agents). This page names each module, what it owns and which modules it may
+fork of herdr-projects 2.0 that runs the agents). This page names each module, what it owns and which modules it may
 import. `bun run check` reads the table below (`scripts/gates/borders.ts`): an import that the table does not allow
 fails, and so does a source file in no module. A file belongs to the module with the longest folder that holds it.
 
@@ -22,23 +22,21 @@ imports count for the borders but not for cycles, since they are gone when the c
 | `gates` | `scripts/gates/` | the check's gates and their baselines | none |
 | `scripts` | `scripts/` | repo tools: the check, the smoke check and canary, measurements, film and icons | `cli`, `brand`, `gates`, `check-line` |
 | `tests` | `test/` | the bun tests, one file per command | `cli`, `pi`, `kit`, `web`, `brand`, `scripts`, `gates`, `ui-test`, `check-line`, `registry` |
-| `shared` | `server/shared/` | types and pure helpers the server and its screen share | none |
+| `shared` | `server/shared/` | types and pure helpers the server shares | none |
 | `server` | `server/server/` | the server: the live source, agents, chats, the engine and the merge lane | `shared`, `generated`, `check-line`, `registry`, `timer-rule` |
 | `registry` | `src/models.ts` | the models every installed harness lists | none |
-| `check-line` | `server/server/live/engine/check-queue.ts`, `src/check-runs.ts` | one line of full checks per repo and machine, each machine's check slots, the stuck head and the log of every check run, files `lineclear check` and the merge lane share | none |
+| `check-line` | `server/server/live/engine/check-queue.ts`, `src/check-runs.ts`, `src/git.ts`, `src/time.ts` | one line of full checks per repo and machine, each machine's check slots, the stuck head and the log of every check run, files `lineclear check` and the merge lane share, and the one git helper and time constants | none |
 | `timer-rule` | `server/server/live/timer-rule.ts` | whether a coordinator may wake on a timer, one rule for the server's refusal and the CLI's heal | none |
 | `generated` | `server/generated/` | the plugin registries the build writes | `plugins` |
-| `screen` | `server/src/`, `server/vite.config.ts`, `server/public/` | the server's own screen: kernel, layout and parts | `shared`, `generated` |
-| `plugins` | `server/plugins/` | the server's plugins, each a screen part and a server part | `screen`, `server`, `shared` |
+| `plugins` | `server/plugins/` | the server's plugins, each a server part | `server`, `shared` |
 | `helper` | `server/helper/` | what runs on a remote machine | `shared` |
 | `server-scripts` | `server/scripts/` | the server's build, update, supervisor and test runner | `server`, `plugins`, `shared`, `server-tests` |
-| `server-tests` | `server/test/` | the server's tests | `server`, `screen`, `plugins`, `shared`, `server-scripts`, `generated`, `helper`, `check-line`, `registry`, `timer-rule` |
+| `server-tests` | `server/test/` | the server's tests | `server`, `plugins`, `shared`, `server-scripts`, `generated`, `helper`, `check-line`, `registry`, `timer-rule` |
 
 ## Rules of thumb
 
-- Code that two modules share lives in the lower one. `shared` holds what the server and its screen both need.
-- `generated` is written by `server/scripts/build-plugins.ts`: it imports every plugin, and only `server` and
-  `screen` read it. That is how the server loads plugins that use the server's own parts.
+- Code that two modules share lives in the lower one. `shared` holds what the server's parts both need.
+- `generated` is written by `server/scripts/build-plugins.ts`: it imports every plugin, and only `server` reads it. That is how the server loads plugins that use the server's own parts.
 - Tests may import what they test, never the other way round.
 - An import across a border that is not allowed fails the gate. `scripts/gates/baseline/borders.json` stays empty.
 
@@ -48,6 +46,7 @@ imports count for the borders but not for cycles, since they are gone when the c
 floor in `scripts/gates/baseline/coverage.json` fails. `bun run coverage --raise` lifts floors to what is measured and
 never lowers one. It is slower than the check allows, so the nightly job and a release run it, not `bun run check`.
 The run gives each test 60 s, since coverage slows it and a timed-out test leaves its lines out of the count.
+A source file no test loads counts as uncovered only under `src/`, `bin/`, `pi/`, `ui/brand/` and `ui/kit/`: the server, Playwright, the repo's own drivers and the eval run under other runners. A module the root tests do not reach has no floor.
 `bunfig.toml` leaves out `scripts/media.ts`, `scripts/budget.ts` and `scripts/smoke.ts`: they drive Blender, Chromium and a live
 service, so only a run of the tool itself reaches them (`bun run media`, the budget step, the smoke check).
 
@@ -78,7 +77,7 @@ names it under Debts until it lands.
 | `ui` | the web pages, the kit, the brand, the web API, the README and its film | [ui](parts/ui.md) |
 | `pi` | the pi extension and the token pack | [pi](parts/pi.md) |
 | `gates` | `bun run check`, the code gates and the parts check | [gates](parts/gates.md) |
-| `server` | the Shepherdr 2.0 fork that runs the agents | [server](parts/server.md) |
+| `server` | the herdr-projects 2.0 fork that runs the agents | [server](parts/server.md) |
 
 **Health.** `lineclear measure` gives each part a health score, higher is worse: 3 for each file over the size limit,
 1 for each 50 lines copied (the copies baseline), 1 for each open debt on its page, 1 for each 5 points (rounded up) its line coverage is under the floors of its modules

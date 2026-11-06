@@ -26,18 +26,18 @@ const names = (xs: string[], saved?: string[]) =>
 
 describe('ordering places', () => {
   test('A to Z by default, any case, numbers as numbers', () => {
-    expect(names(['shepherdr', 'shepherdr-ttt-2', 'gtm'])).toEqual(['gtm', 'shepherdr', 'shepherdr-ttt-2'])
+    expect(names(['lineclear', 'lineclear-ttt-2', 'gtm'])).toEqual(['gtm', 'lineclear', 'lineclear-ttt-2'])
     expect(names(['b', 'A', 'app10', 'app9'])).toEqual(['A', 'app9', 'app10', 'b'])
   })
 
   test('the saved order wins; one it lacks goes after the last one before it A to Z; one gone is skipped', () => {
-    expect(names(['gtm', 'shepherdr', 'shepherdr-ttt-2'], ['shepherdr', 'gtm', 'shepherdr-ttt-2'])).toEqual(['shepherdr', 'gtm', 'shepherdr-ttt-2'])
+    expect(names(['gtm', 'lineclear', 'lineclear-ttt-2'], ['lineclear', 'gtm', 'lineclear-ttt-2'])).toEqual(['lineclear', 'gtm', 'lineclear-ttt-2'])
     // a favourite on top stays on top
-    expect(names(['gtm', 'shepherdr', 'shepherdr-ttt-2', 'herdr'], ['shepherdr', 'gtm', 'shepherdr-ttt-2'])).toEqual([
-      'shepherdr',
+    expect(names(['gtm', 'lineclear', 'lineclear-ttt-2', 'herdr'], ['lineclear', 'gtm', 'lineclear-ttt-2'])).toEqual([
+      'lineclear',
       'gtm',
       'herdr',
-      'shepherdr-ttt-2',
+      'lineclear-ttt-2',
     ])
     expect(names(['gtm', 'zed', 'alpha'], ['zed', 'gtm'])).toEqual(['alpha', 'zed', 'gtm'])
     expect(names(['gtm'], ['old', 'gtm'])).toEqual(['gtm'])

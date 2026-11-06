@@ -2,8 +2,7 @@ import { doneItems } from "./doneproof.ts";
 import { addItem, isOpen, readItems } from "./inbox.ts";
 import type { Step, Task } from "./roadmap.ts";
 import type { Decision, State, World } from "./rules.ts";
-
-const DAY_MS = 24 * 3600_000;
+import { DAY } from "./time.ts";
 
 /** What the limit needs of a tick. */
 interface Ask {
@@ -30,16 +29,16 @@ export function startsInDay(state: State, step: string, now: Date, tasks: Task[]
   }
   // An aged entry stays while its task is listed, or the task would be taken for a new one; it goes with the task.
   const listed = new Set(tasks.map((t) => t.id ?? t.title));
-  const kept = Object.fromEntries(Object.entries(seen).filter(([key, at]) => listed.has(key) || now.getTime() - at < DAY_MS));
+  const kept = Object.fromEntries(Object.entries(seen).filter(([key, at]) => listed.has(key) || now.getTime() - at < DAY));
   state.taskSeen = { ...state.taskSeen, [step]: kept };
-  const fresh = Object.values(kept).filter((at) => now.getTime() - at < DAY_MS);
-  const recorded = (state.stepStarts?.[step] ?? []).filter((at) => now.getTime() - at < DAY_MS).length;
+  const fresh = Object.values(kept).filter((at) => now.getTime() - at < DAY);
+  const recorded = (state.stepStarts?.[step] ?? []).filter((at) => now.getTime() - at < DAY).length;
   return Math.max(recorded, fresh.length);
 }
 
 /** Remembers a start of the step, and forgets those older than 24 hours. */
 export function recordStepStart(state: State, step: string, now: Date) {
-  const recent = (state.stepStarts?.[step] ?? []).filter((at) => now.getTime() - at < DAY_MS);
+  const recent = (state.stepStarts?.[step] ?? []).filter((at) => now.getTime() - at < DAY);
   state.stepStarts = { ...state.stepStarts, [step]: [...recent, now.getTime()] };
 }
 

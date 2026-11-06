@@ -20,7 +20,10 @@ import { afterTick, stallsOf, type TickFacts } from "./stall-ladder.ts";
 import { restartTask } from "./stalls.ts";
 import type { StartRecord } from "./starts.ts";
 import { tickProject } from "./tick-project.ts";
+import { tickGuard } from "./loop-guard.ts";
 import { sweepOldTemp } from "./tmpdirs.ts";
+import { unstick } from "./unstick.ts";
+import { holdWorld } from "./hold.ts";
 import { serviceWaits } from "./wait-service.ts";
 import { clearWait, loadLimit, readWaits } from "./waits.ts";
 import { ownMark, type World } from "./world.ts";
@@ -71,6 +74,8 @@ export interface State extends StartRecord {
   starts?: Record<string, { since: number; rung: number; at?: number; acted?: boolean }>;
   /** What each other machine last said about the project's tasks: kept when it cannot be reached, and read by the views. */
   remoteSeen?: Record<string, Task[]>;
+  /** Per other machine: when it last answered, whether its last read went unanswered, and whether a day of silence dropped its tasks from the views. */
+  machineReads?: Record<string, { good: number; missed?: true; dropped?: true }>;
   /** The project's open stalls, by `<task or step>|<class>`. */
   stalls?: Record<string, StallEntry>;
   /** Held tasks made on another machine, by their id here: one whose local copy did not close is not made twice. */
@@ -89,6 +94,10 @@ export interface State extends StartRecord {
   faultWaits?: Record<string, { fault: string; since: number }>;
   /** Owner-only steps with the Inbox item that asks the owner; the owner's Done answer ends the step. */
   ownerItems?: Record<string, number>;
+  /** Tasks showing Went wrong: when first seen (ms). */
+  wrongSeen?: Record<string, number>;
+  /** Tasks on Ready to merge: when first seen (ms) and when last told to go on (see unstick.ts). */
+  readySeen?: Record<string, { since: number; woke?: number }>;
 }
 const emptyState = (): State => ({ healthFailures: 0, stopped: false, roadmapErrors: [], last: {}, ladder: {}, models: {}, handed: [], starts: {} });
 const statePath = (name: string, env = process.env) => join(projectsDir(env), name, "state.json");
@@ -162,19 +171,21 @@ export function tick(world: World, dryRun: boolean, env = process.env): Decision
     }
     settled.push({ name, settings });
     const state = readState(name, env);
+    const held = holdWorld(world, settings);
     const answer = (space: string, id: string, text: string) => answerCard({ space, id }, text, env);
-    const ops = { clean: (t: string) => world.clean(t), close: (t: string) => world.closeTask(t), restart: (t: string) => restartTask(world, t) };
-    const routed = routeAsks(name, settings.space, (task, text) => world.tellTask(task, text, "answer"), world.now(), dryRun, env, ops, answer).map(
+    const ops = { clean: (t: string) => world.clean(t), close: (t: string) => world.closeTask(t), restart: (t: string) => restartTask(held, t) };
+    const routed = routeAsks(name, settings.space, (task, text) => held.tellTask(task, text, "answer"), world.now(), dryRun, env, ops, answer).map(
       (reason): Decision => ({ time: world.now().toISOString(), project: name, kind: "wake", reason }),
     );
     const facts: TickFacts = {};
     const decisions = [
       ...routed,
       ...closeOver(name, settings, world, dryRun, env),
+      ...unstick({ project: name, settings, world: held, state, waits: readWaits(env), dryRun }),
       ...serviceWaits(name, world, dryRun, env),
-      ...tickProject(name, settings, world, state, dryRun, readWaits(env), loadLimit(env), env, facts),
+      ...tickProject(name, settings, held, state, dryRun, readWaits(env), loadLimit(env), env, facts),
     ];
-    decisions.push(...stallsOf(name, settings, world, state, decisions, facts, dryRun, env));
+    decisions.push(...stallsOf(name, settings, held, state, decisions, facts, dryRun, env));
     if (dryRun) {
       all.push(...decisions);
       continue;
@@ -235,6 +246,15 @@ export async function runMain(args: string[], out: (l: string) => void, world: W
   }
   // a tick that is still running is not started again, and a stop waits for it
   let ticking: Promise<void> | undefined;
+  const guard = tickGuard();
+  // the guard writes a file: its failure must not leave `ticking` set and stop the loop
+  const report = (e?: unknown) => {
+    try {
+      guard(e);
+    } catch (g) {
+      console.error(`lineclear run: loop guard failed: ${g instanceof Error ? g.message : g}`);
+    }
+  };
   const safely = () => {
     if (ticking) return;
     const tickOnce = async () => {
@@ -243,7 +263,10 @@ export async function runMain(args: string[], out: (l: string) => void, world: W
         else await Promise.all([refreshQuota().catch(() => {}), tickAway(out)]);
       } catch (e) {
         console.error(`lineclear run: tick failed: ${e instanceof Error ? e.message : e}`);
+        report(e);
+        return;
       }
+      report();
     };
     const mine = (ticking = tickOnce().then(() => {
       if (ticking === mine) ticking = undefined;

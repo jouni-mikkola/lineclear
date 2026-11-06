@@ -95,7 +95,7 @@ test("a coordinator still has the owner's planted direction after a compaction p
   s.user(PLANTED);
   for (let i = 0; i < 200 && s.tokens() < 170_000; i++) {
     s.work(10);
-    s.user("<shepherdr><heartbeat>nothing new</heartbeat></shepherdr>");
+    s.user("<lineclear><heartbeat>nothing new</heartbeat></lineclear>");
     s.turn();
   }
   s.user(LATEST);

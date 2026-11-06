@@ -1,14 +1,14 @@
 import { openSync, readSync, closeSync, realpathSync, statSync } from "node:fs";
 import { basename, extname, sep } from "node:path";
 import { DISPATCHER_SPACE, dispatcherDir } from "./dispatcher.ts";
-import { keepLinks, postAction, readSnapshot, shepherdrServer, taskChatKey, watchSocket } from "./shepherdr-client.ts";
+import { keepLinks, postAction, readSnapshot, lineclearServer, taskChatKey, watchSocket } from "./lineclear-client.ts";
 import { listProjectNames, readSettings } from "./project.ts";
 
-// The web chat with the Dispatcher. The Dispatcher is the coordinator chat of its own Shepherdr space (L18), so
-// Lineclear talks to it through Shepherdr's own server on this machine: it watches that one chat over Shepherdr's
-// WebSocket and sends with Shepherdr's send action, the same way Shepherdr's own chat does. A file you attach goes to
-// Shepherdr's upload, which saves it in its inbox on the Dispatcher's machine, and its path goes with the message: the
-// same as an attachment in Shepherdr's own chat, so each chat shows the other's files.
+// The web chat with the Dispatcher. The Dispatcher is the coordinator chat of its own Lineclear space, so
+// Lineclear talks to it through Lineclear's own server on this machine: it watches that one chat over Lineclear's
+// WebSocket and sends with Lineclear's send action, the same way Lineclear's own chat does. A file you attach goes to
+// Lineclear's upload, which saves it in its inbox on the Dispatcher's machine, and its path goes with the message: the
+// same as an attachment in Lineclear's own chat, so each chat shows the other's files.
 
 import { ACCEPTED, IMAGE_TYPES, MAX_FILE_BYTES, MAX_FILES, MAX_TEXT, sizeText, TEXT_EXT } from "./chat-limits.ts";
 
@@ -136,7 +136,7 @@ export interface ChatMessage {
 }
 
 export interface ChatView {
-  /** ready: talking. none: there is no Dispatcher yet. offline: Shepherdr cannot be reached. loading: connecting. */
+  /** ready: talking. none: there is no Dispatcher yet. offline: Lineclear cannot be reached. loading: connecting. */
   state: "loading" | "ready" | "none" | "offline";
   reason?: string;
   messages: ChatMessage[];
@@ -148,7 +148,7 @@ export interface ChatView {
   failed: { cid: string; error: string }[];
 }
 
-/** Where the page reads a file of the chat: through this server from Shepherdr, which serves only the chat's own. */
+/** Where the page reads a file of the chat: through this server from Lineclear, which serves only the chat's own. */
 const fileUrl = (path: string) => `/api/chat/file?path=${encodeURIComponent(path)}`;
 
 /** A file in a message as the page shows it. Its size is known when it was attached here. */
@@ -189,7 +189,7 @@ function questionView(q: Raw): NonNullable<ChatMessage["question"]> {
   return { id: String(q.id), choices, ...answered, ...(words ? { words } : {}), ...(steps.length ? { steps } : {}) };
 }
 
-/** One message of Shepherdr's chat as the page draws it, or undefined when it has nothing to show. */
+/** One message of Lineclear's chat as the page draws it, or undefined when it has nothing to show. */
 function messageView(m: Raw, sizes: ReadonlyMap<string, number>): ChatMessage | undefined {
   const base = messageBase(m);
   if (m.file && typeof m.file.path === "string")
@@ -200,7 +200,7 @@ function messageView(m: Raw, sizes: ReadonlyMap<string, number>): ChatMessage | 
   return undefined;
 }
 
-/** Shepherdr's chat (its `Chat`), as the page draws it. */
+/** Lineclear's chat (its `Chat`), as the page draws it. */
 export function chatView(chat: Raw, sizes: ReadonlyMap<string, number> = new Map()): Omit<ChatView, "state"> {
   const messages: ChatMessage[] = [];
   for (const m of (Array.isArray(chat?.messages) ? chat.messages : []) as Raw[]) {
@@ -224,8 +224,8 @@ const NO_TASK_CHAT = "This task has no chat.";
 const SLOW = "The board server has not said yet that the Dispatcher took it. Try again: it goes in only once.";
 const GONE = "An attached file is gone. Attach it again.";
 
-/** Which chat of Shepherdr's snapshot a link follows, and what it says when there is none. */
-/** The parts of Shepherdr's snapshot a chat link reads. */
+/** Which chat of Lineclear's snapshot a link follows, and what it says when there is none. */
+/** The parts of Lineclear's snapshot a chat link reads. */
 interface Snapshot {
   host?: string;
   places?: { name?: string; machine?: string; chat?: string; home?: boolean }[];
@@ -248,17 +248,17 @@ const DISPATCHER: ChatTarget = {
 
 const taskTarget = (id: string): ChatTarget => ({ none: NO_TASK_CHAT, find: (snap) => taskChatKey(snap, id) });
 
-/** The live link to the Dispatcher's chat; see `shepherdrChat`. */
+/** The live link to the Dispatcher's chat; see `lineclearChat`. */
 export function dispatcherChat(env: Env = process.env, retryMs = 3000, sendMs = 120_000, makeDispatcher?: () => number | Promise<number>) {
-  return shepherdrChat(env, DISPATCHER, retryMs, sendMs, makeDispatcher);
+  return lineclearChat(env, DISPATCHER, retryMs, sendMs, makeDispatcher);
 }
 
 /** The live link to one task's chat with its agent. */
 function taskChat(id: string, env: Env = process.env) {
-  return shepherdrChat(env, taskTarget(id));
+  return lineclearChat(env, taskTarget(id));
 }
 
-/** Gives a file to Shepherdr for the chat. Returns the path it saved it at, or why it did not. */
+/** Gives a file to Lineclear for the chat. Returns the path it saved it at, or why it did not. */
 async function saveToServer(base: string, key: string, name: string, type: string, bytes: Uint8Array): Promise<string | { error: string; status: number }> {
   try {
     const form = new FormData();
@@ -273,7 +273,7 @@ async function saveToServer(base: string, key: string, name: string, type: strin
   }
 }
 
-/** A file of the chat, read from Shepherdr: an image shows inline, anything else downloads. */
+/** A file of the chat, read from Lineclear: an image shows inline, anything else downloads. */
 async function fileResponse(base: string, key: string, path: string): Promise<Response> {
   let r: Response;
   try {
@@ -300,8 +300,8 @@ async function fileResponse(base: string, key: string, path: string): Promise<Re
 }
 
 /**
- * The live link to one chat of Shepherdr: one WebSocket to it, opened when a page first asks and opened again
- * when it drops. Each change of the chat goes to every listener at once, so a reply shows as Shepherdr reads it.
+ * The live link to one chat of Lineclear: one WebSocket to it, opened when a page first asks and opened again
+ * when it drops. Each change of the chat goes to every listener at once, so a reply shows as Lineclear reads it.
  */
 function chatLink(env: Env, target: ChatTarget, retryMs: number, sizes: Map<string, number>, makeDispatcher?: () => number | Promise<number>) {
   // a missing Dispatcher is made once, here, so no one is asked to run a command
@@ -331,7 +331,7 @@ function chatLink(env: Env, target: ChatTarget, retryMs: number, sizes: Map<stri
   async function connect() {
     if (ws) return;
     tried = Date.now();
-    base = shepherdrServer(env);
+    base = lineclearServer(env);
     if (!base) return down("offline", OFFLINE);
     const snap: Raw = await readSnapshot(base);
     if (snap === undefined) return down("offline", OFFLINE);
@@ -379,13 +379,13 @@ function chatLink(env: Env, target: ChatTarget, retryMs: number, sizes: Map<stri
 }
 
 /** The chat of one target, with the actions a page takes on it. */
-function shepherdrChat(env: Env, target: ChatTarget, retryMs = 3000, sendMs = 120_000, makeDispatcher?: () => number | Promise<number>) {
-  // what you attached here, by the id the page holds: its path in Shepherdr's inbox
+function lineclearChat(env: Env, target: ChatTarget, retryMs = 3000, sendMs = 120_000, makeDispatcher?: () => number | Promise<number>) {
+  // what you attached here, by the id the page holds: its path in Lineclear's inbox
   const uploads = new Map<string, { path: string; at: number }>();
   const sizes = new Map<string, number>();
   const link = chatLink(env, target, retryMs, sizes, makeDispatcher);
   const { ensure } = link;
-  // Shepherdr answers once the Dispatcher took it, which waits for a stopped one to start
+  // Lineclear answers once the Dispatcher took it, which waits for a stopped one to start
   const act = (action: Record<string, unknown>) => postAction(link.base() ?? "", action, sendMs, OFFLINE, SLOW);
 
   /** Why the chat cannot take an action now, or undefined when it can. */
@@ -406,15 +406,15 @@ function shepherdrChat(env: Env, target: ChatTarget, retryMs = 3000, sendMs = 12
       if (files.some((f) => !f)) return { error: GONE, status: 400 };
       return notReady() ?? act({ type: "send", chat: link.key(), text, attachments: files, ...(cid ? { cid } : {}), ...(reply ? { reply } : {}) });
     },
-    /** Puts your reaction on a message, or takes it off when it is there already, as Shepherdr's own chat does. */
+    /** Puts your reaction on a message, or takes it off when it is there already, as Lineclear's own chat does. */
     async react(message: string, emoji: string): Promise<{ error: string; status: number } | undefined> {
       return notReady() ?? act({ type: "react", chat: link.key(), message, emoji });
     },
-    /** Answers a card the Dispatcher asked with, by the number of its choice, as Shepherdr's own chat does. */
+    /** Answers a card the Dispatcher asked with, by the number of its choice, as Lineclear's own chat does. */
     async answer(question: string, choice: number): Promise<{ error: string; status: number } | undefined> {
       return notReady() ?? act({ type: "answer", chat: link.key(), question, choice });
     },
-    /** Attaches a file: checked here, then saved by Shepherdr for the Dispatcher. Gives its id, or why it is refused. */
+    /** Attaches a file: checked here, then saved by Lineclear for the Dispatcher. Gives its id, or why it is refused. */
     async upload(name: string, bytes: Uint8Array): Promise<({ id: string } & ChatFile) | { error: string; status: number }> {
       const plain = basename(name.replace(/\\/g, "/")).trim() || "file";
       const checked = checkUpload(plain, bytes);
@@ -434,7 +434,7 @@ function shepherdrChat(env: Env, target: ChatTarget, retryMs = 3000, sendMs = 12
       sizes.set(path, bytes.length);
       return { id, name: plain, size: bytes.length, image: checked.image, url: fileUrl(path) };
     },
-    /** A file of the chat, read from Shepherdr: an image shows inline, anything else downloads. */
+    /** A file of the chat, read from Lineclear: an image shows inline, anything else downloads. */
     async file(path: string): Promise<Response> {
       ensure();
       const base = link.base();

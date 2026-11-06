@@ -67,7 +67,7 @@ export async function readCodexRuntime(ids: string[]): Promise<Map<string, Agent
     socket.on('error', finish)
     ws.on('error', finish)
     ws.on('close', finish)
-    ws.on('open', () => ws.send(JSON.stringify({ id: 0, method: 'initialize', params: { clientInfo: { name: 'shepherdr_runtime', version: '1' } } })))
+    ws.on('open', () => ws.send(JSON.stringify({ id: 0, method: 'initialize', params: { clientInfo: { name: 'lineclear_runtime', version: '1' } } })))
     ws.on('message', (data) => {
       try {
         const r = JSON.parse(data.toString())

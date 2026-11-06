@@ -74,7 +74,7 @@ function readRecords(path: string): FlakeRecord[] {
 
 /**
  * The hook for a fix task: gets the flaky test and its evidence, files the task. The default adds a task to the
- * project's Shepherdr space; a learning loop that files its own tasks replaces it. True when the task is filed.
+ * project's Lineclear space; a learning loop that files its own tasks replaces it. True when the task is filed.
  */
 export type FileFix = (f: Failure, seen: number) => boolean;
 

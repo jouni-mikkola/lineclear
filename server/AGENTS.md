@@ -1,4 +1,4 @@
-# Working on Shepherdr
+# Working on Lineclear
 
 How to run, build and lay out the code: [docs/develop.md](docs/develop.md).
 

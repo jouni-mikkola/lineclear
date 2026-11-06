@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-import { oldFolderUsers } from "../src/old-install.ts";
+import { OLD_NAME, oldFolderUsers } from "../src/old-install.ts";
 
 test("a process with the old folder in its command or environment is a user of it", () => {
   const proc = mkdtempSync(join(tmpdir(), "proc-"));
@@ -12,9 +12,9 @@ test("a process with the old folder in its command or environment is a user of i
     writeFileSync(join(proc, pid, "environ"), env);
   };
   const env = { LINECLEAR_OLD_DIR: "/home/x/.old" };
-  put("11", "pi\0", "LINECLEAR_COMMAND=/home/x/.old/helper/bin/shepherdr\0A=b");
+  put("11", "pi\0", `LINECLEAR_COMMAND=/home/x/.old/helper/bin/${OLD_NAME}\0A=b`);
   put("12", "/home/x/.old/helper/bin/agent-browser-bin\0--x", "A=b");
-  put("13", "pi\0", "LINECLEAR_COMMAND=/home/x/.lineclear/helper/bin/shepherdr");
+  put("13", "pi\0", `LINECLEAR_COMMAND=/home/x/.lineclear/helper/bin/${OLD_NAME}`);
   expect(
     oldFolderUsers(env, proc)
       .map((u) => u.split(" ")[0])
@@ -71,14 +71,14 @@ test("a socket bound in an old folder holds it", () => {
   expect(users(proc)).toEqual(["51"]);
 });
 
-test("an agent whose command still ends in shepherdr is named by its chat", async () => {
+test("an agent whose command still ends in the old name is named by its chat", async () => {
   const { agentsOnOldName } = await import("../src/helper.ts");
   const proc = mkdtempSync(join(tmpdir(), "proc-"));
   const put = (pid: string, env: string) => {
     mkdirSync(join(proc, pid));
     writeFileSync(join(proc, pid, "environ"), env);
   };
-  put("21", `HOME=${homedir()}\0LINECLEAR_CHAT=LINE-1/Agent\0LINECLEAR_COMMAND=/h/.lineclear/helper/bin/shepherdr\0`);
+  put("21", `HOME=${homedir()}\0LINECLEAR_CHAT=LINE-1/Agent\0LINECLEAR_COMMAND=/h/.lineclear/helper/bin/${OLD_NAME}\0`);
   put("22", `HOME=${homedir()}\0LINECLEAR_CHAT=LINE-2/Agent\0LINECLEAR_COMMAND=/h/.lineclear/helper/bin/lineclear\0`);
   expect(agentsOnOldName(proc)).toEqual(["LINE-1/Agent"]);
 });

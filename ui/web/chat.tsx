@@ -182,7 +182,7 @@ export function useChat(sample: ChatState | undefined, on: boolean, api = "/api/
     },
     [sample, api],
   );
-  /** Sends one again under the same id: Shepherdr takes an id once, so a message that did go in is not sent twice. */
+  /** Sends one again under the same id: Lineclear takes an id once, so a message that did go in is not sent twice. */
   const latest = useRef(pending);
   latest.current = pending;
   const retry = useCallback((cid: string) => {

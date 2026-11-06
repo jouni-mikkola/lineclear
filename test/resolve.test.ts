@@ -22,16 +22,16 @@ function config(names: Record<string, string>) {
 }
 
 test("fold drops case, accents and punctuation", () => {
-  expect(fold("Oma-Labra")).toBe("webshop");
+  expect(fold("Web-Shop")).toBe("webshop");
   expect(fold("Kärkäs Ääni")).toBe("karkasaani");
 });
 
 test("a project written loosely is found, or refused with the two nearest", () => {
-  const e = config({ lineclear: "/r/lineclear", webshop: "/r/oma-labra", budget: "/r/budget" });
+  const e = config({ lineclear: "/r/lineclear", webshop: "/r/web-shop", budget: "/r/budget" });
   expect(resolveProject("lineclear", e)).toEqual({ name: "lineclear", loose: false });
   expect(resolveProject("Lineclear", e)).toEqual({ name: "lineclear", loose: true });
-  expect(resolveProject("webshopan", e)).toEqual({ name: "webshop", loose: true });
-  expect(resolveProject("Oma-Labra", e)).toEqual({ name: "webshop", loose: true });
+  expect(resolveProject("webshopin", e)).toEqual({ name: "webshop", loose: true });
+  expect(resolveProject("Web-Shop", e)).toEqual({ name: "webshop", loose: true });
   expect(resolveProject("budg", e)).toEqual({ name: "budget", loose: true });
   expect(resolveProject("lineclaer", e)).toEqual({ name: "lineclear", loose: true });
   const bad = resolveProject("budjetti", e);

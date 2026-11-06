@@ -11,7 +11,7 @@ beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "lineclear-project-"));
   repo = join(root, "myrepo");
   mkdirSync(repo);
-  const fake = join(root, "shepherdr");
+  const fake = join(root, "lineclear");
   writeFileSync(fake, `#!/bin/sh\nprintf 'home  (home space)  /root\\nmyspace  MYR  ${repo}  github:x/y\\n'\n`);
   chmodSync(fake, 0o755);
   env = {
@@ -20,7 +20,7 @@ beforeEach(() => {
     LINECLEAR_MAIN_HOME: join(root, "data"),
     LINECLEAR_PORT: "0",
     LINECLEAR_WEB_PORT: "0",
-    SHEPHERDR_BIN: fake,
+    LINECLEAR_SERVER_BIN: fake,
   };
 });
 beforeEach(() => chooseModels(join(root, "config")));
@@ -170,8 +170,8 @@ test("bin/lineclear project add writes projects/<name>/settings.json with every 
   expect(s.check).toContain("run check");
 });
 
-test("add works when shepherdr is not installed, and rejects an empty model list", async () => {
-  env.SHEPHERDR_BIN = join(root, "no-such-shepherdr");
+test("add works when lineclear is not installed, and rejects an empty model list", async () => {
+  env.LINECLEAR_SERVER_BIN = join(root, "no-such-lineclear");
   const asked: string[] = [];
   const r = await run(["project", "add", repo, "--check", "true", "--worker", ",", "--reviewer", "b/z", "--planner", "c/w"], async (q) => {
     asked.push(q);

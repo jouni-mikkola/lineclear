@@ -24,24 +24,19 @@ Home, on the demo data of `lineclear run --demo`. More views are in [docs/shots]
 ## What it needs
 
 - Linux, `curl` and `git`. With systemd user services, Lineclear starts by itself.
-- Access to this repository, which is private for now, and the [GitHub CLI](https://cli.github.com) (`gh`).
 - An AI subscription that [pi](https://pi.dev) can use. The install adds Bun, herdr and pi when they are missing.
   pi needs Node.js 22.19 or newer.
 
 ## Install
 
 ```sh
-gh auth login
-gh auth setup-git
-gh api repos/jouni-mikkola/lineclear/contents/install.sh -H "Accept: application/vnd.github.raw" | sh
+curl -fsSL https://raw.githubusercontent.com/jouni-mikkola/lineclear/main/install.sh | sh
 ```
 
-A plain download of a file from a private repository fails, so the script is fetched with `gh`. `gh auth setup-git`
-lets git use the same sign-in for the repository itself. The install puts `lineclear` in `~/.local/bin` and starts
-`lineclear run` as a user service. Run `lineclear doctor` to check it; it names any problem and the command that
-fixes it.
+The install puts `lineclear` in `~/.local/bin` and starts `lineclear run` as a user service. Run `lineclear doctor`
+to check it; it names any problem and the command that fixes it.
 
-To update, run the last line again. An update that does not work puts the previous version back.
+To update, run the install line again. An update that does not work puts the previous version back.
 `LINECLEAR_REPO` names another copy of the repository (a URL or a path) and `LINECLEAR_REF` a branch, tag or commit
 (default: the machine's stable build once it has one, else `main`). The service runs stable, the last build of main
 that passed its tests, never main itself: [Stable and next](docs/stable-and-next.md).
@@ -51,7 +46,7 @@ that passed its tests, never main itself: [Stable and next](docs/stable-and-next
 Works now: the rules that start, review and merge steps by themselves, waits that name their cause, the stall ladder
 ([stalls](docs/stalls.md)), the Inbox, and the web views (Home, the Dispatcher chat, the Inbox).
 
-Not yet: the own fork (`server/` still follows Shepherdr 2.0) and the merge lane (the merge still runs through the
+Not yet: the own fork (`server/` still follows herdr-projects 2.0) and the merge lane (the merge still runs through the
 board). The [roadmap](docs/ROADMAP.md) has both.
 
 ## Your first steps
@@ -86,8 +81,8 @@ copies; `--all` removes them.
 
 ## More
 
-[The idea](docs/idea.md) · [Roadmap](docs/ROADMAP.md) · [Changelog](CHANGELOG.md) · [Brand](docs/brand.md) · [The agent kit](docs/kit.md)
+[The idea](docs/idea.md) · [Roadmap](docs/ROADMAP.md) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [Brand](docs/brand.md)
 
 Lineclear is released under the MIT license ([LICENSE](LICENSE)). It began as a fork of
-[Shepherdr 2.0](https://github.com/eliasstravik/herdr-projects), which lives in `server/`.
-[server/NOTICE](server/NOTICE) keeps the MIT notice of Shepherdr 2.0.
+[herdr-projects 2.0](https://github.com/eliasstravik/herdr-projects), which lives in `server/`.
+[server/NOTICE](server/NOTICE) keeps the MIT notice of herdr-projects 2.0.

@@ -1,4 +1,4 @@
-// The contract of measure: the readers rules, inbox, the planner and ui use for Shepherdr's and pi's files.
+// The contract of measure: the readers rules, inbox, the planner and ui use for Lineclear's and pi's files.
 import { expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";

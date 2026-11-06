@@ -22,10 +22,10 @@ beforeEach(() => {
   mkdirSync(repo);
   git(repo, "init", "-q", "-b", "main");
   git(repo, "commit", "-q", "--allow-empty", "-m", "x");
-  const fake = join(root, "shepherdr");
+  const fake = join(root, "lineclear");
   writeFileSync(fake, `#!/bin/sh\nprintf 'demo  DEM  ${repo}  github:x/y\\n'\n`);
   chmodSync(fake, 0o755);
-  env = ownEnv(root, { LINECLEAR_CONFIG: join(root, "config"), HOME: root, SHEPHERDR_BIN: fake, LINECLEAR_BIN: bin });
+  env = ownEnv(root, { LINECLEAR_CONFIG: join(root, "config"), HOME: root, LINECLEAR_SERVER_BIN: fake, LINECLEAR_BIN: bin });
 });
 afterEach(() => rmSync(root, { recursive: true, force: true }));
 
@@ -240,7 +240,7 @@ test("a browser suite takes two of two slots, so a bun suite cannot start beside
   await until(() => readWaits(env as NodeJS.ProcessEnv).some((w) => w.task === "LIN-2"));
   writeFileSync(go, "");
   expect(await Promise.all([browser.exited, plain.exited])).toEqual([0, 0]);
-  // on Shepherdr's one-slot-per-command count the bun suite would have started at once, beside the browser suite
+  // on Lineclear's one-slot-per-command count the bun suite would have started at once, beside the browser suite
   expect(readFileSync(log, "utf8").trim().split("\n")).toEqual(["b-start", "b-end", "p-start", "p-end"]);
 });
 

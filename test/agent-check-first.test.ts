@@ -16,10 +16,10 @@ beforeEach(async () => {
   repo = join(root, "repo");
   mkdirSync(repo);
   sh(["git", "init", "-q", "-b", "main"], { cwd: repo });
-  const fake = join(root, "shepherdr");
+  const fake = join(root, "lineclear");
   writeFileSync(fake, `#!/bin/sh\nprintf 'demo  DEM  ${repo}  github:x/y\\n'\n`);
   chmodSync(fake, 0o755);
-  vars = ownEnv(root, { LINECLEAR_CONFIG: join(root, "config"), HOME: root, SHEPHERDR_BIN: fake, LINECLEAR_BIN: bin });
+  vars = ownEnv(root, { LINECLEAR_CONFIG: join(root, "config"), HOME: root, LINECLEAR_SERVER_BIN: fake, LINECLEAR_BIN: bin });
   chooseModels(join(root, "config"));
   const saved = { ...process.env };
   Object.assign(process.env, vars);

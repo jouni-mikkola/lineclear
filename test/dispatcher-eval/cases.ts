@@ -60,7 +60,7 @@ export const cases: Case[] = [
   {
     id: "plan-1",
     lang: "fi",
-    text: "lisää webshopan harjoitus 5: sähköpostin asetukset",
+    text: "lisää webshopin harjoitus 5: sähköpostin asetukset",
     expect: one({ c: "plan", project: "webshop", goal: ["sähköposti", "harjoitus"] }),
   },
   { id: "plan-2", lang: "en", text: "Add CSV export to the budget app", expect: one({ c: "plan", project: "budget", goal: ["csv"] }) },
@@ -75,7 +75,7 @@ export const cases: Case[] = [
   { id: "plan-6", lang: "fi", text: "kauppaan alennuskoodit", expect: one({ c: "plan", project: "kauppa", goal: ["alennuskoodi"] }) },
   { id: "plan-7", lang: "en", text: "add dark mode to the webshop", expect: one({ c: "plan", project: "kauppa", goal: ["dark"] }) },
   { id: "plan-8", lang: "en", text: "teh budget app needs a pie chart for categoris", expect: one({ c: "plan", project: "budget", goal: ["pie"] }) },
-  { id: "plan-9", lang: "fi", text: "lisää webshopan sivu verkkoturvallisuudesta", expect: one({ c: "plan", project: "webshop", goal: ["turvallisuu"] }) },
+  { id: "plan-9", lang: "fi", text: "lisää webshopin sivu verkkoturvallisuudesta", expect: one({ c: "plan", project: "webshop", goal: ["turvallisuu"] }) },
   { id: "plan-10", lang: "en", text: "fix the typo in the README of webshop", expect: one({ c: "plan", project: "webshop", goal: ["typo", "readme"] }) },
   {
     id: "plan-11",

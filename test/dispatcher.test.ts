@@ -31,7 +31,7 @@ function setup(projects = ["demo"], withRepos = true) {
   writeFileSync(join(bin, "lineclear"), `#!/bin/sh\nfor a in "$@"; do printf '%s\\001' "$a"; done >> "${log}"; printf '\\002' >> "${log}"\n`);
   chmodSync(join(bin, "lineclear"), 0o755);
   const config = join(dir, "config");
-  const env = { ...process.env, LINECLEAR_CONFIG: config, SHEPHERDR_BIN: join(bin, "lineclear"), LINECLEAR_SHEPHERDR_DIR: join(dir, "sh") };
+  const env = { ...process.env, LINECLEAR_CONFIG: config, LINECLEAR_SERVER_BIN: join(bin, "lineclear"), LINECLEAR_HOME: join(dir, "sh") };
   const repos: Record<string, string> = {};
   for (const name of projects) {
     const repo = join(dir, name);
@@ -117,7 +117,7 @@ test("the extension refuses an inbox answer from every agent, and any merge in t
   const r = (c: string, cwd = home) => refusal(c, cwd, t.env);
   expect(r("lineclear inbox answer 3 Approve")).toContain("answers the Inbox");
   expect(r("cd x && lineclear inbox answer 3 Reject --note no")).toContain("answers the Inbox");
-  expect(r("shepherdr merge LIN-5")).toContain("never merges");
+  expect(r("lineclear merge LIN-5")).toContain("never merges");
   expect(r("git merge main")).toContain("never merges");
   expect(r("git -C /x merge main")).toContain("never merges");
   expect(r("gh pr merge 4")).toContain("never merges");
@@ -137,8 +137,8 @@ test("the extension refuses an inbox answer from every agent, and any merge in t
   // a task's agent is refused too
   expect(refusal("lineclear inbox answer 3 Approve", t.dir, t.env)).toContain("no agent answers the Inbox");
   expect(refusal("bin/lineclear inbox answer 3 Approve", t.dir, { ...t.env, LINECLEAR_ROLE: "worker" })).toContain("no agent answers the Inbox");
-  expect(refusal("shepherdr merge LIN-5", t.dir, t.env)).toBeUndefined();
-  expect(refusal("shepherdr merge LIN-5", t.dir, { ...t.env, LINECLEAR_ROLE: "dispatcher" })).toContain("never merges");
+  expect(refusal("lineclear merge LIN-5", t.dir, t.env)).toBeUndefined();
+  expect(refusal("lineclear merge LIN-5", t.dir, { ...t.env, LINECLEAR_ROLE: "dispatcher" })).toContain("never merges");
 });
 
 test("setup makes a regular-mode space with pi, and plans go to the project's space, so no task event reaches it", () => {
@@ -243,7 +243,7 @@ test("nothing the rule loop or a project add does names the Dispatcher's space, 
   expect(lines.join("\n")).toContain("Dispatcher");
   writeWait({ task: "LIN-9", project: "demo", kind: "owner", reason: "asked: x", since: "2026-01-01T00:00:00Z" }, t.env);
   status(() => {}, t.env);
-  // Only setup talks to Shepherdr about the Dispatcher's space; an event in a project adds no call for it.
+  // Only setup talks to Lineclear about the Dispatcher's space; an event in a project adds no call for it.
   expect(t.calls().slice(setupCalls).flat()).not.toContain("dispatcher");
   expect(
     t

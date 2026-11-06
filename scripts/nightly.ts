@@ -12,7 +12,7 @@ import { askGoal, askGoalFailure, askGoalLine } from "../src/ask-goal.ts";
 import { costGoal, costGoalFailure, costGoalLine } from "../src/cost-goal.ts";
 import { appendGoalLine, goalSince, waitGoal, waitGoalFailure, waitGoalLine } from "../src/wait-goal.ts";
 
-/** The goals read from one `lineclear measure` of the last three days (L238, L242, L245): each is recorded in docs/numbers.md and fails past its limit. A repo that is no project, or has no docs/numbers.md, keeps none. */
+/** The goals read from one `lineclear measure` of the last three days: each is recorded in docs/numbers.md and fails past its limit. A repo that is no project, or has no docs/numbers.md, keeps none. */
 function goalChecks(repo: string): { name: string; output: string }[] {
   const project = findProject(repo);
   if (project === undefined || !existsSync(join(repo, "docs", "numbers.md"))) return [];

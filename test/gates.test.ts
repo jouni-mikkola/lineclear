@@ -191,20 +191,6 @@ test(
 );
 
 test(
-  "copies fail on a block found in two files",
-  () => {
-    const block = Array.from({ length: 12 }, (_, i) => `  total += values[${i}] * weights[${i}] - offsets[${i}];`).join("\n");
-    const body = (name: string) =>
-      `export function ${name}(values: number[], weights: number[], offsets: number[]): number {\n  let total = 0;\n${block}\n  return total;\n}\n`;
-    const dir = scratch({ "src/high/a.ts": body("first"), "src/high/b.ts": body("second") });
-    const r = gate(dir, "copies");
-    expect(r.code).toBe(1);
-    expect(r.out).toContain("src/high/a.ts = src/high/b.ts");
-  },
-  SLOW,
-);
-
-test(
   "borders fail on an import the module table does not allow and on a file in no module",
   () => {
     const dir = scratch({
@@ -218,23 +204,6 @@ test(
     expect(r.out).toContain("src/low/base.ts:1 imports src/high/top.ts: low may not import high");
     expect(r.out).toContain("src/stray.ts is in no module");
     expect(r.out).not.toContain("src/high/ok.ts");
-  },
-  SLOW,
-);
-
-test(
-  "cycles fail on files that import each other, but not on type-only imports",
-  () => {
-    const dir = scratch({
-      "src/high/x.ts": 'import { y } from "./y.ts";\nexport const x = () => y;\n',
-      "src/high/y.ts": 'import { x } from "./x.ts";\nexport const y = () => x;\n',
-      "src/high/t1.ts": 'import type { T2 } from "./t2.ts";\nexport type T1 = { t: T2 };\n',
-      "src/high/t2.ts": 'import { type T1 } from "./t1.ts";\nexport type T2 = { t?: T1 };\n',
-    });
-    const r = gate(dir, "cycles");
-    expect(r.code).toBe(1);
-    expect(r.out).toContain("src/high/x.ts > src/high/y.ts");
-    expect(r.out).not.toContain("t1.ts");
   },
   SLOW,
 );
@@ -303,7 +272,7 @@ test("the module table reads names, folders and imports, and imports are read wi
 });
 
 test(
-  "model-names fail on a model name in code, with its file and line, and leave test fixtures alone",
+  "code-rules fail on a model name in code, with its file and line, and leave test fixtures alone",
   () => {
     const dir = scratch({
       "src/high/m.ts": 'export const a = 1;\nexport const model = "claude-sonnet-5-5";\n',
@@ -313,7 +282,7 @@ test(
       "ui/test/fixture.ts": 'export const d = "gpt-6-sol";\n',
       "docs/idea.md": "gpt-6-sol\n",
     });
-    const r = gate(dir, "model-names");
+    const r = gate(dir, "code-rules");
     expect(r.code).toBe(1);
     expect(r.out).toContain("src/high/m.ts:2 a model name in code (claude-sonnet)");
     expect(r.out).toContain("ui/web/s.ts:1 a model name in code (Opus 5)");
@@ -326,7 +295,33 @@ test(
 );
 
 test(
-  "herdr-calls fail on a herdr command or socket outside the adapter, and leave the adapter and comments alone",
+  "old-name fails on the old product's name in a code file, a doc, a skill and a path, and leaves the notice and the changelog alone",
+  () => {
+    const old = ["shep", "herdr"].join("");
+    const dir = scratch({
+      "src/high/c.ts": `export const a = "${old}";\n`,
+      "docs/idea.md": `Use ${old[0]?.toUpperCase()}${old.slice(1)} here.\n`,
+      "server/skill/lineclear/SKILL.md": `run ${old} first\n`,
+      [`docs/${old}-notes.md`]: "clean text\n",
+      "server/NOTICE": `${old} 2.0.0\n`,
+      "CHANGELOG.md": `- ${old} is gone\n`,
+      "src/high/clean.ts": "export const b = 1;\n",
+    });
+    const r = gate(dir, "old-name");
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("src/high/c.ts:1 the old name");
+    expect(r.out).toContain("docs/idea.md:1 the old name");
+    expect(r.out).toContain("server/skill/lineclear/SKILL.md:1 the old name");
+    expect(r.out).toContain("notes.md: the old name in the file's path");
+    expect(r.out).not.toContain("NOTICE");
+    expect(r.out).not.toContain("CHANGELOG");
+    expect(r.out).not.toContain("clean.ts");
+  },
+  SLOW,
+);
+
+test(
+  "code-rules also fail on a herdr command or socket outside the adapter, and leave the adapter and comments alone",
   () => {
     const dir = scratch({
       "src/herdr.ts": 'export const a = ["herdr", "status"];\n',
@@ -336,7 +331,7 @@ test(
       "src/clean.ts": 'export const d = which("herdr");\n',
       "server/server/live/direct.ts": 'export const e = Bun.spawnSync("herdr", ["status"]);\n',
     });
-    const r = gate(dir, "herdr-calls");
+    const r = gate(dir, "code-rules");
     expect(r.code).toBe(1);
     expect(r.out).toContain("src/other.ts:2 a herdr call outside the adapter");
     expect(r.out).toContain("server/server/live/bridge.ts:1 a herdr call outside the adapter");
@@ -344,6 +339,42 @@ test(
     expect(r.out).not.toContain("src/herdr.ts:");
     expect(r.out).not.toContain("clean.ts");
     expect(r.out).not.toContain("other.ts:1");
+  },
+  SLOW,
+);
+
+const BLOCK = Array.from({ length: 12 }, (_, i) => `  total += values[${i}] * weights[${i}] - offsets[${i}];`).join("\n");
+const copyBody = (name: string) =>
+  `export function ${name}(values: number[], weights: number[], offsets: number[]): number {\n  let total = 0;\n${BLOCK}\n  return total;\n}\n`;
+const LONG = `${Array.from({ length: 700 }, (_, i) => `export const v${i} = ${i};`).join("\n")}\n`;
+
+/** L318: one fault of each class (a cycle of type-only imports is none), in a repo of one module table; the merged gates keep their classes. */
+const PLANTED: Record<string, string> = {
+  "src/main.ts": 'import { top } from "./high/top.ts";\nimport { x } from "./high/x.ts";\nexport const main = [top, x];\n',
+  "src/low/base.ts":
+    'import { top } from "../high/top.ts";\nexport const base = top;\nexport const unused = 1;\nexport function f(): number {\n  const x = 1;\n  return 2;\n}\n// const old = load();\nexport const bad  =  1\n',
+  "src/high/top.ts": 'export const top = "claude-sonnet-5-5";\nexport const sock = ["herdr", "status"];\n',
+  "src/high/x.ts": 'import { y } from "./y.ts";\nexport const x = () => y;\n',
+  "src/high/t1.ts": 'import type { T2 } from "./t2.ts";\nexport type T1 = { t: T2 };\n',
+  "src/high/t2.ts": 'import { type T1 } from "./t1.ts";\nexport type T2 = { t?: T1 };\n',
+  "src/high/y.ts": 'import { x } from "./x.ts";\nexport const y = () => x;\n',
+  "src/high/a.ts": copyBody("first"),
+  "src/high/b.ts": copyBody("second"),
+  "src/high/long.ts": LONG,
+};
+
+test(
+  "the gates step refuses one planted fault of each class and names every gate that caught one",
+  () => {
+    const dir = scratch(PLANTED);
+    const r = gate(dir, "--full");
+    expect(r.code).toBe(1);
+    const last = r.out.trim().split("\n").at(-1) ?? "";
+    expect(last).toStartWith("gates failed: ");
+    expect(last.slice("gates failed: ".length).split(", ").sort()).toEqual(["borders", "code-rules", "comments", "copies", "dead-code", "lint", "size"]);
+    expect(r.out).toContain("src/high/a.ts = src/high/b.ts");
+    expect(r.out).toContain("src/high/x.ts > src/high/y.ts");
+    expect(r.out).not.toContain("cycle src/high/t1.ts");
   },
   SLOW,
 );

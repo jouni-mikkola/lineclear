@@ -3,12 +3,13 @@ import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { writeAtomic } from "../pi/atomic.ts";
 import { join } from "node:path";
 import { addItem, type InboxKind, type Item, readItems, stepRule } from "./inbox.ts";
-import { chatFiles, findSpace, shepherdrDir, spaceTasks } from "./measure.ts";
+import { chatFiles, findSpace, lineclearDir, spaceTasks } from "./measure.ts";
 import { projectsDir } from "./project.ts";
 import { loadableTotps, secretNames, storedLogin, totpAdvice, totpAnswers } from "./secrets.ts";
 import { writeWait } from "./waits.ts";
 import { IDLE_NUDGE, PROMISE_NUDGE, promisesNext } from "../pi/nudge.ts";
 import { type AskKind, askKind, askKinds, type Card, IDLE_TEXT, isIdle, lineOf, questionIn, replyText } from "./cards.ts";
+import { HOUR_MS } from "./time.ts";
 
 const title = (c: Card) => c.ask?.questions?.[0]?.title ?? "";
 
@@ -41,7 +42,6 @@ export const saysDone = (reply: string) =>
 
 /** Nudges one task gets in an hour before its next quiet turn goes to the stall ladder's restart. */
 const NUDGES_PER_HOUR = 3;
-const HOUR_MS = 3_600_000;
 /** Nudges a task in Merging gets in an hour before its next quiet turn goes to the restart rung. */
 const MERGE_NUDGES = 1;
 
@@ -59,7 +59,7 @@ export interface IdleHooks {
 
 type Posted = { at: number; card: Card };
 
-/** The slice of Shepherdr's chat log file these rules read. */
+/** The slice of Lineclear's chat log file these rules read. */
 interface ChatLog {
   posted?: { at?: number; question?: { id?: string; title?: string; kind?: string; sent?: number; choices?: { label?: string }[] } }[];
   answers?: Record<string, number>;
@@ -93,7 +93,7 @@ interface CoordinatorCard extends Card {
   task: string;
 }
 
-/** The coordinator chat's files of a space: the logs of the chat Shepherdr names for the place, not a task's own chat. */
+/** The coordinator chat's files of a space: the logs of the chat Lineclear names for the place, not a task's own chat. */
 function coordinatorLogs(dir: string, space: { name: string }): ChatLog[] {
   const log = join(dir, "chatlog");
   if (!existsSync(log)) return [];
@@ -278,9 +278,9 @@ function routeCoordinator(
   env: NodeJS.ProcessEnv,
   out: string[],
 ): void {
-  const tasks = spaceTasks(shepherdrDir(env), space);
+  const tasks = spaceTasks(lineclearDir(env), space);
   for (const card of coordinatorCards(
-    coordinatorLogs(shepherdrDir(env), space),
+    coordinatorLogs(lineclearDir(env), space),
     tasks.map((t) => String(t.id)),
   )) {
     const task = tasks.find((t) => t.id === card.task);
@@ -386,7 +386,7 @@ function routeCard(card: Card, at: number, id: string, inMerge: boolean, project
   const action = ruleFor(card, project, new Date(Math.min(at, now.getTime())), env);
   if (action === undefined) return;
   if (action.kind === "wait" && action.until <= now) {
-    // the limit is over already, and Shepherdr itself tells the agent to carry on
+    // the limit is over already, and Lineclear itself tells the agent to carry on
     done.add(id);
     return;
   }
@@ -420,7 +420,7 @@ export function routeAsks(
   idle?: IdleHooks,
   closeCard?: CardCloser,
 ): string[] {
-  const dir = shepherdrDir(env);
+  const dir = lineclearDir(env);
   const s = findSpace(dir, space, "");
   if (s === undefined) return [];
   const done = new Set(readRouted(project, env));
@@ -483,7 +483,7 @@ function askLines(files: any[], items: Item[], since: number): AskLine[] {
 
 /** The chat files of every board, live and archived. */
 function allChatFiles(env: NodeJS.ProcessEnv): any[] {
-  const dir = shepherdrDir(env);
+  const dir = lineclearDir(env);
   return [join(dir, "chatlog"), join(dir, "archive", "chatlog")]
     .filter((log) => existsSync(log))
     .flatMap((log) =>

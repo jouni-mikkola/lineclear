@@ -17,7 +17,7 @@ import { linkHelper } from "./helper.ts";
 type Env = Record<string, string | undefined>;
 type Out = (line: string) => void;
 
-/** Files of Shepherdr 2.0 that hold the spaces and their settings, copied whole. */
+/** Files of herdr-projects 2.0 that hold the spaces and their settings, copied whole. */
 const SPACE_FILES = [
   "spaces.json",
   "settings.json",
@@ -30,11 +30,35 @@ const SPACE_FILES = [
   "automations.json",
   "cli-models.json",
   "retries.json",
+  "vault.json",
 ];
 const SPACE_DIRS = ["machines", "prompts", "hooks", "tasks"];
 const MARK = "migrated.json";
 /** What `--back` leaves in Lineclear's folder, so moving forward again merges instead of refusing. */
 const BACK_MARK = "migrated.back.json";
+
+/** Whether this folder already holds a copy of the old install. */
+export const migrated = (to: string) => existsSync(join(to, MARK));
+
+/** Brings the old install's settings files that Lineclear's folder lacks, such as the secrets of a copy made before they moved. */
+export function fillMissingFiles(from: string, to: string): void {
+  for (const f of SPACE_FILES) if (existsSync(join(from, f)) && !existsSync(join(to, f))) cpSync(join(from, f), join(to, f));
+}
+
+/** Everything a copy writes in Lineclear's folder, so a caller can put it back as it was. */
+export const MIGRATE_WRITES = [
+  ...SPACE_FILES,
+  ...SPACE_DIRS,
+  "tasks.json",
+  "tasks-cold.jsonl",
+  "artifacts.json",
+  "artifacts",
+  "chatlog",
+  "heartbeat",
+  "helper",
+  MARK,
+  BACK_MARK,
+];
 
 /** What a migration copies, read from the old folder only. */
 interface Plan {
@@ -220,7 +244,7 @@ function cardCounts(dir: string, from: number, to: number): { needsYou: number; 
   };
 }
 
-/** The fork's run since the move against Shepherdr 2.0's span of the same length before it. Returns the exit code. */
+/** The fork's run since the move against herdr-projects 2.0's span of the same length before it. Returns the exit code. */
 function check(from: string, to: string, out: Out, now: number): number {
   const mark = readJson(join(to, MARK));
   if (!mark) return (out(`lineclear migrate: nothing migrated yet, no ${join(to, MARK)}`), 1);
@@ -242,7 +266,7 @@ function check(from: string, to: string, out: Out, now: number): number {
   return worse === 0 ? 0 : 1;
 }
 
-/** `lineclear migrate --back`: every task, chat, artifact and setting of Lineclear's folder joins Shepherdr 2.0's. */
+/** `lineclear migrate --back`: every task, chat, artifact and setting of Lineclear's folder joins herdr-projects 2.0's. */
 function back(from: string, to: string, out: Out, now: number): number {
   if (!existsSync(join(to, "spaces.json")) && !existsSync(join(to, "tasks.json")))
     return (out(`lineclear migrate: nothing to move back, ${to} holds no spaces or tasks`), 1);
@@ -256,7 +280,7 @@ function back(from: string, to: string, out: Out, now: number): number {
   out(`Copied back. Your work in ${to} stays there too, so 'lineclear migrate' moves forward again without losing what was done in either place.`);
   out("Before moving forward again, stop Lineclear's server: it saves from memory.");
   out(
-    "Then start the old install: herdr plugin enable herdr-projects, or if 'lineclear doctor --fix' removed it, herdr plugin install github:eliasstravik/shepherdr --yes.",
+    "Then start the old install: herdr plugin enable herdr-projects, or if 'lineclear doctor --fix' removed it, herdr plugin install github:eliasstravik/herdr-projects --yes.",
   );
   return 0;
 }
@@ -264,7 +288,7 @@ function back(from: string, to: string, out: Out, now: number): number {
 function backMain(from: string, to: string, out: Out, env: Env, now: number, busy: Busy): number {
   if (!existsSync(join(to, MARK)))
     return (out(`lineclear migrate: this machine has not moved to Lineclear (no ${join(to, MARK)}), so there is nothing to move back`), 1);
-  if (busy("shepherdr", env))
+  if (busy("old", env))
     return (
       out("lineclear migrate: the old install is running, and would save over what is copied back. Stop it first: herdr plugin disable herdr-projects"), 1
     );
@@ -302,7 +326,7 @@ export function migrateMain(args: string[], out: Out, env: Env = process.env, no
     out(`lineclear migrate: ${to} already has spaces or tasks, so nothing was copied. Move it away to migrate again.`);
     return 1;
   }
-  if (busy("shepherdr", env)) {
+  if (busy("old", env)) {
     out(
       "lineclear migrate: the old install is running, and what its tasks and agents save after the copy would be missed. Stop its server first (herdr plugin disable herdr-projects); agents keep running, and a command of theirs that fails meanwhile works once 'lineclear serve' is up on the same port.",
     );
@@ -313,7 +337,7 @@ export function migrateMain(args: string[], out: Out, env: Env = process.env, no
     return 1;
   }
   migrate(from, to, plan, now);
-  // agents started under Shepherdr 2.0 keep the old socket path in their command
+  // agents started under herdr-projects 2.0 keep the old socket path in their command
   linkHelper(env);
   sayCopied(from, out);
   return 0;

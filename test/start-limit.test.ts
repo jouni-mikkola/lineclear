@@ -72,6 +72,18 @@ for (const kind of ["ready", "reopened", "unproven"] as const) {
   });
 }
 
+test("a reopened step started three times in a day gets no Fix task when a task has merged since: one Inbox item", () => {
+  const t = setup("reopened");
+  for (let i = 0; i < 3; i++) t.step();
+  expect(starts(t.adds)).toBe(3);
+  // a task merged after the Reopened line, but the line stayed: the refile would be a fourth start
+  t.world.commitsSince = () => 2;
+  const out = tick(t.world, false, t.env);
+  expect(t.adds).toHaveLength(3);
+  expect(out.filter((d) => d.kind === "start" && d.step === "A")).toHaveLength(0);
+  expect(readItems(t.env).filter((i) => i.kind === "step")).toHaveLength(1);
+});
+
 test("a reopened step whose Reopened line cannot be placed does not start, and Home says so", () => {
   const t = setup("reopened");
   t.world.commitsSince = () => undefined;

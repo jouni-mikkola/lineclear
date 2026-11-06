@@ -22,9 +22,11 @@ export function readServers(units: string[] = UNITS): HerdrServer[] {
       const stat = readFileSync(`/proc/${entry}/stat`, "utf8");
       const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
       const cpuSeconds = (Number(fields[11]) + Number(fields[12])) / TICKS_PER_SECOND;
+      const rss = /^VmRSS:\s+(\d+) kB/m.exec(readFileSync(`/proc/${entry}/status`, "utf8"));
       out.push({
         pid: Number(entry),
         cpuSeconds,
+        ...(rss ? { rssMb: Math.round(Number(rss[1]) / 1024) } : {}),
         inService: readFileSync(`/proc/${entry}/cgroup`, "utf8")
           .split("\n")
           .some((l) => units.some((u) => l.endsWith(`/${u}`))),

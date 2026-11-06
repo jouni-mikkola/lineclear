@@ -1,21 +1,23 @@
 // What a working task's row on Home shows: its last card, the files it changed and its check, and, once the row is
-// opened, its log tail, diff stat, check output, review findings and cost. All from Shepherdr's files, git, the check
+// opened, its log tail, diff stat, check output, review findings and cost. All from Lineclear's files, git, the check
 // log and pi's session files, with no AI.
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { readRuns, whereRun } from "./check-runs.ts";
 import { readTasksKept } from "./kept-read.ts";
 import { dataDir } from "./paths.ts";
+import { DAY } from "./time.ts";
+import { gitWith } from "./git.ts";
+
+/** A task folder's git output, trimmed; empty when git fails or hangs, so Home never waits on it. */
+export const taskGit = (cwd: string, ...args: string[]) => {
+  const r = gitWith({ timeout: 5000 }, cwd, ...args);
+  return r.ok ? r.out.trim() : "";
+};
 
 type Env = Record<string, string | undefined>;
 
-const DAY = 86_400_000;
 const LOG_LINES = 12;
-
-export const git = (cwd: string, ...args: string[]) => {
-  const p = Bun.spawnSync(["git", "-C", cwd, ...args], { stdin: "ignore", stderr: "ignore", timeout: 5000 });
-  return p.exitCode === 0 ? p.stdout.toString() : "";
-};
 
 export interface TaskFacts {
   /** How many files its branch changed against its base. */
@@ -34,7 +36,7 @@ export const baseOf = (t: TaskRef) => (typeof t.base === "string" && t.base ? t.
 
 export function taskFacts(t: TaskRef, env: Env = process.env, now = Date.now()): TaskFacts {
   if (typeof t.worktree !== "string" || !existsSync(t.worktree)) return {};
-  const out = git(t.worktree, "diff", "--numstat", `${baseOf(t)}...HEAD`);
+  const out = taskGit(t.worktree, "diff", "--numstat", `${baseOf(t)}...HEAD`);
   const files = out ? out.trim().split("\n").filter(Boolean).length : 0;
   const where = whereRun(t.worktree);
   const run = readRuns(where.repo, now - 7 * DAY, env as NodeJS.ProcessEnv)
@@ -72,18 +74,18 @@ const cardTexts = (file: string, task?: string) => {
   }
 };
 
-/** What the caller brings: Shepherdr's folder and a pricer of a worktree's sessions. */
+/** What the caller brings: Lineclear's folder and a pricer of a worktree's sessions. */
 export interface TaskSources {
-  shepherdr: string;
+  lineclear: string;
   costSoFar: (worktree: string) => number | undefined;
 }
 
 /**
- * A task's opened row, or undefined for an id this machine has no task of. `shepherdr` is Shepherdr's folder and
+ * A task's opened row, or undefined for an id this machine has no task of. `lineclear` is Lineclear's folder and
  * `costSoFar` prices a worktree's sessions; the caller brings both, as measure.ts sits in a cycle this file stays out of.
  */
 export function taskDetail(id: string, from: TaskSources, env: Env = process.env, now = Date.now()): TaskDetail | undefined {
-  const t = readTasksKept(from.shepherdr).tasks.find((x) => x.id === id) as TaskRef | undefined;
+  const t = readTasksKept(from.lineclear).tasks.find((x) => x.id === id) as TaskRef | undefined;
   if (!t) return undefined;
   const chats = join(dataDir(env), "chatlog");
   const files = existsSync(chats) ? readdirSync(chats) : [];
@@ -93,7 +95,7 @@ export function taskDetail(id: string, from: TaskSources, env: Env = process.env
     .slice(-LOG_LINES);
   const review = files.filter((f) => f === `${id}_Reviewer.json`).flatMap((f) => cardTexts(join(chats, f)));
   const worktree = typeof t.worktree === "string" && existsSync(t.worktree) ? t.worktree : undefined;
-  const diff = worktree ? git(worktree, "diff", "--stat", `${baseOf(t)}...HEAD`).trim() : "";
+  const diff = worktree ? taskGit(worktree, "diff", "--stat", `${baseOf(t)}...HEAD`) : "";
   const where = worktree ? whereRun(worktree) : undefined;
   const run =
     where &&

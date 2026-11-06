@@ -203,7 +203,7 @@ describe("a task's place in herdr", () => {
     const dir = repo()
     const p = await world().places.add(dir, 'sweep')
     const old = mkdtempSync(join(tmpdir(), 'shep-old-'))
-    // left by an older Shepherdr: squash-merged, marked cleaned, and main moved on over the same lines since
+    // left by an older Lineclear: squash-merged, marked cleaned, and main moved on over the same lines since
     const make = (n: number, file: string) => {
       const wt = join(old, `work-${n}`)
       sh(`git worktree add -q -b work/${n}-x ${wt} main`, dir)
@@ -323,7 +323,7 @@ describe("a task's place in herdr", () => {
     const w = world(herdr)
     const dir = repo()
     const p = await w.places.add(dir, 'ownspace')
-    // the project's space as Shepherdr opens it for its coordinator: a plain workspace in the repo
+    // the project's space as Lineclear opens it for its coordinator: a plain workspace in the repo
     herdr.spaces.push({ workspace_id: 'proj', label: p.name, tab_count: 1, panes: ['proj:p1'] })
     herdr.cwd.set('proj:p1', dir)
     herdr.agentPanes.add('proj:p1')

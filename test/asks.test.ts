@@ -27,7 +27,7 @@ const mergeChat: Card = {
   task: "T-3",
   status: "need",
   text: "needs you: Waits for your reply",
-  ask: { reply: { text: "`shepherdr merge T-3` says each time that there is a new message in the chat." } },
+  ask: { reply: { text: "`lineclear merge T-3` says each time that there is a new message in the chat." } },
 };
 const login = (q: string): Card => ({ id: "d", task: "T-4", status: "need", text: "needs you: x", ask: { questions: [{ title: q, kind: "Form" }] } });
 const plan: Card = { id: "e", task: "T-5", status: "need", text: "x", ask: { questions: [{ title: "Plan for T-5", kind: "Plan" }] } };
@@ -99,12 +99,12 @@ test("an open card is not one its task has spoken after", () => {
   expect(openNeedCards(files).map((n) => n.card.id)).toEqual(["z"]);
 });
 
-/** A config, a project and a Shepherdr folder with one space and the given cards. */
+/** A config, a project and a Lineclear folder with one space and the given cards. */
 function world(cards: Card[], secrets = "", postedAt = 1000) {
   const dir = tmp("asks");
   temps.push(dir);
   const config = join(dir, "config");
-  const shep = join(dir, "shepherdr");
+  const shep = join(dir, "lineclear");
   mkdirSync(join(config, "projects", "demo"), { recursive: true });
   mkdirSync(join(shep, "chatlog"), { recursive: true });
   writeFileSync(
@@ -125,8 +125,6 @@ function world(cards: Card[], secrets = "", postedAt = 1000) {
     ...process.env,
     LINECLEAR_CONFIG: config,
     LINECLEAR_HOME: shep,
-    LINECLEAR_SHEPHERDR_DIR: shep,
-    LINECLEAR_SECRETS_FOLDER: join(dir, "no-logins"),
     LINECLEAR_MAIN_HOME: join(dir, "main"),
   };
   const told: string[] = [];
@@ -197,7 +195,7 @@ test("lineclear asks counts the kinds and names where each goes", () => {
 test("a report of a done task closes by a rule and a question is answered by a rule, and reports are counted apart", () => {
   const w = world([report, question]);
   const done: Card = { id: "d8", task: "T-8", status: "done", text: "done" };
-  writeFileSync(join(w.env.LINECLEAR_SHEPHERDR_DIR!, "chatlog", "T-8_Done.json"), JSON.stringify({ posted: [{ at: 5000, id: "d8", card: done }] }));
+  writeFileSync(join(w.env.LINECLEAR_HOME!, "chatlog", "T-8_Done.json"), JSON.stringify({ posted: [{ at: 5000, id: "d8", card: done }] }));
   const files = [
     {
       posted: [
@@ -255,7 +253,7 @@ test("each quiet turn is nudged, three an hour, then the next is restarted", () 
   const idle = { clean: () => false, close: () => undefined, restart: (t: string) => void restarted.push(t) };
   const turn = (n: number) => {
     writeFileSync(
-      join(w.env.LINECLEAR_SHEPHERDR_DIR!, "chatlog", `T-1_${n}.json`),
+      join(w.env.LINECLEAR_HOME!, "chatlog", `T-1_${n}.json`),
       JSON.stringify({ posted: [{ at: 2000 + n, id: `q${n}`, card: idleCard("T-1", `q${n}`, "Still here.") }] }),
     );
     return w.route(idle, new Date(start + n * 60_000));
@@ -276,7 +274,7 @@ test("each quiet turn is nudged, three an hour, then the next is restarted", () 
 
 test("a quiet turn in Merging is told to merge again, the second goes to the restart rung", () => {
   const w = world([idleCard("T-1", "i1", "Merged. Nothing more to do.")]);
-  const shep = w.env.LINECLEAR_SHEPHERDR_DIR ?? "";
+  const shep = w.env.LINECLEAR_HOME ?? "";
   writeFileSync(join(shep, "tasks.json"), JSON.stringify({ tasks: [{ id: "T-1", status: "merging" }] }));
   // a nudge from Work earlier in the hour does not count against the merge
   writeFileSync(join(w.config, "projects", "demo", "asks-routed.json"), JSON.stringify([`nudge:T-1@${Date.now() - 60_000}`]));
@@ -295,7 +293,7 @@ test("a quiet turn in Merging is told to merge again, the second goes to the res
 });
 
 test("a quiet turn after a nudge is answered in each of three ways", () => {
-  const replies = ["", "I'll keep calling `shepherdr merge T-2` until it goes through.", "I set a wait on it."];
+  const replies = ["", "I'll keep calling `lineclear merge T-2` until it goes through.", "I set a wait on it."];
   const w = world(replies.map((r, i) => idleCard(`T-${i + 1}`, `q${i}`, r)));
   const earlier = (i: number) => `nudge:T-${i + 1}@${Date.now() - 600_000}`;
   writeFileSync(join(w.config, "projects", "demo", "asks-routed.json"), JSON.stringify(replies.map((_, i) => earlier(i))));
@@ -340,7 +338,7 @@ test("a question about a login code, money or something that leaves is not bounc
 
 test("a task's two cards in the coordinator chat: the kept merge is an Inbox item, the other is answered by rule and closes", () => {
   const w = world([]);
-  const shep = w.env.LINECLEAR_SHEPHERDR_DIR as string;
+  const shep = w.env.LINECLEAR_HOME as string;
   const ask = (id: string, title: string) => ({ at: 1000, id, question: { id, title, kind: "Form", choices: [{ label: "Merge it" }, { label: "Not yet" }] } });
   writeFileSync(
     join(shep, "chatlog", "p_host_Demo.json"),
@@ -384,7 +382,7 @@ test("a task's two cards in the coordinator chat: the kept merge is an Inbox ite
   expect(route()).toEqual(["T-3's coordinator card is in the Inbox: Ready to merge T-3?"]);
   // a failed close is tried again, and the task is not told twice
   const again = world([]);
-  const againDir = again.env.LINECLEAR_SHEPHERDR_DIR as string;
+  const againDir = again.env.LINECLEAR_HOME as string;
   writeFileSync(
     join(againDir, "chatlog", "p_host_Demo.json"),
     JSON.stringify({ posted: [ask("ask:w", "Why has T-4's merge not gone through?")], answers: {} }),
@@ -398,11 +396,11 @@ test("a task's two cards in the coordinator chat: the kept merge is an Inbox ite
 
 test("answering the Inbox item answers its card, and closing the item closes it too", () => {
   const w = world([]);
-  const log = join(w.config, "shepherdr-calls");
-  const bin = join(w.config, "shepherdr");
+  const log = join(w.config, "lineclear-calls");
+  const bin = join(w.config, "lineclear");
   writeFileSync(bin, `#!/bin/sh\necho "$@" >> "${log}"\n`);
   chmodSync(bin, 0o755);
-  const env = { ...w.env, SHEPHERDR_BIN: bin };
+  const env = { ...w.env, LINECLEAR_SERVER_BIN: bin };
   const item = (question: string, id: string) =>
     addItem(
       { kind: "step", task: "T-3", project: "demo", question, choices: ["Merge it", "Not yet"], card: { space: "Demo", id }, since: new Date().toISOString() },
@@ -424,12 +422,9 @@ test("a push to approve is not the owner's when any login has a stored TOTP", ()
   const w = world([push], "M365_GA_TOTP='k'\n");
   expect(routeAsks("demo", "Demo", w.tell, new Date(), false, w.env)).toEqual(["T-4 was told how to go on (login)"]);
   expect(w.told[0]).toContain("M365_GA_TOTP is stored");
-  expect(w.told[0]).toContain("cc-totp M365_GA");
+  expect(w.told[0]).toContain("lineclear totp M365_GA");
   expect(w.told[0]).toContain("verification code");
-  // the pair is the project's and its TOTP sits only in the shared folder: still the code option, not the Inbox
-  const mixed = world([login("Log in to GitHub, done?")], "GITHUB_USER='u'\nGITHUB_PASSWORD='p'\n");
-  mkdirSync(mixed.env.LINECLEAR_SECRETS_FOLDER, { recursive: true });
-  writeFileSync(join(mixed.env.LINECLEAR_SECRETS_FOLDER, "common.env"), "GITHUB_TOTP='k'\n");
+  const mixed = world([login("Log in to GitHub, done?")], "GITHUB_USER='u'\nGITHUB_PASSWORD='p'\nGITHUB_TOTP='k'\n");
   routeAsks("demo", "Demo", mixed.tell, new Date(), false, mixed.env);
   expect(mixed.told[0]).toContain("lineclear totp GITHUB");
   const none = world([push]);

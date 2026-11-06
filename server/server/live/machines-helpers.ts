@@ -95,7 +95,7 @@ function commandOf(pid: number): string {
   }
 }
 
-/** a worker from before this server started, still running: its process, if it is one of Shepherdr's */
+/** a worker from before this server started, still running: its process, if it is one of Lineclear's */
 export function running(pid: number | undefined): Worker | undefined {
   if (!pid || pid === process.pid) return undefined
   try {
@@ -135,7 +135,7 @@ export function kept(): Kept[] {
 }
 
 /** the machine as last looked at is ready for a worker: nothing missing, and the helper there is this one's */
-export const fits = (p: Probe) => !lacks(p).length && !p.oldInstall && p.helper === helperVersion(p.os, p.arch)
+export const fits = (p: Probe) => !lacks(p).length && p.helper === helperVersion(p.os, p.arch)
 
 /** a worker started from one look runs the same as from the other */
 export const sameBox = (m: Saved, a: Probe, b: Probe) => JSON.stringify(boxInfo(m, a)) === JSON.stringify(boxInfo(m, b))

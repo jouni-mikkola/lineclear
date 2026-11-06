@@ -1,5 +1,6 @@
 // The wait goal: the median wait from ready to start of the last three days stays under five minutes.
-import { DAY, measure, median, type Measured, type Numbers } from "./measure.ts";
+import { DAY } from "./time.ts";
+import { measure, median, type Measured, type Numbers } from "./measure.ts";
 import { causeTotals } from "./wait-causes.ts";
 
 /** The goal in minutes: a median at or above it fails. */
@@ -39,7 +40,7 @@ export function waitGoalFailure(g: WaitGoal): string | undefined {
   return `median wait from ready to start is ${g.median.toFixed(1)} min over the last ${DAYS} days, the goal is under ${WAIT_GOAL_MIN} min; largest cause: ${g.largestCause ?? "none recorded"}`;
 }
 
-/** The lines `docs/numbers.md` gets under "L238" for one run. */
+/** The lines `docs/numbers.md` gets for one run. */
 export function waitGoalLine(g: WaitGoal, today: string): string {
   const counts = g.counts.map((c) => `${c.date} ${c.tasks}`).join(", ");
   return `- ${today}: median ${g.median === null ? "-" : `${g.median.toFixed(1)} min`}; waits per day: ${counts}`;

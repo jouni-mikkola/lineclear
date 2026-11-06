@@ -184,7 +184,7 @@ describe('machine health', () => {
       expect(card?.card).toMatchObject({ text: 'memory is 96% used', health: { level: 'over', machine: HOST } })
       const news = sent.find((s) => s.key === machine && s.text.includes('<health '))!.text
       expect(news).toStartWith(
-        `<shepherdr><health kind="memory" what="over">Machine ${HOST}: memory is over 90%: 96% in use.\nCPU 13% (load 2.0 on 16 cores) · Memory 96% (96 GB of 100 GB) · Disk /tmp 40% (60 GB free)\nTasks: `,
+        `<lineclear><health kind="memory" what="over">Machine ${HOST}: memory is over 90%: 96% in use.\nCPU 13% (load 2.0 on 16 cores) · Memory 96% (96 GB of 100 GB) · Disk /tmp 40% (60 GB free)\nTasks: `,
       )
       expect(news).toContain('Using it most now:')
       expect(news).toContain('Lineclear closed 2 shared browsers that finished tasks left open (TG-4, TG-5).')

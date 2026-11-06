@@ -178,7 +178,7 @@ describe('folded hook events say what the agent does', () => {
       'npx serve dist',
     ])
       expect([c, kind(c)]).toEqual([c, 'server'])
-    expect(kind('bun server/index.ts', 'Start the Shepherdr server')).toBe('server')
+    expect(kind('bun server/index.ts', 'Start the Lineclear server')).toBe('server')
     expect(kind('python3 app.py', 'Serve the preview on 8080')).toBe('server')
     for (const c of [
       'bun run test',
@@ -381,7 +381,7 @@ describe('what it has not read yet', () => {
     const typed = [
       { id: '1', key: 'T-9/Agent', text: 'Run the bash command: touch made-by-test.txt', at: turn - 50 },
       { id: '2', key: 'T-9/Agent', text: '<reaction from="Elias" emoji="👍" to="started"/>', reaction: { message: 'started', emoji: '👍' }, at: turn + 1000 },
-      { id: '3', key: 'T-9/Agent', text: '<shepherdr><news task="SHE-1" event="merged">SHE-1 was merged</news></shepherdr>', at: turn + 1500 },
+      { id: '3', key: 'T-9/Agent', text: '<lineclear><news task="SHE-1" event="merged">SHE-1 was merged</news></lineclear>', at: turn + 1500 },
       { id: '4', key: 'T-9/Agent', text: 'Also add a line to the README', at: turn + 2000 },
     ]
     let waiting: typeof typed = []
@@ -395,7 +395,7 @@ describe('what it has not read yet', () => {
       (k) => k,
       () => 'Elias',
     )
-    // typed in mid-turn, not taken in yet; a reaction and Shepherdr's hidden news don't count
+    // typed in mid-turn, not taken in yet; a reaction and Lineclear's hidden news don't count
     expect(words(chats.unseen('T-9/Agent'))).toEqual(['Also add a line to the README'])
     // it took it in at its next step: the log has it
     appendFileSync(

@@ -11,7 +11,7 @@ Every agent, coordinator or task agent, gets the same chat.
   Commands like /compact or a model change wait for the turn to end.
 - Startup trust and MCP approval prompts appear as choice cards, even before the first message. The card keeps the
   CLI's screen text and offers Open terminal if it cannot read the choices. Answers are checked before messages go
-  in. Only task worktrees Shepherdr creates are pre-trusted in Claude Code and Codex; a space you picked still asks.
+  in. Only task worktrees Lineclear creates are pre-trusted in Claude Code and Codex; a space you picked still asks.
 - A slash command you type (`/clear`, `/new`, `/compact`, `/model sonnet`, a custom one) goes into the agent's CLI as
   you typed it, once its turn is over, and the CLI runs it. The chat shows it as you typed it, and what the CLI printed
   as its answer. After `/clear` or `/new` a quiet New session line starts the new session, whose log the chat reads
@@ -65,8 +65,8 @@ Every agent, coordinator or task agent, gets the same chat.
   there and it really lies inside it (no `..`, no links out, nothing ignored, never `.git`). Coordinator chats have no
   panel; their terminal flips the chat, from the ⋯ menu or `Ctrl+`` `.
 
-Every agent learns the chat lines, cards, artifacts and the `shepherdr` command from
-[skill/shepherdr](../skill/shepherdr/SKILL.md); coordinators their tasks, news, merges and coordinator timer from
-[skill/shepherdr-coordinator](../skill/shepherdr-coordinator/SKILL.md); task agents the way from brief to merged from
-[skill/shepherdr-agent](../skill/shepherdr-agent/SKILL.md). Their prompts (`server/live/prompts.ts`) say only who they are,
-their space (and a home space's machine duties) or task, and which skills to read. `shepherdr help` lists the command.
+Every agent learns the chat lines, cards, artifacts and the `lineclear` command from
+[skill/lineclear](../skill/lineclear/SKILL.md); coordinators their tasks, news, merges and coordinator timer from
+[skill/lineclear-coordinator](../skill/lineclear-coordinator/SKILL.md); task agents the way from brief to merged from
+[skill/lineclear-agent](../skill/lineclear-agent/SKILL.md). Their prompts (`server/live/prompts.ts`) say only who they are,
+their space (and a home space's machine duties) or task, and which skills to read. `lineclear help` lists the command.

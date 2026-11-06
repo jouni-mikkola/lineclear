@@ -33,7 +33,7 @@ export function idleWorld(env: NodeJS.ProcessEnv, over: Partial<World> = {}): Wo
     started: () => ({ kind: "busy" }),
     lastError: () => undefined,
     ownerWrote: () => false,
-    reviewerSetting: () => undefined, // the real one starts a Shepherdr command, seconds on a busy machine
+    reviewerSetting: () => undefined, // the real one starts a Lineclear command, seconds on a busy machine
     clean: () => false,
     ...over,
   };

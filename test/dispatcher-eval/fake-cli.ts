@@ -68,14 +68,14 @@ if (args.includes("--help") || args.includes("-h")) {
 
 if (verb === "dispatcher" && rest[0] === "projects") {
   say(
-    "lineclear  /home/owner/code/lineclear",
+    "lineclear  /home/user/code/lineclear",
     "  Lineclear runs many software projects through an automated pipeline: a planner, workers and reviewers.",
     "  It only asks the owner for real decisions.",
-    "webshop  /home/owner/code/webshop",
+    "webshop  /home/user/code/webshop",
     "  Webshop on suomenkielinen IT-laboratorion opas: harjoitukset, ohjeet ja sivut opiskelijoille.",
-    "budget  /home/owner/code/budget",
+    "budget  /home/user/code/budget",
     "  Budget tracks household spending: accounts, categories, charts and a monthly report.",
-    "kauppa  /home/owner/code/kauppa",
+    "kauppa  /home/user/code/kauppa",
     "  Kauppa on verkkokauppa: tuotteet, ostoskori, kassa, haku, asiakkaan tili ja tilaukset.",
   );
 }

@@ -1,5 +1,5 @@
 // A slash command you type in a chat (/clear, /model sonnet, /compact, a custom /review) goes into the agent's CLI as
-// typed, between turns, so the CLI itself runs it. Shepherdr then follows what it did: a new session's log after /clear
+// typed, between turns, so the CLI itself runs it. Lineclear then follows what it did: a new session's log after /clear
 // or /new, and a menu or view it opened in the terminal, which waits for keys there and would take your next message:
 // what it showed comes into the chat, and it is closed.
 import type { Agents, OutItem } from './agents.ts'
@@ -119,7 +119,7 @@ const VIEW_MS = 2500
 /**
  * What a slash command did, once it went in: the chat shows it as typed (most CLIs keep no line of it in their log);
  * another session's log is read after /clear or /new; and a menu or view of the CLI's own that waits for keys in the
- * terminal comes into the chat and is closed, so your next message goes in. A menu Shepherdr already shows as a card
+ * terminal comes into the chat and is closed, so your next message goes in. A menu Lineclear already shows as a card
  * (herdr sees it blocking the agent) stays.
  */
 export async function followCommand(agents: Agents, chats: Chats, { key, text, cid }: OutItem, changed: (key: string) => void, wait = VIEW_MS) {

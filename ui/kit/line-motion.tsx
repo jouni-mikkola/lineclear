@@ -1,7 +1,7 @@
 import { type RefObject, useEffect, useLayoutEffect, useRef } from "react";
 import { EASE } from "../brand/rail.ts";
 import { beatDots, countTo, play, reducedMotion } from "./motion.ts";
-import type { AccountUse } from "./charts.tsx";
+import type { AccountUse } from "./spend-charts.tsx";
 import { loadOf, type Placed } from "./line-parts.tsx";
 import { EnginePic } from "./rail.tsx";
 

@@ -26,10 +26,17 @@ export function simplifyParts(): Part[] {
   const units = [...new Set(matches(read("install.sh"), /\b(lineclear(?:-[a-z0-9]+)*\.(?:service|timer))/g))];
   const parts: Part[] = units.map((id) => ({ kind: id.endsWith(".timer") ? "timer" : "process", id }));
   const srcs = walk("src").filter((f) => f.endsWith(".ts"));
-  const text = [...srcs, "pi/config.ts"].map(read).join("\n");
-  const stores = matches(text, /"((?:tasks|task-ids|check-[a-z]+|decisions)[\w-]*\.(?:jsonl|json|sqlite))"/g);
-  for (const id of new Set(stores)) parts.push({ kind: "store", id });
-  for (const id of new Set(matches(srcs.map(read).join("\n"), /\bconst (\w*(?:TICK|EVERY|REFRESH)\w*_MS)\b/g))) parts.push({ kind: "loop", id });
+  // Regexes run per file and only on files that can match: one pass over all of src at once scales badly on a loaded machine.
+  const stores = new Set<string>();
+  const loops = new Set<string>();
+  for (const f of [...srcs, "pi/config.ts"]) {
+    const text = read(f);
+    if (/\.(?:jsonl|json|sqlite)"/.test(text))
+      for (const id of matches(text, /"((?:tasks|task-ids|check-[a-z]+|decisions)[\w-]*\.(?:jsonl|json|sqlite))"/g)) stores.add(id);
+    if (f !== "pi/config.ts" && text.includes("_MS")) for (const id of matches(text, /\bconst (\w*(?:TICK|EVERY|REFRESH)\w*_MS)\b/g)) loops.add(id);
+  }
+  for (const id of stores) parts.push({ kind: "store", id });
+  for (const id of loops) parts.push({ kind: "loop", id });
   for (const f of walk("scripts/gates")) if (f.endsWith(".ts")) for (const id of matches(read(f), /^\s+name: "([a-z-]+)",/gm)) parts.push({ kind: "gate", id });
   return parts;
 }

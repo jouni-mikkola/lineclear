@@ -5,16 +5,16 @@ import { resolve } from "node:path";
 import { HOST, machinesFile, readMachines, type SavedMachine } from "./machine-list.ts";
 import { doctorChecks, realProbe } from "./doctor.ts";
 import { networkTrouble, type Trouble } from "./health.ts";
-import { onlyShepherdrLeft } from "./retire.ts";
+import { onlyOldInstallLeft } from "./retire.ts";
 import { relationOf, type Relation, remoteExports } from "./remotes.ts";
 import { LINECLEAR, quote, run, sshArgs } from "./ssh.ts";
 import { listProjectNames, readSettings } from "./project.ts";
 import { cloneOn } from "./spread.ts";
-import { pushSecrets } from "./secret-sync.ts";
 import { codeCommit, pathsFor } from "./paths.ts";
 import { readRelease } from "./release.ts";
 import { configDir } from "../pi/config.ts";
 import { limitOf, loadLimit } from "./waits.ts";
+import { gitText } from "./git.ts";
 
 // The machines Lineclear runs on: this one, and each one added by its SSH host. Adding one runs install.sh there over
 // SSH and then its doctor. The list is `<config>/machines.json`, written by the CLI and the Settings view alike.
@@ -66,21 +66,13 @@ function cloneProjects(host: string, env: Env, say: (l: string) => void): string
   for (const name of listProjectNames(env as NodeJS.ProcessEnv)) {
     const s = readSettings(name, env as NodeJS.ProcessEnv);
     if (typeof s === "string") continue;
-    const origin = Bun.spawnSync(["git", "-C", s.repo, "remote", "get-url", "origin"], { stdin: "ignore", stderr: "ignore" });
-    if (origin.exitCode !== 0) continue;
-    const err = cloneOn(host, s.space, origin.stdout.toString().trim(), env);
+    const origin = gitText(s.repo, "remote", "get-url", "origin");
+    if (origin === undefined) continue;
+    const err = cloneOn(host, s.space, origin, env);
     say(`  ${name}: ${err ? `FAILED ${err}` : `repo is on ${host}`}`);
     if (err) failed.push(`FAILED repo of ${name}: ${err}`);
   }
   return failed;
-}
-
-async function copySecrets(host: string, env: Env, say: (l: string) => void): Promise<string[]> {
-  say(`Copying the login secrets to ${host}`);
-  const err = await pushSecrets(host, env);
-  if (!err) return [];
-  say(`  FAILED ${err}`);
-  return [`FAILED secrets of ${host}: ${err}`];
 }
 
 /**
@@ -116,16 +108,15 @@ export async function installMachine(host: string, env: Env = process.env, say: 
     say(`Fixing what is safe to fix on ${host}`);
     const fixed = await run(sshArgs(env, host, `${LINECLEAR} doctor --fix --here`), undefined, 120_000, env);
     for (const l of fixed.lines) say(`  ${l}`);
-    const secretsFailed = await copySecrets(host, env, say);
     say(`Cloning the project repos on ${host}`);
-    const cloneFailed = [...secretsFailed, ...cloneProjects(host, env, say)];
+    const cloneFailed = cloneProjects(host, env, say);
     say(`Running lineclear doctor on ${host}`);
     const doctor = await run(sshArgs(env, host, `${LINECLEAR} doctor`), undefined, 60_000, env);
     for (const l of doctor.lines) say(`  ${l}`);
     const lines = doctor.lines.length ? doctor.lines : [`lineclear doctor failed (exit ${doctor.code}).`];
     done = {
       host,
-      state: cloneFailed.length === 0 && (doctor.code === 0 || onlyShepherdrLeft(doctor.lines)) ? "ready" : "failed",
+      state: cloneFailed.length === 0 && (doctor.code === 0 || onlyOldInstallLeft(doctor.lines)) ? "ready" : "failed",
       since,
       doctor: [...cloneFailed, ...lines],
     };
@@ -225,10 +216,10 @@ export async function remoteLoad(host: string, env: Env = process.env): Promise<
   return { load, limit };
 }
 
-/** How many tasks Shepherdr lets work on this machine at once, from `shepherdr show`. */
+/** How many tasks Lineclear lets work on this machine at once, from `lineclear show`. */
 async function localMaxTasks(env: Env = process.env): Promise<number | undefined> {
   try {
-    const p = Bun.spawn([env.SHEPHERDR_BIN ?? "lineclear", "show"], { stdin: "ignore", stderr: "ignore", timeout: 10_000 });
+    const p = Bun.spawn([env.LINECLEAR_SERVER_BIN ?? "lineclear", "show"], { stdin: "ignore", stderr: "ignore", timeout: 10_000 });
     const [out, code] = await Promise.all([new Response(p.stdout).text(), p.exited]);
     const m = /^machine\.maxTasks\s+(\d+)/m.exec(out);
     return code === 0 && m ? Number(m[1]) : undefined;
@@ -249,7 +240,7 @@ export function machinesView(env: Env = process.env, now = () => Date.now(), bus
   // the network is checked in the background, so a read never waits for a timeout
   let network: { at: number; trouble: Trouble | undefined; busy: boolean } | undefined;
   const mine = codeCommit();
-  // `shepherdr show` can be slow, so the slot count is read in the background, with the doctor
+  // `lineclear show` can be slow, so the slot count is read in the background, with the doctor
   let max: number | undefined;
   let maxAt = -Infinity;
   const readMax = () => {

@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { contractOf, declaration, ownerOf, PAGE_MAX_LINES, type Part, PARTS_DIR, readParts, SECTIONS, scopeFaults, usedInterface } from "./parts.ts";
 import { parseRoadmap } from "./roadmap.ts";
 import { mainRef } from "./main-branch.ts";
+import { git } from "./git.ts";
 
 type Out = (line: string) => void;
 const ARCHITECTURE = "docs/architecture.md";
@@ -127,7 +128,14 @@ function scopeOfBranch(repo: string, parts: Part[], since: Since): string[] {
   const roadmap = existsSync(join(repo, "docs/ROADMAP.md")) ? readFileSync(join(repo, "docs/ROADMAP.md"), "utf8") : undefined;
   const step = id === undefined || roadmap === undefined ? undefined : parseRoadmap(roadmap).steps.find((s) => s.id === id);
   if (id !== undefined && step === undefined) return [`step ${id} of branch ${since.branch} is not in docs/ROADMAP.md`];
-  return step === undefined ? [] : scopeFaults(step, since.changed, parts);
+  // a deleted file has no part left to own it
+  return step === undefined
+    ? []
+    : scopeFaults(
+        step,
+        [...since.changed].filter((p) => existsSync(join(repo, p))),
+        parts,
+      );
 }
 
 /** Every fault of a repo's parts; none for a repo with no parts. */
@@ -144,11 +152,6 @@ export function partsFaults(repo: string, tracked: string[], since?: Since): str
   }
   out.push(...ownershipFaults(parts, tracked), ...interfaceFaults(repo, parts, tracked, since), ...(since ? scopeOfBranch(repo, parts, since) : []));
   return out;
-}
-
-function git(repo: string, ...args: string[]): { ok: boolean; out: string } {
-  const p = Bun.spawnSync(["git", "-C", repo, ...args], { stdin: "ignore", stderr: "ignore" });
-  return { ok: p.exitCode === 0, out: p.stdout.toString() };
 }
 
 /** The repo's files, new ones not yet added included, and what changed since it left main. */

@@ -1,6 +1,6 @@
 # Asks
 
-An ask is a needs-you card in Shepherdr's chat. An ask that a rule can answer should never reach you. This page
+An ask is a needs-you card in Lineclear's chat. An ask that a rule can answer should never reach you. This page
 sorts a week of real cards into kinds, says which rules answer them, and says where the rest go in the Inbox.
 
 `lineclear asks [--days N]` prints the same count from your own chat files, then lists each ask with its task, kind and what should have answered it. It counts the Inbox too: an item with no card in a chat is an ask of kind `inbox <kind>`. `lineclear run` applies the rules.
@@ -15,7 +15,7 @@ The needs-you cards of the 7 days to 2026-11-04, counted by `lineclear asks --da
 | question | 25 | A question with choices, or a form. | Rule 5: a written rule answers it, never the owner |
 | allowance | 14 | The agent's subscription is out until a named time. | Rule 1 |
 | plan | 2 | A plan waits for a yes. | Rule 6: applies by itself when the checks pass, the owner can undo |
-| merge-chat | 1 | `shepherdr merge` refuses because the chat has a new message the agent has not read. | Rule 2 |
+| merge-chat | 1 | `lineclear merge` refuses because the chat has a new message the agent has not read. | Rule 2 |
 | login | 1 | The agent waits for you to log in to a site. | Rule 3 when a login is stored, else Inbox: login or code |
 | permission | 1 | A terminal asks permission to run a command. | Inbox: outward (a wrong yes runs a command nobody checked) |
 | report | 159 | A task stopped and says why, with no question. | Not an ask. Closed by rule 4 once its task is done |
@@ -59,7 +59,7 @@ Each rule runs once per card, in each tick of the rule loop, and writes what it 
    it itself, or files it as a task (LIN-163) and goes on. These were the three asks of the day in
    `docs/numbers.md` under L243, all of one cause (L50's real power cut). Tested in `test/rules-waits.test.ts`.
 
-A rule answers by telling the task or by a wait. Shepherdr has already posted the card, and the rule does not
+A rule answers by telling the task or by a wait. Lineclear has already posted the card, and the rule does not
 remove it. A card that no rule can answer (no readable time, no stored login) is left as it is. `lineclear asks`
 names the Inbox kind it will become.
 

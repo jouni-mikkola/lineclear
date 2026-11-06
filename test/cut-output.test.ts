@@ -76,7 +76,7 @@ test("writes, edits, images and the chat are never cut", () => {
   expect(s.result("edit", big(), { path: "a" })).toBeUndefined();
   expect(s.result("read", big(), { path: "a" }, [{ type: "image", data: "x" }])).toBeUndefined();
   expect(s.result("bash", big(), { command: "lineclear chat say hello" })).toBeUndefined();
-  expect(s.result("bash", big(), { command: "shepherdr ask 'q' --choice a" })).toBeUndefined();
+  expect(s.result("bash", big(), { command: "lineclear ask 'q' --choice a" })).toBeUndefined();
   expect(existsSync(saveDir(s.env))).toBe(false);
   expect(s.result("read", big(), { path: "a" })).toBeDefined(); // a read is cut
 });
