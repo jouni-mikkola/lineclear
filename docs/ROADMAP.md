@@ -221,7 +221,7 @@ Result: The server's settings code is split into files under the size limit.
 Result: You add a machine without installing Lineclear on it.
 - why: every Lineclear install is one more copy to update, with its own PATH, port and folders to break.
 - done when: `lineclear machine add <host>` runs `herdr machine add`, installs pi, bun, git, gh and the agent kit there, and clones the projects that may run there. It installs no Lineclear server, and says so.
-- files: src/machines.ts, src/spread.ts, src/migrate.ts, server/server/live/install.ts
+- files: src/machines.ts, src/spread.ts, server/server/live/install.ts
 - parts: install, rules, server
 - after: none
 
