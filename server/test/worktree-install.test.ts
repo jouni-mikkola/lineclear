@@ -61,7 +61,9 @@ describe('install step of a new worktree', () => {
 
 function copyProject(from: string, to: string) {
   mkdirSync(join(to, 'dep'))
-  for (const f of ['package.json', 'bun.lock', 'dep/package.json']) writeFileSync(join(to, f), readFileSync(join(from, f)))
+  writeFileSync(join(to, 'package.json'), readFileSync(join(from, 'package.json')))
+  writeFileSync(join(to, 'bun.lock'), readFileSync(join(from, 'bun.lock')))
+  writeFileSync(join(to, 'dep/package.json'), readFileSync(join(from, 'dep/package.json')))
 }
 
 describe('one install per lock file', () => {
