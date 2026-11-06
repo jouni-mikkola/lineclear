@@ -340,10 +340,10 @@ Result: No code, doc, brief or skill of Lineclear names the old product, and a g
   - The old product's binary, its client file, its env names and the fork's old code paths are renamed or removed; `bun run test` passes on the result.
   - A gate `old-name` in `bun run gates` fails on the old name (any case) in a tracked file or in a brief or skill a task is given, with only `server/NOTICE` and the MIT license text allowed, and a test plants the name in a code file, a doc and a skill and finds each refused.
   - The gate's baseline is empty and `bun run check` names it in the gates step.
-- parts: gates, server, pi
+- parts: gates, server, pi, ui
 - locks: old-name
 - after: L311, L312
-- files: scripts/gates/run.ts, scripts/gates/baseline, server/NOTICE, pi/extension.ts, test/contracts/gates.test.ts
+- files: scripts/gates/run.ts, scripts/gates/old-name.ts, scripts/gates/baseline, server/NOTICE, pi/extension.ts, test/gates.test.ts, CHANGELOG.md
 
 ### L314 Every moving part has a cost
 Result: `docs/simplify.md` lists each process, timer, store, loop and gate with what it costs a merged step and what breaks without it.
