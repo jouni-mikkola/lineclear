@@ -4,6 +4,8 @@ import { existsSync } from '../mfs.ts'
 import { agentEnv, onMachine, type BoxInfo } from '../box.ts'
 import type { Task, TaskStatus } from '../../../shared/types.ts'
 import { Emitter } from '../../source.ts'
+import { machineOf } from '../../../../src/check-runs.ts'
+import { recordWork } from '../../../../src/task-work.ts'
 import { readJson, writeJson } from '../../store.ts'
 import { ROOT } from '../../root.ts'
 import { has } from '../../plugins.ts'
@@ -414,6 +416,8 @@ export abstract class EngineState extends Emitter<Events> {
       first,
       pane: () => this.wtOf(t).agentPane({ home, wt: t.worktree!, label: labelOf(t), tab: 'Agent', env, made }),
     }
+    // a start, not a message to a running agent that launch only heals
+    if (!rec || restart || this.agents.status(key) === 'gone') recordWork(t.id, 'agent', undefined, t.machine ?? machineOf())
     return restart ? this.agents.restart(spec, restart) : this.agents.ensure(spec)
   }
 

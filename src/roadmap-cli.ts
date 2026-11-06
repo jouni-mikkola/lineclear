@@ -20,7 +20,7 @@ import {
   type StepStatus,
   type Task,
 } from "./roadmap.ts";
-import { readParts, stepPartFaults, stepParts, unblockedByFiles } from "./parts.ts";
+import { unblockedByFiles } from "./parts.ts";
 import { mainRefs } from "./main-branch.ts";
 import { git } from "./git.ts";
 
@@ -100,7 +100,7 @@ export function roadmapMain(
     return 1;
   }
   if (sub === "check") {
-    const faults = [...partFaults(repo, parsed.steps), ...missingProofs(repo, parsed.steps), ...noNewMeasuring(repo, parsed.steps)];
+    const faults = [...missingProofs(repo, parsed.steps), ...noNewMeasuring(repo, parsed.steps)];
     for (const f of faults) out(`${road.file}:${f.line}: ${f.message}`);
     if (faults.length > 0) return 1;
     out(`ok: ${parsed.steps.length} steps`);
@@ -158,27 +158,6 @@ function missingProofs(repo: string, steps: Step[]): { line: number; message: st
   const file = join(repo, "docs", "numbers.md");
   if (!existsSync(file)) return [];
   return proofFaults(steps, doneOnMain(repo, steps), readFileSync(file, "utf8"));
-}
-
-/**
- * In a repo with parts, every step still to do names its parts, and every step's parts and files fit them. A step
- * done before parts existed keeps its old form.
- */
-function partFaults(repo: string, steps: Step[]): { line: number; message: string }[] {
-  const parts = readParts(repo);
-  if (parts.length === 0) return [];
-  const done = doneOnMain(repo, steps);
-  const out: { line: number; message: string }[] = [];
-  for (const s of steps) {
-    if (s.dropped) continue;
-    if (stepParts(s).names.length === 0) {
-      if (!done.has(s.id))
-        out.push({ line: s.line, message: `step ${s.id} names no parts: add '- parts: <part>, ...' (${parts.map((p) => p.name).join(", ")})` });
-      continue;
-    }
-    for (const message of stepPartFaults(s, parts)) out.push({ line: s.fields.parts?.line ?? s.line, message });
-  }
-  return out;
 }
 
 /** Prints one step of the roadmap, so that a worker need not read the whole file. */

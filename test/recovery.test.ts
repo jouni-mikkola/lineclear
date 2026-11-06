@@ -27,6 +27,7 @@ test("no source file writes a state file in place", () => {
     "full.ts",
     "plan.ts",
     "check-runs.ts",
+    "task-work.ts",
     "api-latency.ts",
     "stall-class.ts",
     "track.ts",

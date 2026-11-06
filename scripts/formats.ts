@@ -1,7 +1,7 @@
 // Reads the files another build wrote with this build's code: `bun scripts/formats.ts <repo> [<store>] [--older]` prints one line
 // per file it cannot read as that build meant it and exits 1 if there is one: the roadmap of <repo> with this build's
 // roadmap check, and the store files in <store> with this build's server (server/scripts/store-formats.ts). A promotion
-// runs stable's copy on next's files and next's copy on stable's store (see docs/stable-and-next.md).
+// runs stable's copy on next's files and next's copy on stable's store.
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";

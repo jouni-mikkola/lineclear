@@ -1,4 +1,4 @@
-// Promotion (see docs/stable-and-next.md): the one path to stable. `lineclear release promote <version>` takes a build that
+// Promotion: the one path to stable. `lineclear release promote <version>` takes a build that
 // passed `release check`, points `current` at it, keeps the one before as `previous`, restarts the service, runs the smoke
 // check and goes back by itself when that fails. Running work lives in herdr, a unit of its own, so it is never touched.
 import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readlinkSync, rmSync, statSync } from "node:fs";

@@ -3,30 +3,8 @@ import { expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { readSlowBaseline, writeSlowBaseline } from "../scripts/check-speed.ts";
-import { filmParts, railWithMotion } from "../scripts/media-lib.ts";
 import { installFromTag } from "../scripts/release-tag.ts";
 import { tmp } from "./helpers.ts";
-
-test("the film's parts take their sizes from the rail parts and their curves from motion.json", () => {
-  const f = filmParts();
-  expect(f.length).toBeGreaterThan(0);
-  expect(f.parts.train.w).toBeGreaterThan(0);
-  expect(f.parts.rail.gap).toBeGreaterThan(f.parts.rail.tie);
-  expect(Object.keys(f.ink)).toContain("fg");
-  expect(Object.keys(f.ease).length).toBeGreaterThan(0);
-});
-
-test("rail.ts is rewritten with its motion block from motion.json", () => {
-  const src = railWithMotion();
-  expect(src).toContain("export const MS = {");
-});
-
-test("a rail.ts that lost its motion markers is named", () => {
-  const root = tmp("rail");
-  mkdirSync(join(root, "ui", "brand"), { recursive: true });
-  writeFileSync(join(root, "ui", "brand", "rail.ts"), "export {};\n");
-  expect(() => railWithMotion(root)).toThrow("lost its motion markers");
-});
 
 test("the slow baseline is written sorted and read back, and a missing one is empty", () => {
   const root = tmp("slow");

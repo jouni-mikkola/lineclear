@@ -252,7 +252,7 @@ function recordSteps(project: string, tasks: { id: string; title: string }[]) {
   write(join(FIXTURE, "config", "projects", project, "state.json"), { taskSteps: Object.fromEntries(tasks.map((t) => [t.id, t.title.split(" ")[0]])) });
 }
 
-export function writeSpaceTasks(space: string, tasks: { id: string; title: string; status: string; sub?: string }[]) {
+function writeSpaceTasks(space: string, tasks: { id: string; title: string; status: string; sub?: string }[]) {
   write(join(FIXTURE, "lineclear", `task-list-${space}.json`), tasks);
 }
 
@@ -324,7 +324,7 @@ const SHOP = `# Roadmap
 - after: W2, W3
 `;
 
-export const SHOP_TASKS = [
+const SHOP_TASKS = [
   { id: "WEB-3", title: "W2 Pay with a saved card", status: "work", sub: "Writing the tests" },
   { id: "WEB-4", title: "W3 Search that forgives typos", status: "work", sub: "Writing the tests" },
 ];
@@ -423,7 +423,7 @@ export const ROADMAP_LIVE: Partial<Record<Motion, { change: () => void; after: s
 
 // Settings: the machines in <config>/machines.json, each reached over ui/test/fake-ssh, and a project's settings.
 
-export function writeMachines(machines: { host: string; state: "installing" | "ready" | "failed"; doctor?: string[] }[]) {
+function writeMachines(machines: { host: string; state: "installing" | "ready" | "failed"; doctor?: string[] }[]) {
   write(join(FIXTURE, "config", "machines.json"), { machines: machines.map((m) => ({ since: "2026-01-05T09:12:00.000Z", ...m })) });
 }
 
@@ -435,7 +435,7 @@ export const sshLog = () => {
   }
 };
 
-export const MACHINES = [
+const MACHINES = [
   { host: "build-box", state: "ready" as const, doctor: ["ok     git", "All well."] },
   { host: "broken-box", state: "failed" as const, doctor: ["FAILED service: lineclear.service is not running"] },
 ];
@@ -455,13 +455,6 @@ export function startSettings() {
     models: SHOP_MODELS,
   });
 }
-
-const machine = (h: string) => `document.querySelector('[data-machines] > [data-key="${h}"]')`;
-
-/** Each live motion on Settings: a machine added in the CLI. */
-export const SETTINGS_LIVE: Partial<Record<Motion, { change: () => void; after: string }>> = {
-  "machine-add": { change: () => writeMachines([...MACHINES, { host: "new-box", state: "ready" }]), after: `!!${machine("new-box")}` },
-};
 
 // Adding a project from Home: an empty config, a repo folder with a check script and a roadmap, and its space.
 

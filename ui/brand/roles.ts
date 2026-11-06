@@ -1,7 +1,6 @@
 // One small icon per role, on a 16 unit grid with a 1.5 stroke, in the picture language of docs/brand.md: the
 // Dispatcher is the signal box, the reviewer the signal, the rules the points, main the line the tracks join. The
-// web pages draw them from here in the text's colour, and `bun scripts/role-icons.ts` writes the same shapes to
-// `ui/brand/roles/<role>.svg` for the README.
+// web pages draw them from here in the text's colour.
 
 export const ROLE_ICONS = {
   you: {
@@ -43,17 +42,3 @@ export const ROLE_ICONS = {
 } as const satisfies Record<string, { label: string; shapes: readonly ({ d: string } | { circle: readonly [number, number, number]; fill?: boolean })[] }>;
 
 export type RoleName = keyof typeof ROLE_ICONS;
-export const ROLE_NAMES = Object.keys(ROLE_ICONS) as RoleName[];
-
-/** A role's icon as a standalone SVG file, in one colour. */
-export function roleSvg(role: RoleName, colour = "#a9a6a1"): string {
-  const { label, shapes } = ROLE_ICONS[role];
-  const body = shapes
-    .map((s) =>
-      "d" in s
-        ? `<path d="${s.d}"/>`
-        : `<circle cx="${s.circle[0]}" cy="${s.circle[1]}" r="${s.circle[2]}"${"fill" in s && s.fill ? ` fill="${colour}" stroke="none"` : ""}/>`,
-    )
-    .join("");
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" role="img" aria-label="${label}"><g fill="none" stroke="${colour}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${body}</g></svg>\n`;
-}

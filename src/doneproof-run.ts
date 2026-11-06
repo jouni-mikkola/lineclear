@@ -2,6 +2,7 @@ import { ANSWER_MAX_TOKENS, askModel, INPUT_MAX_TOKENS } from "./ask-model.ts";
 import { commandsFor, type ProveTools, doneItems, type ItemProof, keyOf, type Runner, readOnly, type StepProof, saveProof } from "./doneproof.ts";
 import { stepFiles } from "./parts.ts";
 import { company } from "./company.ts";
+import { recordWork } from "./task-work.ts";
 import type { Step } from "./roadmap.ts";
 
 const spawn: Runner = (argv, cwd) => {
@@ -111,6 +112,7 @@ export interface ProveInput {
  */
 export function proveStep(i: ProveInput): StepProof | string {
   const run = i.run ?? spawn;
+  recordWork(i.step.id, "doneproof", i.env);
   const items = doneItems(i.step);
   const byCommand = new Map(items.map((it) => [it, proveByCommand(it, i.repo, run)] as const));
   const rest = items.filter((it) => byCommand.get(it) === undefined);

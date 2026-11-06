@@ -1,4 +1,4 @@
-// Two faults of herdr-projects 2.0 (docs/known-faults.md) that no other server test plants. Each fails on ebb17d5.
+// Two faults of herdr-projects 2.0 that no other server test plants. Each fails on ebb17d5.
 import { expect, test } from 'bun:test'
 import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'

@@ -94,7 +94,7 @@ function fixGoal(c: StallClass, evidence: string[]): string {
 
 const isStall = (d: Decision) => d.event === "stall" || (d.event === "remedy" && d.kind === "stall" && typeof d.minutes === "number");
 
-export const isOpen = (f: { title: string }, tasks: { title: string; status: string }[]) =>
+const isOpen = (f: { title: string }, tasks: { title: string; status: string }[]) =>
   tasks.some((t) => t.title === f.title && t.status !== "done" && t.status !== "closed");
 
 /** A task that ended with nothing merged: closed, or done with nothing to merge (a planning task may end that way). */

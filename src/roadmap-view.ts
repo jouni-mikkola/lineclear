@@ -1,9 +1,7 @@
 import { localSpaceBySlug, stepMarks } from "./home-data.ts";
 import { stopsOfSpace } from "./home-waits.ts";
 import { readSettings } from "./project.ts";
-import { chatFiles, findSpace, lineclearDir, spaceTasks } from "./measure.ts";
-import { partHealth, taskSignals } from "./part-health.ts";
-import { readParts, stepParts } from "./parts.ts";
+import { stepParts } from "./parts.ts";
 import { countSteps, currentPhase, lineOf, type Plan, readPlan, type RoadmapLine } from "./progress.ts";
 import { unprovenOf } from "./doneproof.ts";
 import { roadmapSource, lineclearTasks } from "./roadmap-source.ts";
@@ -27,7 +25,7 @@ export interface RoadmapData {
   history: { step: string; at: number; commit: string; subject: string }[];
   /** The Inbox asks of this project that wait for you, newest first. The server adds them, so a read of the files has none. */
   decisions?: { n: number; question: string; step?: string }[];
-  /** Each part the steps name, with its health score (higher is worse). Absent when the project has no parts pages. */
+  /** Each part the steps name, with its health score (higher is worse). Absent when none is given. */
   parts?: { name: string; score: number }[];
   /** Review rounds a step's task may use before it asks you. */
   rounds: number;
@@ -194,21 +192,11 @@ export function roadmapData(
     .flatMap(({ c, steps }) => steps.map((step) => ({ step, at: c.at, commit: c.commit, subject: c.subject })))
     .slice(0, HISTORY);
   const plan = readPlan(text, commits, unproven);
-  const pages = readParts(settings.repo);
-  const dir = lineclearDir(env);
-  const space = findSpace(dir, settings.space, settings.repo);
-  const listed = space ? spaceTasks(dir, space) : [];
-  const withFacts = listed.map((t) => ({ id: String(t.id), title: String(t.title ?? ""), facts: typeof t.facts === "string" ? t.facts : undefined }));
-  const signals = space ? taskSignals(chatFiles(dir, space), withFacts) : new Map();
-  const parts = partHealth(settings.repo, pages, parsed.steps, withFacts, signals)
-    .map((h) => ({ name: h.part, score: h.score }))
-    .sort((a, b) => a.name.localeCompare(b.name));
   return {
     ok: {
       project,
       phases,
       steps,
-      ...(parts.length ? { parts } : {}),
       ...countSteps(plan),
       line: line(read),
       ...(currentPhase(plan) ? { phase: currentPhase(plan) } : {}),

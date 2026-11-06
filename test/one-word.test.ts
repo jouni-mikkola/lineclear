@@ -12,8 +12,8 @@ test("the word Autopilot is in no doc, CLI help or page of Lineclear", () => {
   expect(hits).toEqual([]);
 });
 
-test("the CLI help and the leftovers list say coordinator timer, never autopilot", () => {
-  for (const f of ["server/server/live/args.ts", "src/cli.ts", "src/leftovers.ts"]) {
+test("the CLI help says coordinator timer, never autopilot", () => {
+  for (const f of ["server/server/live/args.ts", "src/cli.ts"]) {
     const shown = readFileSync(join(root, f), "utf8")
       .split("\n")
       .filter((l) => /autopilot/i.test(l) && !/autopilot runtime|autopilot-runtime|autopilot-runs/.test(l));

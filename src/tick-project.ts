@@ -6,9 +6,7 @@ import { CHECKS_PER_TICK, type ProveTools, missingItem, needsProof, testOf } fro
 import { type FixSpec, fileFix } from "./self-fix.ts";
 import { ownerStepItem, ownerStepsDone } from "./owner-steps.ts";
 import { overStartLimit, recordStepStart, START_LIMIT, startsInDay } from "./start-limit.ts";
-import { type FaultFix, holdForFault } from "./system-fault.ts";
 import { placeHeld } from "./held.ts";
-import { heavyTasks } from "./heavy-run.ts";
 import { criticalSteps, firstByRoom } from "./pace.ts";
 import { noWorkerNote, startAccountNote } from "./quota.ts";
 import { stepHeld } from "./parts.ts";
@@ -514,8 +512,7 @@ function startReadySteps(s: Starting) {
     const step = s.byId.get(st.id) as Step;
     if (isFrozen(step) || (step.ownerOnly && ownerStepItem(s.t, step))) continue;
     const held = st.unproven !== undefined && !restartUnproven(s, step, st.unproven);
-    const file = (f: FaultFix) => fileStepFix(s.t, step, "faulted", f.why, f.brief, f.evidence, undefined, f.title);
-    if (held || (step.reopened && refileReopened(s, step)) || holdForFault(s.t, step, s.picked().worker !== undefined, file)) continue;
+    if (held || (step.reopened && refileReopened(s, step))) continue;
     const why = whyNotStart(s, step, reserved);
     if (why) s.t.note("skip", why, step.id);
     else startStep(s, step);
@@ -548,7 +545,6 @@ export function tickProject(
 
   const overloaded = world.load() > limit;
   checkHealth(t, main, overloaded);
-  if (!overloaded && !dryRun && main.checkedOut === main.head) heavyTasks(name, settings, main.head, tasks, world, env, note);
   // The list of offered models costs seconds of CPU: read it only when a stall or a start needs it, once per tick.
   let list: { set: Set<string> | undefined } | undefined;
   const offered = () => {

@@ -15,15 +15,13 @@ import { agentsOnOldName, helperApart } from "./helper.ts";
 import { realBusy } from "./old-install.ts";
 import { diskTrouble, freeBytes } from "./health.ts";
 import { retiredChecks, skillRoots } from "./retire.ts";
-import { type Kit, kitDiff, kitOthers, type Wanted } from "./kit.ts";
 import { parts } from "./pack.ts";
 import { readModelFile } from "./models.ts";
-import { findLeftovers, leftoverChecks, oldTests, tmpFull, type Leftovers } from "./leftovers.ts";
 import { checkoutPointers } from "./install-paths.ts";
 import { buildNames, buildProblem, buildsDir, installReleaseCommand, type RunFrom, unitCommand } from "./builds.ts";
 import { unknownWindows } from "../pi/compaction.ts";
 import { publishedAddress, serveCommand } from "./published.ts";
-import { compileCacheDir, ramUsedBytes, removeFolders, staleFolders } from "./tmpdirs.ts";
+import { compileCacheDir } from "./tmpdirs.ts";
 
 export interface Check {
   name: string;
@@ -75,20 +73,11 @@ export interface Probe {
   free?: (dir: string) => number;
   /** The address the server is told to listen on (LINECLEAR_HOST), when set. */
   listen?: string;
-  /** Test and check folders left in the temp folders for over 6 hours, none in use. */
-  oldTestFolders?: string[];
-  /** Bytes in use on a RAM-backed /tmp (0 when /tmp is a disk). */
-  tmpRamBytes?: number;
-  /** Worktrees, branches and runtime folders of finished work, and what is kept (doctor --fix removes the safe ones). */
-  leftovers?: () => Leftovers;
-  /** Removes them (doctor --fix). */
-  removeTestFolders?: (paths: string[]) => unknown;
   /** Where the web pages are published on the tailnet (task links open there), when tailscale is here. */
   published?: string;
   /** The herdr version the contract test passed with, and the one each machine runs (null when it cannot say). */
   herdr?: { tested: string; machines: { machine: string; version: string | null }[] };
   /** What pi loads here and on each other machine (a null diff: it cannot be read), and what the release wants. */
-  kit?: { here: Kit; want: Wanted; others: { host: string; diff: string[] | null; own?: string[] }[] };
   /** What is wrong with the backup, "" when it is fine or none is set. */
   backup?: string;
   /** The machine whose board runs this machine's tasks ("" when this one does). */
@@ -123,10 +112,6 @@ export function realProbe(paths: Paths, env: Record<string, string | undefined> 
     helperApart: helperApart(env),
     oldNameAgents: () => agentsOnOldName(),
     published: publishedAddress(env),
-    oldTestFolders: staleFolders(),
-    tmpRamBytes: ramUsedBytes(),
-    removeTestFolders: removeFolders,
-    leftovers: () => findLeftovers(env),
     backup: backupProblem(env),
     runBy: runByNote(env),
     store: readBackupSettings(env) === undefined ? copiesProblem(env) : "",
@@ -422,19 +407,6 @@ function tokenPack(p: Probe): Check {
   return { name: `token pack: ${shown}`, problem: "", fix: "" };
 }
 
-/** Every machine loads the kit the release names (pi, package versions, extension owners): another may behave otherwise. */
-function agentKit(p: Probe): Check[] {
-  if (!p.kit) return [];
-  const fix = "lineclear kit shows it; lineclear machine update <machine>, then pi install the pinned versions in pi/kit.json";
-  const row = (name: string, diff: string[] | null, own: string[] = []): Check => ({
-    name: `agent kit on ${name}`,
-    problem: diff === null ? `${name} cannot be read` : diff.join("; "),
-    fix,
-    ...(own.length ? { info: `extensions of its owner, left alone: ${own.join(", ")}` } : {}),
-  });
-  return [row("this machine", kitDiff(p.kit.here, p.kit.want), kitOthers(p.kit.here)), ...p.kit.others.map((o) => row(o.host, o.diff, o.own))];
-}
-
 /** An installed file or pi setting that points into a git checkout runs that branch's code, and breaks when the checkout goes. */
 function checkoutFree(p: Probe, env: Record<string, string | undefined>): Check {
   const { paths } = p;
@@ -494,7 +466,6 @@ export function doctorChecks(probe: Probe): Check[] {
       fix: INSTALL_AGAIN,
     },
     tokenPack(p),
-    ...agentKit(p),
     compactionWindows(p),
     checkoutFree(p, process.env),
     service(p),
@@ -511,9 +482,6 @@ export function doctorChecks(probe: Probe): Check[] {
     oldFoldersArchived(p),
     listening(p),
     publishedPages(p),
-    oldTests(p),
-    tmpFull(p),
-    ...leftoverChecks(p),
     { name: "backup", problem: p.backup ?? "", fix: "lineclear backup (it names what fails); lineclear backup status" },
     { name: "store", problem: p.store ?? "", fix: "lineclear store copy; lineclear store list; the rule loop takes a copy every hour" },
     {

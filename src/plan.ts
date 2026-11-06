@@ -2,10 +2,7 @@ import { serverBin } from "./paths.ts";
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { dispatcherDir } from "./dispatcher.ts";
-import { applyPlan, type PartsContext, partProblems, planProblems, plansAreAuto, readiness, stepFormProblems } from "./autoplan.ts";
-import { chatFiles, findSpace, lineclearDir, spaceTasks } from "./measure.ts";
-import { partHealth, taskSignals, worstParts } from "./part-health.ts";
-import { readParts } from "./parts.ts";
+import { applyPlan, planProblems, plansAreAuto, readiness, stepFormProblems } from "./autoplan.ts";
 import { addItem, isOpen, readItems } from "./inbox.ts";
 import { readSettings } from "./project.ts";
 import { looseNote, resolveProject } from "./resolve.ts";
@@ -91,21 +88,6 @@ export function planMain(raw: string[], out: (l: string) => void, baseEnv = proc
   return 0;
 }
 
-/** A repo's parts and its worst ones, counting what its space's chat says of its tasks when the space is known. */
-function partsContext(repo: string, roadmap: string, space: string | undefined, env: NodeJS.ProcessEnv): PartsContext {
-  const parts = readParts(repo);
-  if (parts.length === 0) return { parts, worst: [] };
-  const dir = lineclearDir(env);
-  const s = space ? findSpace(dir, space, repo) : undefined;
-  const tasks = (s ? spaceTasks(dir, s) : []).map((t) => ({
-    id: String(t.id),
-    title: String(t.title ?? ""),
-    facts: typeof t.facts === "string" ? t.facts : undefined,
-  }));
-  const health = partHealth(repo, parts, checkRoadmap(roadmap).parsed.steps, tasks, s ? taskSignals(chatFiles(dir, s), tasks) : new Map());
-  return { parts, worst: worstParts(health) };
-}
-
 function submit(out: (l: string) => void, env: NodeJS.ProcessEnv, cwd: string, now: () => Date): number {
   const fail = (m: string) => (out(`lineclear plan submit: ${m}`), 1);
   if (serverIsDown(env)) return (out(NO_SERVER), 1);
@@ -140,11 +122,7 @@ function submit(out: (l: string) => void, env: NodeJS.ProcessEnv, cwd: string, n
   const head = git(root, "rev-parse", "HEAD").out.trim();
   const round = readItems(env).filter((i) => i.kind === "plan" && i.task === task).length + 1;
   if (round > 2) return fail("the plan was already sent back once; this task ends");
-  // the part rules hold whether the owner approves or the plan applies by itself: the owner is not the one to count parts
   const settings = project ? readSettings(project, env) : undefined;
-  const ctx = partsContext(root, text, typeof settings === "object" ? settings.space : undefined, env);
-  const parts = partProblems(checkRoadmap(was.ok ? was.out : "").parsed.steps, checkRoadmap(text).parsed.steps, ctx);
-  if (parts.length > 0) return fail(`the part rules refuse this plan, fix these, commit and run 'lineclear plan submit' again:\n${parts.join("\n")}`);
   const before = was.ok ? was.out : "";
   const planner = typeof settings === "object" ? settings.models.planner[0] : undefined;
   const reviewers = typeof settings === "object" ? settings.models.reviewer : [];

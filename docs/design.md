@@ -130,8 +130,6 @@ as sidings, then the agents at work, then tokens and cost. `test/board-usage.tes
 "Running low".
 
 A change in the files plays its motion: a task starting, moving or finishing on Home, an item arriving in the Inbox.
-Recordings: [Home task-start](design/motion/home-task-start.webm), [Home task-move](design/motion/home-task-move.webm),
-[Home task-finish](design/motion/home-task-finish.webm), [Inbox inbox-arrive](design/motion/inbox-inbox-arrive.webm).
 
 | State | Home 1440 px | Home 390 px | Inbox 1440 px | Inbox 390 px |
 |---|---|---|---|---|
@@ -170,8 +168,7 @@ it, with no lines between them. One click opens its why, done-when, task, review
 to one line, and the page opens on the first phase with open steps. The history lists recent merges, newest first.
 
 A step whose task starts glows once (`task-start`), and a merged step slides to done while its phase fills
-(`task-finish`). Recordings: [Roadmap task-start](design/motion/roadmap-task-start.webm),
-[Roadmap task-finish](design/motion/roadmap-task-finish.webm).
+(`task-finish`).
 
 | State | Roadmap 1440 px | Roadmap 390 px |
 |---|---|---|
@@ -197,8 +194,7 @@ and a box and a few keys type into it. The server takes input only for a session
 its own pages, and only as a click, text, a listed key or a scroll. `LINECLEAR_PLAYWRIGHT_CLI` sets the command.
 
 A session that opens grows in at its place (`browser-open`) and one that closes shrinks away (`browser-close`),
-while the other cards slide. Recordings: [browser-open](design/motion/browsers-browser-open.webm),
-[browser-close](design/motion/browsers-browser-close.webm).
+while the other cards slide.
 
 | State | Browsers 1440 px | Browsers 390 px |
 |---|---|---|
@@ -227,8 +223,6 @@ secrets by name only: a value never reaches a page.
 
 A machine that is added drops in at its place (`machine-add`), a machine's new state shape pops in
 (`machine-state`) and a model slides to its new place (`model-move`). A new load reading changes the bar at once.
-Recordings: [machine-add](design/motion/settings-machine-add.webm),
-[machine-state](design/motion/settings-machine-state.webm), [model-move](design/motion/settings-model-move.webm).
 
 | State | Settings 1440 px | Settings 390 px |
 |---|---|---|
@@ -259,8 +253,7 @@ is a link. Lineclear talks to the Dispatcher through Lineclear's own server on t
 
 Empty shows one line on what the Dispatcher does and three questions to tap. A message on its way says Sending; one
 that did not go says why with Try again. While the Dispatcher writes, three grey dots beat (`chat-typing`) with what
-it does now. Offline, a line says so and Send waits. A new message slides up into place (`chat-arrive`). Recordings:
-[chat-arrive](design/motion/chat-arrive.webm), [chat-typing](design/motion/chat-typing.webm).
+it does now. Offline, a line says so and Send waits. A new message slides up into place (`chat-arrive`).
 
 | State | Chat 1440 px | Chat 390 px |
 |---|---|---|
@@ -322,8 +315,7 @@ Reduced motion shows the end state at once. Offline, the line dims and says when
 
 Each role has one small icon, on a 16 unit grid with a 1.5 stroke, drawn in the colour of the text around it:
 You, Dispatcher, Roadmap, Rules, Worker, Reviewer, Main and Planner. `ui/brand/roles.ts` holds the shapes,
-`RoleIcon` draws them on the pages (the line, Settings models, Inbox cards, the roadmap view), and
-`bun scripts/role-icons.ts` writes them to `ui/brand/roles/` for the README.
+`RoleIcon` draws them on the pages (the line, Settings models, Inbox cards, the roadmap view).
 
 ## The old UI's views
 
@@ -425,7 +417,7 @@ content (answers, questions, details).
 ## Motion
 
 Every animation starts in `ui/kit/motion.ts`, one named motion per state change and no others. Their times and easings
-are the motion tokens in `ui/brand/rail.ts`, shared with the README's films. Each runs on transform
+are the motion tokens in `ui/brand/rail.ts`. Each runs on transform
 and opacity with the Web Animations API, is under 300 ms, starts from where things are on screen, and never blocks
 input. Under prefers-reduced-motion none runs and every change is instant.
 
@@ -460,25 +452,10 @@ from left to right, sleeper by sleeper, until the part is read. Under reduced mo
 ### Alike with the board
 
 The key motions of U24 (a train's glide, a lamp turning green, a view change, laying the track) take their time and
-curve from `KEY` in `ui/brand/rail.ts`, which `bun run media` writes from `scripts/film/motion.json`, the file the
-film reads too. `ui/test/alike.pw.ts` holds each motion in the app and the same motion in `docs/design/board.html` at
+curve from `KEY` in `ui/brand/rail.ts`. `ui/test/alike.pw.ts` holds each motion in the app and the same motion in `docs/design/board.html` at
 its start, every 50 ms and its end, and compares the share of its travel each has made (position, opacity, colour).
 Alike threshold: 5 %. A motion that differs from the board by more at any instant fails. The parts at rest are
-compared by their ink, pixel by pixel, in the app and on the board (`ui/test/alike-parts.pw.ts`). Parts threshold: 20 %. `bun run ui:record`
-keeps the frames of the app, of the board and side by side in `docs/design/motion/alike/`.
-
-Beside the board (app left, board right, one row per instant): [train](design/motion/alike/train.png), [lamp](design/motion/alike/lamp.png), [view](design/motion/alike/view.png), [track-lay](design/motion/alike/lay.png).
-Before and after U41: [train](design/motion/alike/before-train.webm) to [train](design/motion/alike/after-train.webm), [lamp](design/motion/alike/before-lamp.webm) to [lamp](design/motion/alike/after-lamp.webm), [view](design/motion/alike/before-view.webm) to [view](design/motion/alike/after-view.webm), [track-lay](design/motion/alike/before-lay.webm) to [track-lay](design/motion/alike/after-lay.webm).
-
-Recordings: [task-start](design/motion/task-start.webm), [task-move](design/motion/task-move.webm),
-[task-finish](design/motion/task-finish.webm), [task-wait](design/motion/task-wait.webm), [inbox-clear](design/motion/inbox-clear.webm), [inbox-arrive](design/motion/inbox-arrive.webm),
-[view-change](design/motion/view-change.webm), [chat-open](design/motion/chat-open.webm), [browser-open](design/motion/browser-open.webm),
-[browser-close](design/motion/browser-close.webm), [machine-add](design/motion/machine-add.webm),
-[machine-state](design/motion/machine-state.webm), [model-move](design/motion/model-move.webm),
-[chat-arrive](design/motion/chat-arrive.webm), [chat-typing](design/motion/chat-typing.webm),
-[part-change](design/motion/part-change.webm), [value-change](design/motion/value-change.webm),
-[track-lay](design/motion/track-lay.webm), [request-run](design/motion/request-run.webm), [train-progress](design/motion/train-progress.webm),
-[load-shrink](design/motion/load-shrink.webm), [track-ahead](design/motion/track-ahead.webm), [engine-swap](design/motion/engine-swap.webm), and the whole line at [1440 px](design/motion/line-1440.webm) and [390 px](design/motion/line-390.webm).
+compared by their ink, pixel by pixel, in the app and on the board (`ui/test/alike-parts.pw.ts`). Parts threshold: 20 %.
 
 ## Say each thing once
 
@@ -530,7 +507,7 @@ Every view step passes it, with the helpers in `ui/test/bar.ts`:
 `bun run ui:test` runs it in headless Chromium (once per machine: `bunx playwright install chromium`) against `lineclear run` on an empty config. For each motion it checks
 that only named motions run and each is under 300 ms, reads the compositor's frames and the main thread's tasks from a
 DevTools trace, clicks again halfway through and wants the change on the next frame, and repeats with reduced motion
-and wants no animation at all. `bun run ui:record` makes the recordings again. After a change to a picture on
+and wants no animation at all. After a change to a picture on
 purpose, `bunx playwright test --update-snapshots` writes the new ones.
 In every state the pictures show, each letter is drawn in the served font: `ui/test/font.pw.ts` fails if one falls back
 to a font of the machine. So the pictures match on machines with other system fonts. They are made and compared on

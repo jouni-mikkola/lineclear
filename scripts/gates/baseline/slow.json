@@ -3,8 +3,6 @@
   "test/backup.test.ts": 1.9,
   "test/dispatcher.test.ts": 3.0,
   "test/doctor.test.ts": 1.4,
-  "test/gates.test.ts": 2.5,
-  "test/heavy.test.ts": 6.0,
   "test/install.test.ts": 32.4,
   "test/kit.test.ts": 1.5,
   "test/machines.test.ts": 3.5,

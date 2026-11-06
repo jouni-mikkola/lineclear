@@ -6,7 +6,6 @@ import type { ReleaseState } from "./release.ts";
 import { existsSync, readdirSync } from "node:fs";
 import { hostname } from "node:os";
 import { join } from "node:path";
-import { herdrLines } from "./herdr-health.ts";
 import { type Blocker, countSteps, lineOf, readPlan, type RoadmapLine, type Where } from "./progress.ts";
 import { roadmapSource, lineclearAllTasks } from "./roadmap-source.ts";
 import { titledByStep } from "./task-steps.ts";
@@ -50,8 +49,6 @@ export interface HomeData {
   dispatcher?: { writing: boolean };
   /** Stable and next, once the rule loop has looked at main (`lineclear release`). */
   release?: ReleaseState;
-  /** A failing herdr.service with its failure count (see herdr-health.ts), as a line. */
-  herdr?: string[];
   /** What `lineclear doctor` finds wrong on this machine, each as "problem: fix command". */
   doctor?: string[];
 }
@@ -470,7 +467,6 @@ export function homeData(env: Env = process.env, now = Date.now(), remote?: Expo
     projects: withProject(all),
     loose: looseTasks(all),
     ...usage,
-    herdr: herdrLines(env),
   };
 }
 

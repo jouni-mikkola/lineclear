@@ -45,7 +45,6 @@ export interface HomeData {
   dispatcher?: { writing: boolean };
   /** How many requests the Planner is laying steps for now. */
   planning?: number;
-  herdr?: string[];
   /** What `lineclear doctor` finds wrong, each with its fix command. */
   doctor?: string[];
 }

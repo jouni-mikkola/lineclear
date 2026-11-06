@@ -131,26 +131,6 @@ test("submit sends an incomplete step back to the planner, logs it and adds noth
   expect(readFileSync(join(String(t.env.LINECLEAR_CONFIG), "decisions.jsonl"), "utf8")).toContain("step B needs");
 });
 
-test("submit refuses a step with parts and no lock areas, and says to name them", () => {
-  const t = setup();
-  const f = join(t.work, "docs", "ROADMAP.md");
-  const base = readFileSync(f, "utf8");
-  const stepWith = (locks: string) =>
-    `${base}\n### B Title B\n- result: Title B works.\n- why: because\n- done when:\n  - it works\n- parts: ui\n${locks}- after: none\n- files: src/b.ts\n`;
-  const commit = (text: string) => {
-    writeFileSync(f, text);
-    Bun.spawnSync(["git", "-C", t.work, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-am", "x"]);
-  };
-  for (const locks of ["- locks: none\n", ""]) {
-    commit(stepWith(locks).replace("- files: src/b.ts\n", "- files: none\n"));
-    const r = t.plan(["submit"]);
-    expect(r.code).toBe(1);
-    expect(r.text).toContain("name the real areas");
-    expect(r.text).toContain("the part itself when the work needs all of it");
-  }
-  expect(readItems(t.env)).toHaveLength(0);
-});
-
 test("approving a plan merges it", () => {
   const t = setup();
   t.edit("B");

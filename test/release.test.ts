@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  fullCheckWhy,
   pointOriginAt,
   PROMOTE_EVERY_MS,
   type ReleaseDeps,
@@ -28,7 +29,7 @@ const B = "b".repeat(40);
 const C = "c".repeat(40);
 
 /** A world whose main is `head`, and whose test fails for the commits in `broken`. */
-function world(head: () => string, broken: Set<string> = new Set()) {
+function world(head: () => string, broken: Set<string> = new Set(), why = "smoke: the web pages do not answer") {
   const did = { tested: [] as string[], promoted: [] as string[], tasks: [] as string[], told: [] as string[] };
   let open: string | undefined;
   let stable = A;
@@ -37,7 +38,7 @@ function world(head: () => string, broken: Set<string> = new Set()) {
     head,
     test(c) {
       did.tested.push(c);
-      return broken.has(c) ? "smoke: the web pages do not answer" : "";
+      return broken.has(c) ? why : "";
     },
     promote(c) {
       did.promoted.push(c);
@@ -303,4 +304,19 @@ test("the release clone follows the app's origin when the repository is renamed"
   pointOriginAt(dir, "https://example.com/acme/new.git", env);
   expect(sh(["git", "remote", "get-url", "origin"], { cwd: dir }).out.trim()).toBe("https://example.com/acme/new.git");
   expect(() => pointOriginAt(dir, "fatal: No such remote 'origin'", env)).toThrow();
+});
+
+test("a red full check names its failing tests, a timed-out file and a failed gate in the held line and the fix task", () => {
+  const tests = Array.from({ length: 22 }, (_, i) => `  test/t${i}.test.ts > case ${i}: expected ${i}`);
+  tests[1] = "  test/slow.test.ts > waits: timed out after 120000ms";
+  const out = `noise\ncheck: failing tests:\n${tests.join("\n")}\ncheck: tests 1/2 failed\ncheck: gates failed: lint: 3 errors`;
+  const why = fullCheckWhy(out);
+  const { deps, did } = world(() => B, new Set([B]), why);
+  const s = releaseStep(deps, env, at(0));
+  expect(s.held).toContain("test/t0.test.ts > case 0: expected 0");
+  expect(s.held).toContain("test/slow.test.ts > waits: timed out after 120000ms");
+  expect(s.held).toContain("and 2 more");
+  expect(s.held).toContain("gates failed: lint: 3 errors");
+  expect(s.next).toMatchObject({ why });
+  expect(did.tasks).toEqual(["Fix next bbbbbbb"]);
 });

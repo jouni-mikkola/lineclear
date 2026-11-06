@@ -4,7 +4,7 @@ import { join } from "node:path";
 const HEADING = "## The owner's direction";
 
 /** The section of `docs/idea.md` that holds the owner's direction: its heading and lines, up to the next `## ` heading. */
-export function directionOf(idea: string): string | undefined {
+function directionOf(idea: string): string | undefined {
   const start = idea.indexOf(`\n${HEADING}\n`);
   if (start < 0) return undefined;
   const from = start + 1;
@@ -13,7 +13,6 @@ export function directionOf(idea: string): string | undefined {
 }
 
 /** The task ids a text names, each once, as `LIN-123`. */
-export const taskIds = (text: string): string[] => [...new Set(text.match(/\bLIN-\d+\b/g) ?? [])];
 
 /**
  * The owner's direction for work on a repo: the section of its own docs/idea.md, else the general one Lineclear ships.

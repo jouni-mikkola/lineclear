@@ -63,12 +63,7 @@ export function Home({
       <h1 className="sr-only">Home</h1>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 px-5 pt-4 md:px-10 lg:py-6 lg:pr-6">
         <InboxStrip open={open} held={held} onChoose={choose} onUndo={undo} ask={ask} errors={errors} read={asksRead} />
-        {(
-          [
-            ["herdr", d?.herdr],
-            ["doctor", d?.doctor],
-          ] as const
-        ).map(
+        {([["doctor", d?.doctor]] as const).map(
           ([kind, lines]) =>
             !!lines?.length && (
               <ul key={kind} aria-label={kind} className="flex flex-col gap-1 text-sm text-caution" {...{ [`data-${kind}`]: "" }}>
