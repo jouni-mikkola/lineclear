@@ -52,7 +52,7 @@ export function withoutBrowserSpecs(lcov: string, architecture: string): string 
     .join("end_of_record");
 }
 
-/** Each covered file's hit and found lines with the floor of its module, for part health (`src/part-health.ts`). */
+/** Each covered file's hit and found lines with the floor of its module. */
 export function fileCoverage(lcov: string, architecture: string, floors: Floors): Record<string, Lines & { floor: number }> {
   const modules = readModules(architecture);
   const out: Record<string, Lines & { floor: number }> = {};

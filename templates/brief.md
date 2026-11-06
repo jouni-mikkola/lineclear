@@ -18,7 +18,7 @@ Read the rest of the idea only as you need. Do exactly what "done when" says, no
 
 Do not read the whole docs/ROADMAP.md: it is large and stays in your context on every turn. To see another step, run
 `lineclear roadmap show <id>`.
-{{parts}}{{files}}{{rules}}
+{{files}}{{rules}}
 Check: while you work, run the test files you touch directly (`bun test <file>`); run `lineclear check --changed` once before `lineclear ready`, not after each edit (it runs `{{check}}` with `--changed` when a
 check slot is free: only the tests that reach your change, the types and the gates of what you changed). It must pass.
 Do not run the full check yourself: it runs once, in the merge lane, after the rebase, and a red result comes back to

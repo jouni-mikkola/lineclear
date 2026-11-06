@@ -1,4 +1,4 @@
-// The canary a promotion runs on next (see docs/stable-and-next.md): next's own server and web pages, on spare
+// The canary a promotion runs on next: next's own server and web pages, on spare
 // ports, pass the smoke check and take one task through its life (start, brief, change, check, close).
 // `bun scripts/canary.ts [--keep <dir>]` prints one line per step, exits 1 on the first that fails, and with --keep
 // leaves the store next wrote in <dir>. The agent is a stub script, so it spends no tokens. Everything it touches

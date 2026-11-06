@@ -131,12 +131,6 @@ test("it will not replace a roadmap without --force, and --no-commit prints the 
   expect(log).not.toContain("Step: A");
 });
 
-test("the example in docs/import.md imports", () => {
-  const md = readFileSync(join(import.meta.dir, "..", "docs", "import.md"), "utf8");
-  const json = /```json\n([\s\S]*?)```/.exec(md)?.[1] as string;
-  expect(importInto(repo(), JSON.parse(json)).code).toBe(0);
-});
-
 test("a missing repo is refused, and a failed commit leaves nothing written", () => {
   const steps = [step("A", "done", ["none"])];
   const missing = importInto(join(dir(), "typo"), steps);

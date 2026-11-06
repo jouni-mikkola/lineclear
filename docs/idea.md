@@ -197,8 +197,7 @@ It follows three principles:
   machine usable while agents work. Every heavy test suite takes a slot, and a step that waits for room starts on
   another machine of its project that has it.
 - **Planner.** It writes a roadmap the same way every time. Each step has a why, a done-when test, its parts, locks
-  and `after`. Each part has a keeper's page (`docs/parts/`): the step's worker reads it and keeps it true, and about
-  one step in five is health work for the part in the worst state. A plan or a roadmap change applies by itself once the rule checks pass (form, locks, `after`, the longest
+  and `after`. A plan or a roadmap change applies by itself once the rule checks pass (form, locks, `after`, the longest
   chain to the last step not longer, every done-when kept as strict) and the step check says go. You
   see it on the Roadmap and can undo it with one tap: a revert, not an approval. Settings has `Ask me before: plans`
   for a project that wants the old way.

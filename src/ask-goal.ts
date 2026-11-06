@@ -22,7 +22,7 @@ export function askGoal(numbers: Numbers, today: string): AskGoal {
 export function askGoalFailure(g: AskGoal): string | undefined {
   const over = g.days.filter((d) => d.asks >= ASK_GOAL);
   if (over.length === 0) return undefined;
-  return `${over.map((d) => `${d.date} had ${d.asks} asks`).join(", ")}; the goal is under ${ASK_GOAL} a day. Each ask is a card or Inbox item: settle its kind by a rule (docs/asks.md) so it stops reaching the owner`;
+  return `${over.map((d) => `${d.date} had ${d.asks} asks`).join(", ")}; the goal is under ${ASK_GOAL} a day. Each ask is a card or Inbox item: settle its kind by a rule so it stops reaching the owner`;
 }
 
 /** The line `docs/numbers.md` gets for one run. */

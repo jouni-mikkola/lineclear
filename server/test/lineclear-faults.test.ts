@@ -1,5 +1,5 @@
 // Faults seen in herdr-projects 2.0 (ebb17d5) that the fork fixes, each with a test that fails on the base's behaviour. The
-// table in docs/known-faults.md says which test is which.
+// Each is named for the fault it plants.
 import { describe, expect, spyOn, test } from 'bun:test'
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'

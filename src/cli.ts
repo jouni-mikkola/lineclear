@@ -14,8 +14,6 @@ import { cachedRead } from "./reads-cache.ts";
 import { machineMain } from "./machines.ts";
 import { readMachines } from "./machine-list.ts";
 import { fetchExportSync, relationOf } from "./remotes.ts";
-import { kitMain, remoteKitDiffs } from "./kit-cli.ts";
-import { readKit, wantedKit } from "./kit.ts";
 import { measureMain } from "./measure-main.ts";
 import { packMain } from "./pack.ts";
 import { planMain } from "./plan.ts";
@@ -31,7 +29,6 @@ import { setupMain } from "./setup.ts";
 import { project } from "./project-cli.ts";
 import { roadmapMain } from "./roadmap-cli.ts";
 import { demoMain } from "./demo.ts";
-import { partsMain } from "./parts-check.ts";
 import { decisionsPath, realWorld, runMain } from "./rules.ts";
 import { fileFixNow } from "./self-fix.ts";
 import { startWeb } from "./web.ts";
@@ -50,12 +47,10 @@ export const commands: Record<string, string> = {
   doctor:
     "Check each part and name the command that fixes a problem (--fix removes the old install's plugin and skills and test folders older than a day, on every machine; --here limits either to this one)",
   pack: "List the token pack's parts, or turn one on or off (pack on <part>, pack off <part>)",
-  kit: "Print what pi loads here (packages, extensions, skills, pack parts); kit --write [<project>] makes docs/kit.md for every machine",
   measure: "Print asks, wait, cost and the health measures from files and git (no AI)",
   machine: "Add a machine by its SSH host (installs Lineclear there and runs its doctor), list, remove or update machines",
   project: "Add, list, change, remove and check projects",
   roadmap: "Check, show or import the roadmap (roadmap show <id> prints one step)",
-  parts: "Check that the part pages in docs/parts/ are true: parts check [<repo>]",
   setup: "Choose a model for the worker, reviewer, planner and step checker from the logged-in harnesses (the reviewer from another company than the worker)",
   run: "Run the rule loop and serve the web pages (--once, --dry-run; --board <port> also starts herdr and the board where no service does), or only serve them on fixed demo data (--demo)",
   serve: "Serve the board (the web server): serve --port <port>",
@@ -216,7 +211,6 @@ const COMMANDS: Record<string, (rest: string[], out: Out) => number | Promise<nu
   track: trackMain,
   machine: (rest, out) => machineMain(rest, out, process.env, (evidence) => fileFixNow(realWorld(process.env), "command-failed", evidence)),
   roadmap: roadmapMain,
-  parts: partsMain,
   run: (rest, out) => (rest[0] === "--demo" ? demoMain(rest.slice(1), out) : runMain(rest, out, undefined, { web: startWeb })),
   serve: serveMain,
   export: (_rest, out) => exportMain(out),
@@ -241,7 +235,6 @@ const COMMANDS: Record<string, (rest: string[], out: Out) => number | Promise<nu
   ask: askMain,
   asks: (rest, out) => asksMain(rest, out),
   inbox: inboxCommand,
-  kit: kitMain,
   pack: packMain,
 };
 
@@ -266,7 +259,6 @@ async function installCommand(name: "doctor" | "uninstall", rest: string[], out:
           return { host, commit: e?.commit ?? null, ...(e ? { relation: relationOf(codeCommit(), e.commit) } : {}), helperApart: e?.helperApart };
         }),
       };
-    probe.kit = { here: readKit(), want: wantedKit(), others: here ? [] : remoteKitDiffs() };
     const code = doctor(probe, out);
     if (here) return code;
     const left = await remoteLeft(out);

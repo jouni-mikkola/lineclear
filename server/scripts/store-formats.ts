@@ -1,4 +1,4 @@
-// The store's files as this build reads and writes them (see docs/stable-and-next.md):
+// The store's files as this build reads and writes them:
 // - `bun scripts/store-formats.ts read <dir> [--older]` prints one line per file in <dir> this build cannot read, and
 //   exits 1 if there is one. It reads a copy, so <dir> may be a live store. A promotion runs stable's copy on the store
 //   next wrote, where a value stable would drop is lost after a rollback; and next's copy with --older on this

@@ -15,7 +15,6 @@ import { agentsOnOldName, helperApart } from "./helper.ts";
 import { realBusy } from "./old-install.ts";
 import { diskTrouble, freeBytes } from "./health.ts";
 import { retiredChecks, skillRoots } from "./retire.ts";
-import { type Kit, kitDiff, kitOthers, type Wanted } from "./kit.ts";
 import { parts } from "./pack.ts";
 import { readModelFile } from "./models.ts";
 import { checkoutPointers } from "./install-paths.ts";
@@ -79,7 +78,6 @@ export interface Probe {
   /** The herdr version the contract test passed with, and the one each machine runs (null when it cannot say). */
   herdr?: { tested: string; machines: { machine: string; version: string | null }[] };
   /** What pi loads here and on each other machine (a null diff: it cannot be read), and what the release wants. */
-  kit?: { here: Kit; want: Wanted; others: { host: string; diff: string[] | null; own?: string[] }[] };
   /** What is wrong with the backup, "" when it is fine or none is set. */
   backup?: string;
   /** The machine whose board runs this machine's tasks ("" when this one does). */
@@ -409,19 +407,6 @@ function tokenPack(p: Probe): Check {
   return { name: `token pack: ${shown}`, problem: "", fix: "" };
 }
 
-/** Every machine loads the kit the release names (pi, package versions, extension owners): another may behave otherwise. */
-function agentKit(p: Probe): Check[] {
-  if (!p.kit) return [];
-  const fix = "lineclear kit shows it; lineclear machine update <machine>, then pi install the pinned versions in pi/kit.json";
-  const row = (name: string, diff: string[] | null, own: string[] = []): Check => ({
-    name: `agent kit on ${name}`,
-    problem: diff === null ? `${name} cannot be read` : diff.join("; "),
-    fix,
-    ...(own.length ? { info: `extensions of its owner, left alone: ${own.join(", ")}` } : {}),
-  });
-  return [row("this machine", kitDiff(p.kit.here, p.kit.want), kitOthers(p.kit.here)), ...p.kit.others.map((o) => row(o.host, o.diff, o.own))];
-}
-
 /** An installed file or pi setting that points into a git checkout runs that branch's code, and breaks when the checkout goes. */
 function checkoutFree(p: Probe, env: Record<string, string | undefined>): Check {
   const { paths } = p;
@@ -481,7 +466,6 @@ export function doctorChecks(probe: Probe): Check[] {
       fix: INSTALL_AGAIN,
     },
     tokenPack(p),
-    ...agentKit(p),
     compactionWindows(p),
     checkoutFree(p, process.env),
     service(p),

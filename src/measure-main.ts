@@ -33,9 +33,7 @@ import {
   taskStart,
   worktreeUsage,
 } from "./measure.ts";
-import { healthLines as partHealthLines, partHealth, taskSignals } from "./part-health.ts";
 import { type FixInput, refileLines, refiles } from "./measure-refiles.ts";
-import { readParts } from "./parts.ts";
 import { piDir } from "./paths.ts";
 import { readSettings } from "./project.ts";
 import { doneIds, parseRoadmap } from "./roadmap.ts";
@@ -170,7 +168,7 @@ function measuredHere(
   merges: Map<string, number>,
   priceOf: Measured["priceOf"],
   env: Env,
-  causes: Pick<Measured, "decisions" | "partNames">,
+  causes: Pick<Measured, "decisions">,
 ): Measured {
   return {
     ...causes,
@@ -241,7 +239,6 @@ export function measureMain(args: string[], out: Out, env: Env = process.env): n
   );
   const causes = {
     decisions: stepLines.map((d) => ({ step: d.step as string, at: Date.parse(d.time), kind: d.kind, reason: d.reason })),
-    partNames: readParts(settings.repo).map((p) => p.name),
   };
   const here = measuredHere(tasks, asks, steps, merges, priceOf, env, causes);
   if (args.includes("--raw")) {
@@ -282,7 +279,6 @@ export function measureMain(args: string[], out: Out, env: Env = process.env): n
   const lane = laneDays(readRuns(settings.repo, 0, env), from);
   const perMachine = runsPerMachine(readRuns(settings.repo, from, env), readWork(env), machineOf(env));
   const red = redByCause(readRuns(settings.repo, from, env));
-  const parts = partHealth(settings.repo, readParts(settings.repo), steps, tasks, taskSignals(files, tasks));
   if (args.includes("--json")) {
     out(
       JSON.stringify(
@@ -292,7 +288,6 @@ export function measureMain(args: string[], out: Out, env: Env = process.env): n
           ownerTaps: taps,
           stepCheck,
           health: healthy,
-          partHealth: parts,
           mergeLine: lane,
           redMerges: red,
           catches: catchesOf(settings.repo, env, Number(env.LINECLEAR_NOW) || Date.now()),
@@ -310,7 +305,6 @@ export function measureMain(args: string[], out: Out, env: Env = process.env): n
     taps,
     reads,
     healthy,
-    parts,
     stepCheck,
     roundLines,
     lane,
@@ -347,7 +341,6 @@ type Printed = {
   taps: ReturnType<typeof ownerTaps>;
   reads: ReturnType<typeof roadmapReads>;
   healthy: ReturnType<typeof health>;
-  parts: ReturnType<typeof partHealth>;
   stepCheck: StepCheckNumbers;
   roundLines: string[];
   lane: ReturnType<typeof laneDays>;
@@ -361,7 +354,7 @@ type Printed = {
 function printNumbers(
   out: Out,
   env: Env,
-  { machines, numbers, taps, reads, healthy, parts, stepCheck, roundLines, lane, perMachine, red, catches, roundDollars }: Printed,
+  { machines, numbers, taps, reads, healthy, stepCheck, roundLines, lane, perMachine, red, catches, roundDollars }: Printed,
 ): void {
   if (machines.length > 0) out(`counted on this machine and ${machines.join(", ")}`);
   out("date        asks  wait (median min)  cost ($ per merged step)  tokens per merged step  ready to merged (median min)  turns (goal 0)");
@@ -404,7 +397,6 @@ function printNumbers(
   out(`token pack small briefs: whole roadmap read before ${r(reads.before)}, after ${r(reads.after)}`);
   out(`token pack compaction notes: ${notesLine(env)}`);
   for (const l of healthLines(healthy)) out(`health, ${l}`);
-  for (const l of partHealthLines(parts)) out(l);
   for (const l of roundLines) out(l);
   for (const l of stepCheckLines(stepCheck, roundDollars)) out(l);
   if (numbers.unpriced.length > 0) out(`no price in pi's model data, steps not counted: ${numbers.unpriced.join(", ")}`);

@@ -1,4 +1,4 @@
-// A candidate release checked on its own (see docs/stable-and-next.md): `lineclear release check <version>` runs the
+// A candidate release checked on its own: `lineclear release check <version>` runs the
 // project's check at the candidate's tag, then the smoke check and canary on its test instance, then the store check
 // both ways. Every outcome is kept in release.json under `candidate`; a failed candidate files one fix task.
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";

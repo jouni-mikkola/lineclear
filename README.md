@@ -37,7 +37,7 @@ to check it; it names any problem and the command that fixes it.
 To update, run the install line again. An update that does not work puts the previous version back.
 `LINECLEAR_REPO` names another copy of the repository (a URL or a path) and `LINECLEAR_REF` a branch, tag or commit
 (default: the machine's stable build once it has one, else `main`). The service runs stable, the last build of main
-that passed its tests, never main itself: [Stable and next](docs/stable-and-next.md).
+that passed its tests, never main itself.
 
 ## Status
 

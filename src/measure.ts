@@ -50,8 +50,6 @@ export interface Measured {
   partsOf?: (task: TaskInfo) => string[];
   /** The rule loop's decision lines that name a step, for the causes of a wait. */
   decisions?: StepDecision[];
-  /** The repo's part names, to tell a part held from a lock held. */
-  partNames?: string[];
 }
 
 /** Cost per merged step for the steps with a token pack part on, and for those without it. */
@@ -348,7 +346,7 @@ export function measure(m: Measured, since: string): Numbers {
     stepTokens,
     reviews: reviewCosts(m, from),
     waitMinutes: windows.map((w) => (w.start - w.ready) / 60_000),
-    waitCauses: waitCauses(windows, m.decisions ?? [], new Set(m.partNames ?? [])),
+    waitCauses: waitCauses(windows, m.decisions ?? [], new Set()),
   };
 }
 

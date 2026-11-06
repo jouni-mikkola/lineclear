@@ -1,4 +1,4 @@
-// Stable and next (see docs/stable-and-next.md): the service runs stable, the last build that proved itself. Next is main. The rule
+// Stable and next: the service runs stable, the last build that proved itself. Next is main. The rule
 // loop runs `lineclear release run` every few minutes: it builds next in a folder of its own, runs its smoke check and
 // canary on spare ports, reads next's files with stable's code, and installs next as stable when all pass (install.sh,
 // which restarts, checks and rolls back, then updates the other machines). Else stable stays and one fix task is filed.

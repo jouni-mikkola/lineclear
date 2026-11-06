@@ -1,4 +1,4 @@
-// The test instance of a build (see docs/stable-and-next.md): `lineclear release try [version]` builds a release into
+// The test instance of a build: `lineclear release try [version]` builds a release into
 // `builds/<version>` and runs its server on a copy of the real data, so a new build meets the data it takes over before it
 // does. Everything it can write is in one folder under the cache: its config, its data, clones of the projects whose
 // remote is a bare copy beside them, and a herdr session of its own. It gets no GitHub token, no SSH and only stub agents.

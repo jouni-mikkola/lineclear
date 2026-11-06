@@ -2,7 +2,6 @@ import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseRoadmap } from "../src/roadmap.ts";
-import { type Part, scopeFaults } from "../src/parts.ts";
 import { readState } from "../src/rules.ts";
 import { AGE_TICKS, agentStart, nudgePane, lockWhy, reservedLocks } from "../src/starts.ts";
 import { tmp } from "./helpers.ts";
@@ -122,19 +121,4 @@ test("reservations go to the oldest waiting step, and a step reserves nothing un
   expect(reserved.get("x")).toBe("B");
   expect(lockWhy(byId.get("A")!, new Map(), reserved)).toContain("reserved for B");
   expect(lockWhy(byId.get("B")!, new Map(), reserved)).toBeUndefined();
-});
-
-const parts: Part[] = [
-  { name: "planner", files: ["src/starts.ts", "src/tick-project.ts"], text: "", page: "docs/parts/planner.md" },
-  { name: "ui", files: ["ui/"], text: "", page: "docs/parts/ui.md" },
-] as unknown as Part[];
-
-test("a task with a file outside its step's files and parts is refused, naming the path", () => {
-  const s = parseRoadmap(`## P\n\n${step("L1", "none").replace("- locks", "- parts: planner\n- files: src/starts.ts\n- locks")}`).steps[0]!;
-  expect(scopeFaults(s, ["src/starts.ts", "docs/ROADMAP.md"], parts)).toEqual([]);
-  const faults = scopeFaults(s, ["src/starts.ts", "ui/web/app.ts"], parts);
-  expect(faults).toHaveLength(1);
-  expect(faults[0]).toContain("ui/web/app.ts");
-  // files named: another file of the same part is outside too
-  expect(scopeFaults(s, ["src/tick-project.ts"], parts)[0]).toContain("src/tick-project.ts");
 });
