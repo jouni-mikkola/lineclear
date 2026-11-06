@@ -496,6 +496,18 @@ test("a failed call on a full session moves the task in the same tick, before an
   expect(readMoves(t.env)).toMatchObject([{ task: "LIN-5", step: "A", from: "anthropic/claude-sonnet-5-5", to: "openai-codex/gpt-6.1-sol" }]);
 });
 
+test("a refused account is unusable, not waiting for a reply: the task restarts on the next account with the plain error", () => {
+  const t = setup({ tasks: [{ id: "LIN-5", title: "A Alpha", status: "need", sub: "Waits for your reply" }] });
+  const refusal = "Your organization has disabled Claude subscription access for Claude Code";
+  t.world.lastError = () => ({ text: refusal, at: t.clock.at.getTime() - 1000 });
+  const d = t.tick();
+  expect(t.log).toEqual(["close LIN-5"]);
+  expect(t.adds[0]!.join(" ")).toContain("--model openai-codex/gpt-6.1-sol");
+  expect(readAccounts(t.env).anthropic).toMatchObject({ out: true, dead: refusal });
+  expect(readAccounts(t.env).anthropic?.resetAt).toBeUndefined();
+  expect(d.some((x) => x.reason.includes(`the anthropic account is unusable: ${refusal}`))).toBe(true);
+});
+
 test("a full week marks the account until its reset for the reviewers too, then the mark clears by itself", () => {
   const t = setup();
   t.world.lastError = () => ({ text: WEEK, at: t.clock.at.getTime() });

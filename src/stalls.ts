@@ -7,7 +7,7 @@ import { company } from "./company.ts";
 import type { Settings } from "./project.ts";
 import { type Wait, writeWait } from "./waits.ts";
 import { configDir } from "../pi/config.ts";
-import { type Account, markFull, providerOf, readAccounts, readLimit, recordMove } from "./full.ts";
+import { type Account, markDead, markFull, readDead, providerOf, readAccounts, readLimit, recordMove } from "./full.ts";
 import { join } from "node:path";
 import { closeSync, existsSync, openSync, readSync, statSync } from "node:fs";
 import { writeAtomic } from "../pi/atomic.ts";
@@ -225,6 +225,8 @@ const LEFT_WAITING = /^signed out/i;
 
 /** What the task list shows for a task in Needs you that asks nothing (the server's `NEED.reply`). */
 const SILENT_SUB = "Waits for your reply";
+/** A task on a provider error shows one of these while it works or sits on a refused account. */
+const runs = (t: Task) => t.status === "work" || (t.status === "need" && (t.sub === SILENT_SUB || /^(provider error|provider refused)/i.test(t.sub ?? "")));
 const REMINDER =
   "You may be stuck: nothing has moved for a while. Say where you are with `lineclear status`, then carry on. If you wait for the owner, a login or a browser, declare it with `lineclear wait`.";
 const ESTIMATE = "You are past your time left. Say where you are with `lineclear status` and give a new estimate, then carry on.";
@@ -413,14 +415,25 @@ function markFullAccounts(p: Pass): void {
   const { world, dryRun, note, env } = p.a;
   for (const t of p.a.tasks) {
     const step = p.stepOf(t);
-    if (t.id === undefined || t.status !== "work" || step === undefined || p.waiting.has(t.id)) continue;
+    if (t.id === undefined || !runs(t) || step === undefined || p.waiting.has(t.id)) continue;
     const failed = world.lastError(t.id);
     // An error older than this is one the task already got past, or waited out.
-    const limit = failed === undefined || p.now.getTime() - failed.at > FAILED_FRESH_MS ? undefined : readLimit(failed.text, new Date(failed.at));
-    // The reset is read from the time of the error. One that has passed is no mark.
-    if (limit === undefined || limit.until <= p.now) continue;
+    const fresh = failed === undefined || p.now.getTime() - failed.at > FAILED_FRESH_MS ? undefined : failed;
+    if (fresh === undefined) continue;
     const provider = providerOf(p.currentModel(step));
     if (availability(p.currentModel(step), env, p.now) === "out") continue;
+    const dead = readDead(fresh.text);
+    if (dead !== undefined) {
+      if (dryRun) note("stall", `would mark ${provider} unusable: ${t.id} got "${dead}"`, t.id);
+      else {
+        markDead(provider, dead, env);
+        note("stall", `${provider} is unusable: ${t.id} got "${dead}"`, t.id);
+      }
+      continue;
+    }
+    // The reset is read from the time of the error. One that has passed is no mark.
+    const limit = readLimit(fresh.text, new Date(fresh.at));
+    if (limit === undefined || limit.until <= p.now) continue;
     if (dryRun) {
       note("stall", `would mark ${provider} full until ${limit.until.toISOString()}: ${t.id} hit its ${limit.window} limit`, t.id);
       continue;
@@ -459,8 +472,14 @@ function handOverStuck(p: Pass): void {
   for (const t of p.a.tasks) {
     if (t.id === undefined || p.waiting.has(t.id) || p.gone.has(t.id) || p.ladderOf(t.id).rung >= 3) continue;
     const step = p.stepOf(t);
-    if (t.status === "work" && step !== undefined && availability(p.currentModel(step), env, p.now) === "out") {
-      climb(p, t, 3, `the account of ${p.currentModel(step)} is out`);
+    const account = step === undefined ? undefined : readAccounts(env)[providerOf(p.currentModel(step))];
+    if (runs(t) && step !== undefined && availability(p.currentModel(step), env, p.now) === "out") {
+      climb(
+        p,
+        t,
+        3,
+        account?.dead ? `the ${providerOf(p.currentModel(step))} account is unusable: ${account.dead}` : `the account of ${p.currentModel(step)} is out`,
+      );
     } else if (t.status === "need" && LEFT_WAITING.test(t.sub ?? "")) {
       climb(p, t, 3, `it cannot go on: ${t.sub}`);
     }
