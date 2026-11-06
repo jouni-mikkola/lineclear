@@ -15,7 +15,7 @@ Getting Lineclear onto a machine and keeping it healthy there: `install.sh`, `li
 - `src/machine-alerts.ts`: `watchMachine`
 - `src/store-copies.ts`: `storeMain`
 - `src/candidate-check.ts`: `candidateMain`
-- `src/release.ts`: `releaseMain`, `releaseTry`, `startReleaseIfDue`, `readRelease`, `ReleaseState`, `fullCheckWhy`, `bareLog`
+- `src/release.ts`: `releaseMain`, `releaseTry`, `startReleaseIfDue`, `readRelease`, `ReleaseState`
 - `src/promote-cmd.ts`: `promoteMain`
 - `src/promote-step.ts`: `startPromoteIfDue`
 - `src/doctor.ts`: `doctor`, `realProbe`, `herdrVersions`, `testedHerdr`

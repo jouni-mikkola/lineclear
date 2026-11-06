@@ -34,11 +34,11 @@ The roadmap and its plans: the format of `docs/ROADMAP.md`, its check, which ste
 
 - code: `src/plan.ts`, `src/autoplan.ts`, `src/roadmap.ts`, `src/roadmap-cli.ts`, `src/task-steps.ts`, `src/roadmap-import.ts`, `src/brief.ts`, `src/progress.ts`, `src/goals.ts`, `src/direction.ts`, `src/stepcheck.ts`, `src/doneproof.ts`, `src/doneproof-run.ts`, `src/ask-model.ts`, `src/reader-ask.ts`, `src/plan-brief.ts`
 - words: `templates/plan.md`, `docs/ROADMAP.md`, `docs/import.md`, `templates/direction.md`
-- tests: `test/plan.test.ts`, `test/autoplan.test.ts`, `test/autoplan-apply.test.ts`, `test/roadmap.test.ts`, `test/frozen-steps.test.ts`, `test/reopened.test.ts`, `test/goals.test.ts`, `test/roadmap-import.test.ts`, `test/briefs.test.ts`, `test/direction.test.ts`, `test/stepcheck.test.ts`, `test/stepcheck-pi.test.ts`, `test/doneproof.test.ts`
+- tests: `test/plan.test.ts`, `test/autoplan.test.ts`, `test/autoplan-apply.test.ts`, `test/roadmap.test.ts`, `test/frozen-steps.test.ts`, `test/reopened.test.ts`, `test/goals.test.ts`, `test/roadmap-import.test.ts`, `test/briefs.test.ts`, `test/stepcheck.test.ts`, `test/stepcheck-pi.test.ts`, `test/doneproof.test.ts`
 
 ## Tests
 
-- `test/contracts/planner.test.ts`, `test/plan.test.ts`, `test/autoplan.test.ts`, `test/autoplan-apply.test.ts`, `test/roadmap.test.ts`, `test/roadmap-import.test.ts`, `test/briefs.test.ts`, `test/direction.test.ts`, `test/stepcheck.test.ts`, `test/stepcheck-pi.test.ts`, `test/doneproof.test.ts`
+- `test/contracts/planner.test.ts`, `test/plan.test.ts`, `test/autoplan.test.ts`, `test/autoplan-apply.test.ts`, `test/roadmap.test.ts`, `test/roadmap-import.test.ts`, `test/briefs.test.ts`, `test/stepcheck.test.ts`, `test/stepcheck-pi.test.ts`, `test/doneproof.test.ts`
 
 ## Debts
 
