@@ -1,8 +1,9 @@
 // git for tasks: what a fresh worktree starts from and gets copied in, whether its work is in main, commits, rebasing
 // on main and merging into it. herdr itself makes and removes task worktrees (worktrees.ts).
+import { createHash } from 'node:crypto'
 import { basename, join } from 'node:path'
 import { remoteBox, GIT_READ_SHARE_MS, isGitRead, run } from '../box.ts'
-import { cpSync, existsSync, readdirSync, readFileSync } from '../mfs.ts'
+import { boxDir, cpSync, existsSync, readdirSync, readFileSync } from '../mfs.ts'
 
 export interface Run {
   ok: boolean
@@ -218,10 +219,40 @@ export async function install(wt: string, cmd?: string) {
     ? [{ dir: wt, cmd: ['/bin/sh', '-c', step], text: step }]
     : installDirs(wt).map((dir) => ({ dir, cmd: ['bun', 'install', '--frozen-lockfile'], text: 'bun install --frozen-lockfile' }))
   for (const j of jobs) {
+    if (!step && (await linkStore(j.dir, wt))) continue
     const r = await sh(j.cmd, j.dir, { timeoutMs: 300_000 })
     const why = (r.err || r.out).split('\n').filter(Boolean).slice(-3).join(' ')
     if (!r.ok) throw new Error(`Install failed (${j.text}${j.dir === wt ? '' : ` in ${basename(j.dir)}/`}): ${why || `exit ${r.code}`}`)
+    if (!step) await keepStore(j.dir, wt)
   }
+}
+
+/** The store entry of a lock file: its content hash, so a changed lock file makes a new entry. */
+export function storeKey(lock: string | Buffer) {
+  return createHash('sha256').update(lock).digest('hex').slice(0, 16)
+}
+
+/** Where the installed `node_modules` of the Bun project in `dir` (the worktree `wt` or a folder under it) is kept for every
+ *  worktree with the same lock file. A worktree's own copy takes 400 MB and many agents multiply it; one linked copy takes none. */
+export function storePath(dir: string, wt: string) {
+  const lock = existsSync(join(dir, 'bun.lock')) ? 'bun.lock' : 'bun.lockb'
+  return join(boxDir(), 'deps', storeKey(readFileSync(join(dir, lock))), dir === wt ? '.' : basename(dir), 'node_modules')
+}
+
+/** `node_modules` of `dir` linked from the store when the store has its lock file's entry. */
+async function linkStore(dir: string, wt: string) {
+  const store = storePath(dir, wt)
+  const r = await sh(['/bin/sh', '-c', `[ -d "$1" ] && rm -rf "$2" && ln -s "$1" "$2"`, 'sh', store, join(dir, 'node_modules')], dir)
+  return r.ok
+}
+
+/** A fresh install moves into the store and is linked back, so the next worktree with this lock file links it. A failure here
+ *  leaves the worktree's own install in place. */
+async function keepStore(dir: string, wt: string) {
+  const store = storePath(dir, wt)
+  const own = join(dir, 'node_modules')
+  const script = `mkdir -p "$(dirname "$1")" && t="$1.$$" && mv "$2" "$t" && { mv -T "$t" "$1" 2>/dev/null || rm -rf "$t"; } && ln -s "$1" "$2"`
+  await sh(['/bin/sh', '-c', script, 'sh', store, own], dir)
 }
 
 /**
