@@ -148,10 +148,14 @@ export class MachinesLinks extends Emitter<Events> {
     return [...this.links.values()]
   }
 
-  /** the machine as a worker is told of it, once it has been looked at (box.ts) */
-  boxOf(label: string): BoxInfo | undefined {
-    const l = this.links.get(label)
-    return l?.probe ? boxInfo(l.saved, l.probe) : undefined
+  /** whether herdr has this machine saved and enabled, looked at yet or not */
+  knows(label: string) {
+    return this.links.has(label)
+  }
+
+  /** the machines that have been looked at, as a worker is told of them (box.ts): where tasks may be placed */
+  boxes(): BoxInfo[] {
+    return [...this.links.values()].flatMap((l) => (l.probe ? [boxInfo(l.saved, l.probe)] : []))
   }
 
   protected syncing = false

@@ -3,18 +3,14 @@ import { src, stopSource } from './source-fixture.ts'
 
 afterAll(stopSource)
 
-const saved = (label: string, enabled = true) => ({ id: label, label, target: `${label}.local`, session: 'default', enabled })
-
-test('the machines herdr has saved and enabled are the ones room and placement know, as the list changes', async () => {
-  src.machineList = async () => [saved('elitebook'), saved('off', false)]
-  await src.syncMachines()
-  expect([...src.engine.machines.keys()]).toEqual(['elitebook'])
-  // no herdr is here to read its room, but the machine is known
+test('a machine herdr has saved is known to room at once, and to placement once it was looked at', async () => {
+  // herdr lists elitebook; no worker is up and it was not looked at yet
+  const l = src.peers!.adopt('elitebook', 'http://127.0.0.1:1')
   expect((await src.cli(['room', 'elitebook'], {})).out).not.toContain('No machine called')
-  expect((await src.cli(['room', 'off'], {})).out).toContain('No machine called off')
+  expect((await src.cli(['room', 'nowhere'], {})).out).toContain('No machine called nowhere')
+  expect(src.engine.machines.has('elitebook')).toBe(false)
 
-  src.machineList = async () => []
-  await src.syncMachines()
-  expect(src.engine.machines.size).toBe(0)
-  expect((await src.cli(['room', 'elitebook'], {})).out).toContain('No machine called elitebook')
+  l.probe = { home: '/home/e', os: 'Linux', arch: 'x86_64', path: '/usr/bin', herdr: 'herdr', tools: {}, helper: '', browser: '' }
+  src.syncMachines()
+  expect(src.engine.machines.get('elitebook')?.home).toBe('/home/e')
 })

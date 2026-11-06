@@ -35,7 +35,7 @@ export class LiveSource extends LiveSourceUpkeep implements Source {
     }
     this.peers?.on('snapshot', () => {
       // another machine's task may be what a queued task here waits for
-      this.applyMachines()
+      this.syncMachines()
       this.engine.recheck()
       this.engine.unifyIds(this.peerTasks())
       this.emit('snapshot')
@@ -113,8 +113,6 @@ export class LiveSource extends LiveSourceUpkeep implements Source {
       // browsers left idle (Settings, browser.idleClose): looked for once a minute
       this.timers.push(setInterval(() => void this.browsers?.closeIdle().catch(() => undefined), 60_000))
     }
-    void this.syncMachines()
-    if (this.machineList) this.timers.push(setInterval(() => void this.syncMachines(), 15_000))
     this.agents.start()
     // the space the machine's and All machines' coordinators shared is the home space's now; their agents close
     void this.agents.space(HOME_SPACE.label, HOME_SPACE.was).catch(() => undefined)
