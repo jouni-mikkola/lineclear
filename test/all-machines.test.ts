@@ -77,8 +77,7 @@ test("migrate --all --dry-run lists what moves on each machine and copies nothin
 });
 
 /** Each read starts a whole Lineclear process; one that a loaded machine delays past the 30 s read limit shows nothing, so read again. */
-const readUntil = (env: Record<string, string | undefined>, seen: () => boolean) =>
-  until(async () => (await refreshRemotes(env), seen()), 0, 150_000);
+const readUntil = (env: Record<string, string | undefined>, seen: () => boolean) => until(async () => (await refreshRemotes(env), seen()), 0, 150_000);
 
 test("migrate --all moves both machines, and one Home shows the work of both", async () => {
   const { env, box } = world();
