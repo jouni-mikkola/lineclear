@@ -154,10 +154,10 @@ describe("a task's CLI, model and effort, continued", () => {
       })
       const place = placeId.space((await src.places.add(dir, 'coord-settings')).name)
       expect(src.agents.record(place)).toBeUndefined()
-      src.settings.set('coordinator.agent', 'Codex')
+      src.settings.set('coordinator.agent', 'pi')
       src.settings.set('coordinator.effort', 'high')
       await (src as unknown as { coordinator(id: string): Promise<unknown> }).coordinator(place)
-      expect(seen.at(-1)).toMatchObject({ kind: 'codex', model: '', effort: 'high' })
+      expect(seen.at(-1)).toMatchObject({ kind: 'pi', model: '', effort: 'high' })
     } finally {
       src.agents.ensure = ensure
       src.settings.set('coordinator.agent', null)

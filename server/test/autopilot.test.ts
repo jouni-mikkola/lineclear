@@ -15,17 +15,16 @@ const { LiveSource } = await import('../server/live/source.ts')
 const { Heartbeats } = await import('../server/live/heartbeat.ts')
 const { placeId } = await import('../server/live/places.ts')
 const { PilotUsage } = await import('../server/live/autopilot-usage.ts')
-const { HOME } = await import('../server/store.ts')
 import type { AgentRecord, Spec } from '../server/live/agents.ts'
 import type { PilotConfig, PilotRun } from '../server/live/autopilot.ts'
 
-const config = (kind = 'codex'): PilotConfig => ({ harness: { kind }, hosts: ['api.openai.com'], secrets: [], approvals: ['merge'], parallel: 2 })
+const config = (kind = 'claude'): PilotConfig => ({ harness: { kind }, hosts: ['api.openai.com'], secrets: [], approvals: ['merge'], parallel: 2 })
 const cleanup: (() => void)[] = []
 afterEach(() => {
   for (const f of cleanup.splice(0)) f()
 })
 
-function world(kind = 'codex') {
+function world(kind = 'claude') {
   const key = placeId.space('fixture')
   const path = mkdtempSync(join(tmpdir(), 'shep-pilot-repo-'))
   const settings = new Settings({ everywhere: { 'coordinator.agent': kind, 'autopilot.agent': 'inherit' }, machine: {}, spaces: {} })
@@ -120,7 +119,7 @@ function world(kind = 'codex') {
 }
 
 describe('capabilities and exact launch settings', () => {
-  test.each(['claude', 'codex', 'pi'])('%s launch replaces a profile-altered PATH before starting an agent', async (kind) => {
+  test.each(['claude', 'pi'])('%s launch replaces a profile-altered PATH before starting an agent', async (kind) => {
     const commands: string[] = [],
       wrapper = `/trusted/launcher/${kind}`
     let polls = 0
@@ -147,7 +146,7 @@ describe('capabilities and exact launch settings', () => {
     expect(commands).toEqual(["exec /usr/bin/env PATH='/trusted/launcher:/usr/local/bin:/usr/bin:/bin' ENV=/dev/null /bin/sh -i"])
     await expect(isolatedShell('pane', wrapper, { ...io, read: () => 'unverified' })).rejects.toThrow('No agent was started')
   })
-  test.each(['claude', 'codex', 'pi'])('%s only reports startup once that exact adapter accepts input', async (kind) => {
+  test.each(['claude', 'pi'])('%s only reports startup once that exact adapter accepts input', async (kind) => {
     const seen = [undefined, { agent: kind, interactive_ready: false }, { agent: kind, interactive_ready: true }]
     let polls = 0
     await isolatedReady(
@@ -177,20 +176,20 @@ describe('capabilities and exact launch settings', () => {
       ),
     ).rejects.toThrow('not started')
   })
-  test.each(['claude', 'codex', 'pi'])('%s has a chat adapter; other Herdr CLIs fail closed', (kind) => {
+  test.each(['claude', 'pi'])('%s has a chat adapter; other Herdr CLIs fail closed', (kind) => {
     expect(AUTOPILOT_KINDS).toContain(kind)
     expect(pilotProblem(kind)).toBeUndefined()
     expect(pilotProblem('cursor')).toContain('chat')
   })
-  test.each(['claude', 'codex'])('%s inherits normal defaults and accepts explicit overrides', (kind) => {
+  test.each(['claude'])('%s inherits normal defaults and accepts explicit overrides', (kind) => {
     const s = new Settings({ everywhere: { 'coordinator.agent': kind, 'coordinator.effort': 'high' }, machine: {}, spaces: {} })
     expect(s.pilot().harness).toMatchObject({ kind, effort: 'high' })
-    expect(s.set('autopilot.agent', kind === 'claude' ? 'Codex' : 'Claude Code').ok).toBe(true)
+    expect(s.set('autopilot.agent', 'pi').ok).toBe(true)
     expect(s.set('autopilot.effort', 'low').ok).toBe(true)
     expect(s.pilot().harness.effort).toBe('low')
     expect(s.set('autopilot.agent', 'Cursor').ok).toBe(false)
   })
-  test.each(['claude', 'codex'])('%s fresh launch resets old explicit model/effort to CLI defaults', async (kind) => {
+  test.each(['claude'])('%s fresh launch resets old explicit model/effort to CLI defaults', async (kind) => {
     const a = new Agents(),
       cwd = mkdtempSync(join(tmpdir(), 'pilot-defaults-'))
     a.records.defaults = { key: 'defaults', name: 'defaults', kind, cwd, workspace: 'fixture', model: 'old-model', effort: 'high', logs: [], started: 1 }
@@ -208,7 +207,7 @@ describe('capabilities and exact launch settings', () => {
       a.stop()
     }
   })
-  test.each(['claude', 'codex'])('%s startup flags apply model/effort within shared OS isolation', (kind) => {
+  test.each(['claude'])('%s startup flags apply model/effort within shared OS isolation', (kind) => {
     const a = new Agents()
     cleanup.push(() => a.stop())
     const r = {
@@ -237,7 +236,7 @@ describe('fresh replacement, failures and worker ownership', () => {
   test.each(['send', 'deliver'])('%s rechecks ownership after delayed input preflight', async (path) => {
     const a = new Agents(),
       key = 'preflight',
-      r: AgentRecord = { key, name: key, kind: 'codex', cwd: '/fixture', workspace: 'fixture', launch: 'old', logs: [], started: 1 }
+      r: AgentRecord = { key, name: key, kind: 'claude', cwd: '/fixture', workspace: 'fixture', launch: 'old', logs: [], started: 1 }
     a.records[key] = r
     let release!: () => void
     a.beforeInput = () =>
@@ -260,7 +259,7 @@ describe('fresh replacement, failures and worker ownership', () => {
       a.stop()
     }
   })
-  test.each(['claude', 'codex'])('%s main chat excludes newer helpers and headless reviewers', (kind) => {
+  test.each(['claude'])('%s main chat excludes newer helpers and headless reviewers', (kind) => {
     const a = new Agents(),
       captures = mkdtempSync(join(tmpdir(), 'pilot-main-captures-'))
     const id = '00000000-0000-4000-8000-000000000001'
@@ -268,10 +267,9 @@ describe('fresh replacement, failures and worker ownership', () => {
     const helper = capturedTranscript(captures, kind, '.config/subagents/child.jsonl')
     const reviewer = capturedTranscript(captures, kind, '.config/reviewer.jsonl')
     for (const f of [main, helper, reviewer]) mkdirSync(join(f, '..'), { recursive: true })
-    const meta = (source: unknown) => `${JSON.stringify({ type: 'session_meta', payload: { cwd: '/fixture', source } })}\n`
-    writeFileSync(main, kind === 'codex' ? meta('cli') : '{}\n')
-    writeFileSync(helper, kind === 'codex' ? meta({ subagent: {} }) : '{}\n')
-    writeFileSync(reviewer, kind === 'codex' ? meta('exec') : '{}\n')
+    writeFileSync(main, '{}\n')
+    writeFileSync(helper, '{}\n')
+    writeFileSync(reviewer, '{}\n')
     for (const f of [helper, reviewer]) utimesSync(f, new Date(), new Date(Date.now() + 1000))
     a.records.main = {
       key: 'main',
@@ -295,7 +293,7 @@ describe('fresh replacement, failures and worker ownership', () => {
     const a = new Agents(),
       key = 'handover'
     const state = a as unknown as { outbox: { key: string; id: string; text: string; at: number; launch?: string; cid?: string }[]; live: Map<string, unknown> }
-    a.records[key] = { key, name: key, kind: 'codex', cwd: '/fixture', workspace: 'fixture', launch: 'new', logs: [], started: 1 }
+    a.records[key] = { key, name: key, kind: 'claude', cwd: '/fixture', workspace: 'fixture', launch: 'new', logs: [], started: 1 }
     state.outbox = [
       { key, id: 'old', text: '<lineclear>act on old Heartbeat</lineclear>', at: 1, launch: 'old' },
       { key, id: 'new', text: 'regular startup', at: 2, launch: 'new' },
@@ -317,7 +315,7 @@ describe('fresh replacement, failures and worker ownership', () => {
       a.stop()
     }
   })
-  test.each(['claude', 'codex'])('%s ON/OFF replace one owner in the same chat', async (kind) => {
+  test.each(['claude'])('%s ON/OFF replace one owner in the same chat', async (kind) => {
     const w = world(kind)
     await w.internals.switchPilot(w.key, 'autopilot')
     expect(w.specs[0]).toMatchObject({ key: w.key, kind, fresh: true })
@@ -435,7 +433,7 @@ describe('trusted broker, limits and actual namespace configuration', () => {
     expect(() => hostList('*.example.com')).toThrow()
     expect(() => hostList('127.0.0.1')).toThrow()
   })
-  test.each(['claude', 'codex', 'pi'])('%s gets the same outer sandbox with no unrestricted shell escape', (kind) => {
+  test.each(['claude', 'pi'])('%s gets the same outer sandbox with no unrestricted shell escape', (kind) => {
     const args = sandboxArgs({
       cwd: '/work/task',
       repo: '/repo',
@@ -486,24 +484,5 @@ describe('trusted broker, limits and actual namespace configuration', () => {
     expect(claude).not.toContain('unrestricted-shell')
     expect(claude).not.toContain('UNRELATED_SECRET')
     expect(claude).not.toContain('mcpServers')
-  })
-  test('all coordinator/worker/reviewer transcripts contribute without offset-id collisions', () => {
-    const run = 'usage-fixture',
-      root = join(HOME, 'autopilot-runtime', run)
-    for (const who of ['coordinator', 'worker', 'reviewer']) {
-      const dir = join(root, who, 'captures/.codex/sessions/2026/10/29')
-      mkdirSync(dir, { recursive: true })
-      writeFileSync(
-        join(dir, `${who}.jsonl`),
-        `${JSON.stringify({
-          timestamp: '2026-10-29T00:00:00Z',
-          type: 'event_msg',
-          payload: { type: 'token_count', info: { total_token_usage: { total_tokens: 7 }, last_token_usage: { total_tokens: 7 } } },
-        })}\n`,
-      )
-    }
-    const usage = new PilotUsage()
-    expect(usage.tokens(run)).toBe(21)
-    expect(usage.tokens(run)).toBe(21)
   })
 })

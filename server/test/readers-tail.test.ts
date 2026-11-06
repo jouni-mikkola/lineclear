@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { claudeLogPath, findClaudeLog, findCodexLog, findPiLog, piSessionDir } from '../server/live/readers/find.ts'
 import { LogTail, readerFor } from '../server/live/readers/index.ts'
 import type { LogEvent } from '../server/live/readers/types.ts'
-import { parse, brief, base, ts, cuser, typed, cassistant, toolResult, line, cxmsg, sessionMeta, pimsg, T } from './readers-fixture.ts'
+import { parse, brief, base, ts, cuser, typed, cassistant, toolResult, cxmsg, sessionMeta, pimsg, T } from './readers-fixture.ts'
 
 let dir = ''
 beforeAll(() => {
@@ -150,21 +150,6 @@ describe('token usage', () => {
     expect(u).toHaveLength(1)
     expect(u[0]).toMatchObject({ id: 'usage-msg_U', tokens: 122 })
   })
-  test('Codex: each model call from its token count', () => {
-    const ev = parse('codex', [
-      {
-        timestamp: '2026-10-25T10:00:00.000Z',
-        type: 'event_msg',
-        payload: { type: 'token_count', info: { last_token_usage: { total_tokens: 300 }, total_token_usage: { total_tokens: 300 } } },
-      },
-      {
-        timestamp: '2026-10-25T10:00:01.000Z',
-        type: 'event_msg',
-        payload: { type: 'token_count', info: { last_token_usage: { total_tokens: 200 }, total_token_usage: { total_tokens: 500 } } },
-      },
-    ])
-    expect(ev.filter((e) => e.kind === 'usage').reduce((n, e) => n + (e.kind === 'usage' ? e.tokens : 0), 0)).toBe(500)
-  })
   test('pi: each reply from its usage', () => {
     const ev = parse('pi', [
       {
@@ -203,13 +188,7 @@ describe('turn marks', () => {
     expect(turns(ev)).toEqual(['turn-start'])
   })
 
-  test("Codex: task_started and task_complete; pi: each prompt and the reply's stop, and a retry after an error", () => {
-    const cx = parse('codex', [
-      line('event_msg', { type: 'task_started', turn_id: 'turn-1', started_at: 1792927516 }),
-      cxmsg('msg_u1', 'user', [{ type: 'input_text', text: 'Add a dark mode' }], ['user.text']),
-      line('event_msg', { type: 'task_complete', turn_id: 'turn-1', last_agent_message: 'Done.', duration_ms: 1000 }),
-    ])
-    expect(cx.filter((e) => e.kind === 'turn-start' || e.kind === 'turn-end').map((e) => e.id)).toEqual(['start-turn-1', 'turn-turn-1'])
+  test("pi: each prompt and the reply's stop, and a retry after an error", () => {
     const pi = parse('pi', [
       pimsg('e1', null, { role: 'user', content: [{ type: 'text', text: 'List the files' }], timestamp: 2 }),
       pimsg('e2', 'e1', { role: 'assistant', content: [{ type: 'text', text: 'One file.' }], usage: {}, stopReason: 'stop', timestamp: 3 }),

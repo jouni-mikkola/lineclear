@@ -309,13 +309,13 @@ describe('settings', () => {
     expect(s.pick('brief.review')).toEqual({ value: 'off', from: 'all' })
     expect(s.pick('machine.maxTasks')).toEqual({ value: '8', from: 'machine' })
     expect(s.pick('task.agent')).toEqual({ value: 'Claude Code', from: 'default' })
-    expect(s.set('task.agent', 'Codex', 'machine').ok).toBe(true)
-    expect(s.set('task.agent', 'pi', { space: 'web' }).ok).toBe(true)
+    expect(s.set('task.agent', 'pi', 'machine').ok).toBe(true)
+    expect(s.set('task.agent', 'Claude Code', { space: 'web' }).ok).toBe(true)
     expect(s.set('brief.review', 'on', { space: 'web' }).ok).toBe(true)
-    expect(s.get('task.agent')).toBe('Codex')
-    expect(s.get('task.agent', 'web')).toBe('pi')
-    expect(s.get('task.agent', 'api')).toBe('Codex')
-    expect(s.harness('task', 'web').kind).toBe('pi')
+    expect(s.get('task.agent')).toBe('pi')
+    expect(s.get('task.agent', 'web')).toBe('Claude Code')
+    expect(s.get('task.agent', 'api')).toBe('pi')
+    expect(s.harness('task', 'web').kind).toBe('claude')
     expect(s.ways('web').review).toBe(true)
     expect(s.ways('api').review).toBe(false)
     // a machine's capacity has no project level; alerts are one for all
@@ -323,35 +323,35 @@ describe('settings', () => {
     expect(s.set('alerts', 'x', 'machine').ok).toBe(false)
     expect(readJson<Record<string, unknown>>('settings.json', {})).toEqual({
       everywhere: { 'brief.review': 'off' },
-      machine: { 'machine.maxTasks': '8', 'task.agent': 'Codex' },
-      spaces: { web: { 'task.agent': 'pi', 'brief.review': 'on' } },
+      machine: { 'machine.maxTasks': '8', 'task.agent': 'pi' },
+      spaces: { web: { 'task.agent': 'Claude Code', 'brief.review': 'on' } },
     })
     // the screen's rows say where an inherited value comes from, and what a reset goes back to
     const rows = (level: string, name: string) => s.sections([], [], null, 'vm', ['web']).find((x) => x.level === level && x.name === name)!.rows
     const agent = (level: string) => rows(level, 'Agents').find((r) => r.key === 'task.agent')!
-    expect(agent('p:vm:web')).toMatchObject({ value: 'pi', inherits: { value: 'Codex', from: 'vm' } })
-    expect(agent('m:vm')).toMatchObject({ value: 'Codex', inherits: { value: 'Claude Code', from: 'Everywhere' } })
+    expect(agent('p:vm:web')).toMatchObject({ value: 'Claude Code', inherits: { value: 'pi', from: 'vm' } })
+    expect(agent('m:vm')).toMatchObject({ value: 'pi', inherits: { value: 'Claude Code', from: 'Everywhere' } })
     expect(agent('all')).toMatchObject({ value: 'Claude Code' })
     expect(agent('all').from).toBeUndefined()
     // a machine shown by a name of its own: the rows say that name, its levels keep the key
     const named = s.sections([], [], null, 'vm', ['web'], 'VM box').find((x) => x.level === 'p:vm:web' && x.name === 'Agents')!
-    expect(named.rows.find((r) => r.key === 'task.agent')).toMatchObject({ inherits: { value: 'Codex', from: 'VM box' } })
+    expect(named.rows.find((r) => r.key === 'task.agent')).toMatchObject({ inherits: { value: 'pi', from: 'VM box' } })
     expect(named.machine).toBe('vm')
     expect(rows('p:vm:web', 'How tasks work').find((r) => r.key === 'brief.merge')).toMatchObject({ value: 'on its own', from: 'Everywhere' })
     expect(s.sections([], [], null, 'vm', ['web']).some((x) => x.level === 'p:vm:web' && x.name === 'Machine')).toBe(false)
     // unset drops a level's own: the one above counts again
     s.set('task.agent', null, { space: 'web' })
-    expect(s.pick('task.agent', { space: 'web' })).toEqual({ value: 'Codex', from: 'machine' })
+    expect(s.pick('task.agent', { space: 'web' })).toEqual({ value: 'pi', from: 'machine' })
     // the other machines take the main one's All machines
     expect(s.adopt({ 'brief.review': 'on', nonsense: 'x' })).toBe(true)
     expect(s.everywhere()).toEqual({ 'brief.review': 'on' })
     writeJson('settings.json', {})
   })
-  test("a task's backup agent is Codex unless set: any CLI herdr starts, or off", () => {
+  test("a task's backup agent is pi unless set: any CLI herdr starts, or off", () => {
     const s = new Settings()
-    expect(s.get('task.fallback')).toBe('Codex')
-    expect(s.set('task.fallback', 'pi').ok).toBe(true)
     expect(s.get('task.fallback')).toBe('pi')
+    expect(s.set('task.fallback', 'Claude Code').ok).toBe(true)
+    expect(s.get('task.fallback')).toBe('Claude Code')
     expect(s.set('task.fallback', 'Off').ok).toBe(true)
     expect(s.get('task.fallback')).toBe('off')
     expect(s.set('task.fallback', 'Nonsense').ok).toBe(false)

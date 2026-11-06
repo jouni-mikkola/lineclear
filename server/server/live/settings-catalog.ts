@@ -225,7 +225,7 @@ export const CATALOG: Section[] = [
       ...agentRows('Tasks', 'task', [...CHAT_CLIS], 'default', 'default'),
       ...agentRows('Coordinators', 'coordinator', [...CHAT_CLIS], 'default', 'default'),
       // a backup agent takes a task over where its agent can't go on (engine.ts cantGoOn)
-      { group: 'Backup', label: 'Agent', key: 'task.fallback', value: 'Codex', options: ['off', ...CHAT_CLIS] },
+      { group: 'Backup', label: 'Agent', key: 'task.fallback', value: 'pi', options: ['off', ...CHAT_CLIS] },
       { group: 'Backup', label: 'Model', key: 'backup.model', value: 'default', text: true },
       { group: 'Backup', label: 'Effort', key: 'backup.effort', value: 'default', options: [...EFFORTS] },
     ],

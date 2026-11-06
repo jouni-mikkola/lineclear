@@ -28,7 +28,6 @@ describe("each CLI's log says what cut its turn off", () => {
   test('errors that pass by themselves are waited out', () => {
     expect(ending('claude-overloaded-made')).toEqual({ passing: true, reason: 'Provider overloaded' })
     expect(ending('claude-rate-limit-made')).toEqual({ passing: true, reason: 'Rate limited' })
-    expect(ending('codex-at-capacity')).toEqual({ passing: true, reason: 'Model at capacity' })
     expect(ending('pi-socket-closed')).toEqual({ passing: true, reason: 'Connection dropped' })
     expect(ending('pi-overloaded')).toEqual({ passing: true, reason: 'Provider overloaded' })
     expect(ending('pi-gateway-502').passing).toBe(true)
@@ -37,8 +36,6 @@ describe("each CLI's log says what cut its turn off", () => {
   test('errors waiting cannot fix go on at once, in a few words', () => {
     expect(ending('claude-usage-limit-made')).toEqual({ passing: false, reason: 'Out of allowance until 5pm' })
     expect(ending('claude-model-not-found')).toEqual({ passing: false, reason: 'Model not available' })
-    expect(ending('codex-unauthorized')).toEqual({ passing: false, reason: 'Signed out' })
-    expect(ending('codex-model-not-supported')).toEqual({ passing: false, reason: 'Model not available' })
     expect(ending('pi-unknown-provider').passing).toBe(false)
     expect(providerError('Your input exceeds the context window of this model.', 'context_window_exceeded').reason).toBe('Context window full')
     expect(providerError("You've hit your limit · resets 5pm (Europe/Oslo)").reason).toBe('Out of allowance until 5pm')

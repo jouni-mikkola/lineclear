@@ -6,7 +6,7 @@ import { Emitter } from '../source.ts'
 import { readJson, writeJson } from '../store.ts'
 import { ColdAgents } from './engine/cold.ts'
 import { addLog } from './log-list.ts'
-import type { AgentRuntime, TermScreen } from '../../shared/types.ts'
+import type { TermScreen } from '../../shared/types.ts'
 import { herdr, type Subscription, type AgentInfo, type AgentStatus } from './herdr.ts'
 import { ClaudeSessions, Reviewers, screenBackground, sessionBackground, type Background } from './readers/background.ts'
 import { claudeLogPath, findClaudeLog, findCodexLog, findPiLog, mainCodexLog } from './readers/find.ts'
@@ -17,7 +17,6 @@ import { mirrored } from './mfs.ts'
 import { agentEnv, BOX, helperDir, run } from './box.ts'
 import { ROOT } from '../root.ts'
 import { inputHoldsText, leftAtPrompt } from './commands.ts'
-import { readCodexRuntime } from './codex-runtime.ts'
 import { capturedTranscript, privateRuntimePath } from './autopilot-sandbox.ts'
 import { SecretAccess } from './secret-access.ts'
 import { isAgentProcess } from './agent-process.ts'
@@ -157,37 +156,6 @@ export class AgentsState extends Emitter<Events> {
 
   status(key: string): AgentStatus | 'gone' {
     return statusFrom(this.said(key), this.info(key)?.agent_status ?? 'gone')
-  }
-
-  protected codexState = new Map<string, AgentRuntime>()
-  protected runtimeAt = 0
-  protected runtimeReading = false
-
-  protected async readRuntime() {
-    if (this.runtimeReading || Date.now() - this.runtimeAt < 5000) return
-    this.runtimeReading = true
-    this.runtimeAt = Date.now()
-    try {
-      const sessions = new Map<string, { id: string; started: number }>()
-      for (const [key, r] of Object.entries(this.records)) {
-        if (r.kind !== 'codex' || r.isolation || !this.info(key)) continue
-        const active = this.info(key)?.agent_session
-        const id = active?.kind === 'id' ? active.value : (active?.kind === 'path' ? active.value : r.logs.at(-1))?.match(/([0-9a-f-]{36})\.jsonl$/)?.[1]
-        if (id) sessions.set(key, { id, started: r.started })
-      }
-      const states = await readCodexRuntime([...new Set([...sessions.values()].map((s) => s.id))])
-      this.codexState.clear()
-      for (const [key, session] of sessions) {
-        if (this.records[key]?.started !== session.started) continue
-        const state = states.get(session.id)
-        if (state) this.codexState.set(key, state)
-        this.emit('logs', key)
-      }
-    } catch {
-      this.codexState.clear()
-    } finally {
-      this.runtimeReading = false
-    }
   }
 
   /** what the agent reports of itself, from its hooks; nothing when it reports nothing (see statusFrom). A turn its log

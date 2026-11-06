@@ -15,7 +15,7 @@ export class PilotUsage {
     this.usage.set(run, values)
     for (const file of new Bun.Glob('*/captures/**/*.jsonl').scanSync({ cwd: root, dot: true, absolute: true, onlyFiles: true })) {
       if (!privateRuntimePath(root, file)) continue
-      const kind = file.includes('/.claude/') ? 'claude' : file.includes('/.codex/') ? 'codex' : 'pi'
+      const kind = file.includes('/.claude/') ? 'claude' : 'pi'
       let tail = this.tails.get(file)
       if (!tail) {
         tail = new LogTail(file, readerFor(kind)!)

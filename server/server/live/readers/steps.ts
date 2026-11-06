@@ -455,27 +455,3 @@ export function codexItem(it: Json): (Said & { failed?: boolean; tool: string; r
   }
   return undefined
 }
-
-/** Codex's own calls before code mode logged its items: a shell command, a patch */
-export function codexCall(name: string, args: Json): Said {
-  const a = args && typeof args === 'object' ? args : {}
-  if (name === 'apply_patch') {
-    const patch = String(a.input ?? args ?? '')
-    const files = [...patch.matchAll(/\*\*\* (?:Update|Add|Delete) File: (.+)/g)].map((m) => m[1].trim())
-    const n = diffCounts(patch.replace(/^\*\*\*.*$/gm, ''))
-    if (!files.length) return { step: 'edit', ...words('Edit files', '', n) }
-    const f = baseName(files[0])
-    return {
-      step: 'edit',
-      ...words(files.length > 1 ? `Edit ${files.length} files: ${files.slice(0, 3).map(baseName).join(', ')}` : `Edit ${f}`, files.length > 1 ? '' : f, {
-        detail: files.join('\n'),
-        ...n,
-      }),
-    }
-  }
-  if (name === 'shell' || name === 'exec_command' || name === 'local_shell' || name === 'exec') {
-    const cmd = Array.isArray(a.command) ? a.command.at(-1) : (a.cmd ?? a.command ?? /\bcmd\s*:\s*(["'`])((?:\\.|(?!\1).)*)\1/.exec(String(args ?? ''))?.[2])
-    return commandSay(String(cmd ?? ''))
-  }
-  return { step: 'other', ...words(`Use ${toolWords(name)}`) }
-}

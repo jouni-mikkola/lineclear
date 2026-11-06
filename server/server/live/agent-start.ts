@@ -24,8 +24,7 @@ export async function isolatedReady(
 /** Herdr starts a canonical command in the pane's shell. A login profile may have
  * replaced its PATH or aliased that command: use a clean non-login sh and verify
  * its actual process environment BEFORE asking Herdr to start any agent. */
-export const isolatedShellCommand = (wrapper: string) =>
-  `exec /usr/bin/env PATH=${q(`${dirname(wrapper)}:/usr/local/bin:/usr/bin:/bin`)} ENV=/dev/null /bin/sh -i`
+const isolatedShellCommand = (wrapper: string) => `exec /usr/bin/env PATH=${q(`${dirname(wrapper)}:/usr/local/bin:/usr/bin:/bin`)} ENV=/dev/null /bin/sh -i`
 export async function isolatedShell(
   pane: string,
   wrapper: string,

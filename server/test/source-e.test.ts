@@ -359,7 +359,7 @@ describe('automations add tasks with fresh agents', () => {
     const name = src.places.space(place)!.name
     const tasks = () => src.engine.tasks.filter((x) => x.project === place && x.by.startsWith('the automation'))
     const add = await src.cli(
-      ['automation', 'add', 'Nightly', '--task', 'Bump deps', '--brief', 'Bump and test.', '--when', 'FREQ=MINUTELY;INTERVAL=5', '--agent', 'codex'],
+      ['automation', 'add', 'Nightly', '--task', 'Bump deps', '--brief', 'Bump and test.', '--when', 'FREQ=MINUTELY;INTERVAL=5', '--agent', 'pi'],
       { chat: place },
     )
     expect(add.out).toMatch(
@@ -368,7 +368,7 @@ describe('automations add tasks with fresh agents', () => {
     // its first run is the rule's first after it was made: as if made six minutes ago
     src.automations.find(place, 'Nightly')!.since = Date.now() - 6 * 60_000
     ;(src as unknown as { runSchedules(): void }).runSchedules()
-    expect(tasks().map((x) => [x.title, x.by, x.agent?.kind])).toEqual([['Bump deps', 'the automation “Nightly”', 'codex']])
+    expect(tasks().map((x) => [x.title, x.by, x.agent?.kind])).toEqual([['Bump deps', 'the automation “Nightly”', 'pi']])
     expect(tasks()[0].desc).toStartWith('Bump and test.')
     // the next run is five minutes after the last
     ;(src as unknown as { runSchedules(): void }).runSchedules()
@@ -395,7 +395,7 @@ describe('automations add tasks with fresh agents', () => {
     await src.cli(['automation', 'edit', 'Nightly', '--when', 'FREQ=DAILY;BYHOUR=3;BYMINUTE=0', '--task', 'Bump all deps', '--brief', ''], { chat: place })
     expect(src.automations.find(place, 'Nightly')).toMatchObject({
       trigger: { time: 'DTSTART:20260101T000000 RRULE:FREQ=DAILY;BYHOUR=3;BYMINUTE=0' },
-      task: { title: 'Bump all deps', agent: { kind: 'codex' } },
+      task: { title: 'Bump all deps', agent: { kind: 'pi' } },
       on: false,
     })
     expect(src.automations.find(place, 'Nightly')!.task.desc).toBeUndefined()
@@ -406,7 +406,7 @@ describe('automations add tasks with fresh agents', () => {
     expect(await src.act({ type: 'automation', place, op: 'save', name: 'Nightly' } as never)).toMatchObject({ ok: false })
     expect(await src.act({ type: 'automation', place, op: 'remove', name: 'Echo' })).toEqual({ ok: true })
     expect((await src.cli(['automation', 'list', '--space', name], {})).out).toMatch(
-      /Nightly · Every day at 3:00 \(.+\) \[--when "DTSTART:20260101T000000 RRULE:FREQ=DAILY;BYHOUR=3;BYMINUTE=0"\] · adds “Bump all deps” \(codex\) · autos · paused · last ran/,
+      /Nightly · Every day at 3:00 \(.+\) \[--when "DTSTART:20260101T000000 RRULE:FREQ=DAILY;BYHOUR=3;BYMINUTE=0"\] · adds “Bump all deps” \(pi\) · autos · paused · last ran/,
     )
     // the old kinds are gone
     expect((await src.cli(['automation', 'add', 'Ask', '--ask', 'What waits?', '--when', 'FREQ=DAILY'], { chat: place })).out).toContain('takes no --ask')

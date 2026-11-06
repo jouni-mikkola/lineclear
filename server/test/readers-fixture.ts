@@ -53,7 +53,7 @@ export const toolResult = (uuid: string, id: string, content: string) =>
   cuser(uuid, [{ tool_use_id: id, type: 'tool_result', content }], { toolUseResult: { stdout: content }, sourceToolAssistantUUID: 'x' })
 
 export const T = '01a172ce-0000-7000-8000-000000000002'
-export const line = (type: string, payload: object) => ({ timestamp: ts(), type, payload })
+const line = (type: string, payload: object) => ({ timestamp: ts(), type, payload })
 const meta = (kinds: string[]) => ({ turn_id: 'turn-1', create_time: 1792927517.06, content_item_kinds: kinds })
 export const cxmsg = (id: string, role: string, content: object[], kinds?: string[]) =>
   line('response_item', { type: 'message', id, role, content, internal_chat_message_metadata_passthrough: kinds ? meta(kinds) : { turn_id: 'turn-1' } })
