@@ -271,7 +271,26 @@ function lineReader(onLine: (line: string) => unknown) {
   }
 }
 
-function send<T>(method: string, params: Record<string, unknown>, timeoutMs: number, path: string): Promise<T> {
+/** calls that type, create or notify: herdr may have done them before it closed, so they are never asked twice */
+const once = /send_|prompt|create|\.open|\.split|notification/
+
+/** over an ssh bridge a close is a failed link, which the machine's own recovery handles */
+const bridged = () => {
+  const b = box()
+  return !!b && !b.socket
+}
+
+/** a closed socket means the request came late, not that herdr is down: ask once more, and fail plainly on a second close */
+async function send<T>(method: string, params: Record<string, unknown>, timeoutMs: number, path: string): Promise<T> {
+  try {
+    return await sendOnce<T>(method, params, timeoutMs, path)
+  } catch (e) {
+    if (!(e instanceof HerdrError) || e.code !== 'closed' || once.test(method) || bridged()) throw e
+    return sendOnce<T>(method, params, timeoutMs, path)
+  }
+}
+
+function sendOnce<T>(method: string, params: Record<string, unknown>, timeoutMs: number, path: string): Promise<T> {
   const id = `shep-${Date.now().toString(36)}-${++n}`
   return new Promise<T>((resolve, reject) => {
     let done = false
@@ -295,8 +314,15 @@ function send<T>(method: string, params: Record<string, unknown>, timeoutMs: num
       }),
     )
     // its socket refusing, or gone: herdr stopped or is starting again. Said plainly, never "connect ECONNREFUSED …"
-    sock.on('error', (e) => finish(() => reject(new HerdrError('unreachable', !e || gone(e) ? "herdr isn't answering" : e.message))))
-    sock.on('close', () => finish(() => reject(new HerdrError('closed', `herdr closed the connection during ${method}`))))
+    const closedError = () => new HerdrError('closed', `herdr closed the connection during ${method}`)
+    sock.on('error', (e?: Error & { code?: string }) =>
+      finish(() =>
+        reject(
+          e?.code === 'ECONNRESET' || e?.code === 'EPIPE' ? closedError() : new HerdrError('unreachable', !e || gone(e) ? "herdr isn't answering" : e.message),
+        ),
+      ),
+    )
+    sock.on('close', () => finish(() => reject(closedError())))
   })
 }
 
