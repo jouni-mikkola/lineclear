@@ -5,6 +5,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import * as Runs from '../../src/check-runs.ts'
+import { checkTier } from '../../src/check-tier.ts'
+import { readSettings } from '../../src/project.ts'
 import * as Lane from '../server/live/engine/lane.ts'
 import * as Queue from '../server/live/engine/check-queue.ts'
 import { repo, sh, started, until, world } from './engine-world.ts'
@@ -324,4 +326,26 @@ test("a task started on machine B has its merge check recorded on B and waits in
   const c = await run
   expect(c.step === 'checked' && c.ok).toBe(true)
   expect(Runs.readRuns(dir, 0).map((r) => r.machine)).toEqual(['boxb'])
+})
+
+test("a task started on machine B: its lineclear check and its merge check both run on B, none on the main machine", async () => {
+  const w = world()
+  const dir = repo()
+  project(dir, 'true')
+  const { t } = await started(w, dir, 'lane-b-both')
+  t.machine = 'boxb'
+  writeFileSync(join(wt(t), 'mine.txt'), 'mine\n')
+  sh('git add -A && git commit -qm mine', wt(t))
+  await w.engine.done(t.id, 'Added mine.')
+  // the agent's `lineclear check` runs in the task's folder, in B's environment
+  const settings = readSettings('lane')
+  if (typeof settings === 'string') throw new Error(settings)
+  const onB = { ...process.env, LINECLEAR_MACHINE: 'boxb' }
+  expect(await checkTier([], settings, () => {}, onB, wt(t), async () => 0)).toBe(0)
+  expect((await w.engine.merge(t.id, { self: true })).ok).toBe(true)
+  const runs = Runs.readRuns(dir, 0)
+  expect(runs.map((r) => r.tier)).toContain('merge')
+  expect(runs.length).toBeGreaterThan(1)
+  expect(runs.every((r) => r.machine === 'boxb')).toBe(true)
+  expect(runs.some((r) => r.machine === Runs.machineOf())).toBe(false)
 })
