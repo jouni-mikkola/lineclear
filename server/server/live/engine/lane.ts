@@ -124,6 +124,7 @@ async function runCheck(
     ok: r.ok,
     failed,
     ...(r.ok ? {} : { causes: Runs.failureCauses(text, r.code, failed, gate) }),
+    ...(r.ok ? {} : Runs.infraField(text, r.code)),
     ...(gate ? { gate } : {}),
     ...(outside.length > 0 ? { outside } : {}),
     ...(passes ? { quarantined: true } : {}),

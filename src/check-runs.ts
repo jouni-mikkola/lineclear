@@ -45,6 +45,8 @@ export interface CheckRun {
   gate?: FailedGate;
   /** why a red run is red, never empty: `gate: <step>: <line>`, `test: <name>`, `timeout: <line>`, or `exit <code>: <last line>` when the output names nothing (absent in older lines) */
   causes?: string[];
+  /** a red run the machine caused, not the change: `out of disk` or `killed` (absent when the output names no such fault) */
+  infra?: string;
   /** the failed tests of a run whose every failure is in a test the branch does not reach: not its doing, so each gets one Fix task (src/outside-fix.ts) */
   outside?: string[];
   /** it failed with no named test or gate and was run once more: not a refusal, whatever the rerun says */
@@ -338,6 +340,38 @@ export function failureCauses(output: string, code: number, failed: string[], ga
   const slow = lines.find((l) => TIMEOUT_LINE.test(l));
   if (TIMEOUT_CODES.has(code) || slow) causes.push(`timeout: ${slow?.trim() ?? `exit ${code}`}`);
   return causes.length > 0 ? causes : [`exit ${code}: ${lines.at(-1)?.trim() ?? "no output"}`];
+}
+
+const DISK_LINE = /no space left on device|ENOSPC/i;
+const KILLED_LINE = /^\s*Killed\s*$|\bSIGKILL\b|out of memory/im;
+
+/** The machine fault behind a red run, from its exit code and output, as the run's `infra` field: `out of disk` or `killed`; empty when the change may be the cause. */
+export function infraField(output: string, code: number): { infra?: string } {
+  if (DISK_LINE.test(output)) return { infra: "out of disk" };
+  return code === 137 || KILLED_LINE.test(output) ? { infra: "killed" } : {};
+}
+
+/** A merge check that waited this long for its slot is a stuck line, not a slow change. */
+const SLOT_WAIT_LIMIT_MIN = 30;
+/** A machine fault pauses the line this long, then one head tries again: nothing else would ever run to show it passed. */
+const INFRA_PAUSE_MS = 10 * 60_000;
+
+/**
+ * Why a project's merge line is paused, or undefined when it runs. Two reasons: the last merge-tier run on `base` is red
+ * (until a later merge run passes, which only a fix can do), or the last merge run failed for out of disk, killed or an
+ * over-long slot wait (for a few minutes). A rerun or a quarantined pass says nothing.
+ */
+export function lanePause(runs: CheckRun[], base: string, now = Date.now()): string | undefined {
+  const merge = runs.filter((r) => r.tier === "merge" && !r.dirty && !r.rerun);
+  const last = merge.at(-1);
+  if (!last) return undefined;
+  const red = (r: CheckRun) => !r.ok && !r.quarantined;
+  const fault =
+    last.infra ?? ((last.slotWaitMin ?? 0) >= SLOT_WAIT_LIMIT_MIN ? `waited ${Math.round(last.slotWaitMin ?? 0)} min for the check slot` : undefined);
+  if (red(last) && fault && now - last.at < INFRA_PAUSE_MS) return `the last check failed: ${fault}`;
+  const main = merge.filter((r) => r.branch === base).at(-1);
+  if (main && red(main) && !merge.some((r) => r.at > main.at && r.ok)) return `${base} is red: ${main.causes?.[0] ?? "its last check failed"}`;
+  return undefined;
 }
 
 /** The red merge-tier runs by the first cause they name (`gate <step>`, `test`, `timeout`, `exit`; `unnamed` for a run logged before causes), and all merge-tier runs. */

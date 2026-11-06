@@ -6,6 +6,7 @@ import { serverBin } from "./paths.ts";
 import {
   failedGate,
   failureCauses,
+  infraField,
   flakeFixDue,
   failedOutside,
   failedTests,
@@ -125,6 +126,7 @@ async function runRecorded(
       ok: code === 0,
       failed,
       ...(code === 0 ? {} : { causes: failureCauses(output, code, failed, gate) }),
+      ...(code === 0 ? {} : infraField(output, code)),
       ...(gate ? { gate } : {}),
       ...(outside.length > 0 ? { outside } : {}),
       ...(passes ? { quarantined: true } : {}),
