@@ -24,10 +24,10 @@ The check tiers of each project and what keeps its checks honest: `lineclear che
 - `check.where` = `github` (default `local`): a landing opens its pull request and waits for GitHub's checks (`.github/workflows/`: changed tests per pull request, the full check in 4 shards in the merge queue, heavy suites after a merge on main, .github/workflows/heavy.yml), naming failing tests from the job log.
 
 ## Interface
-
 `lineclear check [--tier <tier>] [command]`, `lineclear check --release <test>`, the check
 log `check-runs.jsonl`, and these names:
-- `src/check-runs.ts`: `Tier`, `CheckRun`, `loadMeter`, `recordStepTimes`, `readRuns`, `laneDays`, `redByCause`, `refusedMergeBranches`, `whereRun`, `machineOf`, `testKey`, `recordWork`, `readWork`, `runsPerMachine`, `machineRunLine` (`src/task-work.ts`)
+- `src/check-runs.ts`: `Tier`, `CheckRun`, `loadMeter`, `recordStepTimes`, `readRuns`, `laneDays`, `redByCause`, `refusedMergeBranches`, `whereRun`, `machineOf`, `testKey`
+- `src/task-work.ts`: `recordWork`, `readWork`, `runsPerMachine`, `machineRunLine`
 - `src/git.ts`: `git`, `gitWith`, `gitText`, `gitAsLineclear`
 - `src/check-tier.ts`: `checkTier`, `flakeFixIn`
 
