@@ -7,6 +7,7 @@ import { sessionFolder } from "../src/measure.ts";
 import { decisionsPath } from "../pi/config.ts";
 import { realWorld, tick } from "../src/rules.ts";
 import { status } from "../src/status.ts";
+import { changeSettings } from "../src/project.ts";
 import { readWaits, waitPath, writeWait } from "../src/waits.ts";
 import { demoConfig, idleWorld } from "./demo-world.ts";
 import { tmp } from "./helpers.ts";
@@ -141,4 +142,15 @@ test("the owner's message is read from the task's agent log, not Lineclear's own
   writeFileSync(file, `${readFileSync(file, "utf8")}\n${line("2026-06-01T09:40:00Z", "Skip it")}`);
   expect(real.ownerWrote("LIN-2", "2026-06-01T09:00:00Z")).toBe(true);
   expect(real.ownerWrote("LIN-9", "2026-06-01T09:00:00Z")).toBe(false);
+});
+
+test("a wait that ends in a paused project does not wake its task", () => {
+  const told: string[] = [];
+  const t = setup([{ id: "LIN-1", title: "A", status: "work" }]);
+  const world = idleWorld(t.env, { tasks: () => [{ id: "LIN-1", title: "A", status: "work" }], tellTask: (id) => (told.push(id), undefined) });
+  writeWait({ task: "LIN-1", project: "demo", kind: "until", until: "2026-06-01T09:00:00Z", reason: "rest", since: "2026-06-01T08:00:00Z" }, t.env);
+  changeSettings("demo", { paused: true }, t.env);
+  tick(world, false, t.env);
+  expect(told).toEqual([]);
+  expect(readWaits(t.env).map((w) => w.task)).toEqual(["LIN-1"]);
 });
