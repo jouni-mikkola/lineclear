@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { backupDue, backupMain, backupProblem, KEEP } from "../src/backup.ts";
+import { backupDue, backupMain, backupProblem, drillDue, KEEP } from "../src/backup.ts";
+import { watchMachine } from "../src/machine-alerts.ts";
+import { readItems } from "../src/inbox.ts";
 import { secrets } from "../src/secrets.ts";
 import { tmp } from "./helpers.ts";
 
@@ -144,4 +146,38 @@ test("a second run while one runs ends at once", async () => {
   await password();
   writeFileSync(join(config(), "backup.lock"), "");
   expect(run()).toEqual({ code: 0, out: "lineclear backup: another backup runs now" });
+});
+
+test("a restore drill brings the latest copy back, reads its secrets, is due weekly, and a failure raises one Inbox card until it passes", async () => {
+  settings([join(root, "a")]);
+  await password();
+  const t0 = new Date("2026-11-01T10:00:00Z");
+  backupMain(
+    [],
+    () => {},
+    env,
+    () => ({ code: 0, out: "", err: "" }),
+    t0,
+  );
+  expect(drillDue(env, t0)).toBe(true);
+  const failing = () => ({ code: 1, out: "", err: "Fatal: wrong password" });
+  const out: string[] = [];
+  expect(backupMain(["drill"], (l) => out.push(l), env, failing, t0)).toBe(1);
+  expect(out.join("\n")).toContain("restore drill FAILED");
+  expect(drillDue(env, new Date(t0.getTime() + 3_600_000))).toBe(false);
+  const later = new Date(t0.getTime() + 1000);
+  expect(watchMachine(env, later)).toBe(1);
+  expect(watchMachine(env, later)).toBe(0);
+  expect(readItems(env as NodeJS.ProcessEnv).filter((i) => i.alert === "Restore drill failed" && i.closed === undefined)).toHaveLength(1);
+  const good = (_: unknown, args: string[]) => {
+    const target = args[args.indexOf("--target") + 1] ?? "";
+    const kept = args[args.indexOf("--include") + 1] ?? "";
+    mkdirSync(join(target, kept, ".."), { recursive: true });
+    writeFileSync(join(target, kept), "{}");
+    return { code: 0, out: "", err: "" };
+  };
+  expect(backupMain(["drill"], () => {}, env, good, later)).toBe(0);
+  watchMachine(env, later);
+  expect(readItems(env as NodeJS.ProcessEnv).filter((i) => i.alert === "Restore drill failed" && i.closed === undefined)).toHaveLength(0);
+  expect(drillDue(env, new Date(t0.getTime() + 8 * 86_400_000))).toBe(true);
 });

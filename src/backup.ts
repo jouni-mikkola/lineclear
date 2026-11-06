@@ -1,5 +1,5 @@
-import { closeSync, mkdirSync, openSync, rmSync, statSync } from "node:fs";
-import { homedir } from "node:os";
+import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, statSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { writeAtomic } from "../pi/atomic.ts";
 import { configDir, readJson } from "../pi/config.ts";
@@ -33,11 +33,14 @@ interface RepoState {
 interface BackupState {
   repos: Record<string, RepoState>;
   pruned?: string;
+  /** The last restore drill: a copy brought back into a temporary folder and read. */
+  drill?: { ok: boolean; at: string; error?: string };
 }
 
 const BACKUP_EVERY_MS = 60 * 60 * 1000;
 const PRUNE_EVERY_MS = 24 * 60 * 60 * 1000;
 const STALE_MS = 24 * 60 * 60 * 1000;
+const DRILL_EVERY_MS = 7 * 24 * 60 * 60 * 1000;
 const PASSWORD = "LINECLEAR_BACKUP_PASSWORD";
 const TAG = "lineclear";
 /** Hourly copies for two days, daily ones for a month. */
@@ -174,8 +177,9 @@ export function startBackupIfDue(env: Env = process.env, now = new Date()): void
   } catch {
     // no lock: nothing runs
   }
-  if (!backupDue(env, now)) return;
-  Bun.spawn([process.execPath, join(import.meta.dir, "..", "bin", "lineclear"), "backup"], {
+  const sub = backupDue(env, now) ? [] : drillDue(env, now) ? ["drill"] : undefined;
+  if (sub === undefined) return;
+  Bun.spawn([process.execPath, join(import.meta.dir, "..", "bin", "lineclear"), "backup", ...sub], {
     env: env as Record<string, string>,
     stdio: ["ignore", "ignore", "ignore"],
   }).unref();
@@ -190,6 +194,56 @@ export function backupProblem(env: Env = process.env, now = new Date()): string 
   return old.length === 0
     ? ""
     : `no good backup in a day to ${old.map((r) => r.repo).join(", ")}${state.repos[old[0]?.repo ?? ""]?.error ? `: ${state.repos[old[0]?.repo ?? ""]?.error}` : ""}`;
+}
+
+/** For doctor and the alerts: what the last restore drill found wrong, or "" (also before the first one). */
+export function drillProblem(env: Env = process.env): string {
+  const d = readState(env).drill;
+  return d === undefined || d.ok ? "" : `the restore drill of ${d.at.slice(0, 10)} failed: ${d.error}`;
+}
+
+/** Whether the rule loop starts a drill now: a copy exists and the last drill is a week old. */
+export function drillDue(env: Env = process.env, now = new Date()): boolean {
+  const state = readState(env);
+  const copied = Object.values(state.repos).some((r) => r.lastGood);
+  return readBackupSettings(env) !== undefined && copied && !(now.getTime() - Date.parse(state.drill?.at ?? "") < DRILL_EVERY_MS);
+}
+
+/** Restores this machine's latest copy into a temporary folder and reads the secrets file from it, then removes the folder. */
+function drill(out: (l: string) => void, env: Env, now: Date, restic?: Restic): number {
+  const s = readBackupSettings(env);
+  if (s === undefined) return fail(out, `no repository in ${settingsFile(env)}`, "backup");
+  const password = env[PASSWORD] ?? ownerSecret(PASSWORD, env);
+  if (!password) return fail(out, `${PASSWORD} is not set`, "backup");
+  const run = restic ?? realRestic(password, env);
+  const kept = join(dataDir(env), "vault.json");
+  const target = mkdtempSync(join(tmpdir(), "lineclear-drill-"));
+  let error = "no repository answered";
+  try {
+    for (const repo of s.repos) {
+      const r = run(repo, ["restore", "latest", "--tag", TAG, "--host", host(env), "--target", target, "--include", kept]);
+      if (r.code !== 0) {
+        error = `${repo.repo}: ${lastLine(r.err, env)}`;
+        continue;
+      }
+      const back = join(target, kept);
+      try {
+        // no secrets yet is nothing to lose; a file the machine has must come back whole
+        if (existsSync(kept) || existsSync(back)) JSON.parse(readFileSync(back, "utf8"));
+        error = "";
+        break;
+      } catch {
+        error = `${repo.repo}: the secrets in the copy cannot be read`;
+      }
+    }
+  } finally {
+    rmSync(target, { recursive: true, force: true });
+  }
+  const state = readState(env);
+  state.drill = { ok: error === "", at: now.toISOString(), ...(error ? { error } : {}) };
+  writeState(state, env);
+  out(error === "" ? "restore drill passed: the latest copy came back and its secrets read" : `restore drill FAILED: ${error}`);
+  return error === "" ? 0 : 1;
 }
 
 function status(out: (l: string) => void, env: Env): number {
@@ -231,9 +285,10 @@ export function backupMain(args: string[], out: (l: string) => void, env: Env = 
   const [sub, ...rest] = args;
   if (sub === undefined) return runBackup(out, env, now, restic);
   if (sub === "status" && rest.length === 0) return status(out, env);
+  if (sub === "drill" && rest.length === 0) return drill(out, env, now, restic);
   const [dir, flag, from] = rest;
   if (sub === "restore" && dir !== undefined && (rest.length === 1 || (rest.length === 3 && flag === "--from" && from)))
     return restore(dir, from ?? host(env), out, env, restic);
-  out("usage: lineclear backup | backup status | backup restore <dir> [--from <machine>]");
+  out("usage: lineclear backup | backup status | backup drill | backup restore <dir> [--from <machine>]");
   return 2;
 }
