@@ -43,6 +43,8 @@ jobs:
           node -e 'for (const [n, v] of Object.entries(require("./pi/kit.json").packages)) console.log(`npm:${n}@${v}`)' |
             while read -r spec; do pi install "$spec"; done
           pi --version
+          # the update's smoke check starts a coordinator chat, and pi will not start an agent without a model set
+          node -e 'const f = process.env.HOME + "/.pi/agent/settings.json", s = require(f); s.defaultProvider = "claude-bridge"; s.defaultModel = "claude-sonnet-5-5"; require("fs").writeFileSync(f, JSON.stringify(s, null, 2))'
 
       # A user installs a release, so the test tags the commit as one, in the checked-out copy only.
       - name: Install the commit as a release
