@@ -59,6 +59,7 @@ A zero in restarts or gate failures can mean the log has no such line on this ma
 | loop `SWEEP_EVERY_MS` | 0 | 0 | 0 | Temp folders and compile caches of finished runs fill the disk. |
 | loop `CHECK_EVERY_MS` | 0 | 0 | 0 | A built update is never checked, so it is never promoted. |
 | loop `BACKUP_EVERY_MS` | 0 | 0 | 0 | No hourly backup of the stores. |
+| loop `DRILL_EVERY_MS` | 0 | 0 | 0 | No weekly restore drill: a broken copy shows only when it is needed. |
 | loop `PRUNE_EVERY_MS` | 0 | 0 | 0 | Old backups pile up. |
 
 ## Gates
