@@ -35,6 +35,7 @@ export class LiveSource extends LiveSourceUpkeep implements Source {
     }
     this.peers?.on('snapshot', () => {
       // another machine's task may be what a queued task here waits for
+      this.syncMachines()
       this.engine.recheck()
       this.engine.unifyIds(this.peerTasks())
       this.emit('snapshot')

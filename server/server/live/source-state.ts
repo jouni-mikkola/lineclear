@@ -117,6 +117,12 @@ export class LiveSourceState extends Emitter<SourceEvents> {
   /** the main machine runs every other machine saved in herdr, each from a worker of its own (machines.ts); a worker
    *  is one of those (box.ts) */
   peers: Machines | null = BOX ? null : new Machines(process.env.NODE_ENV === 'test' || process.env.LINECLEAR_SCRATCH ? null : undefined)
+  /** the machines herdr has saved and enabled that were looked at are the engine's: placement sees them. Run as
+   *  `peers` shows a change */
+  syncMachines() {
+    if (this.peers) this.engine.setMachines(this.peers.boxes())
+  }
+
   /** each task's shared browser */
   browsers = has('browser')
     ? new Browsers({

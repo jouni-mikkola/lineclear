@@ -19,7 +19,7 @@ import {
   type Saved,
 } from './install.ts'
 import { mirrorHomes } from './mirror.ts'
-import { q, tellRunBy } from './box.ts'
+import { q, tellRunBy, type BoxInfo } from './box.ts'
 import { MERGE_DEADLINE } from './engine/engine.ts'
 import {
   type Events,
@@ -146,6 +146,16 @@ export class MachinesLinks extends Emitter<Events> {
 
   list() {
     return [...this.links.values()]
+  }
+
+  /** whether herdr has this machine saved and enabled, looked at yet or not */
+  knows(label: string) {
+    return this.links.has(label)
+  }
+
+  /** the machines that have been looked at, as a worker is told of them (box.ts): where tasks may be placed */
+  boxes(): BoxInfo[] {
+    return [...this.links.values()].flatMap((l) => (l.probe ? [boxInfo(l.saved, l.probe)] : []))
   }
 
   protected syncing = false
