@@ -452,24 +452,6 @@ function replaceWhole(file: string, text: string): void {
   renameSync(tmp, file);
 }
 
-/** True when a full check (`bun scripts/check.ts --full`) already passed at this commit: a release does not run it again. */
-export function fullCheckPassed(commit: string, env: Env = process.env): boolean {
-  let text = "";
-  try {
-    text = readFileSync(join(configDir(env), "check-steps.jsonl"), "utf8");
-  } catch {
-    return false;
-  }
-  return text.split("\n").some((line) => {
-    try {
-      const e = JSON.parse(line) as { mode?: string; commit?: string; step?: string; ok?: boolean };
-      return e.mode === "full" && e.commit === commit && e.step === "wall" && e.ok === true;
-    } catch {
-      return false;
-    }
-  });
-}
-
 export interface LaneDay {
   date: string;
   /** passing merge-tier groups that ended that UTC day */

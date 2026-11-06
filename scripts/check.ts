@@ -2,15 +2,15 @@
 // (bun run media check), then the server's own types and tests (server/).
 // `bun run check` is the merge lane's: only what the branch's change reaches (below), the independent steps side by side,
 // each step's time recorded (scripts/check-speed.ts) and a file or the whole run over its limit failed by name.
-// `--full` runs everything, the browser suite included: the heavy run and a release candidate. `--changed` is the
-// worker's loop: the same without the browser suite.
+// `--full` runs everything the light check has, never a browser: checks are light and run on GitHub (docs/numbers.md). `--changed`
+// is the worker's loop.
 // A test that fails and then passes alone is a flake (scripts/flaky.ts): recorded, not failed.
 // The budget is 180 s on a machine that is not busy (docs/numbers.md); a busy one is slower for reasons outside the change.
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { compileCacheDir, diskTmpRoot, trimCache } from "../src/tmpdirs.ts";
 import { ownSlot } from "../src/waits.ts";
-import { specsFor, testsFor } from "./changed.ts";
+import { testsFor } from "./changed.ts";
 import { buildMap, readMap, saveMap } from "./load-map.ts";
 import { recordPassed, splitCached } from "./result-cache.ts";
 import {
@@ -25,7 +25,6 @@ import {
   slowFails,
   slowFaults,
   split,
-  specTimes,
   type StepTime,
   table,
   type Times,
@@ -56,13 +55,6 @@ mkdirSync(reports);
 // the repo's bin/lineclear refuses the stable config, data folders and ports (src/paths.ts), and a lane's shell may carry
 // the stable ports; these commands listen on none
 const ownFolders = [`LINECLEAR_CONFIG=${join(reports, "config")}`, `LINECLEAR_HOME=${join(reports, "home")}`, "LINECLEAR_PORT=0", "LINECLEAR_WEB_PORT=0"];
-// the browser suite serves on a port of its own, free when picked, so a suite of another run on the machine never collides
-const uiPort = (() => {
-  const probe = Bun.serve({ port: 0, fetch: () => new Response("") });
-  const port = probe.port;
-  probe.stop(true);
-  return String(port);
-})();
 const finish = (code: number, record?: (ok: boolean) => void): never => {
   trimCache(compileCacheDir());
   // jiti is the code gates' own transpile cache and playwright-daemon the browser sessions': not a test's folders
@@ -71,7 +63,6 @@ const finish = (code: number, record?: (ok: boolean) => void): never => {
     (n) =>
       n !== "jiti" &&
       n !== "playwright-daemon" &&
-      n !== `lineclear-ui-${uiPort}` &&
       !(code !== 0 && n.startsWith("playwright_chromiumdev_profile-")) &&
       !n.startsWith("playwright-transform-cache") &&
       n !== "reports",
@@ -174,29 +165,6 @@ function serverSteps(): Step[] {
   ];
 }
 
-// the browser suite is slow: only a change in ui/ can break it. The full check runs all of it; a branch, the specs of what it changed.
-function uiSteps(others: string[]): Step[] {
-  if (onlyChanged) return [];
-  const specs = full ? undefined : specsFor(changed);
-  if (specs?.length === 0) return [];
-  // shared ui code reaches every view: the lane would need the whole suite, which is the full check's
-  if (!full && specs === undefined) {
-    console.log("check: shared ui code changed: the full check takes the whole browser suite");
-    return [];
-  }
-  const report = `PLAYWRIGHT_JSON_OUTPUT_NAME=${join(reports, "ui.json")}`;
-  const port = `LINECLEAR_UI_PORT=${uiPort}`;
-  return [
-    { name: "ui build", cmd: ["bun", "run", "web:build"] },
-    {
-      name: "ui tests",
-      cmd: ["env", report, port, "bunx", "playwright", "test", "--workers", "1", "--reporter", "dot,json", ...(specs ?? [])],
-      // one worker: the specs share one fixture and one server. The motion tests read frame times: the full run gives them a machine the other steps are done with
-      needs: ["ui build", ...(full ? others : [])],
-    },
-  ];
-}
-
 function steps(): Step[] {
   const base = [
     ...(outsideServer && (code || full) ? [{ name: "types", cmd: full || known === undefined ? ["bun", "run", "types"] : TSC_CHANGED }] : []),
@@ -212,27 +180,7 @@ function steps(): Step[] {
     ...fastGates(ownFolders, code, full),
     ...serverSteps(),
   ];
-  const ui = uiSteps(base.map((b) => b.name));
-  return [
-    ...base,
-    ...ui,
-    ...budgetSteps(
-      ui.length > 0,
-      [...base, ...ui].map((b) => b.name),
-    ),
-  ];
-}
-
-// what the speed budgets (scripts/budgets.json) read: the views, the server's answers and the stream
-const BUDGET_REACH = /^(ui\/web\/|ui\/kit\/|ui\/budget\/|src\/(web|live|home|progress|demo)|scripts\/budget)/;
-
-/** The speed budget run: after every other step, so its CPU and timing numbers see a quiet machine. */
-function budgetSteps(built: boolean, others: string[]): Step[] {
-  if (onlyChanged || !(full || changed.some((f) => BUDGET_REACH.test(f)))) return [];
-  return [
-    ...(built ? [] : [{ name: "ui build", cmd: ["bun", "run", "web:build"] }]),
-    { name: "budgets", cmd: ["bun", "scripts/budget.ts"], needs: others.includes("ui build") ? others : ["ui build", ...others] },
-  ];
+  return base;
 }
 
 /** The last line of a failed step's output that says what went wrong: an error line, else the last line. */
@@ -288,9 +236,7 @@ function shardOf(all: Step[]): Step[] {
   const m = process.argv.find((a) => a.startsWith("--shard="))?.match(/^--shard=(\d+)\/(\d+)$/);
   if (!m) return all;
   const [i, n] = [Number(m[1]), Number(m[2])];
-  // budgets waits for every step to measure it; a shard has only its own, so it waits for the build alone
-  const own = all.map((s) => (s.name === "budgets" ? { ...s, needs: (s.needs ?? []).filter((n) => n === "ui build") } : s));
-  const byName = new Map(own.map((s) => [s.name, s]));
+  const byName = new Map(all.map((s) => [s.name, s]));
   const keep = new Set(all.filter((_, at) => at % n === i - 1).map((s) => s.name));
   const grow = (name: string) => {
     for (const need of byName.get(name)?.needs ?? []) {
@@ -301,7 +247,7 @@ function shardOf(all: Step[]): Step[] {
     }
   };
   for (const name of [...keep]) grow(name);
-  return own.filter((s) => keep.has(s.name));
+  return all.filter((s) => keep.has(s.name));
 }
 const sharded = process.argv.some((a) => a.startsWith("--shard="));
 const plan = shardOf(steps());
@@ -325,7 +271,6 @@ function speed(): void {
     for (const n of names) for (const [f, s] of parse(readFileSync(join(reports, n), "utf8"))) all.set(f, s);
     return all;
   };
-  const exists = (n: string) => readdirSync(reports).includes(n);
   const unit = read(
     readdirSync(reports).filter((n) => n.startsWith("unit-")),
     junitTimes,
@@ -336,19 +281,18 @@ function speed(): void {
     readdirSync(reports).filter((n) => n.startsWith("unit-")),
     junitSlowestCase,
   );
-  const spec = exists("ui.json") ? read(["ui.json"], specTimes) : new Map<string, number>();
   if (lowering) {
-    const next = lowered("spec", spec, lowered("unit", slowest, baseline, factor, adding), factor, adding);
+    const next = lowered("unit", slowest, baseline, factor, adding);
     writeSlowBaseline(".", next);
     console.log("check: scripts/gates/baseline/slow.json lowered to the files over their limits");
     return;
   }
-  const faults = [...slowFaults("unit", slowest, baseline, factor), ...slowFaults("spec", spec, baseline, factor)];
+  const faults = [...slowFaults("unit", slowest, baseline, factor)];
   if (faults.length > 0 && !slowFails(faults, untimed)) {
     console.log(`check: --untimed, not failing on ${faults.length} slow file(s); the slowest: ${faults[0]}`);
   } else if (faults.length > 0) {
     console.error(
-      `check: too slow, a test over 2 s or a spec over 20 s (docs/numbers.md); the slowest first:\n${faults
+      `check: too slow, a test over 2 s (docs/numbers.md); the slowest first:\n${faults
         .slice(0, 8)
         .map((f) => `  ${f}`)
         .join("\n")}`,

@@ -244,23 +244,6 @@ export function releaseHolder(env: Env = process.env): number | undefined {
   return undefined
 }
 
-/** holds new starts on this machine for the release check of this process; false while another release check holds them */
-export function holdForRelease(env: Env = process.env): boolean {
-  mkdirSync(slotsDir(env), { recursive: true })
-  const holder = releaseHolder(env)
-  if (holder !== undefined) return holder === process.pid
-  try {
-    createWhole(holdFile(env), String(process.pid))
-    return true
-  } catch {
-    return false
-  }
-}
-
-export const dropReleaseHold = (env: Env = process.env) => {
-  if (releaseHolder(env) === process.pid) rmSync(holdFile(env), { force: true })
-}
-
 /** Slots held by a live process now. */
 export function slotsHeld(env: Env): number {
   try {

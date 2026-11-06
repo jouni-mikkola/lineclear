@@ -4,14 +4,11 @@
 // which restarts, checks and rolls back, then updates the other machines). Else stable stays and one fix task is filed.
 import { KEPT_ENV } from "./herdr.ts";
 import { rollbackMain } from "./rollback.ts";
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { closeSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, statSync } from "node:fs";
-import { cpus, loadavg } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { writeAtomic } from "../pi/atomic.ts";
 import { configDir, readJson } from "../pi/config.ts";
-import * as Q from "../server/server/live/engine/check-queue.ts";
-import { fullCheckPassed, loadMeter, recordRun, whereRun } from "./check-runs.ts";
 import { dataDir, lockFile, pathsFor, serverBin } from "./paths.ts";
 import { forgetTaskReads, readTasks } from "./task-read.ts";
 import { listProjectNames, readSettings } from "./project.ts";
@@ -79,8 +76,8 @@ export interface ReleaseDeps {
   stable(): string;
   /** Main's newest commit, fetched. */
   head(): string;
-  /** Builds and tests `commit`; returns why it failed, or "". `again` runs the full check even if it passed at this commit. */
-  test(commit: string, again?: boolean): string;
+  /** Builds and tests `commit`; returns why it failed, or "". GitHub's check unfinished is `CHECK_PENDING`, not a failure. */
+  test(commit: string): string;
   /** Installs `commit` as stable; returns why that failed (and was rolled back), or "". */
   promote(commit: string): string;
   /** Files a fix task; returns why it could not, or "". */
@@ -143,7 +140,7 @@ export function releaseStep(deps: ReleaseDeps, env: Env = process.env, now = new
     s.next = { commit: head, at, result: "testing" };
     s.held = `testing ${short(head)}`;
     saveRelease(s, env);
-    const why = deps.test(head, true);
+    const why = deps.test(head);
     s.next = { commit: head, at, result: why ? "red" : "green", ...(why ? { why } : {}) };
     s.held = why ? `next ${short(head)} failed: ${why}` : undefined;
     noteRun(s, { commit: head, at, verdict: why ? "held" : "green", why: why || undefined }, now);
@@ -159,7 +156,14 @@ export function releaseStep(deps: ReleaseDeps, env: Env = process.env, now = new
     s.next = { commit: head, at, result: "testing" };
     s.held = `testing ${short(head)}`;
     saveRelease(s, env);
-    const failed = deps.test(head) || promoteOrWhy(deps, head);
+    const tested = deps.test(head);
+    if (tested.startsWith(CHECK_PENDING)) {
+      s.next = { commit: head, at, result: "waiting" };
+      s.held = tested;
+      saveRelease(s, env);
+      return s;
+    }
+    const failed = tested || promoteOrWhy(deps, head);
     noteRun(s, { commit: head, at, verdict: failed ? "held" : "green", why: failed || undefined }, now);
     if (failed) red(s, deps, head, stable, failed);
     else {
@@ -260,7 +264,7 @@ function realDeps(env: Env = process.env): ReleaseDeps {
       if (!f.ok) throw new Error(tail(f.out));
       return run(["git", "rev-parse", "FETCH_HEAD"], dir, env).out;
     },
-    test: (commit, again) => testNext(app, dir, commit, env, again),
+    test: (commit) => testNext(app, dir, commit, env),
     promote(commit) {
       const r = run(["sh", join(dir, "install.sh")], dir, { ...env, LINECLEAR_REF: commit, LINECLEAR_REPO: origin() }, 30 * 60_000);
       const now = run(["git", "-C", app, "rev-parse", "HEAD"], app, env).out;
@@ -321,8 +325,30 @@ export function fullCheckWhy(out: string): string {
   return parts.join("; ") || lines.filter((l) => l.startsWith("check:")).join("; ") || tail(out);
 }
 
+const CHECK_PENDING = "GitHub check: not finished";
+
+/** What GitHub's "check" says of `commit` (`gh api`, from the clone's origin): "" when it passed, else why not. */
+export function githubCheck(commit: string, dir: string, env: Env): string {
+  const r = run(
+    [
+      "gh",
+      "api",
+      `repos/{owner}/{repo}/commits/${commit}/check-runs`,
+      "--jq",
+      '[.check_runs[] | select(.name == "check") | (.conclusion // "pending")] | join(",")',
+    ],
+    dir,
+    env,
+    60_000,
+  );
+  if (!r.ok) return `GitHub check: cannot read it: ${tail(r.out)}`;
+  const states = r.out.split(",").filter(Boolean);
+  if (states.length === 0 || states.includes("pending")) return `${CHECK_PENDING} at ${commit.slice(0, 7)}`;
+  return states.every((c) => c === "success") ? "" : `GitHub check: ${states.join(",")} at ${commit.slice(0, 7)}`;
+}
+
 /** Builds next at `commit` and runs its smoke check and canary, then stable's format check on what next wrote. */
-function testNext(app: string, dir: string, commit: string, env: Env, again = false): string {
+function testNext(app: string, dir: string, commit: string, env: Env): string {
   const steps: [string, string[], string][] = [
     ...checkoutSteps(dir, commit),
     ["web build", ["bun", "run", "web:build"], dir],
@@ -330,12 +356,9 @@ function testNext(app: string, dir: string, commit: string, env: Env, again = fa
   ];
   const broke = runSteps(steps, env);
   if (broke) return broke;
-  // the full check, the browser suite included, on the newest main only (a release run tests no older commit); one that
-  // already passed at this commit is not run again, unless `again` asks for a second test of it
-  if (again || !fullCheckPassed(commit, env)) {
-    const full = runFullCheck(["bun", "scripts/check.ts", "--full", "--untimed"], dir, env);
-    if (!full.ok) return `full check: ${fullCheckWhy(full.out)}`;
-  }
+  // Checks are light and run on GitHub, never here: next goes out when the merged commit's GitHub check is green.
+  const github = githubCheck(commit, dir, env);
+  if (github) return github;
   const store = mkdtempSync(join(diskTmpRoot(env), "release-store-"));
   try {
     const canary = run(["bun", join(dir, "scripts", "canary.ts"), "--keep", store], dir, env);
@@ -344,100 +367,6 @@ function testNext(app: string, dir: string, commit: string, env: Env, again = fa
   } finally {
     rmSync(store, { recursive: true, force: true });
   }
-}
-
-const pause = (ms: number) => void Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-const SLOT_POLL_MS = 2_000;
-
-/** The check in a process group of its own that ends when this process dies, even killed: it never runs on after its slots are freed. */
-function guarded(cmd: string[], dir: string, env: Env, timeoutMs: number): { ok: boolean; out: string } {
-  const leader = join(mkdtempSync(join(diskTmpRoot(env), "release-check-")), "leader");
-  const watcher = spawn(
-    "bash",
-    ["-c", `while kill -0 ${process.pid} 2>/dev/null; do sleep 1; done; kill -KILL -- -$(cat ${leader}) 2>/dev/null; rm -rf ${dirname(leader)}`],
-    { stdio: "ignore", detached: true },
-  );
-  watcher.unref();
-  try {
-    return run(["setsid", "sh", "-c", `echo $$ > ${leader}; exec "$@"`, "sh", ...cmd], dir, env, timeoutMs);
-  } finally {
-    watcher.kill();
-    rmSync(dirname(leader), { recursive: true, force: true });
-  }
-}
-
-/**
- * The release's full check through the check slots, like `lineclear check --full`: it holds new starts on this machine,
- * waits for the running checks to end, then holds every slot until the check ends. Killed or done, a dead process holds
- * nothing. The run is recorded in the check log with its slot wait and the load at its start.
- */
-export function runFullCheck(
-  cmd: string[],
-  dir: string,
-  env: Env,
-  timeoutMs = 40 * 60_000,
-  quiet: () => boolean = waitUntilQuiet,
-): { ok: boolean; out: string } {
-  const e = env as NodeJS.ProcessEnv;
-  const arrived = Date.now();
-  let slots: string[] | undefined;
-  const free = () => {
-    for (const f of slots ?? []) rmSync(f, { force: true });
-    Q.dropReleaseHold(e);
-  };
-  process.once("exit", free);
-  try {
-    while (!Q.holdForRelease(e)) pause(SLOT_POLL_MS);
-    const all = Q.machineLimits(e).slots;
-    while ((slots = Q.takeSlots(all, e)) === undefined) pause(SLOT_POLL_MS);
-    quiet();
-    const meter = loadMeter();
-    const started = Date.now();
-    const r = guarded(cmd, dir, env, timeoutMs);
-    const seconds = (Date.now() - started) / 1000;
-    const { load, loadAtStart, cores } = meter();
-    recordRun(
-      {
-        at: Date.now(),
-        ...whereRun(dir),
-        repo: dir,
-        tier: "heavy",
-        command: cmd.join(" "),
-        seconds,
-        slotWaitMin: (started - arrived) / 60_000,
-        load,
-        loadAtStart,
-        cores,
-        ok: r.ok,
-        failed: [],
-        group: `${process.pid}-${arrived}`,
-      },
-      e,
-    );
-    return r;
-  } finally {
-    free();
-    process.removeListener("exit", free);
-  }
-}
-
-/** The full check's browser suite times motion in frames: past this many times busier than its cores, the machine decides, not the code. */
-const QUIET_LOAD = 1.5;
-const QUIET_WAIT_MS = 30 * 60_000;
-
-/** Waits until the machine is quiet enough to time anything, at most `waitMs`; then the check runs anyway, its limits scaled by the load. */
-export function waitUntilQuiet(
-  read: () => number = () => (loadavg()[0] ?? 0) / cpus().length,
-  now: () => number = Date.now,
-  pause: (ms: number) => void = (ms) => void Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms),
-  waitMs = QUIET_WAIT_MS,
-): boolean {
-  const until = now() + waitMs;
-  while (read() >= QUIET_LOAD) {
-    if (now() >= until) return false;
-    pause(15_000);
-  }
-  return true;
 }
 
 /** Next reads the store stable wrote on this machine, the one it takes over (its format check reads a copy). */

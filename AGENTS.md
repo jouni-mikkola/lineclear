@@ -4,7 +4,8 @@ What Lineclear is and why: [docs/idea.md](docs/idea.md). The order of work: [doc
 
 ## Commands
 
-- `bun run check`: what the branch's change reaches (types, tests, doc checks, gates, the server's check when `server/` changed, the specs of changed views), in 180 s at most on an idle machine, each test case under 2 s (a file with a slower one needs a baseline) and each spec under 20 s (`docs/numbers.md`). It must pass before a merge. `bun scripts/check.ts --full` runs everything (a test file that passed with the same files is skipped unless `--no-cache` or `--full`): the release loop does, on the newest main.
+- Checks are light and run on GitHub (`check.yml`, 5 minutes a job at most), never on an owner's machine: no browser suite, no coverage run, no local full check in a release or promotion (next goes out when the merged commit's GitHub `check` is green). `test/light-checks.test.ts` fails when that changes.
+- `bun run check`: what the branch's change reaches (types, tests, doc checks, gates, the server's check when `server/` changed), in 180 s at most on an idle machine, each test case under 2 s (a file with a slower one needs a baseline; `docs/numbers.md`). It must pass before a merge. `bun scripts/check.ts --full` runs everything (a test file that passed with the same files is skipped unless `--no-cache` or `--full`): the release loop does, on the newest main.
 - `bun run types` (tsc), `bun run test` (bun test), `bun run dashes` (no en or em dash in any tracked file).
 - `bun run gates`: the code gates (Biome lint and format, knip dead code, jscpd copies, module borders and cycles,
   file size, comments), each against its baseline in `scripts/gates/baseline/`. A fix lowers its baseline:

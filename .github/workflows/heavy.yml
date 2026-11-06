@@ -1,9 +1,7 @@
 name: heavy
 
-# The heavy suites no pull request or merge waits for: the whole-repo gates, the coverage floors and the browser suite.
-# They run after each push to main. A newer push cancels the run before it, so only the newest main is tested.
-# A red run on main files one fix task for its commit (Lineclear reads it with gh run list).
-# (cold-start and the model evals spend tokens and run on the owner's machines.)
+# The whole-repo gates no pull request or merge waits for. No browser suite and no coverage run, ever (test/light-checks.test.ts).
+# (The model evals spend tokens and run on the owner's machines.)
 on:
   push:
     branches: [main]
@@ -16,7 +14,7 @@ concurrency:
 jobs:
   heavy:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,7 +28,4 @@ jobs:
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', 'server/bun.lock') }}
           restore-keys: bun-${{ runner.os }}-
       - run: bun install --frozen-lockfile
-      - run: bunx playwright install --with-deps chromium
       - run: bun run gates:full
-      - run: bun run coverage
-      - run: bun run ui:test

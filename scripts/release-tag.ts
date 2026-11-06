@@ -1,17 +1,23 @@
 // `bun run release 0.1.0`: the release of a version, made here and never pushed. It refuses on a dirty tree, an
-// existing tag a red full check (`bun scripts/check.ts --full`: on a clean main the default check reaches nothing) or a failing heavy check (gates:full, coverage, cold start). Otherwise it sets the version in package.json, commits it, tags `v<version>`,
+// existing tag, a HEAD whose GitHub check is not green (checks are light and run on GitHub, never here) or a failing whole-repo gate check (gates:full). Otherwise it sets the version in package.json, commits it, tags `v<version>`,
 // installs from that tag into a fresh HOME with the README's installer and runs the doctor there. The push and the
 // GitHub release are a separate, outward step.
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { slowFailures } from "../src/heavy-run.ts";
-import { proposeTiers } from "../src/project.ts";
 
-// The full check and an install that downloads tools both end by this limit rather than hang.
+// An install that downloads tools both end by this limit rather than hang.
 const LIMIT_MS = 30 * 60_000;
 
 export type Release = { ok: boolean; lines: string[] };
+
+/** Exit 0 when GitHub's "check" passed on HEAD. */
+const GITHUB_GREEN = [
+  "sh",
+  "-c",
+  `gh api "repos/{owner}/{repo}/commits/$(git rev-parse HEAD)/check-runs" --jq '[.check_runs[] | select(.name == "check") | .conclusion] | unique | join(",")' | grep -qx success`,
+];
 
 /** What release runs; tests swap the check and the install for stand-ins. */
 export type ReleaseSteps = {
@@ -46,8 +52,8 @@ export function installFromTag(repo: string, tag: string, home: string): { ok: b
 }
 
 export function release(version: string, steps: Partial<ReleaseSteps> = {}): Release {
-  const { repo = join(import.meta.dir, ".."), check = ["bun", "scripts/check.ts", "--full"], install = installFromTag } = steps;
-  const heavy = steps.heavy ?? proposeTiers(repo, "bun run check").heavy.commands;
+  const { repo = join(import.meta.dir, ".."), check = GITHUB_GREEN, install = installFromTag } = steps;
+  const heavy = steps.heavy ?? ["bun run gates:full"];
   const lines: string[] = [];
   const refuse = (why: string): Release => ({ ok: false, lines: [...lines, `release: refused: ${why}`] });
   const tag = `v${version}`;

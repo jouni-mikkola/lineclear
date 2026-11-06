@@ -5,7 +5,6 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { configDir } from "../pi/config.ts";
 import { buildsDir } from "./builds.ts";
-import { fullCheckPassed } from "./check-runs.ts";
 import { dataDir, pathsFor } from "./paths.ts";
 import { projectsDir } from "./project.ts";
 import {
@@ -21,7 +20,7 @@ import {
   runSteps,
   saveRelease,
   tail,
-  runFullCheck,
+  githubCheck,
 } from "./release.ts";
 import { cacheDir, diskTmpRoot } from "./tmpdirs.ts";
 import { runningTryEnv, stopTry, tryMain } from "./try-instance.ts";
@@ -118,9 +117,7 @@ function realDeps(env: Env): CandidateDeps {
     check(_version, commit) {
       const broke = runSteps(checkoutSteps(dir, commit), env);
       if (broke) return broke;
-      if (fullCheckPassed(commit, env)) return "";
-      const r = runFullCheck(["bun", "run", "check"], dir, env);
-      return r.ok ? "" : tail(r.out);
+      return githubCheck(commit, dir, env);
     },
     async smoke(version) {
       const lines: string[] = [];
