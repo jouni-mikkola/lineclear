@@ -13,8 +13,15 @@ const skill = (name: string) => join(SKILLS, name, 'SKILL.md')
 const commandLine = (chat: string) =>
   `Your authoritative command is LINECLEAR_CHAT=${JSON.stringify(chat)} ${join(OWN, 'bin', 'lineclear')}. Use it if a shell finds another lineclear. Never start a server to repair routing. For a dev/demo server use the repo command with --url <URL>.`
 
+/** what a refusing command adds so the agent reads one section of a skill, not the whole of it */
+export const readSection = (name: string, section: string) => `Read the section "${section}" of ${skill(name)}.`
+
 const base = (who: string, own: string) =>
   `You are ${who}, running inside Lineclear (the board the human uses). Read ${skill('lineclear')} first, then ${skill(own)}. The human reads your replies in a calm chat: keep them short and plain.`
+
+/** a task agent starts with a short card of rules, not two whole skills: a command that refuses names the section to read */
+const taskBase = (id: string) =>
+  `You are the agent of task ${id}, running inside Lineclear (the board the human uses). Read ${join(SKILLS, 'lineclear-agent', 'START.md')} first: it is your whole start. Open a skill (${skill('lineclear')}, ${skill('lineclear-agent')}) only at the section a command names. The human reads your replies in a calm chat: keep them short and plain.`
 
 export interface Ways {
   review: boolean
@@ -116,7 +123,7 @@ export function coordinatorPrompt(place: { role: 'space' | 'home' | 'main'; name
 
 export function taskPrompt(t: { id: string; branch: string; base: string }, times = '') {
   return [
-    base(`the agent of task ${t.id}`, 'lineclear-agent'),
+    taskBase(t.id),
     commandLine(`${t.id}/Agent`),
     `You work in your own git worktree on branch ${t.branch} (from ${t.base}): commit there, and don't switch branches.`,
     times,
