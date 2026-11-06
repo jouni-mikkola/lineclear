@@ -27,7 +27,7 @@ test("no workflow runs a browser, a coverage run or a UI suite, and none runs ov
 });
 
 test("no code path runs the full check or a browser suite on a machine of the owner's", () => {
-  const code = ["src/release.ts", "src/candidate-check.ts", "scripts/release-tag.ts", "scripts/nightly.ts"];
+  const code = ["src/release.ts", "src/candidate-check.ts", "scripts/release-tag.ts", "scripts/heavy.ts"];
   for (const f of code) expect(read(f), f).not.toMatch(/check\.ts["', ]+--full|runFullCheck|playwright test|ui:test/);
 });
 
