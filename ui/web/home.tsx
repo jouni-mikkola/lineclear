@@ -2,7 +2,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { lazy, Suspense, useRef, useState } from "react";
 import { AddProject, type Browser, DispatcherHead, type DispatcherState, type InboxItem, Part, TheLine } from "../kit/index.ts";
 import { addProject, detect, findRepos, type HomeData, type Load } from "./data.ts";
-import { rowsOf, TaskTable } from "./home-table.tsx";
+import { rowsOf } from "./home-rows.ts";
+import { TaskTable } from "./home-table.tsx";
 import { InboxStrip, useHeldAnswers } from "./inbox-strip.tsx";
 import { UsageMark } from "./usage-mark.tsx";
 

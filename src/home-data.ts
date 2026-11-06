@@ -16,6 +16,7 @@ import { listProjectNames, readSettings } from "./project.ts";
 import { mainRefs } from "./main-branch.ts";
 import { rowFacts } from "./task-detail.ts";
 import { DAY } from "./time.ts";
+import { worktreeInput } from "./measure.ts";
 import { gitText } from "./git.ts";
 
 /** A parsed file or event read as it is: its shape is not ours to promise. */
@@ -56,6 +57,8 @@ export interface HomeTask {
   model?: string;
   /** Since when the task is at its stage (ms). */
   since: number;
+  /** Tokens sent to the model so far: fresh and cache reads. */
+  input?: number;
   /** The other machine the task runs on, when it is not this one. */
   machine?: string;
   /** Lineclear saw no sign of life from it. */
@@ -317,10 +320,20 @@ function farTasks(space: Raw, env: Env, now: number): HomeTask[] {
 
 type Roadmap = ReturnType<typeof roadmapProgress>;
 
+/** The tokens an agent sent to the model so far, from its session logs, read again at most every 30 s. */
+function liveStatus(t: Raw, env: Env, now: number): { input?: number } {
+  if (typeof t.worktree !== "string" || t.machine) return {};
+  const worktree = t.worktree;
+  return keptBy(`status:${worktree}`, String(Math.floor(now / 30_000)), () => {
+    const input = worktreeInput(worktree, env);
+    return input === undefined ? {} : { input };
+  });
+}
+
 /** One of this machine's tasks as the home view shows it. */
 function localRow(x: { t: Raw; state: TaskState }, roadmap: Roadmap, line: string | undefined, ctx: SpaceContext): HomeTask {
   const { t, state } = x;
-  const { cards, now } = ctx;
+  const { cards, env, now } = ctx;
   const title = String(t.title ?? t.id);
   const step = stepOf(title);
   const full = step && roadmap?.titles.get(step);
@@ -339,6 +352,7 @@ function localRow(x: { t: Raw; state: TaskState }, roadmap: Roadmap, line: strin
     ...(result ? { result } : {}),
     ...(typeof model === "string" && stage !== "queued" ? { model } : {}),
     since: stageSince(t, stage, now),
+    ...(stage === "work" || stage === "review" ? liveStatus(t, env, now) : {}),
     ...(state !== "done" ? rowFacts(t, cards.get(t.id), stage !== "queued", now) : {}),
     ...(stage === "work" && typeof t.report?.progress === "number" ? { progress: Math.max(0, Math.min(1, t.report.progress / 100)) } : {}),
     // Lineclear keeps `stalled` after a stall ends; `life` is set only while the task is still quiet

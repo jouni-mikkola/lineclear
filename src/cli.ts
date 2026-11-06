@@ -20,6 +20,7 @@ import { demoMain } from "./demo.ts";
 import { runMain } from "./rules.ts";
 import { startWeb } from "./web.ts";
 import { secrets, totp } from "./secrets.ts";
+import { topMain } from "./top-cmd.ts";
 import { boardMain, isBoardJob, serveMain } from "./serve.ts";
 import { waitsMain } from "./waits.ts";
 import { realRemover, uninstall } from "./uninstall.ts";
@@ -57,6 +58,7 @@ export const commands: Record<string, string> = {
   progress: 'A space\'s coordinator saves or reads its progress: progress ["<text>"]',
   checkpoint: "A space's coordinator commits its owned task's work: checkpoint \"<message>\"",
   complete: 'A space\'s coordinator proves its stopping goal and ends its run: complete "<evidence>"',
+  top: "Every agent at work: its task, machine, phase, input tokens, minutes and what it waits for",
   store: "The local copies of the task store (store list, store copy, store restore <name>); the rule loop takes one an hour",
   totp: "Print the current code of a stored login: totp NAME reads NAME_TOTP from this folder's secrets",
   status:
@@ -166,6 +168,7 @@ function inboxCommand(rest: string[], out: Out): number | Promise<number> {
 
 /** The commands that are one call: each gets the words after its name. */
 const COMMANDS: Record<string, (rest: string[], out: Out) => number | Promise<number>> = {
+  top: (_rest, out) => topMain(out),
   roadmap: roadmapMain,
   run: (rest, out) => (rest[0] === "--demo" ? demoMain(rest.slice(1), out) : runMain(rest, out, undefined, { web: startWeb })),
   serve: serveMain,
