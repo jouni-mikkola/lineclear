@@ -11,7 +11,7 @@ Getting Lineclear onto a machine and keeping it healthy there: `install.sh`, `li
 `install.sh`, `lineclear doctor`, `uninstall`, `migrate`, `machine`, `project`, `secrets`, `totp`, `backup`, `release`, `serve`, `export`, and these names:
 
 - `src/secrets.ts`: `secretNames`, `secrets`, `totp`, `secretsText`, `loadableTotps`, `storedLogin`, `storedLoginAdvice`, `totpAdvice`, `totpAnswers`
-- `src/backup.ts`: `backupMain`, `startBackupIfDue`, `drillDue`, `drillProblem`
+- `src/backup.ts`: `backupMain`, `startBackupIfDue`
 - `src/machine-alerts.ts`: `watchMachine`
 - `src/store-copies.ts`: `storeMain`
 - `src/candidate-check.ts`: `candidateMain`
