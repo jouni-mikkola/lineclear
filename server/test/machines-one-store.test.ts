@@ -39,7 +39,7 @@ async function linked() {
   return { m, l, far, poll, end: () => (m.stop(), far.server.stop(true)) }
 }
 
-test('no snapshot of another machine is kept: an update removes the old one, and the worker\'s own store stays', async () => {
+test("no snapshot of another machine is kept: an update removes the old one, and the worker's own store stays", async () => {
   const { HOME, writeJson } = await import('../server/store.ts')
   const { Machines } = await import('../server/live/machines.ts')
   const saved = { id: 'old', label: 'old', target: 'old.invalid', session: 'default', enabled: false }
