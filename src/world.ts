@@ -50,7 +50,7 @@ export interface World {
   /**
    * `lineclear task tell`, which resumes a stopped agent. `kind` says why: `resume` goes on with the step's own work
    * (a wait is over, a stall, a cut-off), `answer` is a rule answering the agent's own question. Both are marked in
-   * the agent's log so `lineclear measure` does not count them; a call with no kind is counted. Machine news
+   * the agent's log; a call with no kind is counted. Machine news
    * (load, quota, accounts, status changes) is never a reason to call this. Returns an error text, or undefined.
    */
   tellTask(id: string, text: string, kind?: TellKind): string | undefined;

@@ -146,7 +146,7 @@ export function worstParts(health: Health[]): string[] {
   return health.filter((h) => h.score === top).map((h) => h.part);
 }
 
-/** The lines `lineclear measure` prints for part health, worst first. */
+/** The lines for part health, worst first. */
 export function healthLines(health: Health[]): string[] {
   if (health.length === 0) return [];
   return [
