@@ -67,8 +67,8 @@ test("the repo's bin/lineclear refuses the stable config and data folders and ch
   const account = accountHome();
   const stableConfig = join(account, ".config", "lineclear");
   const stable = [stableConfig, join(account, ".lineclear")];
-  // the live instance writes to these folders too, so a refused run is judged by files it could add: only new names count
-  const files = () => stable.flatMap((dir) => (existsSync(dir) ? readdirSync(dir, { recursive: true }).map(String) : []));
+  // the live instance writes to these folders too, so a refused run is judged by files it could add: only new names count, and only at the top of each folder: the subfolders (inbox, check queue, waits, projects) fill with live work at any moment
+  const files = () => stable.flatMap((dir) => (existsSync(dir) ? readdirSync(dir) : []));
   // the runs are independent, so they start together: one after another they take most of the test's 5 s under load
   const run = async (extra: Record<string, string>, ...args: string[]) => {
     const env: Record<string, string | undefined> = {
@@ -104,7 +104,7 @@ test("the repo's bin/lineclear refuses the stable config and data folders and ch
   expect(ok.exitCode).toBe(0);
   expect(version.exitCode).toBe(0);
   const known = new Set(before);
-  expect(files().filter((f) => !known.has(f) && !/\.(log|tmp|lock)$|^(runs|logs|machines)\b/.test(f))).toEqual([]);
+  expect(files().filter((f) => !known.has(f) && !/\.(log|tmp|lock)$/.test(f))).toEqual([]);
   rmSync(own, { recursive: true });
 }, 15_000);
 
