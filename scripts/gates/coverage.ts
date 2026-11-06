@@ -40,6 +40,18 @@ export function withUnloaded(lcov: string, files: Record<string, string>): strin
   return lcov + records.join("");
 }
 
+/** The report without the files of the `ui-test` module: only Playwright runs them, so the root tests can never cover them. */
+export function withoutBrowserSpecs(lcov: string, architecture: string): string {
+  const modules = readModules(architecture);
+  return lcov
+    .split("end_of_record")
+    .filter((record) => {
+      const file = /^SF:(.+)$/m.exec(record)?.[1];
+      return !file || moduleOf(file, modules)?.name !== "ui-test";
+    })
+    .join("end_of_record");
+}
+
 /** Each covered file's hit and found lines with the floor of its module, for part health (`src/part-health.ts`). */
 export function fileCoverage(lcov: string, architecture: string, floors: Floors): Record<string, Lines & { floor: number }> {
   const modules = readModules(architecture);

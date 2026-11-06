@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { belowFloor, linesPerModule, raise, withUnloaded } from "../scripts/gates/coverage.ts";
+import { belowFloor, fileCoverage, linesPerModule, raise, withUnloaded, withoutBrowserSpecs } from "../scripts/gates/coverage.ts";
 
 const architecture = "| Module | Folder | Owns | May import |\n| `pi` | `pi/` | the extension | none |\n| `cli` | `src/` | the CLI | `pi` |\n";
 const lcov = [
@@ -39,4 +39,13 @@ test("a source file no test loaded counts as found lines with none hit", () => {
   const lines = linesPerModule(withBin, "| `cli` | `src/` | the CLI | none |\n| `bin` | `bin/` | the command | `cli` |\n");
   expect(lines.bin).toEqual({ hit: 0, found: 3 });
   expect(lines.cli).toEqual({ hit: 6, found: 20 });
+});
+
+test("a browser spec under ui/test/ is left out of the report", () => {
+  const arch = `${architecture}| \`ui-test\` | \`ui/test/\` | the browser tests | none |\n`;
+  const report = `${lcov}SF:ui/test/a.spec.ts\nLF:5\nLH:0\nend_of_record\n`;
+  const kept = withoutBrowserSpecs(report, arch);
+  expect(kept).not.toContain("ui/test/");
+  expect(linesPerModule(kept, arch)["ui-test"]).toBeUndefined();
+  expect(Object.keys(fileCoverage(kept, arch, { pi: 90, cli: 30, "ui-test": 94 }))).not.toContain("ui/test/a.spec.ts");
 });
