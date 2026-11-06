@@ -60,3 +60,23 @@ test("a fix is a subject that starts with Fix or Main green, after a task id or 
   expect(["Fix the lock", "LIN-1185: Fix a race (#9)", "LE-10: Main green after LIN-1207 (#61)"].map(isFixSubject)).toEqual([true, true, true]);
   expect(["LIN-1215: L423 An agent ends at ready (#66)", "Prefix the name"].map(isFixSubject)).toEqual([false, false]);
 });
+
+const fixture = (name: string) => Bun.file(`${import.meta.dir}/fixtures/check-logs/${name}`).text();
+
+test("logs kept from GitHub runs give the right first cause", async () => {
+  const one = firstCause(await fixture("flaky-test.log"));
+  expect(one).toEqual({ kind: "test", tests: [{ name: "a read that began while a write ran is not shared once the write is done", ms: 32.87 }] });
+  const two = firstCause(await fixture("slow-tests.log"));
+  expect(two.kind).toBe("test");
+  expect(two.tests.map((t) => Math.round(t.ms / 1000))).toEqual([60, 60]);
+  const report = sortRuns([run({ conclusion: "failure", log: await fixture("flaky-test.log") }), run({})]);
+  expect(report.main.causes["flaky test"]).toBe(1);
+  expect(report.tests[0]).toMatchObject({ cause: "flaky test", runs: 1 });
+});
+
+test("a gate fails the run from a GitHub log, on a pull request", async () => {
+  const log = await fixture("gate.log");
+  expect(firstCause(log)).toEqual({ kind: "gate", tests: [] });
+  const report = sortRuns([run({ event: "pull_request", branch: "w/9", conclusion: "failure", log })]);
+  expect(report.pullRequests.causes.gate).toBe(1);
+});
