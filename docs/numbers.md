@@ -70,18 +70,18 @@ LIN-1188        33252         60167  1891918          26.1
 
 ## Check failures
 
-Read with `lineclear measure checks --days 2` on 2026-11-06. Cancelled runs are ones a newer push replaced. A test is flaky when it failed and passed on the same commit, or on main when the next main run passed with no `fix` commit between.
+Read with `lineclear measure checks --days 2` on 2026-11-07. Cancelled runs are ones a newer push replaced. A test is flaky when it failed and passed on the same commit, or on main when the next main run passed with no `fix` commit between.
 
 | | runs | green | red | cancelled | flaky test | real break | gate | setup | time limit |
 |---|---|---|---|---|---|---|---|---|---|
-| main | 59 | 10 | 31 | 18 | 2 | 29 | 0 | 0 | 0 |
-| pull requests | 108 | 75 | 31 | 2 | 0 | 13 | 18 | 0 | 0 |
+| main | 66 | 15 | 31 | 20 | 1 | 30 | 0 | 0 | 0 |
+| pull requests | 118 | 84 | 32 | 2 | 0 | 13 | 19 | 0 | 0 |
 
 | failing test | runs | cause | longest |
 |---|---|---|---|
 | a task's question on its needs-you card in its space's chat > answered in the task chat instead: the card follows, and says where | 25 | flaky test | 60.3 s |
 | a head released twice in a row has its agent restarted | 18 | real break | 0.4 s |
-| a read that began while a write ran is not shared once the write is done | 8 | flaky test | 0.1 s |
+| a read that began while a write ran is not shared once the write is done | 8 | real break | 0.1 s |
 | doctor names a problem and its fix, and exits 1 | 6 | real break | 1.6 s |
 | install replaces the link an older install made, and doctor fails a link | 6 | real break | 1.7 s |
 | where lingering needs root, install prints the one command and doctor names it | 6 | real break | 2.9 s |
