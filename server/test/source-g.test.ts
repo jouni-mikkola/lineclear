@@ -103,9 +103,9 @@ describe('a turn the provider cut off, end to end', () => {
       expect(src.retries.get(key)).toBeUndefined()
       log.cut()
       src.agents.emit('status', key, 'idle')
-      await Bun.sleep(80)
+      // its wait is 30 ms; on a loaded machine the timer comes later
+      await until(() => !src.retries.get(key))
       expect(sent).toEqual([])
-      expect(src.retries.get(key)).toBeUndefined()
     } finally {
       restore()
     }
