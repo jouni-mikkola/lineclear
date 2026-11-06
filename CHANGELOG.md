@@ -14,16 +14,14 @@ The first release.
 - The Dispatcher as a chat in the web UI, the Inbox for real decisions, and live views of Home, roadmap, usage,
   agent browsers and settings, on a phone or a desktop.
 - More machines over SSH with `lineclear machine add`.
-- `lineclear migrate` from Shepherdr 2.0 and back, and `lineclear uninstall`.
+- `lineclear migrate` from the tool Lineclear was forked from, and back, and `lineclear uninstall`.
 
 ### Known not to work
 
 - Linux only. Other systems are not tried.
 - The first project takes several commands: the install does not yet start the board or make the Dispatcher.
 - Home is not yet the Dispatcher chat. The chat is at `/chat`.
-- `server/` and some docs still use Shepherdr's names inside.
 
 ### Origin
 
-Lineclear began as a fork of [Shepherdr 2.0](https://github.com/eliasstravik/herdr-projects) (MIT). Its notice is in
-`server/NOTICE`.
+Lineclear began as a fork of an MIT tool. Its notice is in `server/NOTICE`.
