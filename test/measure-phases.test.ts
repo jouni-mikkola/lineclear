@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { type PHASES, phaseTable, taskPhases } from "../src/measure-phases.ts";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { type PHASES, phaseTable, readCpu, taskPhases } from "../src/measure-phases.ts";
 import { sessionCalls } from "../src/session-text.ts";
 
 function call(at: number, ms: number, usage: number[], command?: string, name = "bash") {
@@ -59,5 +62,12 @@ describe("cost per phase", () => {
     const lines = phaseTable([t]);
     expect(lines.find((l) => l.startsWith("tests"))?.split(/\s{2,}/)).toEqual(["tests", "1", "304", "10", "5", "1.2", "0.5"]);
     expect(lines.find((l) => l.startsWith("all"))?.split(/\s{2,}/)).toEqual(["all", "5", "2015", "160", "92", "2.5", "0.8"]);
+  });
+  test("the server's cpu file reads back as the same lines", () => {
+    const dir = mkdtempSync(join(tmpdir(), "phases-"));
+    mkdirSync(join(dir, "cpu"));
+    writeFileSync(join(dir, "cpu", "T-1.jsonl"), `${CPU.map((l) => JSON.stringify(l)).join("\n")}\nnot json\n`);
+    expect(readCpu(dir, "T-1")).toEqual(CPU);
+    expect(readCpu(dir, "T-2")).toEqual([]);
   });
 });

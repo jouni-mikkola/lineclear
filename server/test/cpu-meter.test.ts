@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test'
-import { mkdtempSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { CpuMeter, type CpuRow } from '../server/live/engine/cpu-meter.ts'
+import { CpuMeter, type CpuRow, readProc } from '../server/live/engine/cpu-meter.ts'
 
 describe('cpu meter', () => {
   const row = (parent: number, ticks: number, cwd: string, cmd: string, childTicks = 0): CpuRow => ({ parent, ticks, childTicks, cwd, cmd })
@@ -50,6 +50,36 @@ describe('cpu meter', () => {
     ).toEqual([
       { at: 2, kind: 'agent', ticks: 8 },
       { at: 2, kind: 'tests', ticks: 10 },
+    ])
+  })
+
+  test('a fixed /proc tree gives each kind its ticks', () => {
+    const root = mkdtempSync(join(tmpdir(), 'proc-'))
+    const work = mkdtempSync(join(tmpdir(), 'wt-'))
+    // pid, parent, utime, stime, cmdline: pi and its bridge, a test run and a server it started
+    const proc = (pid: number, parent: number, used: number, cmd: string) => {
+      mkdirSync(join(root, String(pid)), { recursive: true })
+      writeFileSync(join(root, String(pid), 'stat'), `${pid} (${cmd.split(' ')[0]}) S ${parent} 0 0 0 0 0 0 0 0 0 ${used} 0 0 0 0 0 0 0 0 0`)
+      writeFileSync(join(root, String(pid), 'cmdline'), cmd.split(' ').join('\0'))
+      if (!existsSync(join(root, String(pid), 'cwd'))) symlinkSync(work, join(root, String(pid), 'cwd'))
+    }
+    proc(10, 1, 100, 'pi --model m')
+    proc(11, 10, 40, 'node claude-bridge')
+    proc(12, 10, 60, 'bun test x')
+    proc(13, 12, 5, 'bun run serve')
+    const first = readProc(root)
+    expect(first.get(12)).toEqual({ parent: 10, ticks: 60, childTicks: 0, cwd: work, cmd: 'bun test x' })
+    const meter = new CpuMeter(mkdtempSync(join(tmpdir(), 'cpu-')))
+    meter.sample('T-3', work, first, 1)
+    proc(10, 1, 160, 'pi --model m')
+    proc(11, 10, 50, 'node claude-bridge')
+    proc(12, 10, 360, 'bun test x')
+    proc(13, 12, 25, 'bun run serve')
+    expect(meter.sample('T-3', work, readProc(root), 2)).toEqual([
+      { at: 2, kind: 'agent', ticks: 60 },
+      { at: 2, kind: 'bridge', ticks: 10 },
+      { at: 2, kind: 'tests', ticks: 300 },
+      { at: 2, kind: 'server', ticks: 20 },
     ])
   })
 })
