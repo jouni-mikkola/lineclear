@@ -80,3 +80,17 @@ test("where the full check runs here, lineclear check still runs the project's c
   expect(existsSync(ran())).toBe(true);
   expect(calls()).toEqual(["check-where"]);
 });
+
+test("no GitHub remote or no checks is no result: lineclear check fails and never passes for the missing run", () => {
+  fakeServer("github", 'echo "No GitHub checks: demo has no GitHub remote."');
+  expect(sh([bin, "check"], { cwd: repo, env: agent() }).code).toBe(1);
+  fakeServer("github", 'echo "PR #7 has no checks on GitHub: nothing to wait for."');
+  expect(sh([bin, "check"], { cwd: repo, env: agent() }).code).toBe(1);
+});
+
+test("a run still going is one call of 9 minutes: lineclear check fails and says to run it again", () => {
+  fakeServer("github", 'echo "GitHub\'s checks still run on PR #7: run lineclear checks LIN-1 again."; exit 1');
+  const r = sh([bin, "check"], { cwd: repo, env: agent() });
+  expect(r.code).toBe(1);
+  expect(calls().filter((c) => c.startsWith("checks"))).toEqual(["checks LIN-1"]);
+});

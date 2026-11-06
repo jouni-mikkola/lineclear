@@ -6,7 +6,7 @@
 // is the worker's loop.
 // A test that fails and then passes alone is a flake (scripts/flaky.ts): recorded, not failed.
 // The budget is 180 s on a machine that is not busy (docs/numbers.md); a busy one is slower for reasons outside the change.
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { compileCacheDir, diskTmpRoot, trimCache } from "../src/tmpdirs.ts";
 import { ownSlot } from "../src/waits.ts";
@@ -149,7 +149,7 @@ function testSteps(): Step[] {
   const built = needsPlugins();
   // the same release tests run the server's scripts, which import its dependencies: an install under way (a fresh
   // worktree, a moved lockfile) leaves them half there, so the tests wait for it
-  const installs = (inServer && !onlyChanged) || !existsSync("server/node_modules");
+  const installs = !(onlyChanged && serverInstalled()) && (inServer || !existsSync("server/node_modules"));
   const needs = [...(built ? [PLUGINS.name] : []), ...(installs ? [SERVER_INSTALL.name] : [])];
   const tests = runs.map((run, i) => ({
     name: runs.length === 1 ? "tests" : `tests ${i + 1}/${runs.length}`,
@@ -159,12 +159,18 @@ function testSteps(): Step[] {
   return [...(built ? [PLUGINS] : []), ...(installs && !inServer ? [SERVER_INSTALL] : []), ...tests];
 }
 
-const serverNeeds = () => (onlyChanged && existsSync("server/node_modules") ? [] : ["server install"]);
+// a worker's loop reuses the installed server packages unless the lockfile or package.json is newer than them
+const serverInstalled = () => {
+  if (!existsSync("server/node_modules")) return false;
+  const at = (f: string) => (existsSync(f) ? statSync(f).mtimeMs : 0);
+  return at("server/node_modules") >= Math.max(at("server/package.json"), at("server/bun.lock"));
+};
+const serverNeeds = () => (onlyChanged && serverInstalled() ? [] : ["server install"]);
 
 function serverSteps(): Step[] {
   if (!inServer) return [];
   return [
-    ...(onlyChanged && existsSync("server/node_modules") ? [] : [SERVER_INSTALL]),
+    ...(serverNeeds().length ? [SERVER_INSTALL] : []),
     { name: "server types", cmd: ["bun", "run", full || known === undefined ? "typecheck" : "typecheck:changed"], cwd: "server", needs: serverNeeds() },
     { name: "server tests", cmd: ["bun", "scripts/test.ts", full || known === undefined ? "--force" : "changed"], cwd: "server", needs: serverNeeds() },
   ];

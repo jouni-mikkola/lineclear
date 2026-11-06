@@ -349,9 +349,6 @@ function changedRun(
   );
 }
 
-/** Calls of `lineclear checks` (9 minutes each) one `lineclear check` waits for a run that still goes on. */
-const GITHUB_CALLS = 3;
-
 /** Runs the server's command for this agent; its words, and whether it passed. */
 function serverCall(args: string[], env: NodeJS.ProcessEnv, cwd: string) {
   const r = spawnSync(serverBin(env), args, { env, cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 11 * 60_000 });
@@ -369,13 +366,12 @@ function checkOnGitHub(out: (l: string) => void, env: NodeJS.ProcessEnv, cwd: st
   const pushed = serverCall(["pr", task], env, cwd);
   out(pushed.text);
   if (!pushed.ok) return 1;
-  for (let i = 0; i < GITHUB_CALLS; i++) {
-    const r = serverCall(["checks", task], env, cwd);
-    out(r.text);
-    if (r.ok) return 0;
-    if (!/still run/.test(r.text)) return 1;
-  }
-  return 1;
+  // one call waits 9 minutes, under an agent's 10-minute command limit; a run still going is asked again by running this again
+  const r = serverCall(["checks", task], env, cwd);
+  out(r.text);
+  // no remote or no checks is no result: never a pass for a check Settings say GitHub runs
+  if (/^No GitHub checks:|has no checks on GitHub/.test(r.text)) return 1;
+  return r.ok ? 0 : 1;
 }
 
 /**
