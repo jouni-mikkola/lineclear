@@ -300,6 +300,22 @@ describe('an agent ends at ready', () => {
     expect(existsSync(join(dir, 'hello.txt'))).toBe(true)
   })
 
+  test('keeps its process while a note to it is unread', async () => {
+    const w = world()
+    const { t, key } = await started(w, repo(), 'unread-note')
+    writeFileSync(join(t.worktree!, 'note.txt'), 'note\n')
+    sh('git add -A && git commit -qm note', t.worktree!)
+    await w.engine.done(t.id, 'Done.')
+    w.chat.unseen = ['Also rename the button']
+    expect(w.records[key].finished).toBeFalsy()
+    expect(w.engine.landAtReady(t.id)).toBe(true)
+    w.agentIs(key, 'idle')
+    await Bun.sleep(1200)
+    expect(w.records[key].finished).toBeFalsy()
+    expect(w.engine.statusOf(t)).toBe('ready')
+    w.chat.unseen = []
+  })
+
   test('is left to the human when merges ask first', async () => {
     const w = world()
     const { t } = await started(w, repo(), 'asks-first')

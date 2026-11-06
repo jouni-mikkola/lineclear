@@ -45,6 +45,8 @@ export class EngineLand extends EngineHandoff {
     const key = this.key(t)
     for (const end = Date.now() + TURN_END_WAIT_MS; this.agents.status(key) === 'working' && Date.now() < end; ) await Bun.sleep(500)
     if (this.agents.status(key) === 'working' || !t.reported || ended(t) || t.landing || this.landings.has(t.id)) return
+    // a note not read yet would wait for a process that is gone: leave the agent be, it reads the note and merges
+    if (this.chats.unseen(key).length) return
     await this.agents.finish(key).catch(() => undefined)
     await this.merge(t.id)
   }
