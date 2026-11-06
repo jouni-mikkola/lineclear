@@ -31,7 +31,7 @@ rounds, owner questions, tokens and dollars of the check, for steps planned befo
 ## Files
 
 - code: `scripts/simplify-count.ts`, `src/time.ts`, `src/measure.ts`, `src/measure-main.ts`, `src/catches.ts`, `src/measure-server.ts`, `src/measure-bands.ts`, `src/measure-refiles.ts`, `src/measure-remote.ts`, `src/measure-sessions.ts`, `src/wait-causes.ts`, `src/wait-goal.ts`, `src/cost-goal.ts`, `src/ask-goal.ts`, `src/kit.ts`, `src/kit-cli.ts`, `pi/kit.json`, `src/part-health.ts`, `scripts/measure-service.ts`, `scripts/browsers-speed.ts`, `scripts/measure-speed.ts`, `scripts/fake-sessions.ts`, `src/health-numbers.ts`, `src/session-text.ts`, `src/step-check-cost.ts`
-- docs: `docs/numbers.md`, `docs/simplify.md`, `docs/kit.md`
+- docs: `docs/numbers.md`, `docs/simplify.md`, `docs/simplify-cut.md`, `docs/kit.md`
 - tests: `test/kit.test.ts`, `test/simplify.test.ts`, `test/measure.test.ts`, `test/catches.test.ts`, `test/measure-server.test.ts`, `test/measure-bands.test.ts`, `test/measure-refiles.test.ts`, `test/wait-causes.test.ts`, `test/wait-goal.test.ts`, `test/cost-goal.test.ts`, `test/ask-goal.test.ts`, `test/measure-service.test.ts`, `test/part-health.test.ts`
 
 ## Tests
