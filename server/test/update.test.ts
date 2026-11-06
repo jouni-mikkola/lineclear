@@ -1,5 +1,5 @@
 // Lineclear updates itself when its checkout moves: each commit becomes a frozen release, built and checked; the server
-// restarts on it only when no voice call is on; a failed release leaves the running one.
+// restarts on it; a failed release leaves the running one.
 import { describe, expect, test } from 'bun:test'
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
