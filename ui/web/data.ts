@@ -50,7 +50,6 @@ export interface HomeData {
   compaction?: CompactionGauge;
   /** The waste watch's standing alarms, one line each. */
   waste?: string[];
-  herdr?: string[];
   /** What `lineclear doctor` finds wrong, each with its fix command. */
   doctor?: string[];
 }

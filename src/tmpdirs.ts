@@ -1,4 +1,4 @@
-import { mkdirSync, readdirSync, readFileSync, readlinkSync, rmSync, statfsSync, statSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, readlinkSync, rmSync, statSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { DAY } from "./time.ts";
@@ -19,21 +19,6 @@ export function diskTmpRoot(env: Env = process.env): string {
 export const compileCacheDir = (env: Env = process.env) => join(cacheDir(env), "node-compile-cache");
 
 const COMPILE_CACHE_MAX_BYTES = 500 * 1024 ** 2;
-
-/** Above this much used in a RAM-backed /tmp, the machine swaps and every task slows. */
-export const TMP_STALL_BYTES = 2 * 1024 ** 3;
-
-const TMPFS_MAGIC = 0x01021994;
-
-/** Bytes in use on the filesystem that holds `dir`, when it is RAM (tmpfs); 0 for a disk or when it cannot be read. */
-export function ramUsedBytes(dir = tmpdir()): number {
-  try {
-    const s = statfsSync(dir);
-    return Number(s.type) === TMPFS_MAGIC ? (Number(s.blocks) - Number(s.bfree)) * Number(s.bsize) : 0;
-  } catch {
-    return 0;
-  }
-}
 
 function filesUnder(dir: string): { path: string; size: number; mtimeMs: number }[] {
   const found: { path: string; size: number; mtimeMs: number }[] = [];
@@ -110,7 +95,7 @@ export function sweepOldTemp(now: Date, env: Env = process.env): string[] {
 }
 
 /** Test folders in `dir` last touched more than `olderThan` ms ago (every one with 0). */
-export function testFolders(dir = tmpdir(), olderThan = DAY, now = Date.now()): string[] {
+function testFolders(dir = tmpdir(), olderThan = DAY, now = Date.now()): string[] {
   const found: string[] = [];
   let names: string[] = [];
   try {

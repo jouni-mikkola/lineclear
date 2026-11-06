@@ -18,12 +18,11 @@ import { retiredChecks, skillRoots } from "./retire.ts";
 import { type Kit, kitDiff, kitOthers, type Wanted } from "./kit.ts";
 import { parts } from "./pack.ts";
 import { readModelFile } from "./models.ts";
-import { findLeftovers, leftoverChecks, oldTests, tmpFull, type Leftovers } from "./leftovers.ts";
 import { checkoutPointers } from "./install-paths.ts";
 import { buildNames, buildProblem, buildsDir, installReleaseCommand, type RunFrom, unitCommand } from "./builds.ts";
 import { unknownWindows } from "../pi/compaction.ts";
 import { publishedAddress, serveCommand } from "./published.ts";
-import { compileCacheDir, ramUsedBytes, removeFolders, staleFolders } from "./tmpdirs.ts";
+import { compileCacheDir } from "./tmpdirs.ts";
 
 export interface Check {
   name: string;
@@ -75,14 +74,6 @@ export interface Probe {
   free?: (dir: string) => number;
   /** The address the server is told to listen on (LINECLEAR_HOST), when set. */
   listen?: string;
-  /** Test and check folders left in the temp folders for over 6 hours, none in use. */
-  oldTestFolders?: string[];
-  /** Bytes in use on a RAM-backed /tmp (0 when /tmp is a disk). */
-  tmpRamBytes?: number;
-  /** Worktrees, branches and runtime folders of finished work, and what is kept (doctor --fix removes the safe ones). */
-  leftovers?: () => Leftovers;
-  /** Removes them (doctor --fix). */
-  removeTestFolders?: (paths: string[]) => unknown;
   /** Where the web pages are published on the tailnet (task links open there), when tailscale is here. */
   published?: string;
   /** The herdr version the contract test passed with, and the one each machine runs (null when it cannot say). */
@@ -123,10 +114,6 @@ export function realProbe(paths: Paths, env: Record<string, string | undefined> 
     helperApart: helperApart(env),
     oldNameAgents: () => agentsOnOldName(),
     published: publishedAddress(env),
-    oldTestFolders: staleFolders(),
-    tmpRamBytes: ramUsedBytes(),
-    removeTestFolders: removeFolders,
-    leftovers: () => findLeftovers(env),
     backup: backupProblem(env),
     runBy: runByNote(env),
     store: readBackupSettings(env) === undefined ? copiesProblem(env) : "",
@@ -511,9 +498,6 @@ export function doctorChecks(probe: Probe): Check[] {
     oldFoldersArchived(p),
     listening(p),
     publishedPages(p),
-    oldTests(p),
-    tmpFull(p),
-    ...leftoverChecks(p),
     { name: "backup", problem: p.backup ?? "", fix: "lineclear backup (it names what fails); lineclear backup status" },
     { name: "store", problem: p.store ?? "", fix: "lineclear store copy; lineclear store list; the rule loop takes a copy every hour" },
     {

@@ -7,7 +7,6 @@ import { settlePlans } from "./autoplan.ts";
 import { startBackupIfDue } from "./backup.ts";
 import { watchMachine } from "./machine-alerts.ts";
 import { startBoard } from "./board.ts";
-import { herdrHealth } from "./herdr-health.ts";
 import { freshDecisions } from "./decision-dedupe.ts";
 import { answerCard, closeItem, closeSettledUpdates, isOpen, type Item, readItems } from "./inbox.ts";
 import { listProjectNames, projectsDir, readSettings, type Settings } from "./project.ts";
@@ -91,8 +90,6 @@ export interface State extends StartRecord {
   taskSeen?: Record<string, Record<string, number>>;
   /** Steps over that limit with the Inbox item that told the owner, kept until the step is under the limit again. */
   limitItems?: Record<string, number>;
-  /** Steps waiting for a system fault to clear (herdr down, provider error, timeout), with when the wait began (ms). */
-  faultWaits?: Record<string, { fault: string; since: number }>;
   /** Owner-only steps with the Inbox item that asks the owner; the owner's Done answer ends the step. */
   ownerItems?: Record<string, number>;
   /** Tasks showing Went wrong: when first seen (ms). */
@@ -163,14 +160,12 @@ export function tick(world: World, dryRun: boolean, env = process.env): Decision
       ),
     );
   }
-  const settled: { name: string; settings: Settings }[] = [];
   for (const name of listProjectNames(env)) {
     const settings = readSettings(name, env);
     if (typeof settings === "string") {
       all.push({ time: world.now().toISOString(), project: name, kind: "skip", reason: settings });
       continue;
     }
-    settled.push({ name, settings });
     const state = readState(name, env);
     const held = holdWorld(world, settings);
     const answer = (space: string, id: string, text: string) => answerCard({ space, id }, text, env);
@@ -195,8 +190,6 @@ export function tick(world: World, dryRun: boolean, env = process.env): Decision
     writeAtomic(statePath(name, env), `${JSON.stringify(state, null, 2)}\n`);
     all.push(...logDecisions(fresh, env));
   }
-  const herdr = herdrHealth(world, settled, dryRun, env);
-  all.push(...(dryRun ? herdr : logDecisions(herdr, env)));
   if (!dryRun) all.push(...afterTick(world, all, env));
   return all;
 }

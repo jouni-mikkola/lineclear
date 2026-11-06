@@ -5,7 +5,6 @@ import type { Settings } from "./project.ts";
 import type { Task } from "./roadmap.ts";
 import type { Decision, State, World } from "./rules.ts";
 import { IDLE_TEXT } from "./cards.ts";
-import { fileOutsideFixes } from "./outside-fix.ts";
 import { fileFixes } from "./self-fix.ts";
 import { decisionsPath } from "../pi/config.ts";
 import { CLASS_INFO, type Observation, type StallClass, cutDecisionsDaily, taskObservations, watchStalls } from "./stall-class.ts";
@@ -136,7 +135,6 @@ function unanswered(starts: State["starts"] = {}): Record<string, { since: numbe
 /** After every project's tick: the fixes to file, then once a day the archive. The new decisions. */
 export function afterTick(world: World, all: Decision[], env = process.env): Decision[] {
   const filed = [...fileFixes(world, decisionsPath(env), all, env), ...watchWaste(world, env)];
-  fileOutsideFixes(world, env);
   if (filed.length > 0) appendFileSync(decisionsPath(env), `${filed.map((d) => JSON.stringify(d)).join("\n")}\n`);
   cutDecisionsDaily(decisionsPath(env), world.now());
   return filed;

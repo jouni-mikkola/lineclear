@@ -7,7 +7,6 @@ import { type FixSpec, fileFix } from "./self-fix.ts";
 import { ownerStepItem, ownerStepsDone } from "./owner-steps.ts";
 import { overStartLimit, recordStepStart, startsInDay } from "./start-limit.ts";
 import { LIMITS } from "./waste.ts";
-import { type FaultFix, holdForFault } from "./system-fault.ts";
 import { placeHeld } from "./held.ts";
 import { heavyTasks } from "./heavy-run.ts";
 import { criticalSteps, firstByRoom } from "./pace.ts";
@@ -516,8 +515,7 @@ function startReadySteps(s: Starting) {
     const step = s.byId.get(st.id) as Step;
     if (isFrozen(step) || (step.ownerOnly && ownerStepItem(s.t, step))) continue;
     const held = st.unproven !== undefined && !restartUnproven(s, step, st.unproven);
-    const file = (f: FaultFix) => fileStepFix(s.t, step, "faulted", f.why, f.brief, f.evidence, undefined, f.title);
-    if (held || (step.reopened && refileReopened(s, step)) || holdForFault(s.t, step, s.picked().worker !== undefined, file)) continue;
+    if (held || (step.reopened && refileReopened(s, step))) continue;
     const why = whyNotStart(s, step, reserved);
     if (why) s.t.note("skip", why, step.id);
     else startStep(s, step);

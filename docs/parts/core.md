@@ -19,7 +19,7 @@ The `lineclear` command and its `--help`, and these names:
 - `src/paths.ts`: `dataDir`, `codeCommit`, `piDir`, `pathsFor`, `serverBin`, `lockFile`, `extensionFile`, `cacheEnvFile`, `INSTALL_URL`, `Paths`, `SERVICE`, `OLD_PLUGIN_ID`
 - `src/project.ts`: `Settings`, `Ask`, `roles`, `askBeforeKeys`, `NAME`, `setProject`, `removeProject`, `fail`, `addProject`, `detectCheck`, `detectSpace`, `listProjectNames`, `readSettings`, `projectsDir`, `askBefore`, `Settings`, `Role`, `AskBefore`, `changeSettings`, `detectHeavy`, `tiersOf`, `proposeTiers`, `tierNames`, `setupRoles`, `readSetup`, `Setup`
 - `src/resolve.ts`: `looseNote`, `resolveProject`, `resolveStep`, `nearest`
-- `src/tmpdirs.ts`: `removeFolders` (returns the pids it ended), `staleFolders`, `compileCacheDir`, `cacheDir`, `diskTmpRoot`, `trimCache`, `ramUsedBytes`, `TMP_STALL_BYTES`, `sweepOldTemp`
+- `src/tmpdirs.ts`: `compileCacheDir`, `cacheDir`, `diskTmpRoot`, `trimCache`, `sweepOldTemp`
 - `src/lineclear-client.ts`: `lineclearServer`, `readSnapshot`, `watchSocket`, `postAction`, `keepLinks`, `taskChatKey`
 - `src/herdr.ts`: `herdrArgv`, `herdrSessionArgv`, `herdrSocketOf`, `HERDR_SOCKET_ENV`, `KEPT_ENV`, `herdrVersionOf`
 - `src/company.ts`: `company`, `currentModelFile`

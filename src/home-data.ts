@@ -6,7 +6,6 @@ import type { ReleaseState } from "./release.ts";
 import { existsSync, readdirSync } from "node:fs";
 import { hostname } from "node:os";
 import { join } from "node:path";
-import { herdrLines } from "./herdr-health.ts";
 import { type CompactionGauge, compactionGauge } from "./compaction-gauge.ts";
 import { type Blocker, countSteps, lineOf, readPlan, type RoadmapLine, type Where } from "./progress.ts";
 import { roadmapSource, lineclearAllTasks } from "./roadmap-source.ts";
@@ -57,8 +56,6 @@ export interface HomeData {
   compaction?: CompactionGauge;
   /** The waste watch's standing alarms, each a line: "Waste: <what>, <number>". */
   waste?: string[];
-  /** A failing herdr.service with its failure count (see herdr-health.ts), as a line. */
-  herdr?: string[];
   /** What `lineclear doctor` finds wrong on this machine, each as "problem: fix command". */
   doctor?: string[];
 }
@@ -489,7 +486,6 @@ export function homeData(env: Env = process.env, now = Date.now(), remote?: Expo
     loose: looseTasks(all),
     ...usage,
     waste: wasteLines(env, now),
-    herdr: herdrLines(env),
   };
 }
 

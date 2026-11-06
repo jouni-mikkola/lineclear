@@ -11,7 +11,6 @@ import { archiveFolder } from "./old-archive.ts";
 import { copyBrowsers, uncopiedBrowsers, oldPathRecords, rewriteOldPaths, type Roots } from "./old-paths.ts";
 import { remoteLineclear } from "./ssh.ts";
 import { readMachines } from "./machine-list.ts";
-import { fixLeftovers } from "./leftovers.ts";
 import { timerAllowed } from "../server/server/live/timer-rule.ts";
 
 type Env = Record<string, string | undefined>;
@@ -192,12 +191,7 @@ export function fixRetired(p: Probe, out: Out, reportTimers?: (spaces: string[])
     out("Kept the old folders: their paths or browser profiles are not moved yet; run lineclear doctor --fix again");
     code = 1;
   }
-  const old = p.oldTestFolders ?? [];
-  if (old.length && p.removeTestFolders) {
-    p.removeTestFolders(old);
-    out(`Removed ${old.length} test folder${old.length === 1 ? "" : "s"} older than 6 hours that no process uses`);
-  }
-  return Math.max(code, fixLeftovers(p, out));
+  return code;
 }
 
 /** `lineclear doctor --fix`: here, then on each machine added in Settings (`here`: only this one, which a machine reached over SSH runs). */

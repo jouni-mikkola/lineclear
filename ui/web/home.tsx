@@ -65,7 +65,6 @@ export function Home({
         <InboxStrip open={open} held={held} onChoose={choose} onUndo={undo} ask={ask} errors={errors} read={asksRead} />
         {(
           [
-            ["herdr", d?.herdr],
             ["waste", d?.waste],
             ["doctor", d?.doctor],
           ] as const

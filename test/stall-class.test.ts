@@ -4,8 +4,6 @@ import { dirname, join } from "node:path";
 import { decisionsPath, tick, type Decision, type State } from "../src/rules.ts";
 import { CLASS_INFO, classify, stallsMain, summarize, watchStalls, type Observation } from "../src/stall-class.ts";
 import { DAY_CAP, fileFixes, fileFixNow, readFixes } from "../src/self-fix.ts";
-import { recordRun } from "../src/check-runs.ts";
-import { fileOutsideFixes } from "../src/outside-fix.ts";
 import { readSettings } from "../src/project.ts";
 import { stepStatuses, type Step, type Task } from "../src/roadmap.ts";
 import { stallsOf } from "../src/stall-ladder.ts";
@@ -410,40 +408,6 @@ test("every held lock gets a remedy by what its holder is doing, once", () => {
     expect(remedies, name).toHaveLength(1);
     if (!action) expect(remedies[0]?.reason, name).toContain("waits for the owner");
   }
-});
-
-test("a test red outside the change gets one Fix task, however many runs name it, and another after it closes", () => {
-  const t = setup();
-  const run = (outside: string[]) =>
-    recordRun(
-      {
-        at: t.clock.at.getTime(),
-        repo: t.env.LINECLEAR_HOME ? join(t.env.LINECLEAR_HOME, "..") : "",
-        tier: "merge",
-        command: "check",
-        commit: "c",
-        branch: "b",
-        dirty: false,
-        seconds: 1,
-        load: 0,
-        cores: 8,
-        ok: false,
-        failed: outside,
-        outside,
-        group: "g",
-      },
-      t.env,
-    );
-  run(["a flaky test"]);
-  run(["a flaky test"]);
-  expect(fileOutsideFixes(t.world, t.env)).toEqual(["Fix: a flaky test"]);
-  expect(fileOutsideFixes(t.world, t.env)).toEqual([]);
-  expect(t.adds.map((a) => a[0])).toEqual(["Fix: a flaky test"]);
-  t.tasks.list = t.tasks.list.map((x) => (x.title === "Fix: a flaky test" ? { ...x, status: "done" } : x));
-  expect(fileOutsideFixes(t.world, t.env)).toEqual([]);
-  t.clock.at = new Date(t.clock.at.getTime() + 60_000);
-  run(["a flaky test"]);
-  expect(fileOutsideFixes(t.world, t.env)).toEqual(["Fix: a flaky test"]);
 });
 
 test("a step's task holds its locks by the rules' record, never by a title", () => {
