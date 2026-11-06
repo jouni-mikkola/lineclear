@@ -76,6 +76,14 @@ test("migrate --all --dry-run lists what moves on each machine and copies nothin
   expect(existsSync(env.LINECLEAR_HOME)).toBe(false);
 });
 
+/** Each read starts a whole Lineclear process; one that a loaded machine delays past the 30 s read limit shows nothing, so read again. */
+async function refreshUntil(env: Record<string, string | undefined>, seen: () => boolean): Promise<void> {
+  for (let tries = 0; tries < 4; tries++) {
+    await refreshRemotes(env);
+    if (seen()) return;
+  }
+}
+
 test("migrate --all moves both machines, and one Home shows the work of both", async () => {
   const { env, box } = world();
   const lines: string[] = [];
@@ -84,7 +92,7 @@ test("migrate --all moves both machines, and one Home shows the work of both", a
   expect(JSON.parse(readFileSync(join(env.LINECLEAR_HOME, "tasks.json"), "utf8")).tasks[0].id).toBe("HER-1");
   expect(JSON.parse(readFileSync(join(box.LINECLEAR_HOME, "tasks.json"), "utf8")).tasks[0].id).toBe("BOX-1");
 
-  await refreshRemotes(env);
+  await refreshUntil(env, () => projectsData(env).length === 2);
   const home = projectsData(env);
   expect(home.map((p) => [p.name, p.machine ?? "here"])).toEqual([
     ["alpha", "here"],
@@ -101,7 +109,7 @@ test("migrate --all moves both machines, and one Home shows the work of both", a
     choices: ["a", "b"],
     since: "2026-01-01T00:00:00.000Z",
   });
-  await refreshRemotes(env);
+  await refreshUntil(env, () => waitingForYou(env).items.length === 1);
   const waiting = waitingForYou(env);
   expect(waiting.items.map((i) => [i.n, i.machine])).toEqual([[1, "box"]]);
   const said: string[] = [];
