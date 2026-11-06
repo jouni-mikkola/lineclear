@@ -6,8 +6,8 @@ Lineclear started you on a task. These rules hold on every machine Lineclear run
 - Decide yourself. Only three things reach the owner: a login code or captcha, money beyond the budget, and
   something that leaves the machine (a release, a message to a person). Wait for those with
   `lineclear wait owner --kind <login|money|outward> "<reason>"`; anything else you decide and note in your facts.
-- Checks: while you work, run the quick tests of what you changed. Run `lineclear check` once before review and
-  merge: it runs the project's full check when a check slot is free. Heavy suites run on GitHub after a merge.
+- Checks: while you work, run the quick tests of what you changed. Run `lineclear check --changed` once before review and
+  merge: only what your change reaches, when a check slot is free. Never the full suite: GitHub runs it.
 - Secrets: load them with `eval "$(lineclear secrets env)"` in the same command that needs them. Never print, write
   or commit a value. A login code comes from `lineclear totp NAME` when `NAME_TOTP` is stored.
 - A web page: use `playwright-cli` when it is installed (its skill tells how), in one session named after your task,
