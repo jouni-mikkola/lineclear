@@ -27,6 +27,11 @@ jobs:
       # the check compares the branch with a local main
       - run: git fetch --no-tags origin main:main
         if: github.base_ref == 'main'
+      # Tests commit in fresh repos, which need an identity and a default branch the runner lacks
+      - run: |
+          git config --global user.name ci
+          git config --global user.email ci@localhost
+          git config --global init.defaultBranch main
       - uses: oven-sh/setup-bun@v2
       # The Bun install cache, keyed by both lockfiles
       - uses: actions/cache@v4
