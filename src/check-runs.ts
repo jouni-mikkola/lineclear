@@ -339,6 +339,26 @@ export function failedTests(output: string): string[] {
   return [...names];
 }
 
+/**
+ * Only the lines of the failed tests, from bun's layout: each `(fail)` line with the error lines printed before it, back
+ * to the previous test's result line, then every `check:` line of the check's own verdict (a failed step, a test
+ * outside the change). Empty when the output has no bun `(fail)` line, so the caller sends the plain tail.
+ */
+export function failingLines(output: string): string {
+  const out: string[] = [];
+  const verdict: string[] = [];
+  let block: string[] = [];
+  for (const line of output.split("\n")) {
+    if (/^\s*\(fail\) /.test(line)) {
+      out.push(...block, line);
+      block = [];
+    } else if (/^\s*\((?:pass|skip|todo)\) /.test(line)) block = [];
+    else if (line.startsWith("check: ")) verdict.push(line);
+    else block.push(line);
+  }
+  return out.length > 0 ? [...out, ...verdict].join("\n") : "";
+}
+
 /** The first step of a check that failed and is not a test step, from the line scripts/check.ts prints for it: `check: <step> failed: <first line>`. */
 export function failedGate(output: string): FailedGate | undefined {
   for (const line of output.split("\n")) {
