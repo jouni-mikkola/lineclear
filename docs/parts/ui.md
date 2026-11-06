@@ -19,10 +19,10 @@ system's kit and brand, the web API that feeds them, and the README with its fil
 ## Interface
 
 The web pages and the web API of `src/web.ts`, and these names:
-- `src/web.ts`: `webApi` (its last arguments turn the server's own healing on and take the projects from a worker's snapshots), `startWeb`
+- `src/web.ts`: `startWeb`
 - `src/web-address.ts`: `webAddress`
 - `src/browsers.ts`: `describeSessions`, `openSessions`, `BrowserSession`
-- `src/home-data.ts`: `localProjects`, `HomeProject`, `projectsData`, `piSpendAndUsage`
+- `src/home-data.ts`: `localProjects`, `HomeProject`, `projectsData`
 - `src/roadmap-source.ts`: `lineclearTasks`
 - `src/roadmap-view.ts`: `roadmapData`, `lineOfRoadmap`
 - `src/demo.ts`: `demoMain`

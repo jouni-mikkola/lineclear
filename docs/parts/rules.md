@@ -15,11 +15,11 @@ The rule loop, `lineclear run`: each tick it starts every step whose `after` is 
 
 - `src/waits.ts`: `writeWait`, `clearWait`, `waitsMain`, `readWaits`, `waitsForOwner`, `Wait`, `findProject`, `findTask`, `loadLimit`, `limitOf`, `checkLines`, `WaitGroup`, `waitGroups`, `ownSlot`
 - `src/remotes.ts`: `fetchExportSync`, `Export`, `relationOf`, `Relation`, `remoteExports`, `refreshRemotes`, `staleRemotes`
-- `src/rules.ts`: `Decision`, `decisionsPath`, `runMain`, `realWorld`, `World`, `TICK_MS`
+- `src/rules.ts`: `Decision`, `decisionsPath`, `runMain`, `realWorld`, `World`
 - `src/herdr-health.ts`: `herdrLines`
 - `src/loop-guard.ts`: `fillSetup`
 - `src/status.ts`: `status`
-- `src/stall-class.ts`: `stallsMain`, `median`, `summarize`, `readDecisionsSince`, `CLASS_INFO`, `StallClass`
+- `src/stall-class.ts`: `stallsMain`, `readDecisionsSince`, `CLASS_INFO`, `StallClass`
 - `src/self-fix.ts`: `fileFixNow`, `selfProject`
 - `src/health.ts`: `diskTrouble`, `freeBytes`, `networkTrouble`, `Trouble`
 - `src/spread.ts`: `remoteTasks`, `notReached`, `cloneOn`

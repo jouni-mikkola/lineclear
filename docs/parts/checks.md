@@ -27,7 +27,7 @@ The check tiers of each project and what keeps its checks honest: `lineclear che
 
 `lineclear check [--tier <tier>] [command]`, `lineclear check --release <test>`, the check
 log `check-runs.jsonl`, and these names:
-- `src/check-runs.ts`: `Tier`, `CheckRun`, `loadMeter`, `recordStepTimes`, `readRuns`, `laneDays`, `redByCause`, `refusedMergeBranches`, `whereRun`, `testKey`
+- `src/check-runs.ts`: `Tier`, `CheckRun`, `loadMeter`, `recordStepTimes`, `readRuns`, `whereRun`, `testKey`
 - `src/git.ts`: `git`, `gitWith`, `gitText`, `gitAsLineclear`
 - `src/check-tier.ts`: `checkTier`, `flakeFixIn`
 

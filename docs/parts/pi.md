@@ -27,7 +27,6 @@ The pi extension file install links, `lineclear pack`, and these names:
 - `pi/config.ts`: `configDir`, `decisionsPath`, `readJson`
 - `pi/extension.ts`: `Limits`, `Window`, `callsOf`, `LIMITED_STREAK`
 - `pi/heavy-tool.ts`: `toolRun`
-- `pi/parts/compaction-notes.ts`: `logLines`, `notesStats`
 - `pi/parts/cut-output.ts`: `cutStats`, `logFile`
 
 ## Files
