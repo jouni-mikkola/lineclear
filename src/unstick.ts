@@ -1,22 +1,21 @@
+import { keepsMerge } from "./asks.ts";
 import type { Settings } from "./project.ts";
 import type { Task } from "./roadmap.ts";
 import type { Decision, State, World } from "./rules.ts";
 import type { Wait } from "./waits.ts";
 
 // Two ways a task is left lying on the board with nobody behind it: a task of the rules whose start went wrong is
-// closed so the roadmap starts its step again, and a task that sits on Ready to merge long after its agent reported is
-// told once in a while to go on (its merge may be its own to run).
+// closed so the roadmap starts its step again, and a task that sits on Ready to merge with no merge running is merged
+// by the rules (rebase, check, merge).
 
-/** A task shows Ready to merge this long before its agent is told, and again at most this often. */
-const READY_AFTER_MS = 15 * 60_000;
-const WAKE_GAP_MS = 45 * 60_000;
+/** A task shows Ready to merge this long before its merge is started, and again at most this often. */
+const READY_AFTER_MS = 10 * 60_000;
+const MERGE_GAP_MS = 10 * 60_000;
+/** After this many merges that left the task on Ready the rules leave it alone; the card shows why the last one stopped. */
+const MAX_TRIES = 2;
 
 /** A started wrong task is closed only after it has shown Went wrong this long: a hand-over may still try again. */
 const WRONG_AFTER_MS = 3 * 60_000;
-
-// The tell ends with `lineclear ready`, because any message to a task takes it off Ready to merge.
-const READY_TELL =
-  "Your task is ready but not merged. If your brief says to merge it yourself, run `lineclear merge <id>` until it is through (on a conflict, rebase on the base keeping both sides). Otherwise run `lineclear ready <id>` again with the same summary and facts, and nothing more.";
 
 interface Args {
   project: string;
@@ -58,34 +57,40 @@ function closeFailedStarts(a: Args, tasks: Task[], out: Decision[]): void {
   }
 }
 
-/** A task that stays on Ready to merge is told to go on, once per 45 minutes, unless it declared a wait or the owner wrote to it. */
-function wakeReady(a: Args, tasks: Task[], out: Decision[]): void {
+/** The first task on Ready to merge for 10 minutes has its merge started (one per tick), unless it declared a wait, its merge is the owner's, or the owner wrote to it. */
+function mergeReady(a: Args, tasks: Task[], out: Decision[]): void {
   const { world, state, dryRun } = a;
   const now = world.now().getTime();
   const seen = (state.readySeen ??= {});
   const waiting = new Set(a.waits.map((w) => w.task));
+  let started = false;
   for (const t of tasks) {
     if (t.id === undefined || t.status !== "ready") continue;
     const entry = (seen[t.id] ??= { since: now });
-    if (now - entry.since < READY_AFTER_MS || now - (entry.woke ?? 0) < WAKE_GAP_MS || waiting.has(t.id)) continue;
+    const idle = now - entry.since >= READY_AFTER_MS && now - (entry.tried ?? 0) >= MERGE_GAP_MS;
+    if (started || !idle || (entry.tries ?? 0) >= MAX_TRIES || waiting.has(t.id) || keepsMerge(t.desc)) continue;
     if (world.ownerWrote(t.id, new Date(entry.since).toISOString())) continue;
-    const err = dryRun ? undefined : world.tellTask(t.id, READY_TELL.replace("<id>", t.id), "resume");
-    if (!dryRun) entry.woke = now;
+    started = true;
+    const err = dryRun ? undefined : world.mergeTask(t.id);
+    if (!dryRun) {
+      entry.tried = now;
+      entry.tries = (entry.tries ?? 0) + 1;
+    }
     out.push({
       time: world.now().toISOString(),
       project: a.project,
       step: t.id,
-      kind: "wake",
+      kind: "run",
       reason: err
-        ? `telling ${t.id} to go on failed: ${err}`
-        : `${dryRun ? "would tell" : "told"} ${t.id} to go on: it has shown Ready to merge for ${Math.round((now - entry.since) / 60_000)} minutes`,
+        ? `starting the merge of ${t.id} failed: ${err}`
+        : `${dryRun ? "would merge" : "started the merge of"} ${t.id}: it has shown Ready to merge for ${Math.round((now - entry.since) / 60_000)} minutes`,
     });
   }
-  // a task that works after a tell keeps its record, so the 45 minutes hold; only a gone one loses it
+  // a task that works again starts over; only a gone one loses its record
   for (const [id, entry] of Object.entries(seen)) {
     const task = tasks.find((t) => t.id === id);
     if (!task) delete seen[id];
-    else if (task.status !== "ready") entry.since = now;
+    else if (task.status !== "ready") Object.assign(entry, { since: now, tries: 0 });
   }
 }
 
@@ -95,6 +100,6 @@ export function unstick(a: Args): Decision[] {
   if (typeof tasks === "string") return [];
   const out: Decision[] = [];
   closeFailedStarts(a, tasks, out);
-  wakeReady(a, tasks, out);
+  mergeReady(a, tasks, out);
   return out;
 }

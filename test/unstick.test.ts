@@ -3,7 +3,7 @@ import type { Settings } from "../src/project.ts";
 import type { State, World } from "../src/rules.ts";
 import { unstick } from "../src/unstick.ts";
 
-type T = { id: string; title: string; status: string; sub?: string };
+type T = { id: string; title: string; status: string; sub?: string; desc?: string };
 
 function fake(tasks: T[], o: { clean?: boolean; wrote?: boolean; ahead?: number } = {}) {
   const calls: string[] = [];
@@ -16,7 +16,7 @@ function fake(tasks: T[], o: { clean?: boolean; wrote?: boolean; ahead?: number 
     commitsAhead: () => o.ahead ?? 1,
     ownerWrote: () => o.wrote ?? false,
     closeTask: (id: string) => (calls.push(`close ${id}`), undefined),
-    tellTask: (id: string, _text: string, kind?: string) => (calls.push(`tell ${id} ${kind}`), undefined),
+    mergeTask: (id: string) => (calls.push(`merge ${id}`), undefined),
   } as unknown as World;
   const state = { taskSteps: { "LIN-1": "L1" } } as unknown as State;
   const tick = (waits: { task: string }[] = [], dryRun = false) =>
@@ -48,29 +48,19 @@ test("a task of the rules whose start went wrong is closed, one with work or one
   expect(dry.calls).toEqual([]);
 });
 
-test("a task on Ready to merge is told after 15 minutes and then once per 45, never with a wait or after the owner wrote", () => {
+test("a task on Ready to merge has its merge started after 10 minutes, one at a time, never with a wait or after the owner wrote", () => {
   const ready = { id: "LIN-3", title: "x", status: "ready", sub: "Ready to merge" };
-  const a = fake([ready]);
+  const second = { id: "LIN-4", title: "y", status: "ready", sub: "Ready to merge" };
+  const a = fake([ready, second]);
   a.tick();
-  a.later(10);
+  a.later(9);
   a.tick();
   expect(a.calls).toEqual([]);
-  a.later(6);
+  a.later(2);
   a.tick();
-  a.later(30);
+  expect(a.calls).toEqual(["merge LIN-3"]);
   a.tick();
-  expect(a.calls).toEqual(["tell LIN-3 resume"]);
-  // it works after the tell and shows Ready again: the 45 minutes still hold
-  ready.status = "work";
-  a.later(1);
-  a.tick();
-  ready.status = "ready";
-  a.later(10);
-  a.tick();
-  expect(a.calls).toEqual(["tell LIN-3 resume"]);
-  a.later(40);
-  a.tick();
-  expect(a.calls).toEqual(["tell LIN-3 resume", "tell LIN-3 resume"]);
+  expect(a.calls).toEqual(["merge LIN-3", "merge LIN-4"]);
   for (const o of [{ wrote: true }, {}]) {
     const b = fake([ready], o);
     b.tick(o.wrote ? [] : [{ task: "LIN-3" }]);
@@ -78,6 +68,31 @@ test("a task on Ready to merge is told after 15 minutes and then once per 45, ne
     b.tick(o.wrote ? [] : [{ task: "LIN-3" }]);
     expect(b.calls).toEqual([]);
   }
+});
+
+test("a merge that leaves the task on Ready is tried twice, never when the merge is the owner's, and a task that works starts over", () => {
+  const ready = { id: "LIN-3", title: "x", status: "ready", sub: "Ready to merge" };
+  const a = fake([ready]);
+  a.tick();
+  for (let i = 0; i < 4; i++) {
+    a.later(11);
+    a.tick();
+  }
+  expect(a.calls).toEqual(["merge LIN-3", "merge LIN-3"]);
+  ready.status = "work";
+  a.tick();
+  ready.status = "ready";
+  a.later(9);
+  a.tick();
+  expect(a.calls.length).toBe(2);
+  a.later(2);
+  a.tick();
+  expect(a.calls.length).toBe(3);
+  const asked = fake([{ ...ready, desc: "- Merge: ask me first" } as T]);
+  asked.tick();
+  asked.later(30);
+  asked.tick();
+  expect(asked.calls).toEqual([]);
 });
 
 test("a start with no worktree is closed only when its branch holds no commit", () => {
