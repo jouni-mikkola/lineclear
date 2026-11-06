@@ -245,10 +245,7 @@ async function installCommand(name: "doctor" | "uninstall", rest: string[], out:
           return { host, commit: e?.commit ?? null, ...(e ? { relation: relationOf(codeCommit(), e.commit) } : {}) };
         }),
       };
-    const code = doctor(probe, out);
-    if (here) return code;
-    const left = await remoteLeft(out);
-    return code === 0 && left === 0 ? 0 : 1;
+    return doctor(probe, out);
   }
   const bad = rest.find((a) => a !== "--all");
   if (bad !== undefined) {

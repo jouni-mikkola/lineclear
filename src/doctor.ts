@@ -10,7 +10,7 @@ import { tryLines } from "./try-instance.ts";
 import { cacheEnvFile, dataDir, extensionFile, INSTALL_URL, type Paths, SERVICE, serverBin } from "./paths.ts";
 import type { Relation } from "./remotes.ts";
 import { diskTrouble, freeBytes } from "./health.ts";
-import { retiredChecks, skillRoots } from "./retire.ts";
+import { retiredChecks } from "./retire.ts";
 import { parts } from "./pack.ts";
 import { readModelFile } from "./models.ts";
 import { checkoutPointers } from "./install-paths.ts";
@@ -61,8 +61,6 @@ export interface Probe {
   /** The herdr version the contract test passed with, and the one each machine runs (null when it cannot say). */
   herdr?: { tested: string; machines: { machine: string; version: string | null }[] };
   /** What pi loads here and on each other machine (a null diff: it cannot be read), and what the release wants. */
-  /** What is wrong with the backup, "" when it is fine or none is set. */
-  backup?: string;
   /** The machine whose board runs this machine's tasks ("" when this one does). */
   runBy?: string;
   /** What is wrong with the store: no restic repository and no fresh local copy. "" when fine. */
@@ -95,7 +93,6 @@ export function realProbe(paths: Paths, env: Record<string, string | undefined> 
     pathDirs: (env.PATH ?? "").split(delimiter),
     listen: env.LINECLEAR_HOST,
     published: publishedAddress(env),
-    backup: backupProblem(env),
     runBy: runByNote(env),
     store: copiesProblem(env),
     runFrom: runFrom(paths, env),
@@ -396,7 +393,6 @@ export function doctorChecks(probe: Probe): Check[] {
     ...herdrPinned(p),
     listening(p),
     publishedPages(p),
-    { name: "backup", problem: p.backup ?? "", fix: "lineclear backup (it names what fails); lineclear backup status" },
     { name: "store", problem: p.store ?? "", fix: "lineclear store copy; lineclear store list; the rule loop takes a copy every hour" },
     {
       name: "tasks run by",
