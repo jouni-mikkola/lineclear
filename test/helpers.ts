@@ -96,10 +96,13 @@ exec "$@"`,
   return { bin, state };
 }
 
-/** Waits until `ok` holds, checking every `every` ms. The limit only stops a hang: a busy machine may take long. */
-export async function until(ok: () => boolean | Promise<boolean>, every = 50, limit = 60_000): Promise<void> {
+/** Waits until `condition` holds and throws "never came: <what>" at the deadline. The limit only stops a hang: a busy machine may take long. */
+export async function waitFor(condition: () => boolean | Promise<boolean>, what: string, limit = 60_000): Promise<void> {
   const end = Date.now() + limit;
-  while (!(await ok()) && Date.now() < end) await Bun.sleep(every);
+  while (!(await condition())) {
+    if (Date.now() > end) throw new Error(`never came: ${what}`);
+    await Bun.sleep(20);
+  }
 }
 
 /** Runs the CLI in this process with `env` set on process.env for the call, and returns its exit code and its lines. */

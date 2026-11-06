@@ -8,6 +8,7 @@ import { join } from 'node:path'
 import { helperFiles, helperVersion } from '../server/live/install.ts'
 import { carryClaudeSession } from '../server/live/agent-start.ts'
 import type { BoxInfo } from '../server/live/box.ts'
+import { until } from './until.ts'
 
 const root = join(import.meta.dir, '..')
 const perl = spawnSync('perl', ['-MJSON::PP', '-e1']).status === 0
@@ -249,7 +250,7 @@ describe('a restart of the main server (an update)', () => {
       expect(l.chats.get('p:far:web')?.messages[0].text).toBe('Done.')
       expect(l.connecting).toBe(true)
       expect(m.rows()[0].state).toBe('Connecting…')
-      for (let i = 0; i < 250 && !l.reachable; i++) await Bun.sleep(20)
+      await until(() => l.reachable, 'the link to be reachable')
       expect(l.reachable).toBe(true)
       expect(l.connecting).toBe(false)
       expect(l.worker?.pid).toBe(w.pid)
@@ -274,12 +275,12 @@ describe('a restart of the main server (an update)', () => {
     const next = await oldWorker()
     try {
       const l = m.list().find((x) => x.rec.machine === 'far')!
-      for (let i = 0; i < 250 && !l.reachable; i++) await Bun.sleep(20)
+      await until(() => l.reachable, 'the link to be reachable')
       expect(l.reachable).toBe(true)
       // the old worker stops, and a new one serves on another port, as the doctor leaves it
       process.kill(w.pid)
       writeJson('workers/far/server.json', { port: next.port, pid: next.pid })
-      for (let i = 0; i < 500 && !(l.reachable && l.rec.url.endsWith(`:${next.port}`)); i++) await Bun.sleep(20)
+      await until(() => l.reachable && l.rec.url.endsWith(`:${next.port}`), 'the link to follow the new worker')
       expect(l.rec.url).toBe(`http://127.0.0.1:${next.port}`)
       expect(l.reachable).toBe(true)
       expect(l.worker?.pid).toBe(next.pid)
@@ -308,7 +309,7 @@ describe('a restart of the main server (an update)', () => {
       expect(l.reachable).toBe(false)
       expect(l.rec.url).toBe('')
       resolve([{ ...saved, enabled: false }])
-      for (let i = 0; i < 250 && w.alive(); i++) await Bun.sleep(20)
+      await until(() => !w.alive(), 'the worker to stop')
       expect(w.alive()).toBe(false)
       expect(m.byName('far')).toBeUndefined()
       expect(existsSync(join(HOME, 'machines', 'far', 'last.json'))).toBe(false)
@@ -327,7 +328,7 @@ describe('a restart of the main server (an update)', () => {
       async () => ({}),
     )
     try {
-      for (let i = 0; i < 250 && w.alive(); i++) await Bun.sleep(20)
+      await until(() => !w.alive(), 'the worker to stop')
       expect(w.alive()).toBe(false)
       expect(m.list()[0].worker?.pid).not.toBe(w.pid)
     } finally {

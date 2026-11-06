@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { PAGE_TOKEN } from "../src/web.ts";
 import { startFakeLineclear } from "../ui/test/fake-lineclear-server.ts";
-import { freshWebApi, until } from "./helpers.ts";
+import { freshWebApi, waitFor } from "./helpers.ts";
 
 const origin = "http://127.0.0.1:7420";
 const get = (path: string) => new Request(`${origin}${path}`);
@@ -34,10 +34,10 @@ test("the terminal shows the screen and takes words and keys from own pages only
   try {
     const { handle } = freshWebApi(fake.url);
     let view: { state: string; ansi: string } = { state: "", ansi: "" };
-    await until(async () => {
+    await waitFor(async () => {
       view = await (await handle(get("/api/task/WEB-3/terminal"))).json();
       return view.state === "ready";
-    });
+    }, "the terminal to be ready");
     expect(view.ansi).toContain("ready");
     expect((await handle(post("/api/task/WEB-3/terminal/input", { text: "yes", enter: true }))).status).toBe(202);
     expect((await handle(post("/api/task/WEB-3/terminal/input", { keys: ["esc"] }))).status).toBe(202);

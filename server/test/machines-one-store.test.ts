@@ -2,6 +2,7 @@
 import { expect, test } from 'bun:test'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { until } from './until.ts'
 
 const task = (status: string) => ({ id: 'FAR-1', name: 'x', status, place: 'p:far:web', machine: 'far', age: '1m' })
 const snapOf = (status: string) => ({
@@ -34,7 +35,7 @@ async function linked() {
   const far = farWorker()
   const m = new Machines(null)
   const l = m.adopt('far', `http://127.0.0.1:${far.server.port}`)
-  for (let i = 0; i < 100 && !l.reachable; i++) await Bun.sleep(20)
+  await until(() => l.reachable, 'the link to be reachable')
   const poll = () => (m as unknown as { poll(l: unknown): Promise<void> }).poll(l)
   return { m, l, far, poll, end: () => (m.stop(), far.server.stop(true)) }
 }

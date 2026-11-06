@@ -3,7 +3,7 @@ import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { inputCode, parseInput, taskOfSession } from "../src/browsers.ts";
 import { knownHost, PAGE_TOKEN, webApi } from "../src/web.ts";
-import { until, webShopDir } from "./helpers.ts";
+import { waitFor, webShopDir } from "./helpers.ts";
 
 // The Agent browsers' data, with ui/test/fake-playwright-cli for playwright-cli: it lists the sessions in
 // browsers.json and logs each piece of code a session runs to browser-inputs.log.
@@ -150,7 +150,7 @@ test("the list is read again only when the Browsers view asks, and then after te
   expect(await names("/api/browsers")).toEqual(["WEB-1"]);
   await names("/api/browsers?live");
   // the list is read in the background: wait for it, however slow the machine
-  await until(async () => (await names("/api/browsers?live")).length === 2);
+  await waitFor(async () => (await names("/api/browsers?live")).length === 2, "two live browsers");
   expect(await names("/api/browsers?live")).toEqual(["WEB-12", "WEB-1"]);
   done();
 });

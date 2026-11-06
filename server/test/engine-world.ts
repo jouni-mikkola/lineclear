@@ -166,13 +166,8 @@ export function world(herdr = fakeHerdr(), o: { boot?: string } = {}) {
   }
 }
 
-export const until = async (f: () => boolean, ms = 60_000) => {
-  const t0 = Date.now()
-  while (!f()) {
-    if (Date.now() - t0 > ms) throw new Error('timed out')
-    await Bun.sleep(20)
-  }
-}
+import { until } from './until.ts'
+export { until }
 
 /** a task whose agent has started in its worktree */
 export async function started(w: ReturnType<typeof world>, dir: string, name: string, title = 'Say hello', desc = 'Add hello.txt. Merge when done.') {

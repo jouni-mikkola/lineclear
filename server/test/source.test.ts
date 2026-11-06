@@ -289,7 +289,7 @@ describe('To do from the command', () => {
     // herdr isn't here: its agents can't start. Let that settle before the tests after this one
     const t = src.engine.task(id)!
     const next = src.engine.task(other.out.match(/([A-Z]+-\d+)/)![1])!
-    for (let i = 0; !(t.trouble && next.trouble) && i < 250; i++) await Bun.sleep(20)
+    await until(() => !!(t.trouble && next.trouble), 'both tasks to show trouble')
     expect((await src.cli(['todo', id], { chat: `${next.id}/Agent` })).code).toBe(1)
     expect((await src.cli(['todo', id], { chat: `${id}/Agent` })).out).toContain('To do until it gets a go')
     expect(t.todo).toBe(true)
@@ -351,7 +351,7 @@ describe('Queued from the command', () => {
     links.delete('vm-x')
     // herdr isn't here: its agents can't start. Let that settle before the tests after this one
     const ts = [first, then, use.id].map((id) => src.engine.task(id)!)
-    for (let i = 0; !ts.every((t) => t.trouble) && i < 250; i++) await Bun.sleep(20)
+    await until(() => ts.every((t) => t.trouble), 'every task to show trouble')
     src.agents.outbox = src.agents.outbox.filter((o) => !ts.some((t) => o.key === `${t.id}/Agent`))
   })
 })

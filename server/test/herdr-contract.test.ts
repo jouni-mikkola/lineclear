@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { HERDR_TESTED, herdr, herdrCliSync, paneEvents, rpc, Subscription, type HerdrEvent } from '../server/live/herdr.ts'
 import { forwardArgs, herdrOn, room } from '../server/live/herdr-forward.ts'
+import { until } from './until.ts'
 
 const bin = Bun.which('herdr') ?? ''
 if (!bin) console.info('herdr-contract: herdr is not installed here, so its contract is not checked')
@@ -259,7 +260,7 @@ describe.skipIf(!bin)('herdr contract: a herdr of its own', () => {
     )
     sub.set(paneEvents([]))
     try {
-      for (let i = 0; i < 50 && !opened; i++) await Bun.sleep(100)
+      await until(() => opened, 'the workspace to open')
       expect(opened).toBe(true)
       const w = await herdr.createWorkspace('contract', dir, { LINECLEAR_CONTRACT: '1' })
       const pane = w.root_pane.pane_id
@@ -268,18 +269,18 @@ describe.skipIf(!bin)('herdr contract: a herdr of its own', () => {
       await herdr.paneText(pane, 'echo "contract-$((40 + 2))-$LINECLEAR_CONTRACT"')
       await herdr.paneKeys(pane, ['Enter'])
       let text = ''
-      for (let i = 0; i < 50 && !text.includes('contract-42-1'); i++) {
-        await Bun.sleep(100)
+      await until(async () => {
         text = await herdr.read(pane, 'text', 50)
-      }
+        return text.includes('contract-42-1')
+      }, 'the pane to show contract-42-1')
       expect(text).toContain('contract-42-1')
       expect(await herdr.size(pane)).toMatchObject({ cols: expect.any(Number), rows: expect.any(Number) })
-      for (let i = 0; i < 50 && !events.some((e) => e.event === 'pane_created'); i++) await Bun.sleep(100)
+      await until(() => events.some((e) => e.event === 'pane_created'), 'a pane_created event')
       expect(events.map((e) => e.event)).toContain('pane_created')
       // the server's own list once an agent's pane is known: herdr takes it whole
       opened = false
       sub.set(paneEvents([pane]))
-      for (let i = 0; i < 50 && !opened; i++) await Bun.sleep(100)
+      await until(() => opened, 'the workspace to open')
       expect(opened).toBe(true)
       await herdr.closeWorkspace(w.workspace.workspace_id)
     } finally {
@@ -324,10 +325,10 @@ describe.skipIf(!saved)('herdr contract: the forwarding to a saved machine', () 
       await there.paneText(tab.root_pane.pane_id, 'echo forwarded-$((40 + 2))')
       await there.paneKeys(tab.root_pane.pane_id, ['Enter'])
       let text = ''
-      for (let i = 0; i < 50 && !text.includes('forwarded-42'); i++) {
-        await Bun.sleep(200)
+      await until(async () => {
         text = await there.read(tab.root_pane.pane_id, 'text', 50)
-      }
+        return text.includes('forwarded-42')
+      }, 'the pane to show forwarded-42')
       expect(text).toContain('forwarded-42')
     } finally {
       await there.closePane(tab.root_pane.pane_id).catch(() => undefined)

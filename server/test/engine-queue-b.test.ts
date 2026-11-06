@@ -105,10 +105,10 @@ describe("a task's place in herdr", () => {
     expect(t.cleaned).toBeFalsy()
     w.herdr.busy.delete(root_pane.pane_id)
     // a clean-up already running (it saw the pane busy) makes a sweep skip the task: sweep until one lands
-    for (let i = 0; i < 100 && !t.cleaned; i++) {
+    await until(async () => {
       await w.engine.sweep()
-      if (!t.cleaned) await Bun.sleep(50)
-    }
+      return !!t.cleaned
+    }, 'the task to be cleaned up')
     expect(t.cleaned).toBe(true)
     expect(existsSync(t.worktree!)).toBe(false)
   })

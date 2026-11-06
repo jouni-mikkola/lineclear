@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { checkUpload, dispatcherChat, MAX_FILE_BYTES, MAX_FILES, parseSend, taskChatLinks } from "../src/chat.ts";
 import { PAGE_TOKEN, type webApi } from "../src/web.ts";
 import { DISPATCHER_KEY, startFakeLineclear } from "../ui/test/fake-lineclear-server.ts";
-import { freshWebApi, until } from "./helpers.ts";
+import { freshWebApi, waitFor } from "./helpers.ts";
 
 const dirs: string[] = [];
 afterAll(() => dirs.forEach((d) => rmSync(d, { recursive: true, force: true })));
@@ -25,12 +25,9 @@ const req = (path: string, body?: unknown, headers: Record<string, string> = { "
 
 /** The chat view once `ok` holds, read again until then. */
 async function viewWhen(handle: ReturnType<typeof webApi>, ok: (v: any) => boolean) {
-  for (let i = 0; i < 100; i++) {
-    const v = await (await handle(req("/api/chat"))).json();
-    if (ok(v)) return v;
-    await Bun.sleep(30);
-  }
-  throw new Error("the chat never got there");
+  let v: any;
+  await waitFor(async () => ok((v = await (await handle(req("/api/chat"))).json())), "the chat view to match");
+  return v;
 }
 
 test("an upload is refused when too big, empty, of a type not taken, or not what its name says", () => {
@@ -162,7 +159,7 @@ test("a send Lineclear is slow to take says so, not offline", async () => {
   const chat = dispatcherChat({ LINECLEAR_CONFIG: dir, LINECLEAR_URL: fake.url, HOME: dir }, 3000, 100);
   try {
     chat.listen(() => {});
-    await until(() => !(chat.view().state !== "ready"), 30);
+    await waitFor(() => !(chat.view().state !== "ready"), "the chat to be ready");
     const slow = await chat.send("hi", [], "c9");
     expect(slow?.status).toBe(504);
     expect(slow?.error.includes("goes in only once")).toBe(true);
@@ -225,7 +222,7 @@ test("a missing Dispatcher is made once by the server itself", async () => {
       return 1;
     });
     chat.view();
-    for (let i = 0; i < 60 && chat.view().state === "loading"; i++) await Bun.sleep(30);
+    await waitFor(() => chat.view().state !== "loading", "the chat to stop loading");
     await Bun.sleep(200);
     expect(chat.view().state).toBe("none");
     expect(made).toBe(1);
@@ -294,10 +291,10 @@ test("a task's chat is served at its own address, says it has none, and the olde
   try {
     const { handle } = api(fake.url);
     let none: { state?: string } = {};
-    for (let i = 0; i < 100 && none.state !== "none"; i++) {
+    await waitFor(async () => {
       none = await (await handle(req("/api/task/WEB-3/chat"))).json();
-      await Bun.sleep(30);
-    }
+      return none.state === "none";
+    }, "the task chat to be none");
     expect(none.state).toBe("none");
     const bad = await handle(req("/api/task/WEB-3/chat/react", { message: "", emoji: "x" }));
     expect(bad.status).toBe(400);

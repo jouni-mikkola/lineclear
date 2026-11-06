@@ -25,10 +25,8 @@ Object.assign(src.engine, { wt: new Worktrees(fake.h as never) })
 // --rerun-each runs the file's afterAll after every run, and the next run still needs the source: it ends with the process then
 export const stopSource = () => process.env.LINECLEAR_TEST_RERUN || src.stop()
 
-/** what a test waits for has come true, however slow the machine (a timer, another process) */
-export const until = async (f: () => boolean, ms = 60_000) => {
-  for (const t0 = Date.now(); !f(); await Bun.sleep(20)) if (Date.now() - t0 > ms) throw new Error('timed out')
-}
+import { until } from './until.ts'
+export { until }
 
 /** a project with a task whose agent has committed work on its branch (herdr isn't there: its agent can't start) */
 export async function workedTask(name: string) {

@@ -2,11 +2,7 @@
 // A place's mode switches from the + menu of its coordinator's chat.
 import { describe, expect, test } from 'bun:test'
 import { DemoWorld } from '../server/demo/world.ts'
-
-/** the demo agent answers a moment later: wait for it, up to 5s */
-const until = async (f: () => boolean) => {
-  for (let i = 0; !f() && i < 3000; i++) await Bun.sleep(20)
-}
+import { until } from './until.ts'
 
 describe('one agent per task', () => {
   test("every task has one agent, whose chat is the task's own", () => {

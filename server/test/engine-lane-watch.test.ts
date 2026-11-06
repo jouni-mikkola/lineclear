@@ -72,7 +72,7 @@ test.skipIf(Boolean(process.env.CI))(
     hangs(w, [head.id])
     const t0 = Date.now()
     const hung = w.engine.merge(head.id, { self: true })
-    await until(() => w.engine.subOf(head) === 'Rebasing on main', 2000)
+    await until(() => w.engine.subOf(head) === 'Rebasing on main', 'the task to show Rebasing on main', 2000)
     const waiting = w.engine.merge(behind.id, { self: true })
     // another project's line never waits for it
     expect((await w.engine.merge(x.id, { self: true })).ok).toBe(true)
