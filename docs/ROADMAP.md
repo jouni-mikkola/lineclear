@@ -75,7 +75,7 @@ Result: For a day of normal runs, no step of this repo is recorded waiting on a 
 - why: the tests of L261 and L263 plant the stall, but only a day of real starts shows the class does not come back.
   The task only reads the log and writes one entry, so it holds `numbers` for minutes; started before the day is
   over, it writes nothing, the step stays unproven and the rule loop starts it again later.
-- done when: `decisions.jsonl` in Lineclear's config folder (`$LINECLEAR_CONFIG`, else `~/.config/lineclear/`) has, in the
+- done when: `decisions.jsonl` in Lineclear's config folder (`$LINECLEAR_CONFIG`, else `~/.config/lineclear/`) has, in the 24 hours after L263 merges while the rule loop starts this repo's open steps as usual, no `stall` line of the class `lock-held` for this repo whose holder and waiter share no lock and no file and neither holds a part of the other whole: a wait on the same area, or on a part one of them needs whole, is real contention.
 - parts: measure
 - locks: numbers
 - after: none
@@ -102,7 +102,7 @@ Result: Done tasks move out of `tasks.json` into the cold file, so the hot file 
 ### L70 One web UI, one port
 Result: Lineclear has one web UI on one address to open and to secure.
 - why: while the old UI serves on its own port, there are two UIs and two addresses to secure.
-- done when: The fork's API answers on Lineclear's port, beside Lineclear's own, and agents' commands, remote helpers and
+- done when: The fork's API answers on Lineclear's port, beside Lineclear's own, and agents' commands, remote helpers and the sandbox relay reach it there or on a socket under `~/.lineclear`.
 - parts: server, install
 - after: none
 - dropped: Split into L164 to L167, each small enough for one task: links, no old pages, the code deleted, the lines counted.
@@ -157,7 +157,7 @@ Result: One Usage page shows each account's limit, reset time and share.
 - why: usage is one share-of-tokens bar on Home and again in Settings, with no limit, no reset time, nothing per
   project and nothing per merged step. Whether more work can start, and what it costs, is a question you ask often,
   and the plain facts answer it better than a verdict.
-- done when: `/usage` has no call-out headline such as "Work can start now". It opens with each account's use, limit and reset
+- done when: `/usage` has no call-out headline such as "Work can start now". It opens with each account's use, limit and reset time, then each machine as a siding with its free and busy slots, as the board's Usage frames (U51) draw it. Machines leave Settings. L46 adds when a full account frees up.
 - parts: ui, measure
 - locks: usage, home
 - after: none
@@ -167,7 +167,7 @@ Result: One Usage page shows each account's limit, reset time and share.
 Result: You see each running agent, where it runs and what it costs now.
 - why: to know what the work costs and where it stands right now, you need to see each agent that runs, on which
   model and account, and how much it has used, not only totals per day.
-- done when: `/usage` lists each running agent with its task title, model, account, role (worker, reviewer or planner),
+- done when: `/usage` lists each running agent with its task title, model, account, role (worker, reviewer or planner), context in %, tokens and dollars so far and time running, as the board's frames (U51) draw it. Each account's use shows with its limit and reset time from the same data.
 - parts: ui, measure
 - locks: usage
 - after: U27
@@ -178,7 +178,7 @@ Result: Home shows the state of all work first, then the line, and each decision
 - why: Home says "3 things wait for you" and then shows spend and usage, so a decision sits in two places and Home
   does not say how the work goes. A project shows a progress bar, a station strip and a text list, three pictures of
   one thing. A fresh install is three empty cards with the mark as their icon.
-- done when: The headline gives the state of all work in one plain line, such as "Line clear. 7 at work, 3 merged today, next
+- done when: The headline gives the state of all work in one plain line, such as "Line clear. 7 at work, 3 merged today, next merge in about 20 min", from the shared status code. It never says "N things wait for you", and Home has no ask and no answer button. What waits for you shows only as the count on the Inbox tab (U26) and a lamp on the step in its track. A test reads Home in every state and fails on either.
 - parts: ui
 - locks: home
 - after: none
@@ -193,7 +193,7 @@ Result: Variables, classes and file names inside the code say Lineclear, not Lin
 - why: environment variables, CSS classes, the artifact API (`window.lineclear`, `lineclear-dark`,
   `lineclear-size`) and file and function names in `server/`, `src/`, `pi/`, `scripts/` and `install.sh` still say
   Lineclear, and a user sees them in artifacts and errors.
-- done when: Every environment variable, CSS class, event, meta tag, path (the sandbox's `/run/lineclear` too) and name in
+- done when: Every environment variable, CSS class, event, meta tag, path (the sandbox's `/run/lineclear` too) and name in the code is named Lineclear (`LINECLEAR_*`, `lineclear-*`, `window.lineclear`).
 - parts: server, ui, core, install, pi
 - after: none
 - locks: server, ui, core, install, pi
@@ -201,7 +201,7 @@ Result: Variables, classes and file names inside the code say Lineclear, not Lin
 ### L71 What no one uses is gone
 Result: Code nobody uses is removed, so there is less to read and keep up.
 - why: unused code is read, tested and kept up to date for nothing.
-- done when: `server/herdr-plugin.toml`, its scripts, each plugin no feature uses and the code nothing calls are deleted.
+- done when: `server/herdr-plugin.toml`, its scripts, each plugin no feature uses and the code nothing calls are deleted. The commit lists each part removed and why no one used it.
 - parts: server
 - locks: none
 - files: server/herdr-plugin.toml, server/plugins.json, server/plugins
@@ -211,7 +211,7 @@ Result: Code nobody uses is removed, so there is less to read and keep up.
 Result: The server's settings code is split into files under the size limit.
 - why: the server has the worst part health, and both builds read the settings it keeps, so its 807-line settings
   file is where a format change hides.
-- done when: As the first file of L88's split, `server/server/live/settings.ts` is split by job into files under 600 lines, each function under 80, with no
+- done when: As the first file of L88's split, `server/server/live/settings.ts` is split by job into files under 600 lines, each function under 80, with no entry left for it in the size baseline, and `bun run gates --lower` lowered it.
 - parts: server (health)
 - locks: none
 - after: L71
@@ -220,7 +220,7 @@ Result: The server's settings code is split into files under the size limit.
 ### L95 A machine needs no install
 Result: You add a machine without installing Lineclear on it.
 - why: every Lineclear install is one more copy to update, with its own PATH, port and folders to break.
-- done when: `lineclear machine add <host>` runs `herdr machine add`, installs pi, bun, git, gh and the agent kit there, and
+- done when: `lineclear machine add <host>` runs `herdr machine add`, installs pi, bun, git, gh and the agent kit there, and clones the projects that may run there. It installs no Lineclear server, and says so.
 - files: src/machines.ts, src/spread.ts, src/migrate.ts, server/server/live/install.ts
 - parts: install, rules, server
 - after: none
@@ -229,7 +229,7 @@ Result: You add a machine without installing Lineclear on it.
 Result: Old panes, folders and rule loops are gone from every other machine.
 - why: an old coordinator pane, an old helper folder or an old rule loop on another machine keeps running, spends
   memory and can act on old state.
-- done when: `lineclear doctor` names each leftover on every machine: a Lineclear coordinator pane, a `lineclear run` or a
+- done when: `lineclear doctor` names each leftover on every machine: a Lineclear coordinator pane, a `lineclear run` or a server, the old data folder's helper.
 - files: src/doctor.ts
 - parts: install
 - after: L95
@@ -239,7 +239,7 @@ Result: Secrets live in one store, and an agent gets a login code from it.
 - why: the server keeps secrets in its vault (Settings > Secrets, `lineclear secret`), while `lineclear secrets`
   kept them in files of its own, so a secret set in one place was missing in the other. Agents also need the code of
   a login that asks for one.
-- done when: `lineclear secrets set`, `list` and `env` use the vault. `env` gives the folder's chain: its space, this
+- done when: `lineclear secrets set`, `list` and `env` use the vault. `env` gives the folder's chain: its space, this machine and Everywhere, the most specific first. `set --all` sets one for Everywhere.
 - parts: install, pi, server
 - locks: none
 - files: src/secrets.ts, src/totp.ts, pi/extension.ts
@@ -285,7 +285,7 @@ Result: The chat's composer lives in its own kit file, and `ui/kit/chat.tsx` has
 Result: The web UI is finished and proved before a release goes out.
 - why: a user judges Lineclear by its web UI, so a release with a missing picture, a vague label or a dead button
   breaks trust in all of it.
-- done when: Every main concept of `docs/idea.md` and `docs/brand.md` is on screen and drawn as brand.md says: the line,
+- done when: Every main concept of `docs/idea.md` and `docs/brand.md` is on screen and drawn as brand.md says: the line, stations (steps), trains (tasks) moving between them, signals (waits, locks, check slots), the Inbox as one decision at a time, and usage and spend. A list in `docs/numbers.md` under "U43" maps each concept to the view and the screenshot from `bun run shots` (U42) that shows it.
 - parts: ui
 - locks: kit, shell, words, ui-test, layout-test, motion
 - after: none

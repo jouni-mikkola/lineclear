@@ -76,7 +76,7 @@ when that need is measured.
 
 ## Frozen roadmap steps
 
-Parked by the owner on 5 Nov 2026; moved back to the roadmap only by the owner.
+Parked by the owner; moved back to the roadmap only by the owner.
 
 - L268 Herdr calls are counted: only a count from herdr's own log shows the polling is gone and stays gone.
 - L276 Home shows a looping step: a step that starts again and again burns tokens out of sight, and the owner learns of it only when the count is huge.
@@ -85,7 +85,7 @@ Parked by the owner on 5 Nov 2026; moved back to the roadmap only by the owner.
 - L174 An Operator keeps the line: polling, re-adding failed starts and promotions are chores that fill the Dispatcher's turns. A role of their own does them without taking a worker slot.
 - L175 Owner message reaches mid-turn: today a message waits until the turn ends, which can be minutes. The owner takes the silence for a hang.
 - L176 Answer within 30 s, tested: L173 to L175 are each tested alone. The promise to the owner is the whole chain, so one test holds it.
-- L191 Operations have ids: a pi turn is serial, so a 2 to 10 min merge or release in the Dispatcher's own call holds every owner message
+- L191 Operations have ids: a pi turn is serial, so a 2 to 10 min merge or release in the Dispatcher's own call holds every owner message until it ends.
 - L192 Op events: the Dispatcher polls with `sleep` and `tail` today, which resends about 100 k context tokens per tick.
 - L193 The Dispatcher wakes on an event: "No news reaches you" in its template makes it poll; an event push removes the polling.
 - L194 The Dispatcher never waits: the owner's message must be answered in seconds, and a long call in the Dispatcher's turn blocks it.
