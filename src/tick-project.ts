@@ -12,8 +12,8 @@ import { noWorkerNote, startAccountNote } from "./quota.ts";
 import { stepHeld } from "./parts.ts";
 import { company } from "./company.ts";
 import type { Settings } from "./project.ts";
-import { checkRoadmap, closedSteps, doneIds, isFrozen, resultFlag, stepOfTask, stepStatuses, type Task } from "./roadmap.ts";
-import { mergedSteps, stepInputs } from "./task-steps.ts";
+import { checkRoadmap, closedSteps, doneIds, isFrozen, resultFlag, stepOfTask, type StepStatus, type Task } from "./roadmap.ts";
+import { mergedSteps, statusesFrom, stepInputs } from "./task-steps.ts";
 import type { Decision, State } from "./rules.ts";
 import { askMachines, type Candidate, localSlotsFree, mostRoom, type Room, roomLack } from "./spread.ts";
 import { routineWorker } from "./routine.ts";
@@ -26,7 +26,7 @@ import type { World } from "./world.ts";
 type MainInfo = Exclude<ReturnType<World["main"]>, string>;
 type Parsed = ReturnType<typeof checkRoadmap>["parsed"];
 type Step = Parsed["steps"][number];
-type StepState = ReturnType<typeof stepStatuses>[number];
+type StepState = StepStatus;
 type Note = (kind: Decision["kind"], reason: string, step?: string) => void;
 
 /** What every part of one project's tick needs. */
@@ -230,9 +230,7 @@ function stepStates(t: Tick, steps: Step[], main: MainInfo, tasks: Task[], remot
   const closedHere = closedSteps(steps, tasks, state.taskSteps, remote).keys();
   const proven = proveMerged(t, steps, new Set([...mergedSteps(steps, main.commits, closed), ...closedHere]), main.head);
   const inputs = stepInputs(steps, main.commits, { local: tasks, remote }, settings.repo, env, { state: { ...state, closedSteps: closed }, unproven: proven });
-  const status = stepStatuses(steps, inputs.merged, inputs.tasks, inputs.taskSteps, inputs.remote, inputs.unproven).map((s) =>
-    restarted.has(s.id) ? { ...s, state: "work" as const } : s,
-  );
+  const status = statusesFrom(steps, inputs).map((s) => (restarted.has(s.id) ? { ...s, state: "work" as const } : s));
   const byId = new Map(steps.map((s) => [s.id, s]));
   facts.tasks = tasks;
   facts.done = new Set(status.filter((s) => s.state === "done").map((s) => s.id));

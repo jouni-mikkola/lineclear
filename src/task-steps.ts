@@ -86,10 +86,15 @@ export function stepInputs(
   return { merged, tasks: tasks.local, taskSteps: state.taskSteps ?? {}, remote: tasks.remote, unproven: live.unproven ?? unprovenOf(repo, env) };
 }
 
+/** The states of steps from gathered inputs: the only call of `stepStatuses` outside the roadmap module. */
+export function statusesFrom(steps: Step[], i: StepInputs): StepStatus[] {
+  return stepStatuses(steps, i.merged, i.tasks, i.taskSteps, i.remote, i.unproven);
+}
+
 /** The states of a repo's steps: a local task marks its step only through the rules' record, a task of another machine through its title. */
 export function statusesOf(steps: Step[], commits: Commits, tasks: Task[], repo: string, env: Env): StepStatus[] {
   const i = stepInputs(steps, commits, { local: tasks.filter((t) => !isRemote(t)), remote: tasks.filter(isRemote) }, repo, env);
-  return stepStatuses(steps, i.merged, i.tasks, i.taskSteps, i.remote, i.unproven);
+  return statusesFrom(steps, i);
 }
 
 /** The merged steps and the unproven ones of a roadmap's text, for a reader that draws the plan and not the states. */
