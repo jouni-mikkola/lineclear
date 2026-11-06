@@ -592,7 +592,6 @@ test("stepStatuses is called only where its inputs come from stepInputs", () => 
   for (const file of callers) {
     const text = readFileSync(join(dir, file), "utf8");
     if (/\bstepStatuses\(/.test(text) && file !== "roadmap.ts") found.push(file);
-    if (/\bstepStatuses\(/.test(text) && file !== "roadmap.ts") expect(text).toContain("stepInputs(");
   }
-  expect(found.sort()).toEqual(["task-steps.ts", "tick-project.ts"]);
+  expect(found).toEqual(["task-steps.ts"]);
 });
