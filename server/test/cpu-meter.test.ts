@@ -56,7 +56,7 @@ describe('cpu meter', () => {
   test('a fixed /proc tree gives each kind its ticks', () => {
     const root = mkdtempSync(join(tmpdir(), 'proc-'))
     const work = mkdtempSync(join(tmpdir(), 'wt-'))
-    // pid, parent, utime, stime, cmdline: pi and its bridge, a test run and a server it started
+    // pid, parent, ticks used (utime), cmdline: pi and its bridge, a test run and a server it started
     const proc = (pid: number, parent: number, used: number, cmd: string) => {
       mkdirSync(join(root, String(pid)), { recursive: true })
       writeFileSync(join(root, String(pid), 'stat'), `${pid} (${cmd.split(' ')[0]}) S ${parent} 0 0 0 0 0 0 0 0 0 ${used} 0 0 0 0 0 0 0 0 0`)
