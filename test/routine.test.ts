@@ -1,7 +1,6 @@
 import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { recordRun } from "../src/check-runs.ts";
+import { join } from "node:path";
 import { tick } from "../src/rules.ts";
 import { cheapWorker, isRoutine } from "../src/routine.ts";
 import { parseRoadmap } from "../src/roadmap.ts";
@@ -85,53 +84,4 @@ test("a routine step starts on the cheap model and a code step on the worker mod
   const code = setup("src/a.ts, docs/numbers.md");
   code.tick();
   expect(modelOf(code.adds[0]!)).toBe(STRONG);
-});
-
-test("a routine step whose check failed twice moves to the worker model, and the decision log says so", () => {
-  const t = setup("docs/numbers.md", [{ id: "LIN-5", title: "A Alpha", status: "work" }]);
-  t.tick();
-  const state = JSON.parse(readFileSync(t.statePath, "utf8"));
-  state.models.A = CHEAP;
-  state.cheap = ["A"];
-  writeFileSync(t.statePath, JSON.stringify(state));
-  const run = () =>
-    recordRun(
-      {
-        at: Date.now(),
-        repo: t.dir,
-        tier: "inner",
-        command: "check",
-        commit: "c",
-        branch: "work/5-a-alpha",
-        dirty: true,
-        seconds: 1,
-        load: 0,
-        cores: 1,
-        ok: false,
-        failed: [],
-        group: "g",
-      },
-      t.vars,
-    );
-  run();
-  t.tick();
-  expect(t.adds).toHaveLength(0);
-  run();
-  t.tick();
-  expect(t.closed).toEqual(["LIN-5"]);
-  expect(modelOf(t.adds[0]!)).toBe(STRONG);
-  expect(t.decisions().find((d) => d.kind === "stall").reason).toContain("failed 2 times on the cheap model");
-});
-
-test("a routine step on the cheap model whose account is full falls back to the normal worker, listed before it", () => {
-  const t = setup("docs/numbers.md", [{ id: "LIN-5", title: "A Alpha", status: "work" }]);
-  t.tick();
-  const state = JSON.parse(readFileSync(t.statePath, "utf8"));
-  state.models.A = CHEAP;
-  state.cheap = ["A"];
-  writeFileSync(t.statePath, JSON.stringify(state));
-  writeFileSync(join(dirname(t.statePath), "..", "..", "accounts.json"), JSON.stringify({ openai: { kind: "subscription", out: true } }));
-  t.tick();
-  expect(t.closed).toEqual(["LIN-5"]);
-  expect(modelOf(t.adds[0]!)).toBe(STRONG);
 });

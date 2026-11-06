@@ -1,8 +1,6 @@
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { writeAtomic } from "../pi/atomic.ts";
 import { dirname, join } from "node:path";
-import type { Task } from "./roadmap.ts";
-import type { ChatCard, StallCard } from "./stalls.ts";
 import type { Decision, State } from "./rules.ts";
 import { MIN } from "./time.ts";
 
@@ -123,65 +121,6 @@ export interface Observation {
   /** When it began, if known before this tick (ms). */
   since?: number;
 }
-
-const NO_LIFE_FRESH_MS = 30 * MIN;
-const DONE_STATES = new Set(["done", "closed"]);
-
-/** Stalls a task shows by itself, beside what the decisions of the tick say. */
-export function taskObservations(
-  tasks: Task[],
-  stepOf: (t: Task) => string | undefined,
-  done: Set<string>,
-  cards: StallCard[],
-  chat: ChatCard[],
-  now: number,
-  /** Tasks with a declared wait: they wait for someone, not for the system. */
-  waiting: Set<string> = new Set(),
-  /** Tasks whose agent never answered its brief, since when (ms). */
-  unsent: Record<string, { since: number }> = {},
-  /** The project's stalls so far: how long a merge has waited. */
-  stalls: Record<string, StallEntry> = {},
-): Observation[] {
-  const out: Observation[] = [];
-  const open = (t: Task) => t.id !== undefined && !DONE_STATES.has(t.status) && !waiting.has(t.id);
-  for (const t of tasks) {
-    const id = t.id;
-    if (id === undefined || !open(t)) continue;
-    const brief = unsent[id];
-    if (brief) out.push({ key: id, class: "brief-unsent", evidence: `${id}: its agent never answered its brief`, since: brief.since });
-    const step = stepOf(t);
-    if (t.status === "need" && /^signed out/i.test(t.sub ?? "")) out.push({ key: id, class: "signed-out", evidence: `${id}: ${t.sub}` });
-    if (step !== undefined && done.has(step) && (t.status === "need" || t.status === "ready")) {
-      out.push({ key: id, class: "idle-after-done", evidence: `${id} is ${t.status}, but its step ${step} is merged on main` });
-    }
-    const card = cards.filter((c) => c.task === id).at(-1);
-    if (t.status === "work" && card && now - card.at < NO_LIFE_FRESH_MS) out.push(cardObservation(id, card));
-    if (t.status === "merging") out.push(mergeWait(id, stalls, now));
-    const revive = chat.filter((c) => c.task === id && /outdated settings|couldn.t start it again/i.test(c.text)).at(-1);
-    if (t.status === "need" && revive)
-      out.push({ key: id, class: "revive-loop", evidence: `${id}: ${(revive.text.split("\n")[0] ?? "").slice(0, 160)}`, since: revive.at });
-  }
-  return out;
-}
-
-/** A late card is a busy task past its time; any other card says it was quiet for 20 minutes, so the stall began then. */
-function cardObservation(id: string, card: StallCard): Observation {
-  if (card.late) return { key: id, class: "late", evidence: `${id}: may be stuck, past its time left`, since: card.at };
-  return { key: id, class: "no-sign-of-life", evidence: `${id}: may be stuck, no sign of life`, since: card.at - 20 * MIN };
-}
-
-/**
- * A merge takes minutes: one that stays queued waits behind another project's step in the shared line. After
- * MERGE_LOST_MIN its result is taken as dropped, and the stall moves to that class instead of counting twice.
- */
-function mergeWait(id: string, stalls: Record<string, StallEntry>, now: number): Observation {
-  const queued = stalls[`${id}|head-of-line`];
-  if (stalls[`${id}|merge-lost`] || (queued && now - queued.since >= MERGE_LOST_MIN * MIN))
-    return { key: id, class: "merge-lost", evidence: `${id} has been merging for over ${MERGE_LOST_MIN} min: its result was dropped` };
-  return { key: id, class: "head-of-line", evidence: `${id} is merging, behind the shared check and merge line` };
-}
-
-const MERGE_LOST_MIN = 120;
 
 /** Where each stall of a project stands: kept in the project's state, so a restart loses none. */
 export interface StallEntry {

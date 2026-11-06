@@ -40,9 +40,9 @@ export const saysDone = (reply: string) =>
   !/\b(not|n't|never|yet|still|but|however)\b/i.test(reply.split(/(?<=[.!?])\s+/).at(-1) ?? "") &&
   /\b(done|finished|complete[d]?|released|merged|nothing (more )?to (change|merge|do)|no changes?( needed)?)\b/i.test(reply);
 
-/** Nudges one task gets in an hour before its next quiet turn goes to the stall ladder's restart. */
+/** Nudges one task gets in an hour; its next quiet turn after that is left alone. */
 const NUDGES_PER_HOUR = 3;
-/** Nudges a task in Merging gets in an hour before its next quiet turn goes to the restart rung. */
+/** Nudges a task in Merging gets in an hour. */
 const MERGE_NUDGES = 1;
 
 /** The nudge for a quiet turn in Merging: a merge left running holds every merge behind it in the lane. */
@@ -53,8 +53,6 @@ const mergeNudge = (task: string) =>
 export interface IdleHooks {
   clean(task: string): boolean;
   close(task: string): string | undefined;
-  /** The stall ladder's restart rung: stops the task and tells it to read its brief and go on. */
-  restart(task: string): string | undefined;
 }
 
 type Posted = { at: number; card: Card };
@@ -325,36 +323,27 @@ function closeFinished(task: string, id: string, idle: IdleHooks, r: Round): boo
   return true;
 }
 
-/** Answers a quiet turn: Done when the work is finished, else a nudge, and in time the stall ladder's restart rung. */
+/** Answers a quiet turn: Done when the work is finished, else a nudge, until the hour's nudges are spent. */
 function answerQuietTurn(card: Card, id: string, inMerge: boolean, idle: IdleHooks, r: Round): void {
   const task = String(card.task);
   const reply = replyText(card);
   if (!inMerge && saysDone(reply) && closeFinished(task, id, idle, r)) return;
-  // Merging nudges are kept apart, so a nudge from Work does not send a merge straight to the restart rung
+  // Merging nudges are kept apart, so a nudge from Work does not spend a merge's
   const prefix = `nudge:${inMerge ? "merge:" : ""}${task}@`;
   const recent = [...r.done].filter((k) => k.startsWith(prefix) && r.now.getTime() - Number(k.split("@")[1]) < HOUR_MS);
   const limit = inMerge ? MERGE_NUDGES : NUDGES_PER_HOUR;
-  const restart = recent.length >= limit;
+  if (recent.length >= limit) return void r.done.add(id);
   const quiet = inMerge
     ? "its turn ended while its merge was in progress"
     : promisesNext(reply)
       ? "its reply promised its next action and declared no wait"
       : "its turn ended with no question and no wait";
-  const verb = restart ? "restart" : "nudge";
-  if (r.dryRun) return void r.out.push(`would ${verb} ${task}: ${quiet}`);
+  if (r.dryRun) return void r.out.push(`would nudge ${task}: ${quiet}`);
   const nudge = inMerge ? mergeNudge(task) : promisesNext(reply) ? PROMISE_NUDGE : IDLE_NUDGE;
-  const err = restart ? idle.restart(task) : r.tell(task, nudge);
-  if (err) return void r.out.push(`could not ${verb} ${task}: ${err}`);
-  const at = r.now.toISOString();
-  if (restart) {
-    for (const k of recent) r.done.delete(k);
-    r.out.push(
-      `${task} was restarted, the stall ladder's rung 2: ${recent.length} nudge${recent.length === 1 ? "" : "s"} in an hour did not help (${quiet}) at ${at}`,
-    );
-  } else {
-    r.out.push(`${task} was nudged (${recent.length + 1} of ${inMerge ? limit + 1 : limit} in an hour): ${quiet} at ${at}`);
-    r.done.add(`${prefix}${r.now.getTime()}`);
-  }
+  const err = r.tell(task, nudge);
+  if (err) return void r.out.push(`could not nudge ${task}: ${err}`);
+  r.out.push(`${task} was nudged (${recent.length + 1} of ${limit} in an hour): ${quiet} at ${r.now.toISOString()}`);
+  r.done.add(`${prefix}${r.now.getTime()}`);
   r.done.add(id);
 }
 

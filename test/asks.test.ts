@@ -230,7 +230,7 @@ const idleCard = (task: string, id: string, reply: string): Card => ({
 test("an idle task that says it is done with nothing changed goes to Done", () => {
   const w = world([idleCard("T-1", "i1", "Released 1.0. Nothing more to do.")]);
   const closed: string[] = [];
-  const idle = { clean: () => true, close: (t: string) => (closed.push(t), undefined), restart: () => undefined };
+  const idle = { clean: () => true, close: (t: string) => (closed.push(t), undefined) };
   expect(w.route(idle)).toEqual(["T-1 is Done, nothing to merge: its agent finished with no changes"]);
   expect(closed).toEqual(["T-1"]);
   expect(w.told).toEqual([]);
@@ -239,7 +239,7 @@ test("an idle task that says it is done with nothing changed goes to Done", () =
 test("an idle task with changes, or with no sign it is done, is nudged", () => {
   const w = world([idleCard("T-1", "i1", "Released 1.0."), idleCard("T-2", "i2", "Hmm, ok.")]);
   const closed: string[] = [];
-  const idle = { clean: (t: string) => t === "T-2", close: (t: string) => (closed.push(t), undefined), restart: () => undefined };
+  const idle = { clean: (t: string) => t === "T-2", close: (t: string) => (closed.push(t), undefined) };
   const out = w.route(idle);
   expect(out).toHaveLength(2);
   expect(w.told.map((l) => l.split(":")[0])).toEqual(["T-1", "T-2"]);
@@ -247,10 +247,9 @@ test("an idle task with changes, or with no sign it is done, is nudged", () => {
   expect(closed).toEqual([]);
 });
 
-test("each quiet turn is nudged, three an hour, then the next is restarted", () => {
+test("each quiet turn is nudged, three an hour, then the next is left alone", () => {
   const w = world([idleCard("T-1", "i1", "Hmm, ok.")]);
-  const restarted: string[] = [];
-  const idle = { clean: () => false, close: () => undefined, restart: (t: string) => void restarted.push(t) };
+  const idle = { clean: () => false, close: () => undefined };
   const turn = (n: number) => {
     writeFileSync(
       join(w.env.LINECLEAR_HOME!, "chatlog", `T-1_${n}.json`),
@@ -264,22 +263,19 @@ test("each quiet turn is nudged, three an hour, then the next is restarted", () 
   expect(turn(1)).toHaveLength(1);
   expect(turn(2)).toHaveLength(1);
   expect(w.told).toHaveLength(3);
-  expect(restarted).toEqual([]);
-  expect(turn(3)[0]).toContain("restarted");
-  expect(restarted).toEqual(["T-1"]);
+  expect(turn(3)).toHaveLength(0);
   expect(w.told).toHaveLength(3);
-  expect(turn(4)).toHaveLength(1);
-  expect(w.told).toHaveLength(4);
+  expect(turn(4)).toHaveLength(0);
+  expect(w.told).toHaveLength(3);
 });
 
-test("a quiet turn in Merging is told to merge again, the second goes to the restart rung", () => {
+test("a quiet turn in Merging is told to merge again, the second is left alone", () => {
   const w = world([idleCard("T-1", "i1", "Merged. Nothing more to do.")]);
   const shep = w.env.LINECLEAR_HOME ?? "";
   writeFileSync(join(shep, "tasks.json"), JSON.stringify({ tasks: [{ id: "T-1", status: "merging" }] }));
   // a nudge from Work earlier in the hour does not count against the merge
   writeFileSync(join(w.config, "projects", "demo", "asks-routed.json"), JSON.stringify([`nudge:T-1@${Date.now() - 60_000}`]));
-  const restarted: string[] = [];
-  const idle = { clean: () => true, close: () => undefined, restart: (t: string) => void restarted.push(t) };
+  const idle = { clean: () => true, close: () => undefined };
   // a fixed clock: nudges are keyed by the millisecond, so real time would let the rounds depend on the machine's speed
   const start = Date.now();
   // a clean worktree and a reply that says merged is still not Done while the merge runs
@@ -287,8 +283,7 @@ test("a quiet turn in Merging is told to merge again, the second goes to the res
   expect(w.told).toHaveLength(1);
   expect(w.told[0]).toContain("`lineclear merge T-1` again");
   writeFileSync(join(shep, "chatlog", "T-1_2.json"), JSON.stringify({ posted: [{ at: 2000, id: "q2", card: idleCard("T-1", "q2", "Still merging.") }] }));
-  expect(w.route(idle, new Date(start + 60_000))[0]).toContain("restarted");
-  expect(restarted).toEqual(["T-1"]);
+  expect(w.route(idle, new Date(start + 60_000))).toEqual([]);
   expect(w.told).toHaveLength(1);
 });
 
@@ -297,7 +292,7 @@ test("a quiet turn after a nudge is answered in each of three ways", () => {
   const w = world(replies.map((r, i) => idleCard(`T-${i + 1}`, `q${i}`, r)));
   const earlier = (i: number) => `nudge:T-${i + 1}@${Date.now() - 600_000}`;
   writeFileSync(join(w.config, "projects", "demo", "asks-routed.json"), JSON.stringify(replies.map((_, i) => earlier(i))));
-  const out = w.route({ clean: () => true, close: () => undefined, restart: () => undefined });
+  const out = w.route({ clean: () => true, close: () => undefined });
   expect(out).toHaveLength(3);
   expect(w.told.map((l) => l.split(":")[0])).toEqual(["T-1", "T-2", "T-3"]);
   expect(w.told[1]).toContain("Run that action now");
@@ -316,7 +311,7 @@ test("a question in plain text is not idle, and a negated done is not done", () 
 
 test("an ordinary question at the end of a turn is bounced back once, and never reaches the Inbox", () => {
   const w = world([idleCard("T-1", "q1", "Tests fail on main. Merge despite failing tests?"), idleCard("T-2", "q2", "Should the card show the date?")]);
-  const idle = { clean: () => false, close: () => undefined, restart: () => undefined };
+  const idle = { clean: () => false, close: () => undefined };
   const out = w.route(idle);
   expect(out).toHaveLength(2);
   expect(w.told).toHaveLength(2);
@@ -332,7 +327,7 @@ test("a question about a login code, money or something that leaves is not bounc
     idleCard("T-2", "q2", "Publish the release now?"),
     idleCard("T-3", "q3", "May I pay for more credit beyond the budget?"),
   ]);
-  expect(w.route({ clean: () => false, close: () => undefined, restart: () => undefined })).toEqual([]);
+  expect(w.route({ clean: () => false, close: () => undefined })).toEqual([]);
   expect(w.told).toEqual([]);
 });
 

@@ -2,12 +2,11 @@ import { expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { decisionsPath, tick, type Decision, type State } from "../src/rules.ts";
-import { CLASS_INFO, classify, stallsMain, summarize, watchStalls, type Observation } from "../src/stall-class.ts";
+import { CLASS_INFO, classify, summarize, watchStalls, type Observation } from "../src/stall-class.ts";
 import { DAY_CAP, fileFix, fileFixes, fileFixNow, readFixes, type FixSpec } from "../src/self-fix.ts";
 import { closeItem, isOpen, readItems } from "../src/inbox.ts";
-import { readSettings, type Settings } from "../src/project.ts";
+import type { Settings } from "../src/project.ts";
 import { stepStatuses, type Step, type Task } from "../src/roadmap.ts";
-import { stallsOf } from "../src/stall-ladder.ts";
 import { recordTaskSteps } from "./helpers.ts";
 import { fakeWorld, scratch } from "./fake-world.ts";
 
@@ -131,23 +130,6 @@ test("every class is planted: recorded past its limit, remedied with minutes, en
   }
 });
 
-test("a loop that was away for over 30 minutes records a coordinator-gone stall, its remedy and its end", () => {
-  const t = setup();
-  t.jump(0);
-  t.jump(5 * MIN);
-  t.jump(60 * MIN);
-  t.jump(MIN);
-  const gone = t
-    .decisions()
-    .filter((d) => d.class === "coordinator-gone" && d.event !== undefined)
-    .map((d) => [d.event, d.minutes]);
-  expect(gone).toEqual([
-    ["stall", undefined],
-    ["remedy", 60],
-    ["end", 61],
-  ]);
-});
-
 test("a stall seen by a task's own state counts from when it began", () => {
   const state = { last: {}, roadmapErrors: [] } as unknown as State;
   const o: Observation = { key: "LIN-5", class: "no-sign-of-life", evidence: "LIN-5: may be stuck", since: Date.UTC(2026, 5, 1, 9, 40) };
@@ -172,79 +154,6 @@ test("the summary sums stalls and minutes by class, open ones until now, and the
   expect(s.classes["no-room"]).toEqual({ stalls: 1, minutes: 120, toRemedy: 130 });
   expect(s.classes["signed-out"]).toEqual({ stalls: 1, minutes: 60, toRemedy: null });
   expect([s.stalls, s.minutes]).toEqual([2, 180]);
-});
-
-test("a task whose step is merged is closed by its remedy, and lineclear stalls shows it", () => {
-  const t = setup([{ id: "LIN-5", title: "A Alpha", status: "need" }], [{ subject: "A Alpha", body: "Step: A" }]);
-  t.step(0);
-  expect(t.log).toEqual([]);
-  t.step(31 * MIN);
-  expect(t.log).toEqual(["close LIN-5"]);
-  const lines = t
-    .decisions()
-    .filter((d) => d.class === "idle-after-done")
-    .map((d) => d.event);
-  expect(lines).toEqual(["stall", "remedy"]);
-  const out: string[] = [];
-  expect(stallsMain([], (l) => out.push(l), decisionsPath(t.env), t.clock.at)).toBe(0);
-  expect(out[0]).toContain("1 stall");
-  expect(out[1]).toContain("idle after done");
-  expect(stallsMain(["--bogus"], () => {}, decisionsPath(t.env))).toBe(2);
-});
-
-test("a revive loop is told once to carry on, not revived again", () => {
-  const t = setup([{ id: "LIN-5", title: "A Alpha", status: "need" }]);
-  t.world.chatCards = () => [{ id: "c1", task: "LIN-5", at: t.clock.at.getTime(), text: "Lineclear couldn't start it again" }];
-  t.step(0);
-  t.step(10 * MIN);
-  expect(t.log.filter((l) => l.startsWith("tell LIN-5 Your agent was found waiting"))).toHaveLength(1);
-  expect(
-    t
-      .decisions()
-      .filter((d) => d.class === "revive-loop")
-      .map((d) => d.event),
-  ).toEqual(["stall", "remedy"]);
-});
-
-test("a held lock reminds the task that holds it, once", () => {
-  const t = setup([{ id: "LIN-5", title: "A Alpha", status: "work" }]);
-  const settings = readSettings("demo", t.env);
-  if (typeof settings === "string") throw new Error(settings);
-  const state: State = { healthFailures: 0, stopped: false, roadmapErrors: [], last: {}, ladder: {}, models: {}, handed: [], taskSteps: { "LIN-5": "A" } };
-  const tasks = [{ id: "LIN-5", title: "A Alpha", status: "work" }] as Task[];
-  const made: Decision[] = [];
-  const tickAt = (min: number) => {
-    t.clock.at = new Date(Date.parse("2026-06-01T10:00:00Z") + min * MIN);
-    const held: Decision = { time: "", project: "demo", step: "B", kind: "skip", reason: "lock 'rules' is held by A" };
-    made.push(...stallsOf("demo", settings, t.world, state, [held], { tasks }, false, t.env));
-  };
-  for (const min of [0, 29, 58, 87, 116, 145, 174, 203, 232, 261, 290]) tickAt(min);
-  expect(t.log.filter((l) => l.startsWith("tell LIN-5 Another step waits for a lock"))).toHaveLength(1);
-  expect(made.filter((d) => d.class === "lock-held" && d.event !== undefined).map((d) => d.event)).toEqual(["stall", "remedy"]);
-});
-
-test("a merge that stays queued is a head-of-line stall, and after two hours a lost merge told to run again", () => {
-  const t = setup([{ id: "LIN-7", title: "A Alpha", status: "merging" }], [{ subject: "A Alpha", body: "Step: A" }]);
-  t.step(0);
-  t.step(10 * MIN);
-  const queued = () =>
-    t
-      .decisions()
-      .filter((d) => d.class === "head-of-line")
-      .map((d) => d.event);
-  expect(existsSync(decisionsPath(t.env)) ? queued() : []).toEqual([]);
-  t.step(31 * MIN);
-  expect(queued()).toEqual(["stall"]);
-  // two hours on, its result counts as dropped: the queued stall ends and the task is told to merge again
-  t.step(121 * MIN);
-  expect(queued()).toEqual(["stall", "end"]);
-  expect(
-    t
-      .decisions()
-      .filter((d) => d.class === "merge-lost")
-      .map((d) => d.event),
-  ).toEqual(["stall", "remedy"]);
-  expect(t.log.some((l) => l.startsWith("tell LIN-7 Your merge has been queued"))).toBe(true);
 });
 
 test("a planted new stall files exactly one fix, however many ticks see it", () => {
@@ -319,17 +228,6 @@ test("a hard cap: at most 3 fixes filed in 24 hours in all, however many classes
   expect(t.adds).toHaveLength(4);
 });
 
-test("the loop cuts decisions.jsonl once a day by its own day mark", () => {
-  const t = setup();
-  t.step(0);
-  t.step(MIN);
-  const mark = join(dirname(decisionsPath(t.env)), "decisions-cut-day");
-  expect(readFileSync(mark, "utf8").trim()).toBe("2026-06-01");
-  t.jump(24 * 60 * MIN);
-  expect(readFileSync(mark, "utf8").trim()).toBe("2026-06-02");
-  expect(existsSync(join(dirname(decisionsPath(t.env)), "stalls-daily.jsonl"))).toBe(false);
-});
-
 test("a Paused project starts none of its steps, and that is no stall; Running again, the step starts", () => {
   const t = setup([]);
   const settings = JSON.parse(readFileSync(t.settingsFile, "utf8"));
@@ -357,58 +255,6 @@ test("old decisions rotate to the archive once a day and are still read back", a
   expect(readDecisionsSince(file, now.getTime() - 40 * 86_400_000).map((d) => d.step)).toEqual(["T3", "T4"]);
   expect(readDecisionsSince(file, now.getTime() - 130 * 86_400_000).map((d) => d.step)).toEqual(["T1", "T2", "T3", "T4"]);
   expect(readDecisionsSince(file, 0).map((d) => d.step)).toEqual(["T0", "T1", "T2", "T3", "T4"]);
-});
-
-test("a task titled with a merged step's id that the rules did not start is no idle-after-done, and a started one with unmerged commits stays open", () => {
-  const t = setup(
-    [
-      { id: "LIN-198", title: "A and B next after 0.1", status: "need" },
-      { id: "LIN-5", title: "A Alpha", status: "need" },
-    ],
-    [{ subject: "A Alpha", body: "Step: A" }],
-  );
-  // LIN-198 is the owner's own task: only LIN-5 was started by the rules
-  t.world.commitsAhead = () => 2;
-  t.step(0);
-  t.step(31 * MIN);
-  expect(t.log.filter((l) => l.startsWith("close"))).toEqual([]);
-  const idle = t.decisions().filter((d) => d.class === "idle-after-done");
-  expect(idle.map((d) => `${d.step}:${d.event}`)).toEqual(["LIN-5:stall"]);
-});
-
-test("every held lock gets a remedy by what its holder is doing, once", () => {
-  const cases: [string, T, string | undefined][] = [
-    ["work", { id: "LIN-5", title: "L130 Alpha", status: "work" }, "tell LIN-5 Another step waits for a lock"],
-    ["queued", { id: "LIN-5", title: "L130 Alpha", status: "queued" }, "tell LIN-5 Another step waits for a lock"],
-    ["sleeping", { id: "LIN-5", title: "L130 Alpha", status: "sleep" }, "tell LIN-5 Another step waits for a lock"],
-    ["need, no question", { id: "LIN-5", title: "L130 Alpha", status: "need", sub: "Waits for your reply" }, "tell LIN-5 Another step waits for a lock"],
-    ["need, open question", { id: "LIN-5", title: "L130 Alpha", status: "need", sub: "Question: which colour?" }, undefined],
-    ["merged", { id: "LIN-5", title: "L130 Alpha", status: "need", sub: "Waits for your reply" }, "close LIN-5"],
-  ];
-  for (const [name, task, action] of cases) {
-    const t = setup([task]);
-    const settings = readSettings("demo", t.env);
-    if (typeof settings === "string") throw new Error(settings);
-    const state: State = { healthFailures: 0, stopped: false, roadmapErrors: [], last: {}, ladder: {}, models: {}, handed: [], taskSteps: { "LIN-5": "L130" } };
-    const done = new Set(name === "merged" ? ["L130"] : []);
-    const made: Decision[] = [];
-    const tickAt = (min: number, st: State) => {
-      t.clock.at = new Date(Date.parse("2026-06-01T10:00:00Z") + min * MIN);
-      const held: Decision = { time: "", project: "demo", step: "L131", kind: "skip", reason: "lock 'server' is held by L130" };
-      made.push(...stallsOf("demo", settings, t.world, st, [held], { tasks: [task as Task], done, stepOf: () => "L130" }, false, t.env));
-    };
-    tickAt(0, state);
-    tickAt(241, state);
-    tickAt(300, state);
-    tickAt(360, JSON.parse(JSON.stringify(state)));
-    // a merged step's idle task is also closed by its own stall class: one close either way
-    const acts = [...new Set(t.log.filter((l) => /^(tell|close) /.test(l)))];
-    expect(acts, name).toHaveLength(action ? 1 : 0);
-    if (action) expect(acts[0]?.startsWith(action), name).toBe(true);
-    const remedies = made.filter((d) => d.class === "lock-held" && d.event === "remedy");
-    expect(remedies, name).toHaveLength(1);
-    if (!action) expect(remedies[0]?.reason, name).toContain("waits for the owner");
-  }
 });
 
 test("a step's task holds its locks by the rules' record, never by a title", () => {
@@ -452,4 +298,15 @@ test("a step's fix tasks that end twice with no merge get no third, one fix-loop
   fileFix(t.world, spec("A Fix: held"), t.env);
   end("A Fix: two", { status: "done" });
   expect(fileFix(t.world, spec("A Fix: five"), t.env)).toEqual({ filed: true });
+});
+
+test("the loop cuts decisions.jsonl once a day by its own day mark", () => {
+  const t = setup();
+  t.step(0);
+  t.step(MIN);
+  const mark = join(dirname(decisionsPath(t.env)), "decisions-cut-day");
+  expect(readFileSync(mark, "utf8").trim()).toBe("2026-06-01");
+  t.jump(24 * 60 * MIN);
+  expect(readFileSync(mark, "utf8").trim()).toBe("2026-06-02");
+  expect(existsSync(join(dirname(decisionsPath(t.env)), "stalls-daily.jsonl"))).toBe(false);
 });

@@ -1,21 +1,18 @@
-import { closeWithReport, limitWallTime } from "./stall-close.ts";
 import { chatFiles, findSpace, lineclearDir } from "./measure.ts";
 import { herdrArgv } from "./herdr.ts";
 import { addItem, isOpen, readItems } from "./inbox.ts";
-import { resultFlag, type Step, stepOfTask, type Task } from "./roadmap.ts";
+import { type Step, stepOfTask, type Task } from "./roadmap.ts";
 import { company } from "./company.ts";
 import type { Settings } from "./project.ts";
-import { type Wait, writeWait } from "./waits.ts";
+import type { Wait } from "./waits.ts";
 import { configDir } from "../pi/config.ts";
-import { type Account, markDead, markFull, readDead, providerOf, readAccounts, readLimit, recordMove } from "./full.ts";
+import { type Account, markDead, markFull, readDead, providerOf, readAccounts, readLimit } from "./full.ts";
 import { join } from "node:path";
 import { closeSync, existsSync, openSync, readSync, statSync } from "node:fs";
 import { writeAtomic } from "../pi/atomic.ts";
-import { agentName, recordStart, serviceStarts } from "./starts.ts";
+import { agentName } from "./starts.ts";
 import { piHarness } from "./harness-pi.ts";
-import { stepBrief } from "./brief.ts";
 import { rankByRoom } from "./pace.ts";
-import { failedChecks } from "./routine.ts";
 import type { Decision, State, World } from "./rules.ts";
 import { DAY } from "./time.ts";
 export interface StallCard {
@@ -218,19 +215,12 @@ function markLimitedReviewers(a: Args): void {
   }
 }
 
-// ---- the ladder ----
-
-const MAX_RUNG = 4;
-const LEFT_WAITING = /^signed out/i;
+// ---- accounts in a tick ----
 
 /** What the task list shows for a task in Needs you that asks nothing (the server's `NEED.reply`). */
 const SILENT_SUB = "Waits for your reply";
 /** A task on a provider error shows one of these while it works or sits on a refused account. */
 const runs = (t: Task) => t.status === "work" || (t.status === "need" && (t.sub === SILENT_SUB || /^(provider error|provider refused)/i.test(t.sub ?? "")));
-const REMINDER =
-  "You may be stuck: nothing has moved for a while. Say where you are with `lineclear status`, then carry on. If you wait for the owner, a login or a browser, declare it with `lineclear wait`.";
-const ESTIMATE = "You are past your time left. Say where you are with `lineclear status` and give a new estimate, then carry on.";
-const RESUME = "Your agent was restarted because it went quiet. Read your brief and your branch, then carry on from where you were.";
 
 interface Args {
   project: string;
@@ -246,165 +236,13 @@ interface Args {
   env: NodeJS.ProcessEnv;
 }
 
-/** The restart rung: stops the task, then tells it to read its brief and go on. */
-export const restartTask = (world: World, id: string) => world.stopTask(id) ?? world.tellTask(id, RESUME, "resume");
-
 /** What one pass over the stalled tasks shares. */
 interface Pass {
   a: Args;
-  restarted: Set<string>;
-  gone: Set<string>;
   waiting: Set<string>;
   now: Date;
   stepOf: (t: Task) => Step | undefined;
-  ladderOf: (id: string) => { rung: number; seen: string[]; asked?: number };
   currentModel: (s: Step) => string;
-}
-
-/** Rung 4: the Inbox. */
-function ask(p: Pass, t: Task, why: string): boolean {
-  const { project, dryRun, note, env } = p.a;
-  const id = t.id!;
-  if (dryRun) {
-    note("stall", `rung 4: would put ${id} in the Inbox (${why})`, id);
-    return true;
-  }
-  const item = addItem(
-    {
-      kind: "stuck",
-      task: id,
-      project,
-      question: `${id} is stuck: ${why}. What now?`,
-      choices: ["Keep waiting", "I will look"],
-      since: p.now.toISOString(),
-    },
-    env,
-  );
-  writeWait({ task: id, project, kind: "owner", reason: `asked: ${item.question}`, since: p.now.toISOString() }, env);
-  p.ladderOf(id).rung = 4;
-  note("stall", `rung 4: ${id} is in the Inbox as item ${item.n} (${why})`, id);
-  return true;
-}
-
-/** The next worker model of a step, or why there is none: a paid key not allowed, or a full last model. */
-function nextModel(p: Pass, current: string, step: Step): { next?: string; blocked?: string } {
-  const { settings, world, dryRun, env } = p.a;
-  const offered = p.a.offered();
-  // A step on the cheap model may fall back to the normal worker, which comes before it in the list.
-  const pool = p.a.state.cheap?.includes(step.id)
-    ? settings.models.worker.filter((m) => m !== current)
-    : settings.models.worker.slice(settings.models.worker.indexOf(current) + 1);
-  const later = pool.filter((m) => offered === undefined || offered.has(m));
-  let blocked: string | undefined;
-  for (const m of later) {
-    const av = availability(m, env, p.now);
-    if (av === "key") {
-      if (!dryRun) askKey(m, world, p.now, env);
-      blocked = `${m} is on a paid key you have not allowed`;
-    } else if (av === "ok" && reviewerFor(m, settings, world, offered, env, p.now) !== undefined) {
-      return { next: m };
-    }
-  }
-  return { blocked };
-}
-
-/** The role's last model is full: the task waits for the reset, not for you. Undefined when that is not the case. */
-function waitForReset(p: Pass, t: Task, current: string): boolean | undefined {
-  const { project, dryRun, note, env } = p.a;
-  const id = t.id!;
-  const until = readAccounts(env)[providerOf(current)]?.resetAt;
-  if (availability(current, env, p.now) !== "out" || until === undefined) return undefined;
-  if (dryRun) {
-    note("stall", `would let ${id} wait until ${until}: ${current} is full and no model is next`, id);
-    return true;
-  }
-  writeWait({ task: id, project, kind: "until", until, reason: `${current} is full and no model is next`, since: p.now.toISOString() }, env);
-  p.ladderOf(id).rung = 3;
-  note("stall", `${id} waits until ${until}: ${current} is full and no model is next`, id);
-  return true;
-}
-
-/** Rung 3: closes the task and starts its step again on the next model, from the old branch. */
-function handover(p: Pass, t: Task, why: string, to?: string): boolean {
-  const { settings, world, state, dryRun, note, env } = p.a;
-  const id = t.id!;
-  const step = p.stepOf(t);
-  if (step === undefined) return ask(p, t, `${why}; it is not a roadmap step, so it has no next model`);
-  // A full account may hand a step on again, to a model later in the list; any other stop gets one handover.
-  if (to === undefined && state.handed.includes(step.id) && availability(p.currentModel(step), env, p.now) !== "out")
-    return ask(p, t, `${why}; the next model already had its turn`);
-  const current = p.currentModel(step);
-  const { next, blocked } = to === undefined ? nextModel(p, current, step) : { next: to, blocked: undefined };
-  if (next === undefined && blocked !== undefined) {
-    // The Inbox has the question: this rung is tried again once you answered it.
-    note("skip", `${id}: ${why}; ${blocked}, so the handover waits for your answer`, id);
-    return false;
-  }
-  if (next === undefined) return waitForReset(p, t, current) ?? ask(p, t, `${why}; there is no next worker model to hand it to`);
-  const reviewer = reviewerFor(next, settings, world, p.a.offered(), env, p.now)!;
-  if (dryRun) {
-    note("stall", `rung 3: would hand ${id} over to ${next} (${why})`, id);
-    return true;
-  }
-  const branch = world.branchOf(settings.repo, id);
-  const err = world.closeTask(id);
-  if (err) {
-    note("skip", `could not close ${id}: ${err}`, id);
-    return false;
-  }
-  const goOn = branch
-    ? `An earlier agent (${current}) stopped on this step. Go on from its branch ${branch}: check it out and carry on from its commits. Do not start over.`
-    : `An earlier agent (${current}) stopped on this step and left no branch. Start from main.`;
-  const started = world.addTask(
-    settings.space,
-    `${step.id} ${step.title}`,
-    `${stepBrief(step, settings, reviewer, next, { repo: settings.repo, roadmap: world.roadmap(settings.repo) ?? "" })}\n\n${goOn}\n`,
-    [
-      "--agent",
-      "pi",
-      "--model",
-      next,
-      "--reviewer",
-      "pi",
-      "--reviewer-model",
-      reviewer,
-      "--set",
-      `review.rounds=${settings.reviewRounds ?? 2}`,
-      ...resultFlag(step),
-    ],
-  );
-  // The step is the loop's again, on its next tick, when the start failed.
-  if (started) {
-    note("skip", `closed ${id}, but the next start failed: ${started}`, step.id);
-    return true;
-  }
-  state.models[step.id] = next;
-  recordStart(state, `${step.id} ${step.title}`, step.id);
-  // The move back from the cheap model is no stall handover: the step keeps its one turn on a later model.
-  if (to === undefined) state.handed.push(step.id);
-  recordMove({ time: p.now.toISOString(), task: id, step: step.id, from: current, to: next, why }, env);
-  p.restarted.add(step.id);
-  p.ladderOf(id).rung = 3;
-  p.gone.add(id);
-  note("stall", `rung 3: closed ${id} (${why}) and started ${step.id} again on ${next}${branch ? `, from ${branch}` : ""}`, step.id);
-  return true;
-}
-
-/** Rungs 1 and 2 remind and restart; 3 hands the task on; 4 asks. */
-function climb(p: Pass, t: Task, rung: number, why: string): boolean {
-  const { world, dryRun, note } = p.a;
-  const id = t.id!;
-  if (rung !== 1 && rung !== 2) return rung === 3 ? handover(p, t, why) : ask(p, t, why);
-  if (rung === 1 && t.status === "work" && why.startsWith("no sign")) return closeWithReport(p.a, p.now, p.ladderOf(id), p.gone, t, why);
-  if (dryRun) return (note("stall", `rung ${rung}: would ${rung === 1 ? "remind" : "restart"} ${id} (${why})`, id), true);
-  const err = rung === 1 ? world.tellTask(id, REMINDER, "resume") : restartTask(world, id);
-  if (err) {
-    note("skip", `rung ${rung} for ${id} failed: ${err}`, id);
-    return false;
-  }
-  p.ladderOf(id).rung = rung;
-  note("stall", `rung ${rung}: ${rung === 1 ? "reminded" : "restarted and resumed"} ${id} (${why})`, id);
-  return true;
 }
 
 /**
@@ -443,139 +281,22 @@ function markFullAccounts(p: Pass): void {
   }
 }
 
-/** A routine step on the cheap model whose check failed twice goes to the worker model of Settings, with a line in the decision log. */
-function escalateRoutine(p: Pass): void {
-  const { settings, world, state, env } = p.a;
-  for (const t of p.a.tasks) {
-    const step = t.id === undefined || t.status !== "work" || p.waiting.has(t.id) || p.gone.has(t.id) ? undefined : p.stepOf(t);
-    if (step === undefined || !state.cheap?.includes(step.id)) continue;
-    const failed = failedChecks(step, settings.repo, env);
-    if (failed < 2) continue;
-    const current = p.currentModel(step);
-    const offered = p.a.offered();
-    const to = settings.models.worker.find(
-      (m) =>
-        m !== current &&
-        (offered === undefined || offered.has(m)) &&
-        availability(m, env, p.now) === "ok" &&
-        reviewerFor(m, settings, world, offered, env, p.now) !== undefined,
-    );
-    if (to === undefined) continue;
-    if (handover(p, t, `routine step: its check failed ${failed} times on the cheap model ${current}`, to) && !p.a.dryRun)
-      state.cheap = state.cheap.filter((id) => id !== step.id);
-  }
-}
-
-/** Tasks that cannot go on: a full account, or Lineclear left them waiting for you. Straight to rung 3, no waiting. */
-function handOverStuck(p: Pass): void {
-  const { env } = p.a;
-  for (const t of p.a.tasks) {
-    if (t.id === undefined || p.waiting.has(t.id) || p.gone.has(t.id) || p.ladderOf(t.id).rung >= 3) continue;
-    const step = p.stepOf(t);
-    const account = step === undefined ? undefined : readAccounts(env)[providerOf(p.currentModel(step))];
-    if (runs(t) && step !== undefined && availability(p.currentModel(step), env, p.now) === "out") {
-      climb(
-        p,
-        t,
-        3,
-        account?.dead ? `the ${providerOf(p.currentModel(step))} account is unusable: ${account.dead}` : `the account of ${p.currentModel(step)} is out`,
-      );
-    } else if (t.status === "need" && LEFT_WAITING.test(t.sub ?? "")) {
-      climb(p, t, 3, `it cannot go on: ${t.sub}`);
-    }
-  }
-}
-
-/** The late remedy: asks for a new estimate, once per task. */
-function askEstimate(p: Pass, id: string): boolean {
-  const { world, dryRun, note } = p.a;
-  if (dryRun) {
-    note("stall", `would ask ${id} for a new estimate: may be stuck, past its time left`, id);
-    return true;
-  }
-  const err = world.tellTask(id, ESTIMATE, "resume");
-  if (err) {
-    note("skip", `asking ${id} for a new estimate failed: ${err}`, id);
-    return false;
-  }
-  p.ladderOf(id).asked = p.now.getTime();
-  note("stall", `asked ${id} for a new estimate: may be stuck, past its time left`, id);
-  return true;
-}
-
-/** The task posted a card of its own (a status) after it was asked for a new estimate. */
-function gotStatus(chat: ChatCard[], id: string, since: number): boolean {
-  return chat.some((c) => c.task === id && c.at > since && !/^may be stuck/.test(c.text));
-}
-
-/** A late task is busy, not silent: it is asked for a new estimate, and climbs only if a late card comes with no status since. */
-function climbReason(t: Task, card: StallCard): string {
-  if (card.late) return "late, and no status after the new estimate was asked for";
-  return t.status === "need" ? "it showed Needs you with no question" : "no sign of life for 20 minutes";
-}
-
-/** Each new stall card moves its task one rung up. */
-function climbStalled(p: Pass): void {
-  const { world, settings, state, dryRun, note } = p.a;
-  const live = new Map(p.a.tasks.flatMap((t): [string, Task][] => (t.id === undefined ? [] : [[t.id, t]])));
-  for (const card of world.stallCards(settings.space, settings.repo)) {
-    const l = p.ladderOf(card.task);
-    if (l.seen.includes(card.id) || card.at < (state.stallSince ?? 0)) continue;
-    const t = live.get(card.task);
-    const mark = () => {
-      if (!dryRun) l.seen.push(card.id);
-    };
-    // Needs you counts only while it still shows no question: a plan, a login or a real question was added since the card.
-    const moves = t?.status === "work" || (t?.status === "need" && t.sub === SILENT_SUB);
-    if (t === undefined || !moves || p.gone.has(card.task)) {
-      mark();
-      continue;
-    }
-    if (p.waiting.has(card.task)) {
-      note("skip", `${card.task} may be stuck, but it has a declared wait, so it is not moved up`, card.task);
-      mark();
-      continue;
-    }
-    if (card.late && (l.asked === undefined || gotStatus(world.chatCards(settings.space, settings.repo), card.task, l.asked))) {
-      if (askEstimate(p, card.task)) mark();
-    } else if (climb(p, t, Math.min(l.rung + 1, MAX_RUNG), climbReason(t, card))) mark();
-  }
-}
-
-/**
- * Moves each stalled task one rung up: a reminder, a restart, the next model, an Inbox item. A task with a declared
- * wait is not touched. Returns the steps it started again, so the same tick does not start them a second time.
- */
-export function serviceStalls(a: Args): Set<string> {
-  const { project, settings, world, state, dryRun, note, env } = a;
+/** Marks the accounts that ran out and brings back those whose reset passed. Nobody is told: it shows on Usage. */
+export function serviceAccounts(a: Args): void {
+  const { settings, world, state } = a;
   const now = world.now();
   state.stallSince ??= now.getTime();
   const worker = settings.models.worker;
   const p: Pass = {
     a,
-    restarted: new Set(),
-    gone: new Set(),
     waiting: new Set(a.waits.map((w) => w.task)),
     now,
     stepOf: (t) => stepOfTask(a.steps, t, state.taskSteps ?? {}),
-    ladderOf: (id) => (state.ladder[id] ??= { rung: 0, seen: [] }),
     currentModel: (s) => state.models[s.id] ?? worker[0] ?? "",
   };
   markFullAccounts(p);
-  handOverStuck(p);
-  escalateRoutine(p);
   restoreAccounts(a);
   markLimitedReviewers(a);
-
-  // A start whose agent never answered its brief: its own ladder (starts.ts).
-  // A task marked start failed is still looked at, so its wait ends once its agent answers.
-  const failed = new Set(a.waits.filter((w) => w.kind === "start").map((w) => w.task));
-  const skip = new Set([...[...p.waiting].filter((id) => !failed.has(id)), ...p.gone]);
-  serviceStarts({ project, world, state, dryRun, tasks: a.tasks, skip, failed, note, env });
-
-  limitWallTime(p.a, p.now, p.ladderOf, p.gone, p.waiting);
-  climbStalled(p);
-  return p.restarted;
 }
 
 /**

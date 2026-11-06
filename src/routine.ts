@@ -1,7 +1,6 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { readJson } from "../pi/config.ts";
-import { readRuns } from "./check-runs.ts";
 import { priceFinder } from "./measure.ts";
 import { stepFiles } from "./parts.ts";
 import type { Step } from "./roadmap.ts";
@@ -37,12 +36,6 @@ export function cheapWorker(
     if (p !== undefined && (best === undefined || p < best.p)) best = { m, p };
   }
   return best?.m;
-}
-
-/** How many times the checks failed on the branches of a step's tasks (`work/<n>-<step id>-...`), a dirty run counts: the failure is real. */
-export function failedChecks(step: Step, repo: string, env = process.env): number {
-  const branch = new RegExp(`^work/\\d+-${step.id.toLowerCase()}(-|$)`);
-  return readRuns(repo, 0, env).filter((r) => !r.ok && !r.quarantined && branch.test(r.branch)).length;
 }
 
 /** The cheap model a routine step starts on, or undefined for any other step. */
