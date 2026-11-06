@@ -1,3 +1,4 @@
+import { checksMain } from "./check-failures.ts";
 import { readJson } from "../pi/config.ts";
 import { lineclearDir, spaceTasks } from "./measure.ts";
 import { type SessionCalls, phaseTable, readCpu, taskPhases, worktreeCalls } from "./measure-phases.ts";
@@ -8,7 +9,7 @@ import { join } from "node:path";
 type Env = Record<string, string | undefined>;
 type Out = (l: string) => void;
 
-const USAGE = "usage: lineclear measure phases [--last N]";
+const USAGE = "usage: lineclear measure phases [--last N] | checks [--days N]";
 
 /** The last `n` tasks that had a working folder, newest first, from every space. */
 function lastTasks(dir: string, n: number): { id: string; worktree: string; machine?: string }[] {
@@ -37,6 +38,7 @@ export function measureMain(args: string[], out: Out, env: Env = process.env): n
     out(JSON.stringify(Object.fromEntries(args.slice(1).map((w) => [w, worktreeCalls(w, env)]))));
     return 0;
   }
+  if (args[0] === "checks") return checksMain(args.slice(1), out);
   const i = args.indexOf("--last");
   const last = i >= 0 ? Number(args[i + 1]) : 30;
   if (args[0] !== "phases" || !(last > 0) || args.some((a, n) => n > 0 && a !== "--last" && n !== i + 1)) {

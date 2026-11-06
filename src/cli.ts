@@ -2,7 +2,6 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { asksMain } from "./asks.ts";
-import { measureMain } from "./measure.ts";
 import { storeMain } from "./store-copies.ts";
 import { dispatcherMain, moveMain } from "./dispatcher.ts";
 import { doctor, herdrUnsaved, herdrVersions, realProbe, testedHerdr } from "./doctor.ts";
@@ -77,7 +76,7 @@ export const commands: Record<string, string> = {
   progress: 'A space\'s coordinator saves or reads its progress: progress ["<text>"]',
   checkpoint: "A space's coordinator commits its owned task's work: checkpoint \"<message>\"",
   complete: 'A space\'s coordinator proves its stopping goal and ends its run: complete "<evidence>"',
-  measure: "Where a task's tokens and minutes went: measure phases [--last N]",
+  measure: "Where a task's tokens and minutes went: measure phases [--last N]; measure checks [--days N] sorts red GitHub checks by first cause",
   stalls: "Print the stalls of the last day by class with the minutes lost (--hours N, --json)",
   track: "Run the test track: a fixture project through the whole chain; pass, or the stall class that broke it (--after-update rolls back a broken update)",
   release:
@@ -95,7 +94,6 @@ export const commands: Record<string, string> = {
   ask: "Put a question with choices in the Inbox, and wait for the answer (--kind login|outward); a card in a chat is card",
   card: 'Ask the chat a question with choices: card "<question>" --choice "<label>" ... (the board\'s old ask)',
   answer: 'Answer a choice card of a space\'s coordinator chat in words: answer <card id> "<answer>" --space <name>',
-  measure: "Measure the project: measure checks [--days N] sorts red GitHub checks by first cause",
   asks: "Count the last week's needs-you cards by kind and say which a rule answers",
   inbox: "List open items of every machine (--all adds closed ones of this one), or answer one: inbox answer <n> <choice>",
   resume: "End this task's declared wait",
@@ -227,7 +225,6 @@ const COMMANDS: Record<string, (rest: string[], out: Out) => number | Promise<nu
   dispatcher: dispatcherMain,
   ask: askMain,
   asks: (rest, out) => asksMain(rest, out),
-  measure: measureMain,
   inbox: inboxCommand,
   pack: packMain,
 };
