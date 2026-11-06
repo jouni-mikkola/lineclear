@@ -111,7 +111,12 @@ test('a head released twice in a row has its agent restarted', async () => {
     expect((await hung).ok).toBe(false)
     expect(w.sent.some((m) => m.text.includes('second release in a row'))).toBe(round === 2)
   }
-  expect(decisions(config).map((d) => d.reason.split(' ')[0])).toEqual(['released', 'restarted'])
+  // the agent's own start is logged here too (kind run): only the lane's decisions are the subject
+  expect(
+    decisions(config)
+      .filter((d) => d.kind === 'stall')
+      .map((d) => d.reason.split(' ')[0]),
+  ).toEqual(['released', 'restarted'])
 })
 
 /** a check that spins until `../stop` is there, so its processes use the CPU all the time */
