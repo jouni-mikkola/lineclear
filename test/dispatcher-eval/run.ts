@@ -127,7 +127,7 @@ async function answer(c: Case, root: string, bin: string, prompt: string, model:
       stdin: "ignore",
       stdout: "pipe",
       stderr: "ignore",
-      env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, EVAL_LOG: log, LINECLEAR_ROLE: "dispatcher" },
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, EVAL_LOG: log, LINECLEAR_ROLE: "dispatcher", LINECLEAR_HOME: join(dir, "store") },
     },
   );
   const events = await new Response(p.stdout).text();
