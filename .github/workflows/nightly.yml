@@ -34,12 +34,14 @@ jobs:
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', 'server/bun.lock') }}
           restore-keys: bun-${{ runner.os }}-
       - run: bun install --frozen-lockfile
-      # Each copy gets its own HOME, as a second agent's check would. Any copy that fails fails the job.
+      # Each copy gets its own clone and HOME, as a second agent's check would, so installs and builds do not collide.
+      # Any copy that fails fails the job.
       - run: |
           pids=()
           for copy in 1 2 3 4; do
             mkdir -p "$RUNNER_TEMP/copy-$copy"
-            HOME="$RUNNER_TEMP/copy-$copy" bun scripts/check.ts --full --no-cache --untimed --shard=${{ matrix.shard }}/4 > "$RUNNER_TEMP/copy-$copy.log" 2>&1 &
+            git worktree add --detach -q "$RUNNER_TEMP/tree-$copy" HEAD
+            (cd "$RUNNER_TEMP/tree-$copy" && bun install --frozen-lockfile > "$RUNNER_TEMP/copy-$copy.log" 2>&1 && HOME="$RUNNER_TEMP/copy-$copy" bun scripts/check.ts --full --no-cache --untimed --shard=${{ matrix.shard }}/4 >> "$RUNNER_TEMP/copy-$copy.log" 2>&1) &
             pids+=($!)
           done
           status=0
