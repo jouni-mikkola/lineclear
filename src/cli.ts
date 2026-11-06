@@ -9,7 +9,6 @@ import { fixAll } from "./retire.ts";
 import { askMain } from "./inbox.ts";
 import { inboxMain } from "./inbox-answer.ts";
 import { exportMain, inboxAll, statusAll } from "./export.ts";
-import { cachedRead } from "./reads-cache.ts";
 import { machineMain } from "./machines.ts";
 import { readMachines } from "./machine-list.ts";
 import { fetchExportSync, relationOf } from "./remotes.ts";
@@ -126,7 +125,7 @@ const TASK_ID = /^[A-Z][A-Z0-9]*-\d+$/;
 
 /** `lineclear status [<project>]`: a project written loosely is read as the one it means, or refused with the two nearest. */
 function statusProject(raw: string | undefined, out: (line: string) => void, local = false): number {
-  if (raw === undefined) return cachedRead("status", out) ?? statusAll(out, process.env);
+  if (raw === undefined) return statusAll(out, process.env);
   const r = resolveProject(raw);
   // a project of another machine is not in this one's list: its own machine tells it
   if ("error" in r && TASK_ID.test(raw)) return (out(`lineclear status: '${raw}' is a task, and status takes a project. Try 'lineclear task show ${raw}'`), 1);
@@ -194,7 +193,7 @@ function statusCommand(rest: string[], out: Out): number | Promise<number> {
 
 function inboxCommand(rest: string[], out: Out): number | Promise<number> {
   if (rest[0] === "--help" || rest[0] === "-h") return (out("usage: lineclear inbox [--all] | lineclear inbox answer <n> <choice> [--note <text>]"), 0);
-  if (rest.length === 0) return cachedRead("inbox", out) ?? inboxAll(out);
+  if (rest.length === 0) return inboxAll(out);
   return inboxMain(rest, out);
 }
 
