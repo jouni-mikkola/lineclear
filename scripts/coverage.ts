@@ -3,7 +3,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { belowFloor, fileCoverage, withUnloaded, linesPerModule, raise, readFloors, writeFloors } from "./gates/coverage.ts";
+import { belowFloor, fileCoverage, withUnloaded, withoutBrowserSpecs, linesPerModule, raise, readFloors, writeFloors } from "./gates/coverage.ts";
 
 const root = join(import.meta.dir, "..");
 const dir = mkdtempSync(join(tmpdir(), "lineclear-coverage-"));
@@ -35,8 +35,8 @@ const sources = Object.fromEntries(
     )
     .map((f) => [f, readFileSync(join(root, f), "utf8")]),
 );
-const lcov = withUnloaded(readFileSync(join(dir, "lcov.info"), "utf8"), sources);
 const architecture = readFileSync(join(root, "docs/architecture.md"), "utf8");
+const lcov = withoutBrowserSpecs(withUnloaded(readFileSync(join(dir, "lcov.info"), "utf8"), sources), architecture);
 const lines = linesPerModule(lcov, architecture);
 const floors = readFloors(root);
 // the last measure per file, which `lineclear measure` reads for part health
