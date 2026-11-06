@@ -102,7 +102,7 @@ test("doctor shows which parts are on", () => {
   mkdirSync(join(paths.app, "pi", "parts"), { recursive: true });
   writeFileSync(join(paths.app, "pi", "parts", "a.ts"), "export default () => {};\n");
   writeFileSync(join(paths.app, "pi", "parts", "b.ts"), "export default () => {};\n");
-  const check = doctorChecks({ paths, oldDir: "/none", pathDirs: [], which: () => "x", run: () => null }).find((c) => c.name.startsWith("token pack"));
+  const check = doctorChecks({ paths, pathDirs: [], which: () => "x", run: () => null }).find((c) => c.name.startsWith("token pack"));
   expect(check?.name).toBe("token pack: a on, b off");
   expect(check?.problem).toBe("");
 });
@@ -146,7 +146,7 @@ test("compaction: a value the pack wrote follows a changed window", () => {
 test("doctor names a model with an unknown window", () => {
   const s = compactionSetup({});
   const paths = { ...pathsFor({ HOME: s.root }), extension: join(s.pi, "extensions", "lineclear.ts") };
-  const check = doctorChecks({ paths, oldDir: "/none", pathDirs: [], which: () => "x", run: () => null }).find((c) => c.name.startsWith("compaction"));
+  const check = doctorChecks({ paths, pathDirs: [], which: () => "x", run: () => null }).find((c) => c.name.startsWith("compaction"));
   expect(check?.name).toContain("p/mystery");
   expect(check?.problem).toBe("");
 });

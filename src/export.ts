@@ -1,6 +1,5 @@
 import { codeCommit } from "./paths.ts";
 import { type Export, fetchExportSync } from "./remotes.ts";
-import { helperApart } from "./helper.ts";
 import { readMachines } from "./machine-list.ts";
 import { listProjectNames } from "./project.ts";
 import { remoteLineclearSync } from "./ssh.ts";
@@ -36,7 +35,6 @@ async function exportData(env: Env = process.env, now = Date.now()): Promise<Omi
     inbox: readItems(env).filter(isOpen),
     status: lines,
     browsers,
-    helperApart: helperApart(env),
   };
 }
 

@@ -2,19 +2,15 @@ import { existsSync, lstatSync, readFileSync, readlinkSync } from "node:fs";
 import { herdrArgv, herdrVersionOf } from "./herdr.ts";
 import { userInfo } from "node:os";
 import { delimiter, dirname, join } from "node:path";
+import { readJson } from "../pi/config.ts";
 import { failureTail } from "./secrets.ts";
-import { backupProblem, readBackupSettings } from "./backup.ts";
 import { copiesProblem, runByNote } from "./store-copies.ts";
 import { follows, type ReleaseState, readRelease, releaseLines } from "./release.ts";
 import { tryLines } from "./try-instance.ts";
-import { cacheEnvFile, dataDir, extensionFile, INSTALL_URL, type Paths, SERVICE, OLD_PLUGIN_ID, serverBin } from "./paths.ts";
-import { OLD_DIR_NAME, oldDir, pluginConfig, oldFolders, oldFolderUsers } from "./old-install.ts";
-import { archiveFolder } from "./old-archive.ts";
+import { cacheEnvFile, dataDir, extensionFile, INSTALL_URL, type Paths, SERVICE, serverBin } from "./paths.ts";
 import type { Relation } from "./remotes.ts";
-import { agentsOnOldName, helperApart } from "./helper.ts";
-import { realBusy } from "./old-install.ts";
 import { diskTrouble, freeBytes } from "./health.ts";
-import { retiredChecks, skillRoots } from "./retire.ts";
+import { retiredChecks } from "./retire.ts";
 import { parts } from "./pack.ts";
 import { readModelFile } from "./models.ts";
 import { checkoutPointers } from "./install-paths.ts";
@@ -38,11 +34,8 @@ export interface Check {
 /** What doctor asks of the machine, so a test can answer without one. */
 export interface Probe {
   paths: Paths;
-  /** herdr-projects 2.0's data folder. */
-  oldDir: string;
-  /** Lineclear's data folder, and the folders agents read skills from. */
+  /** Lineclear's data folder. */
   dataDir?: string;
-  skillRoots?: string[];
   /** Whether Lineclear's own server runs now. */
   running?: () => boolean;
   /** Turns a space's timer off through the running server, which keeps its modes in memory. */
@@ -52,17 +45,7 @@ export interface Probe {
   /** Runs a command and returns its output, or null when it failed. */
   run(cmd: string[]): string | null;
   /** The machines added in Settings and the commit each runs (null when it cannot be read), and this one's. */
-  machines?: { commit: string; stable?: string; others: { host: string; commit: string | null; relation?: Relation; helperApart?: boolean }[] };
-  /** The running processes that still use the old folder (agents started before the move). Without it none is looked for. */
-  oldUsers?: () => string[];
-  /** The old folders that still exist here. */
-  oldFolders?: string[];
-  /** Packs one to the archive folder and removes it (doctor --fix); returns the archive. */
-  archiveFolder?: (dir: string) => string;
-  /** Whether this machine's helper socket paths differ after migrate. */
-  helperApart?: boolean;
-  /** Running agents that still call the old command (started before the rename). */
-  oldNameAgents?: () => string[];
+  machines?: { commit: string; stable?: string; others: { host: string; commit: string | null; relation?: Relation }[] };
   /** The exit code and last 20 lines of the latest command that failed, secrets masked. */
   failure?: string;
   /** The user whose lingering is checked. */
@@ -78,8 +61,6 @@ export interface Probe {
   /** The herdr version the contract test passed with, and the one each machine runs (null when it cannot say). */
   herdr?: { tested: string; machines: { machine: string; version: string | null }[] };
   /** What pi loads here and on each other machine (a null diff: it cannot be read), and what the release wants. */
-  /** What is wrong with the backup, "" when it is fine or none is set. */
-  backup?: string;
   /** The machine whose board runs this machine's tasks ("" when this one does). */
   runBy?: string;
   /** What is wrong with the store: no restic repository and no fresh local copy. "" when fine. */
@@ -99,22 +80,21 @@ export interface Probe {
 export function realProbe(paths: Paths, env: Record<string, string | undefined> = process.env): Probe {
   const probe: Probe = {
     paths,
-    oldDir: oldDir(env),
-    oldUsers: () => oldFolderUsers(env),
-    oldFolders: oldFolders(env),
-    archiveFolder: (dir) => archiveFolder(dir, env),
     dataDir: dataDir(env),
-    skillRoots: skillRoots(env),
-    running: () => realBusy("lineclear", env),
+    running: () => {
+      try {
+        const pid = readJson(join(dataDir(env), "server.json"))?.pid;
+        return typeof pid === "number" && process.kill(pid, 0);
+      } catch {
+        return false;
+      }
+    },
     setRegular: (space) => Bun.spawnSync([serverBin(env), "mode", space, "regular"], { stdin: "ignore", timeout: 60_000 }).exitCode === 0,
     pathDirs: (env.PATH ?? "").split(delimiter),
     listen: env.LINECLEAR_HOST,
-    helperApart: helperApart(env),
-    oldNameAgents: () => agentsOnOldName(),
     published: publishedAddress(env),
-    backup: backupProblem(env),
     runBy: runByNote(env),
-    store: readBackupSettings(env) === undefined ? copiesProblem(env) : "",
+    store: copiesProblem(env),
     runFrom: runFrom(paths, env),
     release: readRelease(env),
     tryInstance: tryLines(env),
@@ -169,19 +149,6 @@ function extensionProblem(paths: Paths): string {
   } catch {
     return `${paths.extension} is missing`;
   }
-}
-
-/** herdr-projects 2.0 is retired: its server must not run beside the fork. */
-function oldInstallStopped(p: Probe): Check {
-  const name = "old install stopped";
-  let pid: unknown;
-  try {
-    pid = JSON.parse(readFileSync(join(p.oldDir, "server.json"), "utf8")).pid;
-  } catch {
-    return { name, problem: "", fix: "" }; // no server file: it never ran, or it was removed
-  }
-  if (typeof pid !== "number" || p.run(["kill", "-0", String(pid)]) === null) return { name, problem: "", fix: "" };
-  return { name, problem: `The old install is still running (process ${pid})`, fix: `herdr plugin disable ${OLD_PLUGIN_ID}` };
 }
 
 function service(p: Probe): Check {
@@ -321,56 +288,6 @@ function herdrPinned(p: Probe): Check[] {
   }));
 }
 
-/** Whether the old folder may be archived: only when no running process, agent or tool, still uses it. */
-function oldFolderFree(p: Probe): Check {
-  const users = p.oldUsers?.() ?? [];
-  return {
-    name: "old folder free",
-    problem: users.length
-      ? `${users.length} running process${users.length === 1 ? "" : "es"} still use ${OLD_DIR_NAME}, so it must not be archived yet: ${users.slice(0, 3).join("; ")}`
-      : "",
-    fix: "let those agents finish (or restart them), then check again",
-  };
-}
-
-/** The old folders left on this machine, named so `lineclear doctor` shows which machine still has them. */
-function oldFoldersArchived(p: Probe): Check {
-  const left = p.oldFolders ?? [];
-  return {
-    name: "old folders archived",
-    problem: left.length ? `${left.join(" and ")} still ${left.length === 1 ? "exists" : "exist"}` : "",
-    fix: "lineclear doctor --fix (packs each to ~/archive/<name>-<date>.tgz and removes it)",
-  };
-}
-
-const oldNameAgents = (p: Probe): Check => ({
-  name: "agents on the old command name",
-  problem: `${p.oldNameAgents?.().join(", ") ?? ""}`.replace(/^(.)/, "still call the old name: $1"),
-  fix: "lineclear restart <task id>, or let the task end",
-});
-
-/** After migrate, an agent started under herdr-projects 2.0 reaches the server only if both helper socket paths lead to it. */
-function helperPaths(p: Probe): Check[] {
-  const name = "helper socket paths";
-  const fix = "lineclear migrate --link-helper";
-  return [
-    {
-      name,
-      problem: p.helperApart
-        ? `${OLD_DIR_NAME}/helper/main.sock does not lead to ~/.lineclear/helper/main.sock, so agents started before the move cannot reach the server`
-        : "",
-      fix,
-    },
-    ...(p.machines?.others ?? [])
-      .filter((m) => m.helperApart)
-      .map(({ host }) => ({
-        name: `helper socket paths on ${host}`,
-        problem: `on ${host} the old and new helper socket paths differ, so its agents cannot reach the server`,
-        fix: `ssh ${host} lineclear migrate --link-helper`,
-      })),
-  ];
-}
-
 /** The server listens on 127.0.0.1 only: your phone reaches it through a private network's HTTPS proxy. */
 function listening(p: Probe): Check {
   const name = "listens on 127.0.0.1 only";
@@ -441,8 +358,6 @@ export function doctorChecks(probe: Probe): Check[] {
     tool(p, "rsync", "sudo apt install rsync"),
     tool(p, "herdr", "curl -fsSL https://herdr.dev/install.sh | sh"),
     tool(p, "pi", "curl -fsSL https://pi.dev/install.sh | sh"),
-    oldInstallStopped(p),
-    { name: "plugin config.json", ...pluginConfig(p.dataDir ?? dataDir()) },
     ...retiredChecks(p),
     { name: "models.json", problem: readModelFile(p.dataDir ?? dataDir()).problem, fix: "fix or delete models.json in the data folder" },
     {
@@ -476,13 +391,8 @@ export function doctorChecks(probe: Probe): Check[] {
     disk(p),
     ...machinesBehind(p),
     ...herdrPinned(p),
-    ...helperPaths(p),
-    oldNameAgents(p),
-    oldFolderFree(p),
-    oldFoldersArchived(p),
     listening(p),
     publishedPages(p),
-    { name: "backup", problem: p.backup ?? "", fix: "lineclear backup (it names what fails); lineclear backup status" },
     { name: "store", problem: p.store ?? "", fix: "lineclear store copy; lineclear store list; the rule loop takes a copy every hour" },
     {
       name: "tasks run by",

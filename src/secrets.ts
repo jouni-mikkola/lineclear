@@ -37,9 +37,6 @@ function readEnvFile(file: string): Record<string, string> {
   }
 }
 
-/** An owner-only secret: never in a task's chain, so no agent loads it. */
-export const ownerSecret = (name: string, env: Env = process.env): string | undefined => readEnvFile(ownerFile(env))[name];
-
 const envText = (all: Record<string, string>) =>
   Object.keys(all)
     .sort()
@@ -73,7 +70,7 @@ function readVaultQuietly(env: Env): Vault {
 }
 
 /** This machine's name as the server keeps it: the short host name, or the label of the machine a worker runs for. */
-export const host = (env: Env) => (env.LINECLEAR_MACHINE ?? hostname()).replace(/^.*@/, "").split(".")[0] ?? "";
+const host = (env: Env) => (env.LINECLEAR_MACHINE ?? hostname()).replace(/^.*@/, "").split(".")[0] ?? "";
 const machineLevel = (env: Env) => `m:${host(env)}`;
 const spaceLevel = (space: string, env: Env) => `p:${host(env)}:${space}`;
 
@@ -215,7 +212,7 @@ export function failureTail(code: number | null, output: string, env: Env = proc
   return [`exit ${code}`, ...(text === "" ? [] : text.split("\n").slice(-20))].join("\n");
 }
 
-export function fail(out: (l: string) => void, message: string, command = "secrets"): number {
+function fail(out: (l: string) => void, message: string, command = "secrets"): number {
   out(`lineclear ${command}: ${message}`);
   return 1;
 }

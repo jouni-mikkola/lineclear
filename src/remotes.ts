@@ -25,8 +25,6 @@ export interface Export {
   browsers: BrowserSession[];
   /** Its load average and load limit, read where it runs. */
   load?: { load: number; limit: number };
-  /** True when its helper socket paths differ after migrate, so its agents cannot reach the server. */
-  helperApart?: boolean;
 }
 
 /** How a machine's commit stands to this one's by git ancestry: the same, older (behind), newer (ahead), or neither (different, or not in this checkout). */

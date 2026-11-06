@@ -2,11 +2,10 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { asksMain } from "./asks.ts";
-import { backupMain } from "./backup.ts";
 import { storeMain } from "./store-copies.ts";
 import { dispatcherMain, moveMain } from "./dispatcher.ts";
 import { doctor, herdrVersions, realProbe, testedHerdr } from "./doctor.ts";
-import { fixAll, remoteLeft } from "./retire.ts";
+import { fixAll } from "./retire.ts";
 import { askMain } from "./inbox.ts";
 import { inboxMain } from "./inbox-answer.ts";
 import { exportMain, inboxAll, statusAll } from "./export.ts";
@@ -34,8 +33,6 @@ import { startWeb } from "./web.ts";
 import { secrets, totp } from "./secrets.ts";
 import { stallsMain } from "./stall-class.ts";
 import { trackMain } from "./track.ts";
-import { migrateAll, migrateMain } from "./migrate.ts";
-import { updateMain } from "./update.ts";
 import { boardMain, isBoardJob, serveMain } from "./serve.ts";
 import { waitsMain } from "./waits.ts";
 import { realRemover, uninstall } from "./uninstall.ts";
@@ -52,9 +49,6 @@ export const commands: Record<string, string> = {
   setup: "Choose a model for the worker, reviewer, planner and step checker from the logged-in harnesses (the reviewer from another company than the worker)",
   run: "Run the rule loop and serve the web pages (--once, --dry-run; --board <port> also starts herdr and the board where no service does), or only serve them on fixed demo data (--demo)",
   serve: "Serve the board (the web server): serve --port <port>",
-  update: "Move the old folders into Lineclear's own folder and keep a copy (--back returns it)",
-  migrate:
-    "Copy spaces, settings and open tasks from the old install to Lineclear's own server (--dry-run lists, --check after a run, --all moves every machine, --back returns to the old install and loses nothing)",
   space: "The board's spaces: space add <path> --name <name>, space list, space rename, space remove",
   task: "The board's tasks: task add, list, show, tell, stop, close (task --help lists them)",
   show: "Show the board's few settings: show [--space <name>]",
@@ -84,9 +78,7 @@ export const commands: Record<string, string> = {
   track: "Run the test track: a fixture project through the whole chain; pass, or the stall class that broke it (--after-update rolls back a broken update)",
   release:
     "Show the stable and next builds, the last promotion and why next is held (release status); release run tests main and promotes it when green, as the rule loop does every 2 minutes; release check <version> checks a candidate on its own (check, smoke, canary, store both ways); release promote <version> makes a checked candidate stable and leaves the Inbox item to read; release try [version] starts a test instance on a copy of the data, release try --stop ends it",
-  store: "The local copies of the task store (store list, store copy, store restore <name>); the rule loop takes one an hour, an update one before it",
-  backup:
-    "Back up Lineclear's data and secrets with restic (backup status, backup drill, backup restore <dir> [--from <machine>]); the rule loop runs it hourly and the drill weekly",
+  store: "The local copies of the task store (store list, store copy, store restore <name>); the rule loop takes one an hour",
   totp: "Print the current code of a stored login: totp NAME reads NAME_TOTP from this folder's secrets",
   status:
     'Show what stops each project and what each task waits for; --plan [<task>] shows the steps of a plan; a task\'s agent reports progress: status <id> "<line>" --done <0-100> [--left 5m]',
@@ -211,12 +203,9 @@ const COMMANDS: Record<string, (rest: string[], out: Out) => number | Promise<nu
   run: (rest, out) => (rest[0] === "--demo" ? demoMain(rest.slice(1), out) : runMain(rest, out, undefined, { web: startWeb })),
   serve: serveMain,
   export: (_rest, out) => exportMain(out),
-  update: (rest, out) => updateMain(rest, out),
-  migrate: (rest, out) => (rest.includes("--all") ? migrateAll(rest, out) : migrateMain(rest, out)),
   secrets,
   totp,
   store: storeMain,
-  backup: backupMain,
   release: (rest, out) =>
     rest[0] === "try"
       ? releaseTry(rest.slice(1), out)
@@ -253,13 +242,10 @@ async function installCommand(name: "doctor" | "uninstall", rest: string[], out:
         stable: readRelease().stable?.commit,
         others: hosts.map((host) => {
           const e = fetchExportSync(host);
-          return { host, commit: e?.commit ?? null, ...(e ? { relation: relationOf(codeCommit(), e.commit) } : {}), helperApart: e?.helperApart };
+          return { host, commit: e?.commit ?? null, ...(e ? { relation: relationOf(codeCommit(), e.commit) } : {}) };
         }),
       };
-    const code = doctor(probe, out);
-    if (here) return code;
-    const left = await remoteLeft(out);
-    return code === 0 && left === 0 ? 0 : 1;
+    return doctor(probe, out);
   }
   const bad = rest.find((a) => a !== "--all");
   if (bad !== undefined) {

@@ -66,7 +66,7 @@ interface ChatLog {
 }
 
 /** Every need card, once per card id. */
-export function allNeedCards(files: any[]): Posted[] {
+function allNeedCards(files: any[]): Posted[] {
   const need = new Map<string, Posted>();
   for (const f of files) {
     for (const p of f.posted ?? []) {

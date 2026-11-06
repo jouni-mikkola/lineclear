@@ -5,7 +5,6 @@ import { resolve } from "node:path";
 import { HOST, machinesFile, readMachines, type SavedMachine } from "./machine-list.ts";
 import { doctorChecks, realProbe } from "./doctor.ts";
 import { networkTrouble, type Trouble } from "./health.ts";
-import { onlyOldInstallLeft } from "./retire.ts";
 import { relationOf, type Relation, remoteExports } from "./remotes.ts";
 import { LINECLEAR, quote, run, sshArgs } from "./ssh.ts";
 import { listProjectNames, readSettings } from "./project.ts";
@@ -116,7 +115,7 @@ export async function installMachine(host: string, env: Env = process.env, say: 
     const lines = doctor.lines.length ? doctor.lines : [`lineclear doctor failed (exit ${doctor.code}).`];
     done = {
       host,
-      state: cloneFailed.length === 0 && (doctor.code === 0 || onlyOldInstallLeft(doctor.lines)) ? "ready" : "failed",
+      state: cloneFailed.length === 0 && doctor.code === 0 ? "ready" : "failed",
       since,
       doctor: [...cloneFailed, ...lines],
     };

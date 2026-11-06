@@ -1,13 +1,12 @@
 import { afterAll, expect, setDefaultTimeout, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { main } from "../src/cli.ts";
 import { doctorChecks, type Probe } from "../src/doctor.ts";
 import { statusAll } from "../src/export.ts";
 import { projectsData } from "../src/home-data.ts";
-import { migrateAll } from "../src/migrate.ts";
-import { fixAll, remoteLeft } from "../src/retire.ts";
+import { fixAll } from "../src/retire.ts";
 import { pathsFor } from "../src/paths.ts";
 import { refreshRemotes, relationOf } from "../src/remotes.ts";
 import { waitingForYou } from "../src/waiting.ts";
@@ -25,10 +24,10 @@ const put = (path: string, value: unknown) => {
   writeFileSync(path, typeof value === "string" ? value : JSON.stringify(value));
 };
 
-/** A herdr-projects 2.0 folder with one space and one open task. */
-const oldWorld = (dir: string, key: string, name: string) => {
-  put(join(dir, "spaces.json"), [{ name, path: "/nowhere", key, base: "main" }]);
-  put(join(dir, "tasks.json"), { next: { [key]: 2 }, tasks: [{ id: `${key}-1`, title: `${name} task`, told: "work", created: 1 }], red: {} });
+/** A machine's folders with one space and one open task. */
+const seed = (m: { LINECLEAR_HOME: string }, key: string, name: string) => {
+  put(join(m.LINECLEAR_HOME, "spaces.json"), [{ name, path: "/nowhere", key, base: "main" }]);
+  put(join(m.LINECLEAR_HOME, "tasks.json"), { next: { [key]: 2 }, tasks: [{ id: `${key}-1`, title: `${name} task`, told: "work", created: 1 }], red: {} });
 };
 
 /**
@@ -39,20 +38,18 @@ function world() {
   const here = {
     HOME: join(root, "here"),
     LINECLEAR_HOME: join(root, "here", "data"),
-    LINECLEAR_OLD_DIR: join(root, "here", "old"),
     LINECLEAR_CONFIG: join(root, "here", "config"),
   };
   const box = {
     HOME: join(root, "box"),
     LINECLEAR_HOME: join(root, "box", "data"),
-    LINECLEAR_OLD_DIR: join(root, "box", "old"),
     LINECLEAR_CONFIG: join(root, "box", "config"),
   };
-  oldWorld(here.LINECLEAR_OLD_DIR, "HER", "alpha");
-  oldWorld(box.LINECLEAR_OLD_DIR, "BOX", "beta");
+  seed(here, "HER", "alpha");
+  seed(box, "BOX", "beta");
   put(
     join(box.HOME, ".local", "bin", "lineclear"),
-    `#!/bin/sh\nexport LINECLEAR_HOME='${box.LINECLEAR_HOME}' LINECLEAR_OLD_DIR='${box.LINECLEAR_OLD_DIR}' LINECLEAR_CONFIG='${box.LINECLEAR_CONFIG}'\nexec '${process.execPath}' '${BIN}' "$@"\n`,
+    `#!/bin/sh\nexport LINECLEAR_HOME='${box.LINECLEAR_HOME}' LINECLEAR_CONFIG='${box.LINECLEAR_CONFIG}'\nexec '${process.execPath}' '${BIN}' "$@"\n`,
   );
   chmodSync(join(box.HOME, ".local", "bin", "lineclear"), 0o755);
   const ssh = join(root, "ssh");
@@ -63,27 +60,11 @@ function world() {
   return { env, box };
 }
 
-test("migrate --all --dry-run lists what moves on each machine and copies nothing", async () => {
-  const { env, box } = world();
-  const lines: string[] = [];
-  expect(await migrateAll(["--all", "--dry-run"], (l) => lines.push(l), env)).toBe(0);
-  const text = lines.join("\n");
-  expect(text).toContain("This machine (dry run)");
-  expect(text).toContain("box (dry run)");
-  expect(text).toContain("HER-1");
-  expect(text).toContain("BOX-1");
-  expect(existsSync(box.LINECLEAR_HOME)).toBe(false);
-  expect(existsSync(env.LINECLEAR_HOME)).toBe(false);
-});
-
 /** Each read starts a whole Lineclear process; one that a loaded machine delays past the 30 s read limit shows nothing, so read again. */
 const readUntil = (env: Record<string, string | undefined>, seen: () => boolean) => until(async () => (await refreshRemotes(env), seen()), 0, 150_000);
 
-test("migrate --all moves both machines, and one Home shows the work of both", async () => {
+test("one Home shows the work of both", async () => {
   const { env, box } = world();
-  const lines: string[] = [];
-  expect(await migrateAll(["--all"], (l) => lines.push(l), env)).toBe(0);
-  expect(lines.at(-1)).toBe("Moved: 2 machines.");
   expect(JSON.parse(readFileSync(join(env.LINECLEAR_HOME, "tasks.json"), "utf8")).tasks[0].id).toBe("HER-1");
   expect(JSON.parse(readFileSync(join(box.LINECLEAR_HOME, "tasks.json"), "utf8")).tasks[0].id).toBe("BOX-1");
 
@@ -155,7 +136,6 @@ test("a machine that cannot be reached is named in the status, and shows no work
 
 /** A probe of a machine at `aaaaaaa1111` that knows these other machines. */
 const machinesProbe = (others: NonNullable<Probe["machines"]>["others"], stable?: string): Probe => ({
-  oldDir: "/nonexistent-old",
   paths: pathsFor({ HOME: "/nonexistent-home" }),
   pathDirs: [],
   which: (c) => `/usr/bin/${c}`,
@@ -199,71 +179,13 @@ test("doctor --fix runs on each machine, once, and says what each removed", asyn
     `#!/bin/sh\nwhile [ "$1" != "--" ]; do shift; done\nshift\nshift\necho "$1" >> '${join(root, "fix.log")}'\necho "Removed the skill /x/lineclear"\n`,
   );
   chmodSync(fake, 0o755);
-  const probe: Probe = { oldDir: join(root, "none"), paths: pathsFor({ HOME: "/nonexistent-home" }), pathDirs: [], which: () => null, run: () => null };
+  const probe: Probe = { paths: pathsFor({ HOME: "/nonexistent-home" }), pathDirs: [], which: () => null, run: () => null };
   const lines: string[] = [];
   await fixAll(probe, (l) => lines.push(l), { ...env, LINECLEAR_SSH: fake });
   expect(lines).toEqual(["This machine", "  Nothing to remove.", "box", "  Removed the skill /x/lineclear"]);
   const sent = readFileSync(join(root, "fix.log"), "utf8").trim().split("\n");
   expect(sent).toHaveLength(1);
   expect(sent[0]).toContain("'doctor' '--fix' '--here'");
-});
-
-test("after migrate --all, an agent on a remote machine reaches the server by the old and the new helper socket", async () => {
-  sh(["rm", "-rf", join(root, "here"), join(root, "box")]);
-  const { env, box } = world();
-  // an agent started under herdr-projects 2.0 there has its helper folder
-  mkdirSync(join(box.LINECLEAR_OLD_DIR, "helper"), { recursive: true });
-  expect(await migrateAll(["--all"], () => {}, env)).toBe(0);
-  // the server's tunnel on the remote machine opens the socket in the new folder
-  const now = join(box.LINECLEAR_HOME, "helper", "main.sock");
-  mkdirSync(join(box.LINECLEAR_HOME, "helper"), { recursive: true });
-  const server = Bun.serve({ unix: now, fetch: () => new Response("server") });
-  try {
-    for (const sock of [now, join(box.LINECLEAR_OLD_DIR, "helper", "main.sock")]) {
-      const res = await fetch("http://localhost/api/cli", { unix: sock });
-      expect(await res.text()).toBe("server");
-    }
-  } finally {
-    server.stop(true);
-  }
-});
-
-test("doctor names a machine whose helper socket paths differ, with the command that links them", () => {
-  const probe: Probe = {
-    oldDir: "/nonexistent-old",
-    paths: pathsFor({ HOME: "/nonexistent-home" }),
-    pathDirs: [],
-    which: (c) => `/usr/bin/${c}`,
-    run: () => null,
-    machines: {
-      commit: "aaaaaaa1111",
-      others: [
-        { host: "box", commit: "aaaaaaa1111", helperApart: true },
-        { host: "ok", commit: "aaaaaaa1111", helperApart: false },
-      ],
-    },
-  };
-  const checks = doctorChecks(probe);
-  const box = checks.find((c) => c.name === "helper socket paths on box")!;
-  expect(box.problem).toContain("box");
-  expect(box.fix).toBe("ssh box lineclear migrate --link-helper");
-  expect(checks.some((c) => c.name === "helper socket paths on ok")).toBe(false);
-});
-
-test("a remote machine that holds only the helper gets the socket link from migrate --all", async () => {
-  sh(["rm", "-rf", join(root, "here"), join(root, "box")]);
-  const { env, box } = world();
-  sh(["rm", "-rf", box.LINECLEAR_OLD_DIR]);
-  mkdirSync(join(box.LINECLEAR_OLD_DIR, "helper"), { recursive: true });
-  expect(await migrateAll(["--all"], () => {}, env)).toBe(0);
-  const now = join(box.LINECLEAR_HOME, "helper", "main.sock");
-  const server = Bun.serve({ unix: now, fetch: () => new Response("server") });
-  try {
-    const res = await fetch("http://localhost/api/cli", { unix: join(box.LINECLEAR_OLD_DIR, "helper", "main.sock") });
-    expect(await res.text()).toBe("server");
-  } finally {
-    server.stop(true);
-  }
 });
 
 test("relationOf reads git ancestry", () => {
@@ -286,23 +208,4 @@ test("relationOf reads git ancestry", () => {
   expect(relationOf(b, c, repo)).toBe("different");
   expect(relationOf(b, "0".repeat(40), repo)).toBe("different");
   rmSync(repo, { recursive: true, force: true });
-});
-
-test("doctor names a machine that still has the old folders, and --fix archives them there", async () => {
-  sh(["rm", "-rf", join(root, "here"), join(root, "box")]);
-  const { env, box } = world();
-  for (const d of [box.LINECLEAR_OLD_DIR, join(box.HOME, ".herdr-projects")]) {
-    sh(["rm", "-rf", d]);
-    put(join(d, "file.txt"), "kept in the archive");
-  }
-  const said: string[] = [];
-  expect(await remoteLeft((l) => said.push(l), env)).toBeGreaterThan(0);
-  expect(said.join("\n")).toContain("box: old folders archived");
-
-  const probe: Probe = { oldDir: join(root, "none"), paths: pathsFor({ HOME: "/nonexistent-home" }), pathDirs: [], which: () => null, run: () => null };
-  const lines: string[] = [];
-  await fixAll(probe, (l) => lines.push(l), env);
-  expect(lines.join("\n")).toContain("Packed");
-  expect(existsSync(box.LINECLEAR_OLD_DIR) || existsSync(join(box.HOME, ".herdr-projects"))).toBe(false);
-  expect(readdirSync(join(box.HOME, "archive")).filter((f) => f.endsWith(".tgz"))).toHaveLength(2);
 });

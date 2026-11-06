@@ -1,5 +1,4 @@
 import { statfsSync } from "node:fs";
-import { backupProblem, drillProblem } from "./backup.ts";
 import { addItem, closeItem, isOpen, readItems } from "./inbox.ts";
 import { dataDir } from "./paths.ts";
 
@@ -22,12 +21,8 @@ function diskProblem(env: Env = process.env): string {
 }
 
 /** Each check, the title its Inbox card carries (and the phone shows), and what it found. */
-function machineProblems(env: Env = process.env, now = new Date()): { alert: string; problem: string }[] {
-  return [
-    { alert: "Backup is failing", problem: backupProblem(env, now) },
-    { alert: "Restore drill failed", problem: drillProblem(env) },
-    { alert: "Disk is nearly full", problem: diskProblem(env) },
-  ];
+function machineProblems(env: Env = process.env): { alert: string; problem: string }[] {
+  return [{ alert: "Disk is nearly full", problem: diskProblem(env) }];
 }
 
 /**
@@ -36,7 +31,7 @@ function machineProblems(env: Env = process.env, now = new Date()): { alert: str
  */
 export function watchMachine(env: Env = process.env, now = new Date()): number {
   let made = 0;
-  for (const { alert, problem } of machineProblems(env, now)) {
+  for (const { alert, problem } of machineProblems(env)) {
     const open = readItems(env as NodeJS.ProcessEnv).filter((i) => isOpen(i) && i.kind === "stuck" && i.task === "-" && i.alert === alert);
     if (problem === "") {
       for (const item of open) closeItem(item, "it is fine again", now, env as NodeJS.ProcessEnv);

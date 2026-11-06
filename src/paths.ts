@@ -15,7 +15,6 @@ export const INSTALL_URL = (() => {
     return "install.sh";
   }
 })();
-export const OLD_PLUGIN_ID = "herdr-projects";
 export const SERVICE = "lineclear.service";
 
 /** Where install puts each thing. It follows the XDG folders and pi's own folder variable. */
