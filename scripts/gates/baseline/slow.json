@@ -19,15 +19,10 @@
   "ui/test/add-project.pw.ts": 66.4,
   "ui/test/browsers.pw.ts": 83.3,
   "ui/test/chat.pw.ts": 39.7,
-  "ui/test/design.pw.ts": 267.4,
   "ui/test/errors.pw.ts": 160.0,
-  "ui/test/font.pw.ts": 148,
-  "ui/test/frame.pw.ts": 96.2,
-  "ui/test/headings.pw.ts": 75.4,
   "ui/test/kit.pw.ts": 97.9,
   "ui/test/one-name.pw.ts": 27.0,
   "ui/test/roadmap.pw.ts": 209.1,
   "ui/test/settings.pw.ts": 238.2,
-  "ui/test/taste.pw.ts": 138.2,
   "ui/test/views.pw.ts": 165
 }
