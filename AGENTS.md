@@ -14,13 +14,11 @@ What Lineclear is and why: [docs/idea.md](docs/idea.md). The order of work: [doc
   the whole repo.
 - `bun run coverage`: line coverage of the root tests per module against the floors in `scripts/gates/baseline/coverage.json`; `--raise` lifts them, never lowers. Slow: the heavy run and a release run it, not `check`.
 - `bun run heavy`: the heavy tier (`gates:full`, `coverage`, `ui:test`, `cold-start`, `one-name`; `lineclear project` shows it). `.github/workflows/heavy.yml` runs the GitHub part on each push to main (only the newest main is tested); where a repo has no such workflow the rule loop runs it after main moves. A red run files one fix task per commit. A release runs it first.
-- `bun run media`: renders the README film (Blender, headless), its poster, the README stills, the roles chart and the
-  social preview into `docs/readme/`, all from `ui/brand` (`docs/brand.md`, Pictures). `bun run check` fails on a stale one.
 - `bun run cold-start`: installs Lineclear from this commit into a fresh HOME by the README alone, adds a public repo it did not write (through a local bare remote, so nothing leaves the machine) and waits until a step of it merges; it prints the times and every gap for `docs/numbers.md` under L49. Its options are at the top of `scripts/cold-start.ts`. Slow and it spends tokens: the heavy run and a release run it, not `check`.
 - `bun run release <version>`: refuses on a dirty tree or a red full check; otherwise sets the version, commits and tags `v<version>` here, installs from the tag into a fresh HOME and runs its doctor. It never pushes.
 - `bun run dispatcher:eval`: asks the Dispatcher's model the 58 requests of `test/dispatcher-eval/` and prints the share it called right (goal 100 %, never below 95 %). It spends tokens: not in `check`, run before each release and in U43.
-- `bun run ui:test`: the UI bar in headless Chromium (Playwright, once: `bunx playwright install chromium`) on the pages `lineclear run` serves, on port 7432 or `LINECLEAR_UI_PORT`; `bun run ui:record`
-  records each motion. The design system and its bar are in `docs/design.md`; `/design` is its test page. Home is `/`,
+- `bun run ui:test`: the UI bar in headless Chromium (Playwright, once: `bunx playwright install chromium`) on the pages `lineclear run` serves, on port 7432 or `LINECLEAR_UI_PORT`; the
+  design system and its bar are in `docs/design.md`; `/design` is its test page. Home is `/`,
   the Inbox `/inbox`, both with `?state=`.
 - `bun run ui:cold`: the cold look. Fresh models from three companies get only the pictures of a first run (`docs/cold/`) and are asked who does what; goal 90 % right, answers in `docs/numbers.md`. It spends tokens: not in `check`, run on each UI release.
 - `bun run shots`: starts `lineclear run --demo` (fixed demo data, no real names) and takes every view at 390 and 1440 px

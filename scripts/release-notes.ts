@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { ROOT } from "./media-lib.ts";
+
+const ROOT = join(import.meta.dir, "..");
 
 /** What is wrong with the release notes in docs/releases: a part off the template, a left-over {field}, a missing picture. */
 export function releaseProblems(root: string = ROOT): string[] {

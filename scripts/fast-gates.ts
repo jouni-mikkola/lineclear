@@ -15,7 +15,6 @@ export function fastGates(ownFolders: string[], code: boolean, full = false): Ga
   return [
     { name: "roadmap", cmd: ["env", ...ownFolders, "bin/lineclear", "roadmap", "check", "."] },
     { name: "parts", cmd: ["env", ...ownFolders, "bin/lineclear", "parts", "check", "."] },
-    { name: "media", cmd: ["bun", "scripts/media.ts", "check"] },
     ...(code ? [{ name: "gates", cmd: ["bun", "run", full ? "gates:full" : "gates"] }] : []),
   ];
 }

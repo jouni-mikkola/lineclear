@@ -24,8 +24,7 @@ critical finding. An id is the task that decided the line.
   owner to run (LIN-145). Motion only when something changed, calm, never decorative. Finished to the LIN-146 bar.
 - Steps and tasks say their result: a title naming the result and one concrete sentence, with the agent brief behind
   it (LIN-148).
-- The GitHub page, film and pictures come from one brand source, rendered by one command, in the same style every
-  release (LIN-153).
+- The GitHub page and pictures share one brand source and one style.
 - Plain words everywhere, no AI phrasing.
 - Until the release is green and tiers 1 and 2 of the roadmap are done, nothing new is added and nothing frozen starts (LINE-637).
 

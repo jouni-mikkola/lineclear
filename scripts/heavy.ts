@@ -1,5 +1,5 @@
 // Runs the checks too slow for a merge (src/heavy-run.ts): the whole-repo gates and the coverage floors. A release
-// runs it first (`bun run media release`) and does not go out when it fails. The rule loop starts it after main moves, in a repo with no heavy workflow, with
+// runs it first and does not go out when it fails. The rule loop starts it after main moves, in a repo with no heavy workflow, with
 // `--out <file>`, which gets the failures as JSON instead of an exit code.
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";

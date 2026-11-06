@@ -322,8 +322,7 @@ Reduced motion shows the end state at once. Offline, the line dims and says when
 
 Each role has one small icon, on a 16 unit grid with a 1.5 stroke, drawn in the colour of the text around it:
 You, Dispatcher, Roadmap, Rules, Worker, Reviewer, Main and Planner. `ui/brand/roles.ts` holds the shapes,
-`RoleIcon` draws them on the pages (the line, Settings models, Inbox cards, the roadmap view), and
-`bun scripts/role-icons.ts` writes them to `ui/brand/roles/` for the README.
+`RoleIcon` draws them on the pages (the line, Settings models, Inbox cards, the roadmap view).
 
 ## The old UI's views
 
@@ -425,7 +424,7 @@ content (answers, questions, details).
 ## Motion
 
 Every animation starts in `ui/kit/motion.ts`, one named motion per state change and no others. Their times and easings
-are the motion tokens in `ui/brand/rail.ts`, shared with the README's films. Each runs on transform
+are the motion tokens in `ui/brand/rail.ts`. Each runs on transform
 and opacity with the Web Animations API, is under 300 ms, starts from where things are on screen, and never blocks
 input. Under prefers-reduced-motion none runs and every change is instant.
 
@@ -460,14 +459,10 @@ from left to right, sleeper by sleeper, until the part is read. Under reduced mo
 ### Alike with the board
 
 The key motions of U24 (a train's glide, a lamp turning green, a view change, laying the track) take their time and
-curve from `KEY` in `ui/brand/rail.ts`, which `bun run media` writes from `scripts/film/motion.json`, the file the
-film reads too. `ui/test/alike.pw.ts` holds each motion in the app and the same motion in `docs/design/board.html` at
+curve from `KEY` in `ui/brand/rail.ts`. `ui/test/alike.pw.ts` holds each motion in the app and the same motion in `docs/design/board.html` at
 its start, every 50 ms and its end, and compares the share of its travel each has made (position, opacity, colour).
 Alike threshold: 5 %. A motion that differs from the board by more at any instant fails. The parts at rest are
-compared by their ink, pixel by pixel, in the app and on the board (`ui/test/alike-parts.pw.ts`). Parts threshold: 20 %. `bun run ui:record`
-keeps the frames of the app, of the board and side by side in `docs/design/motion/alike/`.
-
-Beside the board (app left, board right, one row per instant): [train](design/motion/alike/train.png), [lamp](design/motion/alike/lamp.png), [view](design/motion/alike/view.png), [track-lay](design/motion/alike/lay.png).
+compared by their ink, pixel by pixel, in the app and on the board (`ui/test/alike-parts.pw.ts`). Parts threshold: 20 %.
 Before and after U41: [train](design/motion/alike/before-train.webm) to [train](design/motion/alike/after-train.webm), [lamp](design/motion/alike/before-lamp.webm) to [lamp](design/motion/alike/after-lamp.webm), [view](design/motion/alike/before-view.webm) to [view](design/motion/alike/after-view.webm), [track-lay](design/motion/alike/before-lay.webm) to [track-lay](design/motion/alike/after-lay.webm).
 
 Recordings: [task-start](design/motion/task-start.webm), [task-move](design/motion/task-move.webm),
@@ -530,7 +525,7 @@ Every view step passes it, with the helpers in `ui/test/bar.ts`:
 `bun run ui:test` runs it in headless Chromium (once per machine: `bunx playwright install chromium`) against `lineclear run` on an empty config. For each motion it checks
 that only named motions run and each is under 300 ms, reads the compositor's frames and the main thread's tasks from a
 DevTools trace, clicks again halfway through and wants the change on the next frame, and repeats with reduced motion
-and wants no animation at all. `bun run ui:record` makes the recordings again. After a change to a picture on
+and wants no animation at all. After a change to a picture on
 purpose, `bunx playwright test --update-snapshots` writes the new ones.
 In every state the pictures show, each letter is drawn in the served font: `ui/test/font.pw.ts` fails if one falls back
 to a font of the machine. So the pictures match on machines with other system fonts. They are made and compared on
