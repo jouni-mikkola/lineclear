@@ -73,11 +73,10 @@ test("a pane that still shows the pasted brief gets Enter only, never the nudge 
   expect(calls.at(-1)).toEqual(["herdr", "pane", "send-keys", "w1:p2", "Enter"]);
 });
 
-test("the start caps read LIMITS.starts.limit, so the rules and the waste watch hold one number", () => {
+test("the start caps read START_LIMIT, so the rules hold one number", () => {
   const tick = readFileSync(join(import.meta.dir, "../src/tick-project.ts"), "utf8");
-  expect(tick).toMatch(/import \{ LIMITS \} from "\.\/waste\.ts"/);
-  expect(tick).toContain("n < LIMITS.starts.limit");
-  expect(tick).toContain("overStartLimit({ ...t, space: settings.space }, step, LIMITS.starts.limit)");
+  expect(tick).toContain("n < START_LIMIT");
+  expect(tick).toContain("overStartLimit({ ...t, space: settings.space }, step, START_LIMIT)");
 });
 
 const running = [{ id: "LIN-1", title: "R Title R", status: "work" }];

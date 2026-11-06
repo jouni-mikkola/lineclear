@@ -56,7 +56,6 @@ test("spendAndUsage: 14 days of $ and the accounts used in the last day", () => 
   expect(r.spend.find((d) => d.day === "2026-10-28")?.dollars).toBe(5);
   expect(r.spend.reduce((s, d) => s + d.dollars, 0)).toBe(9);
   expect(r.active).toEqual(["a", "b"]);
-  expect(r.tokens).toBe(9); // the compaction card's 14 days, not the 30 days old one
 });
 
 test("homeData reads projects and states from Lineclear's files", () => {

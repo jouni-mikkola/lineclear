@@ -14,7 +14,6 @@ import { cachedRead } from "./reads-cache.ts";
 import { machineMain } from "./machines.ts";
 import { readMachines } from "./machine-list.ts";
 import { fetchExportSync, relationOf } from "./remotes.ts";
-import { measureMain } from "./measure-main.ts";
 import { packMain } from "./pack.ts";
 import { planMain } from "./plan.ts";
 import { planStatus } from "./requests.ts";
@@ -47,7 +46,6 @@ export const commands: Record<string, string> = {
   doctor:
     "Check each part and name the command that fixes a problem (--fix removes the old install's plugin and skills and test folders older than a day, on every machine; --here limits either to this one)",
   pack: "List the token pack's parts, or turn one on or off (pack on <part>, pack off <part>)",
-  measure: "Print asks, wait, cost and the health measures from files and git (no AI)",
   machine: "Add a machine by its SSH host (installs Lineclear there and runs its doctor), list, remove or update machines",
   project: "Add, list, change, remove and check projects",
   roadmap: "Check, show or import the roadmap (roadmap show <id> prints one step)",
@@ -206,7 +204,6 @@ function inboxCommand(rest: string[], out: Out): number | Promise<number> {
 
 /** The commands that are one call: each gets the words after its name. */
 const COMMANDS: Record<string, (rest: string[], out: Out) => number | Promise<number>> = {
-  measure: measureMain,
   stalls: (rest, out) => stallsMain(rest, out, decisionsPath()),
   track: trackMain,
   machine: (rest, out) => machineMain(rest, out, process.env, (evidence) => fileFixNow(realWorld(process.env), "command-failed", evidence)),

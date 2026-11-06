@@ -89,7 +89,7 @@ type Role = "worker" | "reviewer" | "coordinator" | "dispatcher";
 
 /**
  * Where each role compacts, in tokens, unless `<config>/pack.json` says otherwise under `compaction`. First try from the
- * band table of `lineclear measure` (two thirds of the cost is spent above 50k of context): 60 to 80k.
+ * cost bands (two thirds of the cost is spent above 50k of context): 60 to 80k.
  */
 const ROLE_POINTS: Record<Role, number> = { worker: 80_000, reviewer: 70_000, coordinator: 70_000, dispatcher: 60_000 };
 

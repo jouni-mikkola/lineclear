@@ -68,7 +68,7 @@ Result: A rebase onto an unrelated main change reads a step's earlier pass inste
 - parts: checks, gates, measure
 - locks: none
 - after: none
-- files: scripts/check.ts, src/check-runs.ts, test/contracts/checks.test.ts, docs/numbers.md
+- files: scripts/check.ts, src/check-runs.ts, test/contracts/checks.test.ts
 
 ### L264 No lock wait on another area
 Result: For a day of normal runs, no step of this repo is recorded waiting on a lock it does not share with the holder.
@@ -79,7 +79,7 @@ Result: For a day of normal runs, no step of this repo is recorded waiting on a 
 - parts: measure
 - locks: numbers
 - after: none
-- files: docs/numbers.md
+- files:
 
 ### L308 A closed herdr call is retried
 Result: When herdr closes a connection before its reply, the call is retried once and any failure reads "herdr closed the connection".
@@ -97,7 +97,7 @@ Result: Done tasks move out of `tasks.json` into the cold file, so the hot file 
 - parts: server, measure
 - locks: task-store
 - after: none
-- files: server/server/store.ts, server/server/live/engine/, server/test/store-cold.test.ts, docs/numbers.md
+- files: server/server/store.ts, server/server/live/engine/, server/test/store-cold.test.ts
 
 ### L70 One web UI, one port
 Result: Lineclear has one web UI on one address to open and to secure.
@@ -252,7 +252,7 @@ Result: A pulled plug on a machine with lingering on ends no work for good: task
 - parts: rules, measure
 - locks: none
 - after: none
-- files: docs/numbers.md
+- files: docs/stalls.md
 
 ### U71 Task table keeps its edge gap
 Result: The last column of the Home task table sits inside the card with the card's padding.

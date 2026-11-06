@@ -209,15 +209,6 @@ const classFix = (c: StallClass, self: Project, evidence: string[]): FixSpec => 
   planning: true,
 });
 
-export const planningFix = (key: string, title: string, goal: string, self: Project, evidence: string[]): FixSpec => ({
-  key,
-  title,
-  project: self,
-  brief: planBrief(self.name, goal),
-  evidence,
-  planning: true,
-});
-
 function planningFlags(settings: Settings): string[] {
   const planner = settings.models.planner[0];
   return ["--agent", "pi", ...(planner ? ["--model", planner] : []), "--set", "review=off", "--set", "merge=ask me first"];

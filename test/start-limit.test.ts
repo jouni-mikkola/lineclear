@@ -4,8 +4,6 @@ import { join } from "node:path";
 import { decisionsPath } from "../pi/config.ts";
 import { readItems } from "../src/inbox.ts";
 import { tick } from "../src/rules.ts";
-import { alarms } from "../src/waste.ts";
-import { readFacts } from "../src/waste-facts.ts";
 import { demoEnv, fakeWorld, scratch } from "./fake-world.ts";
 
 const scratchDir = scratch();
@@ -92,7 +90,7 @@ test("a reopened step whose Reopened line cannot be placed does not start, and H
   expect(out.some((d) => d.kind === "skip" && d.reason.includes("Reopened line cannot be placed"))).toBe(true);
 });
 
-test("starts here and on another machine share the cap, and the waste watch sees no starts alarm", () => {
+test("starts here and on another machine share the cap", () => {
   const t = setup("ready");
   const file = join(t.env.LINECLEAR_CONFIG as string, "projects", "demo", "settings.json");
   writeFileSync(file, JSON.stringify({ ...JSON.parse(readFileSync(file, "utf8")), machines: ["far"] }));
@@ -116,7 +114,6 @@ test("starts here and on another machine share the cap, and the waste watch sees
   expect(logged).toHaveLength(3);
   expect(starts(t.adds) + remote.length).toBe(3);
   expect(remote.length).toBeGreaterThan(0);
-  expect(alarms(readFacts(t.world, t.env, t.clock.at.getTime())).map((a) => a.id)).not.toContain("starts");
 });
 
 test("an answered limit item is not made again while the step stays over the limit", () => {

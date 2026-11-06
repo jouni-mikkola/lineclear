@@ -10,7 +10,6 @@ import { type Pusher, realPush, watchInbox } from "./notify.ts";
 import { refreshRemotes } from "./remotes.ts";
 import { dispatcherChat, taskChatLinks } from "./chat.ts";
 import { taskTerminalLinks } from "./task-live.ts";
-import { recordLatency } from "./api-latency.ts";
 import { apiAnswer, liveHub } from "./live.ts";
 import { WEB_DIST, WEB_ROOT, webResponse } from "./web-files.ts";
 import { configDir } from "../pi/config.ts";
@@ -222,10 +221,7 @@ export function serveWeb(dir: string, address = webAddress(), env: Env = process
       fetch: async (req) => {
         const url = new URL(req.url);
         if (url.pathname.startsWith("/api/")) {
-          const t0 = performance.now();
-          const answer = await apiAnswer(live, api, req, url, knownHost(url.hostname, env));
-          recordLatency(performance.now() - t0, env);
-          return answer;
+          return apiAnswer(live, api, req, url, knownHost(url.hostname, env));
         }
         // a name this server does not know gets no page and no token
         if (!knownHost(url.hostname, env)) return json({ error: `${url.hostname} is not a name of this server. Add it to LINECLEAR_HOSTS.` }, 403);

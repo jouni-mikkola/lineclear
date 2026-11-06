@@ -4,7 +4,6 @@ import { dirname, join } from "node:path";
 import { writeAtomic } from "../pi/atomic.ts";
 import { readJson } from "../pi/config.ts";
 import type { Account } from "./full.ts";
-import { GAUGE_WINDOW } from "./compaction-gauge.ts";
 import { costOf, priceFinder, type Price } from "./measure.ts";
 import { piHarness } from "./harness-pi.ts";
 import { piDir } from "./paths.ts";
@@ -50,8 +49,6 @@ export interface PiSpend {
   monthAccounts?: string[];
   /** The month `monthly` is of, such as "2026-10". */
   month?: string;
-  /** Every token of the compaction card's window: input, output and cache. */
-  tokens?: number;
 }
 
 const monthOf = (at: number) => new Date(at).toISOString().slice(0, 7);
@@ -96,9 +93,7 @@ export function spendAndUsage(messages: { at: number; account: string; usage: Us
   const month = monthOf(now);
   const monthly: Record<string, number> = {};
   const monthAccounts = new Set<string>();
-  let tokens = 0;
   for (const m of messages) {
-    if (m.at > now - GAUGE_WINDOW && m.at <= now) tokens += m.usage.input + m.usage.output + m.usage.cacheRead + m.usage.cacheWrite;
     const day = new Date(m.at).toISOString().slice(0, 10);
     const price = priceOf(m.usage);
     if (price && days.has(day)) days.set(day, (days.get(day) ?? 0) + costOf(m.usage, price));
@@ -114,7 +109,6 @@ export function spendAndUsage(messages: { at: number; account: string; usage: Us
     monthly,
     monthAccounts: [...monthAccounts].sort(),
     month,
-    tokens,
   };
 }
 

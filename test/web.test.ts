@@ -370,14 +370,6 @@ test("/api/settings gives the machines and each project with its secret names, n
       models: { worker: ["a/x", "a/y"], reviewer: ["b/z"], planner: ["c/w"] },
       secrets: ["API_TOKEN"],
       askBefore: { plans: false, releases: true, spending: true },
-      reasons: {
-        worker: [
-          { state: "use", reason: "in use, usage not reported" },
-          { state: "next", reason: "next, takes over when the ones above are full, usage not reported" },
-        ],
-        reviewer: [{ state: "use", reason: "in use, usage not reported" }],
-        planner: [{ state: "use", reason: "in use, usage not reported" }],
-      },
     },
   ]);
 

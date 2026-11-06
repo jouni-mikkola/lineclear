@@ -8,7 +8,7 @@ import { configDir, readJson } from "./config.ts";
 type Env = Record<string, string | undefined>;
 type Pi = { on: (event: string, handler: (event: any, ctx: any) => unknown) => void; appendEntry?: (type: string, data?: unknown) => void };
 
-/** The entry each session records, so `lineclear measure` can split its numbers by part. */
+/** The entry each session records. */
 export const PACK_ENTRY = "lineclear-pack";
 
 /** The folder of parts, beside this file, found through the link install makes (LINECLEAR_PACK_PARTS names another, for tests). */

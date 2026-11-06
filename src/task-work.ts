@@ -1,5 +1,5 @@
 // What a task runs besides its checks (its agent, a review, the step check, the done proof) is written to decisions.jsonl
-// with the machine it ran on, so `lineclear measure` can count the runs per machine next to check-runs.jsonl's.
+// with the machine it ran on, next to check-runs.jsonl's.
 // A task stays on the machine it was started on: work found on another one is a fault.
 import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";

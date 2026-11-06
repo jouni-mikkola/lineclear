@@ -1,6 +1,5 @@
 import type { AccountUse, Detection, InboxItem, Project, Task, TaskState } from "../kit/index.ts";
 import { realInbox, realProjects, realUsage } from "./real-samples.ts";
-import type { CompactionGauge } from "../../src/compaction-gauge.ts";
 
 // Sample data for each state of a page (`?state=`): the design page and the views draw it, so their pictures stay
 // the same on every machine.
@@ -319,13 +318,6 @@ export function usage(state: PageState): AccountUse[] {
       week: { percent: Math.max(0, 70 - i * 5), resetAt: fromNow(1440 + i * 300) },
     }));
   return base;
-}
-
-/** Home's compaction card: none in the empty state, four-digit counts in the many state. */
-export function compaction(state: PageState): CompactionGauge {
-  if (state === "empty") return { compactions: 0, fellBack: 0, tokensPerTask: null, tasks: 0 };
-  if (state === "many") return { compactions: 1_284, fellBack: 212, tokensPerTask: 48_200_000, tasks: 3_120 };
-  return { compactions: 37, fellBack: 2, tokensPerTask: 5_412_000, tasks: 61 };
 }
 
 export const moves = [

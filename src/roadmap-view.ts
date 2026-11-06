@@ -3,8 +3,6 @@ import { stopsOfSpace } from "./home-waits.ts";
 import { readSettings } from "./project.ts";
 import { stepParts } from "./parts.ts";
 import { countSteps, currentPhase, lineOf, type Plan, readPlan, type RoadmapLine } from "./progress.ts";
-import { type Goal, goalsOf, type Hold } from "./goals.ts";
-import { readWaits, waitsForOwner } from "./waits.ts";
 import { unprovenOf } from "./doneproof.ts";
 import { roadmapSource, lineclearTasks } from "./roadmap-source.ts";
 import { checkRoadmap, doneIds, resultOf, type State, type Task } from "./roadmap.ts";
@@ -25,8 +23,6 @@ export interface RoadmapData {
   phase?: string;
   /** Commits on origin/main that mark a step done, newest first. */
   history: { step: string; at: number; commit: string; subject: string }[];
-  /** Set by the server; the sample pages leave it out. The roadmap's goals, each with its progress, expected date and confidence. */
-  goals?: Goal[];
   /** The Inbox asks of this project that wait for you, newest first. The server adds them, so a read of the files has none. */
   decisions?: { n: number; question: string; step?: string }[];
   /** Each part the steps name, with its health score (higher is worse). Absent when none is given. */
@@ -79,23 +75,8 @@ export function lineOfRoadmap(repo: string, space: string, tasks: Task[], env: E
   return lineOf(source.text, source.commits, marks, stopsOfSpace(space, repo, env), now, 0, unprovenOf(repo, env)).line;
 }
 
-/** Which steps' tasks wait for you, for a model quota or have stalled. A wait for a task, a slot or a start asks the owner nothing. */
-function holdsOf(steps: RoadmapStep[], env: Env): Map<string, Hold> {
-  const waits = readWaits(env);
-  const holds = new Map<string, Hold>();
-  for (const s of steps) {
-    if (s.state !== "work" || !s.task) continue;
-    const wait = waits.find((w) => w.task === s.task?.id);
-    if (wait?.kind === "until") holds.set(s.id, "quota");
-    else if (wait && !waitsForOwner(wait)) continue;
-    else if (s.task.status === "need") holds.set(s.id, "you");
-    else if (s.task.stalled) holds.set(s.id, "stall");
-  }
-  return holds;
-}
-
 /** A roadmap of Now, Next and Later lists: each list a phase, each item a step with no task or dependency. */
-function listRoadmap(project: string, plan: Plan, line: RoadmapLine, rounds: number, read: Task[] | string, text: string, now: number): RoadmapData {
+function listRoadmap(project: string, plan: Plan, line: RoadmapLine, rounds: number, read: Task[] | string): RoadmapData {
   const steps = plan.steps.map(
     (s): RoadmapStep => ({
       id: s.id,
@@ -118,7 +99,6 @@ function listRoadmap(project: string, plan: Plan, line: RoadmapLine, rounds: num
     line,
     ...(currentPhase(plan) ? { phase: currentPhase(plan) } : {}),
     history: [],
-    goals: goalsOf(text, steps, new Map(), [], now),
     decisions: [],
     rounds,
     ...(typeof read === "string" ? { tasksError: read } : {}),
@@ -155,7 +135,7 @@ export function roadmapData(
     const plan = readPlan(text, commits);
     if (plan.steps.length > 0) {
       const read = tasksOf(settings.space);
-      return { ok: { ...listRoadmap(project, plan, line(read), settings.reviewRounds ?? 2, read, text, now), ...(settings.paused ? { paused: true } : {}) } };
+      return { ok: { ...listRoadmap(project, plan, line(read), settings.reviewRounds ?? 2, read), ...(settings.paused ? { paused: true } : {}) } };
     }
   }
   if (errors.length)
@@ -221,7 +201,6 @@ export function roadmapData(
       line: line(read),
       ...(currentPhase(plan) ? { phase: currentPhase(plan) } : {}),
       history,
-      goals: goalsOf(text, steps, holdsOf(steps, env), commits, now),
       decisions: [],
       rounds: settings.reviewRounds ?? 2,
       ...(typeof read === "string" ? { tasksError: read } : {}),

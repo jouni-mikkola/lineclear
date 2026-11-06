@@ -1,4 +1,4 @@
-// What `lineclear measure` reads in pi's session files: tokens, turns, token pack parts and roadmap reads.
+// What is read from pi's session files: tokens, turns, token pack parts and roadmap reads.
 
 export interface Usage {
   model: string;
