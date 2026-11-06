@@ -35,6 +35,8 @@ async function timed(path: string) {
 // the feed's thread is blocked in a 5 s read from the second snapshot on
 test("a static file and /api/home answer within 200 ms while a read blocks for 5 s", async () => {
   await Bun.sleep(100);
+  // first requests pay one-off costs (connection, lazy module and route setup) that have nothing to do with the blocked read
+  for (const path of ["/favicon.ico", "/api/home"]) await timed(path);
   for (const path of ["/favicon.ico", "/api/home"]) {
     const r = await timed(path);
     expect(r.status).toBe(200);
