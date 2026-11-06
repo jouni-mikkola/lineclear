@@ -28,4 +28,7 @@ jobs:
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', 'server/bun.lock') }}
           restore-keys: bun-${{ runner.os }}-
       - run: bun install --frozen-lockfile
+      # The root tests import the server's code (push, formats), which needs the server's own dependencies
+      - run: bun install --frozen-lockfile
+        working-directory: server
       - run: bun run gates:full
