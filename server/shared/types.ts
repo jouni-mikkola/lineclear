@@ -9,6 +9,7 @@ export type {
   Report,
   TaskStatus,
   TaskAgent,
+  AgentHerdr,
   Task,
   Automation,
   Question,

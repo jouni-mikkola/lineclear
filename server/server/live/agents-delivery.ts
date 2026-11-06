@@ -156,6 +156,7 @@ export class AgentsDelivery extends AgentsState {
 
   protected take(list: AgentInfo[]) {
     this.listed = list
+    this.heardAt = Date.now()
     this.live = new Map(list.filter((a) => a.name).map((a) => [a.name!, a]))
     this.settle()
     void this.repairRoutes()
@@ -188,6 +189,7 @@ export class AgentsDelivery extends AgentsState {
       if (was !== now) {
         // the screen is read again for a change of status, nothing else
         this.screenDue.add(key)
+        this.pasteDue.add(key)
         this.changed(key, now, was)
       }
     }

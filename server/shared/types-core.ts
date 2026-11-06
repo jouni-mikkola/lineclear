@@ -185,6 +185,19 @@ export interface TaskAgent {
   status: Status
   age: string
   note: string
+  /** what herdr last said of the agent, kept from its events: the rule loop reads it instead of asking herdr */
+  herdr?: AgentHerdr
+}
+
+export interface AgentHerdr {
+  /** herdr's agent_status */
+  status: string
+  /** the path of its pi session file */
+  session?: string
+  /** its pane still shows the pasted brief */
+  pasted: boolean
+  /** when the event or snapshot it comes from arrived (ms) */
+  at: number
 }
 
 export interface Task {
