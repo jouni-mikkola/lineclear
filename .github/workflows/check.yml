@@ -1,6 +1,7 @@
 name: check
 
-# Changed tests while working, the full check once at merge, the heavy suites after a merge (heavy.yml).
+# Checks are light and run here, never on a machine of the owner's: no browser, no coverage run, 5 minutes a job at most
+# (test/light-checks.test.ts keeps it so). Changed tests while working, the full light check once at merge.
 # A pull request runs only the tests of what it changed (scripts/check.ts --changed, the quick tier the lane uses too).
 # The merge queue runs the full check once, in 4 jobs that each take every 4th step of it (--shard).
 # Nothing runs the full check on every push. Require the job "check" in the branch rules: it is green when the
@@ -26,7 +27,7 @@ jobs:
     name: changed tests
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:
@@ -54,7 +55,7 @@ jobs:
     name: full check (${{ matrix.shard }}/4)
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     strategy:
       fail-fast: false
       matrix:
@@ -70,8 +71,6 @@ jobs:
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', 'server/bun.lock') }}
           restore-keys: bun-${{ runner.os }}-
       - run: bun install --frozen-lockfile
-      - name: Browser for the UI specs
-        run: bunx playwright install --with-deps chromium
       - run: bun scripts/check.ts --full --no-cache --untimed --shard=${{ matrix.shard }}/4
 
   check:

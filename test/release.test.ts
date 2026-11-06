@@ -2,7 +2,6 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  fullCheckWhy,
   pointOriginAt,
   PROMOTE_EVERY_MS,
   type ReleaseDeps,
@@ -12,7 +11,6 @@ import {
   releaseStartDue,
   releaseStep,
   startReleaseIfDue,
-  waitUntilQuiet,
 } from "../src/release.ts";
 import { sh, tmp } from "./helpers.ts";
 
@@ -85,16 +83,16 @@ test("a planted breaking merge is held at next, never promoted, and files one fi
   expect(readRelease(env).stable?.commit).toBe(A);
 });
 
-test("a red main with no new commit costs one full check in 10 ticks, and a new commit one more", () => {
+test("a red main with no new commit costs one test in 10 ticks, and a new commit one more", () => {
   let head = B;
   const { deps } = world(() => head, new Set([B, C]));
   const test = deps.test;
   const dir = env.LINECLEAR_CONFIG as string;
   const log = join(dir, "check-runs.jsonl");
-  deps.test = (c, again) => {
+  deps.test = (c) => {
     mkdirSync(dir, { recursive: true });
     appendFileSync(log, `${JSON.stringify({ mode: "full", commit: c })}\n`);
-    return test(c, again);
+    return test(c);
   };
   const fullChecks = () => readFileSync(log, "utf8").trim().split("\n").length;
   for (let i = 0; i < 10; i++) releaseStep(deps, env, at(i * 2));
@@ -213,36 +211,6 @@ test("install.sh marks a machine another one installs as its follower", () => {
   expect(readFileSync(join(root, "config", "release-follows"), "utf8")).toBe("desk\n");
 });
 
-test("the release check waits for a quiet machine, and runs anyway after the longest wait", () => {
-  let t = 0;
-  const loads = [5, 3, 1];
-  const waited: number[] = [];
-  const pause = (ms: number) => {
-    t += ms;
-    waited.push(ms);
-  };
-  expect(
-    waitUntilQuiet(
-      () => loads.shift() ?? 1,
-      () => t,
-      pause,
-      600_000,
-    ),
-  ).toBe(true);
-  expect(waited).toHaveLength(2);
-  waited.length = 0;
-  t = 0;
-  expect(
-    waitUntilQuiet(
-      () => 9,
-      () => t,
-      pause,
-      60_000,
-    ),
-  ).toBe(false);
-  expect(waited.reduce((a, b) => a + b, 0)).toBeGreaterThanOrEqual(60_000);
-});
-
 test("a newer red main tells the open Fix next task and files no second one", () => {
   let head = B;
   const { deps, did, close } = world(() => head, new Set([B, C]));
@@ -288,44 +256,6 @@ test("a release run that fails or leaves main held is started less and less ofte
   expect(start(32 * MIN)).toBe(true);
   expect(start(33 * MIN)).toBe(false);
   expect(start(34 * MIN)).toBe(true);
-});
-
-/** A full check's output with a failing test, a timed-out test and a failed gate planted in it. */
-const planted = [
-  "check: failing tests:",
-  "  test/a.test.ts > adds up: expect(received).toBe(expected)",
-  "  test/b.test.ts > waits for it: timed out after 120000ms",
-  "check: tests 1/2 failed",
-  "check: gates failed: error: file src/x.ts is 700 lines",
-  "check: every step ran",
-].join("\n");
-
-test("the held line names each failing test, a timed-out one and a failed gate", () => {
-  const { deps } = world(() => B);
-  deps.test = () => `full check: ${fullCheckWhy(planted)}`;
-  const held = releaseStep(deps, env, at(0)).held ?? "";
-  expect(held).toContain("test/a.test.ts > adds up: expect(received).toBe(expected)");
-  expect(held).toContain("test/b.test.ts > waits for it: timed out after 120000ms");
-  expect(held).toContain("gates failed: error: file src/x.ts is 700 lines");
-});
-
-test("a failed step with no test names is never an empty list", () => {
-  expect(fullCheckWhy("check: ui tests failed: Error: browser killed\ncheck: every step ran")).toContain("ui tests failed: Error: browser killed");
-});
-
-test("failing tests of every shard are named, and a shard with no test names is named with its last error line", () => {
-  const out = [
-    "check: failing tests:",
-    "  test/a.test.ts > one: e1",
-    "check: tests 1/2 failed: error: unhandled between tests",
-    "check: failing tests:",
-    "  test/c.test.ts > two: e2",
-    "  and 3 more",
-    "check: tests 2/2 failed",
-  ].join("\n");
-  const why = fullCheckWhy(out);
-  expect(why).toContain("test/a.test.ts > one: e1; test/c.test.ts > two: e2; and 3 more");
-  expect(why).toContain("tests 1/2 failed: error: unhandled between tests");
 });
 
 test("--again on a held commit that now passes records green and does not promote", () => {
