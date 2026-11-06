@@ -99,7 +99,7 @@ wait: told to resume. A holder that waits for the owner gets no tell; the remedy
 Every way a task or a ready step stops moving has a class (`CLASS_INFO` in `src/stall-class.ts`): signed out, account
 full, revive loop, idle after done, main red, lock held too long, no room, no sign of life, late (busy but past its time left: asked for a new estimate once, the ladder climbs only if no status comes), brief never sent, roadmap
 broken, repo folder off main, a command that fails, a machine out of reach, head-of-line block across projects, merge
-result lost (queued two hours), coordinator gone (the loop did not tick a project for 30 minutes), and unknown. Each has a limit in minutes. Past it the stall goes to
+result lost (queued two hours), coordinator gone (the loop did not tick a project for 30 minutes), fix loop (a step's last two fix tasks ended with no merge), and unknown. Each has a limit in minutes. Past it the stall goes to
 `decisions.jsonl` with its class, its remedy with the minutes from the stall, and its end with the minutes it cost.
 `lineclear stalls` sums the last day by class, and the loop cuts `decisions.jsonl` once a day. A test plants each
 class (`test/stall-class.test.ts`).
