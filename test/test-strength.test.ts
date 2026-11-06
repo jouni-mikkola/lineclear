@@ -27,6 +27,16 @@ describe("test strength gate", () => {
     expect(testStrengthFaults(diff(["  await Bun.sleep(900);"], ["  await Bun.sleep(100);"]), ["Fix x"])).toEqual([]);
     expect(testStrengthFaults(diff(["  await Bun.sleep(100);"], ["  await Bun.sleep(900);"], "src/x.ts"), ["Fix x"])).toEqual([]);
   });
+  test("fails a sleep or limit added from nothing, a deleted test's expects and a toPass", () => {
+    expect(testStrengthFaults(diff([], ["  await Bun.sleep(5000);"]), ["Fix x"])[0]).toContain("raises a time limit");
+    expect(testStrengthFaults(diff(["});"], ["}, 60_000);"]), ["Fix x"])[0]).toContain("raises a time limit");
+    expect(testStrengthFaults(diff([], ["  await expect(async () => {}).toPass();"]), ["Fix x"])[0]).toContain("adds a retry");
+    const gone = ["--- a/test/old.test.ts", "+++ /dev/null", "@@ -1,2 +0,0 @@", "-expect(a).toBe(1);", "-expect(b).toBe(1);"].join("\n");
+    expect(testStrengthFaults(gone, ["Fix x"])[0]).toContain("test/old.test.ts removes 2 expects");
+  });
+  test("a cause line clears only the test it names", () => {
+    expect(testStrengthFaults(diff([], ["test.skip('a', () => {"]), ["Cause: other thing: waited on it"])).not.toEqual([]);
+  });
   test("a cause line needs a test and a reason", () => {
     expect(testStrengthFaults(diff([], ["test.skip('a', () => {"]), ["Cause: nothing"])).not.toEqual([]);
   });
