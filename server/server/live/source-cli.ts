@@ -246,6 +246,9 @@ export class LiveSourceCli extends LiveSourceSubcommands {
         return answerCard((x) => this.act(x), ctx.chat, one(p, 'space'), a1, rest.join(' '))
       case 'merge':
         return this.mergeCommand(a1, ctx)
+      case 'check-where':
+        // for lineclear check: where this space's full check runs
+        return this.settings.ways(this.placeOfCommand(p, ctx)?.name).checkWhere ?? 'local'
       case 'pr':
       case 'checks': {
         const t = this.engine.task(a1 ?? '')

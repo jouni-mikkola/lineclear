@@ -34,7 +34,13 @@ describe("the brief's default way of working", () => {
 - Reviewer: a headless Codex or a Codex subagent (its default model and effort).
 - Must fix: major. Findings are tagged critical/major/minor/trivial; fix critical and major, then review again.
 - Review rounds: 3. Stop when a round finds none to fix, at most 3 rounds.
-- Merge: on its own. Merge it yourself once it works (lineclear merge X-1). Don't wait for GitHub's checks.`)
+- Merge: on its own. Merge it yourself once it works (lineclear merge X-1). Don't wait for GitHub's checks.
+- Checks: the full check runs here. While you work run only the tests of what you changed (lineclear check --changed); lineclear check runs the full check.`)
+  })
+  test('where checks run on GitHub, the Checks line says lineclear check hands the branch over', () => {
+    expect(settingsBlock('X-1', { ways: { ...ways, checkWhere: 'github' } })).toContain(
+      '- Checks: GitHub runs the full check. While you work run only the tests of what you changed (lineclear check --changed); lineclear check hands your branch to GitHub and waits for its result.',
+    )
   })
   test("a brief splits into the coordinator's words and the Settings block", () => {
     const how = settingsBlock('X-1', { ways })

@@ -48,7 +48,7 @@ const runTmp = mkdtempSync(join(diskTmpRoot(), "lc-check-"));
 const env = { ...process.env, TMPDIR: runTmp, NODE_COMPILE_CACHE: compileCacheDir(), PWTEST_DAEMON_SESSION_DIR: join(runTmp, "playwright-daemon") };
 // The server's tests bind unix sockets under their temp folder, and a socket path stops at 107 bytes: one more folder
 // level puts them over it. They get the temp root, where their own tmp-scope.ts still clears what they make.
-const serverEnv = { ...env, TMPDIR: diskTmpRoot() };
+const serverEnv = { ...env, TMPDIR: diskTmpRoot(), ...(process.argv.includes("--changed") ? { LINECLEAR_TEST_JOBS: "4" } : {}) };
 // reports of this run's test runners, outside the folders the tests are checked to leave clean
 const reports = join(runTmp, "reports");
 mkdirSync(reports);
@@ -98,7 +98,10 @@ const inServer = known === undefined || changed.some((f) => (f.startsWith("serve
 const outsideServer = known === undefined || changed.some((f) => !f.startsWith("server/") && !isDoc(f));
 // the incremental build is kept between runs: the second run of the types takes a fraction of the first
 const TSC_CHANGED = ["bunx", "tsc", "--noEmit", "--incremental", "--tsBuildInfoFile", "node_modules/.cache/tsc-changed.tsbuildinfo"];
+// the most test processes at once: the worker's loop, the lane and the server's tests alike
 const TEST_SHARDS = 4;
+// install.sh builds the web pages with vite for real: a run on GitHub, never in a worker's loop
+const BUILDING_TESTS = ["test/install.test.ts"];
 
 // the tests the change reaches: a failure in any other file is not the change's
 // none when the change reaches every test or the whole run is asked for: then no failure is outside it
@@ -124,7 +127,7 @@ function testSteps(): Step[] {
   const map = known ? readMap(".") : undefined;
   const reachedFiles = known
     ? testsFor(".", changed, map)
-        ?.filter((f) => existsSync(f))
+        ?.filter((f) => existsSync(f) && !(onlyChanged && BUILDING_TESTS.includes(f)))
         .map((f) => `./${f}`)
     : undefined;
   let files = reachedFiles;
@@ -146,7 +149,7 @@ function testSteps(): Step[] {
   const built = needsPlugins();
   // the same release tests run the server's scripts, which import its dependencies: an install under way (a fresh
   // worktree, a moved lockfile) leaves them half there, so the tests wait for it
-  const installs = inServer || !existsSync("server/node_modules");
+  const installs = (inServer && !onlyChanged) || !existsSync("server/node_modules");
   const needs = [...(built ? [PLUGINS.name] : []), ...(installs ? [SERVER_INSTALL.name] : [])];
   const tests = runs.map((run, i) => ({
     name: runs.length === 1 ? "tests" : `tests ${i + 1}/${runs.length}`,
@@ -156,12 +159,14 @@ function testSteps(): Step[] {
   return [...(built ? [PLUGINS] : []), ...(installs && !inServer ? [SERVER_INSTALL] : []), ...tests];
 }
 
+const serverNeeds = () => (onlyChanged && existsSync("server/node_modules") ? [] : ["server install"]);
+
 function serverSteps(): Step[] {
   if (!inServer) return [];
   return [
-    SERVER_INSTALL,
-    { name: "server types", cmd: ["bun", "run", full || known === undefined ? "typecheck" : "typecheck:changed"], cwd: "server", needs: ["server install"] },
-    { name: "server tests", cmd: ["bun", "scripts/test.ts", full || known === undefined ? "--force" : "changed"], cwd: "server", needs: ["server install"] },
+    ...(onlyChanged && existsSync("server/node_modules") ? [] : [SERVER_INSTALL]),
+    { name: "server types", cmd: ["bun", "run", full || known === undefined ? "typecheck" : "typecheck:changed"], cwd: "server", needs: serverNeeds() },
+    { name: "server tests", cmd: ["bun", "scripts/test.ts", full || known === undefined ? "--force" : "changed"], cwd: "server", needs: serverNeeds() },
   ];
 }
 
