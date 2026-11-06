@@ -271,12 +271,15 @@ function lineReader(onLine: (line: string) => unknown) {
   }
 }
 
+/** calls that type, create or notify: herdr may have done them before it closed, so they are never asked twice */
+const once = /send_|prompt|create|\.open|\.split|notification/
+
 /** a closed socket means the request came late, not that herdr is down: ask once more, and fail plainly on a second close */
 async function send<T>(method: string, params: Record<string, unknown>, timeoutMs: number, path: string): Promise<T> {
   try {
     return await sendOnce<T>(method, params, timeoutMs, path)
   } catch (e) {
-    if (!(e instanceof HerdrError) || e.code !== 'closed') throw e
+    if (!(e instanceof HerdrError) || e.code !== 'closed' || once.test(method)) throw e
     return sendOnce<T>(method, params, timeoutMs, path)
   }
 }
