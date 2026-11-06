@@ -4,6 +4,7 @@ import type { Space } from '../places.ts'
 import * as G from './git.ts'
 import * as GH from './github.ts'
 import * as Lane from './lane.ts'
+import * as Runs from '../../../../src/check-runs.ts'
 import { type TaskRec, ended, ANSWER_GRACE, CHECKS_EVERY } from './engine-helpers.ts'
 import { EngineHandoff } from './engine-handoff.ts'
 
@@ -235,8 +236,12 @@ export class EngineLand extends EngineHandoff {
     }
     // no check set for the project: nothing is assumed about its tools, and the merge goes on as before
     if (!command) return undefined
+    // a red main or a check the machine failed pauses the line; the task that fixes it goes first
+    const repo = this.places.space(t.project)?.path ?? p.path
+    const paused = /^(fix\b|\S+ fix:)/i.test(t.title) ? undefined : Runs.lanePause(Runs.readRuns(repo, Date.now() - 86_400_000), base)
+    if (paused) return { ok: false, error: `The merge line is paused: ${paused}. Nothing was merged. Run lineclear merge ${t.id} again in a few minutes.` }
     // one full check at a time in this repo; a real change by the task (not a message) makes it leave the line
-    const c = await Lane.checkInTurn(t.id, this.places.space(t.project)?.path ?? p.path, wt, base, command, {
+    const c = await Lane.checkInTurn(t.id, repo, wt, base, command, {
       slotMachine: t.machine,
       gone: () => (!t.landing ? 'its merge was cancelled' : ended(t) ? 'it is ended' : this.task(t.id) !== t ? 'its record was replaced' : undefined),
       waiting: (n, noSlot) => t.landing && this.land(t, n || noSlot ? 'queue' : 'check', undefined, n),

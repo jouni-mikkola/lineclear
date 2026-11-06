@@ -320,6 +320,7 @@ export function NowList({ tasks, waiting }: { tasks: Task[]; waiting?: Waiting }
 
 /** Why work waits in a project: what runs now, what each paused task waits for, why a ready step has not started. Each line is already in plain words. */
 export interface Waiting {
+  linePaused?: string;
   running: { id: string; title: string; stage: Stage; since: number }[];
   paused: { text: string; count: number }[];
   notStarted: { title: string; reason: string }[];
@@ -327,8 +328,8 @@ export interface Waiting {
 
 /** What runs now, what each paused task waits for and why each ready step has not started: three plain groups, each shown only when it has lines. */
 function WaitingGroups({ waiting }: { waiting: Waiting }) {
-  const { running, paused, notStarted } = waiting;
-  if (!running.length && !paused.length && !notStarted.length) return null;
+  const { running, paused, notStarted, linePaused } = waiting;
+  if (!running.length && !paused.length && !notStarted.length && !linePaused) return null;
   const group = (name: string, lines: ReactNode[]) =>
     lines.length > 0 && (
       <ul className="space-y-0.5 text-sm text-fg3 [overflow-wrap:anywhere]" data-waiting={name}>
@@ -340,6 +341,7 @@ function WaitingGroups({ waiting }: { waiting: Waiting }) {
     );
   return (
     <div className="space-y-3" data-waiting-groups>
+      {group("line-paused", linePaused ? [linePaused] : [])}
       {group(
         "running",
         running.map((t) => (

@@ -93,6 +93,7 @@ async function runCheck(
   onPid: (pid: number) => void,
   readLoad?: () => number[],
   rerun = false,
+  slotWaitMin = 0,
 ): Promise<{ ok: boolean; tail: string }> {
   // git runs where the task's folder is: the machine the check runs on, not the server's
   const where = {
@@ -120,17 +121,19 @@ async function runCheck(
     tier: 'merge',
     command,
     seconds,
+    slotWaitMin,
     ...load,
     ok: r.ok,
     failed,
     ...(r.ok ? {} : { causes: Runs.failureCauses(text, r.code, failed, gate) }),
+    ...(r.ok ? {} : Runs.infraField(text, r.code)),
     ...(gate ? { gate } : {}),
     ...(outside.length > 0 ? { outside } : {}),
     ...(passes ? { quarantined: true } : {}),
     ...(again ? { rerun: true } : {}),
     group: `${id}-${Date.now()}`,
   })
-  if (again) return runCheck(repo, machine, wt, command, id, onPid, readLoad, true)
+  if (again) return runCheck(repo, machine, wt, command, id, onPid, readLoad, true, slotWaitMin)
   const held = rerun && !r.ok && !passes && failed.length === 0 && !gate
   return { ok: r.ok || passes, tail: `${held ? 'held, cause unnamed: it failed twice and named no test or gate\n' : ''}${text.slice(-TAIL)}` }
 }
@@ -172,6 +175,7 @@ export async function checkInTurn(
   }
   // a task on another machine waits in that machine's line and checks there, never in the main machine's
   const machine = Runs.machineOf(o.slotMachine ? { ...(o.env ?? process.env), LINECLEAR_MACHINE: o.slotMachine } : o.env)
+  const entered = performance.now()
   return Queue.inTurn(
     id,
     Queue.lineOn(repo, o.slotMachine, o.env),
@@ -180,7 +184,11 @@ export async function checkInTurn(
       if (why) return { step: 'left' as const, why }
       const before = (await git(wt, 'rev-parse', 'HEAD')).out
       if (!(await rebase(wt, base)).ok) return { step: 'conflict' as const }
-      return { step: 'checked' as const, before, ...(await runCheck(repo, machine, wt, command, id, track, o.readLoad)) }
+      return {
+        step: 'checked' as const,
+        before,
+        ...(await runCheck(repo, machine, wt, command, id, track, o.readLoad, false, (performance.now() - entered) / 60_000)),
+      }
     },
     {
       env: o.env,

@@ -89,6 +89,8 @@ export interface HomeTask {
 
 /** Why work waits in a project, in words: what runs now, what each paused task waits for, why a ready step has not started. */
 export interface HomeWaiting {
+  /** Why the merge line is paused, when it is (a red main or a check that failed for the machine's sake). */
+  linePaused?: string;
   running: { id: string; title: string; stage: Stage; since: number }[];
   paused: WaitGroup[];
   notStarted: { title: string; reason: string }[];
@@ -411,7 +413,7 @@ function spaceView(s: Raw, ctx: SpaceContext, owner?: { project: string; paused:
     broken,
     ...owner,
     tasks: shown,
-    waiting: waitingOf(shown, own, waits, roadmap, owner?.project, env, now),
+    waiting: waitingOf(shown, own, waits, roadmap, owner?.project, env, now, existsSync(s.path) ? mainRefs(s.path)[1] : undefined, s.path),
   } satisfies HomeProject;
 }
 
