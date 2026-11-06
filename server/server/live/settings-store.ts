@@ -241,6 +241,7 @@ export class Settings {
       mustFix: by('review.mustFix'),
       rounds: by('review.rounds'),
       merge: by('brief.merge'),
+      check: by('check.where'),
       agent: by('task.agent', 'task.model', 'task.effort'),
     }
     return Object.fromEntries(Object.entries(all).filter(([, v]) => v)) as Partial<Record<Said, SetBy>>

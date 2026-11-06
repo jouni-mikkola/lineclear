@@ -152,7 +152,7 @@ test("three checks with two slots still run one at a time, and the two after the
   writeFileSync(join(t.env.LINECLEAR_CONFIG, "machine.json"), JSON.stringify({ checkSlots: 2, loadPerCore: 1e6 }));
   const go = (task: string) => check(() => {}, { ...t.env, LINECLEAR_TASK: task }, { cwd: t.repo, pollMs: 20 });
   const runs = [go("LIN-1"), go("LIN-2"), go("LIN-3")];
-  await until(() => existsSync(log) && waitsOf(t).length === 2);
+  await until(() => existsSync(log) && readFileSync(log, "utf8").includes("start") && waitsOf(t).length === 2);
   expect(readFileSync(log, "utf8").trim().split("\n")).toEqual(["start"]);
   expect(waitsOf(t).map((w) => `${w.task}:${w.kind}`)).toEqual(["LIN-2:checks", "LIN-3:checks"]);
   writeFileSync(gate, "");

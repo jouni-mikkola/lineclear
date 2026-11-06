@@ -11,6 +11,8 @@ import { checkTier } from "./check-tier.ts";
 import type { Tier } from "./check-runs.ts";
 import { day } from "./progress.ts";
 import { gitText } from "./git.ts";
+import { spawnSync } from "node:child_process";
+import { serverBin } from "./paths.ts";
 
 const waitKinds = ["owner", "login", "checks", "browser"] as const;
 /** The only things an owner wait may be for: a login code, money beyond the budget, or something that leaves the machine. */
@@ -347,6 +349,31 @@ function changedRun(
   );
 }
 
+/** Runs the server's command for this agent; its words, and whether it passed. */
+function serverCall(args: string[], env: NodeJS.ProcessEnv, cwd: string) {
+  const r = spawnSync(serverBin(env), args, { env, cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 11 * 60_000 });
+  return { ok: r.status === 0, text: `${r.stdout ?? ""}${r.stderr ?? ""}`.trim() };
+}
+
+/**
+ * The full check of a project whose Settings run it on GitHub: the task's branch goes to GitHub as a pull request and
+ * the result of GitHub's check run comes back with the failed tests, so no check script runs on this machine.
+ * Undefined when this is not an agent's check or its space runs the full check here.
+ */
+function checkOnGitHub(out: (l: string) => void, env: NodeJS.ProcessEnv, cwd: string): number | undefined {
+  const task = agentTask(env);
+  if (task === undefined || serverCall(["check-where"], env, cwd).text !== "github") return undefined;
+  const pushed = serverCall(["pr", task], env, cwd);
+  out(pushed.text);
+  if (!pushed.ok) return 1;
+  // one call waits 9 minutes, under an agent's 10-minute command limit; a run still going is asked again by running this again
+  const r = serverCall(["checks", task], env, cwd);
+  out(r.text);
+  // no remote or no checks is no result: never a pass for a check Settings say GitHub runs
+  if (/^No GitHub checks:|has no checks on GitHub/.test(r.text)) return 1;
+  return r.ok ? 0 : 1;
+}
+
 /**
  * `lineclear check [--tier inner|merge|heavy] [command]`: a tier's commands (the merge tier, the full check, when no
  * tier is named), or the command given, in its turn: one full check at a time. The inner tier waits for no turn.
@@ -372,6 +399,11 @@ export async function check(out: (l: string) => void, env = process.env, o: Chec
     }
     out("lineclear check --changed: this project's check does not take --changed, so the full check runs");
     return changedRun(command ?? settings.check, "inner", settings, name, env, cwd, out, { ...o, full: true });
+  }
+  // an agent's full check goes to GitHub where Settings say so; a named command or tier runs as asked
+  if (args.length === 0) {
+    const github = checkOnGitHub(out, env, cwd);
+    if (github !== undefined) return github;
   }
   // only a command the caller named: the project's own tier commands keep their turn
   const cheap = (command: string) => args.includes(command) && isCheap(command);

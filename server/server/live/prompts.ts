@@ -56,7 +56,7 @@ function reviewerWords(r: Reviewer) {
 export const SEVERITIES = ['critical', 'major', 'minor', 'trivial']
 
 /** the Settings block's lines, by the settings each comes from (Settings → How tasks work shows each under its row) */
-export type Said = 'review' | 'reviewer' | 'mustFix' | 'rounds' | 'merge' | 'agent'
+export type Said = 'review' | 'reviewer' | 'mustFix' | 'rounds' | 'merge' | 'check' | 'agent'
 
 /** what a brief's Settings block says: How tasks work, who reviews, the agent it runs on (only so it knows), and who
  *  set the lines that differ from Lineclear's own */
@@ -108,6 +108,13 @@ export function settingsLines(id: string, t: Told): { said: Said; text: string }
     },
   ]
   lines.push({ said: 'merge', text: `Merge: ${merge}` })
+  lines.push({
+    said: 'check',
+    text:
+      w.checkWhere === 'github'
+        ? 'Checks: GitHub runs the full check. While you work run only the tests of what you changed (lineclear check --changed); lineclear check hands your branch to GitHub and waits for its result.'
+        : 'Checks: the full check runs here. While you work run only the tests of what you changed (lineclear check --changed); lineclear check runs the full check.',
+  })
   if (t.agent) lines.push({ said: 'agent', text: `Agent: ${onWords(t.agent)}. Only so you know what you run on.` })
   return lines.map((l) => (t.by?.[l.said] ? { ...l, text: `${l.text} (${SET_BY[t.by[l.said]!]})` } : l))
 }
