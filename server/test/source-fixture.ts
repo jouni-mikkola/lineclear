@@ -40,7 +40,7 @@ export async function workedTask(name: string) {
   })
   const p = await src.places.add(dir, name)
   const t = src.engine.add({ project: p.name, title: 'Worked', by: 'test' })
-  for (let i = 0; !t.worktree && i < 200; i++) await Bun.sleep(20)
+  await until(() => !!t.worktree).catch(() => undefined)
   // never in the folder the tests run from
   if (!t.worktree) throw new Error(`${t.id} got no worktree: ${t.trouble}`)
   execSync('echo x > x.txt && git add -A && git commit -qm work', { cwd: t.worktree!, shell: '/bin/sh' })
