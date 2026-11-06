@@ -13,7 +13,14 @@ test('a task agent in the snapshot has status, session, pasted and at from herdr
     take(list: unknown[]): void
     heard(e: unknown): void
   }
-  const pane = { pane_id: 'w1:p1', agent: 'pi', name: 'shep-snap', agent_status: 'idle', interactive_ready: true, agent_session: { kind: 'path', value: '/s/pi.jsonl' } }
+  const pane = {
+    pane_id: 'w1:p1',
+    agent: 'pi',
+    name: 'shep-snap',
+    agent_status: 'idle',
+    interactive_ready: true,
+    agent_session: { kind: 'path', value: '/s/pi.jsonl' },
+  }
   kept.records[key] = { key, name: 'shep-snap', started: 0, kind: 'pi', logs: [] }
   kept.paste.shown.add(key)
   const before = Date.now()
