@@ -36,7 +36,7 @@ export interface ProjectFacts {
 /** The lamp of an answer: green clear, amber waits for you, red broken, grey when something only takes its time. */
 export type Tone = "clear" | "caution" | "stop" | "plain";
 
-export const STATE_WORD: Record<TaskState, string> = {
+const STATE_WORD: Record<TaskState, string> = {
   queued: "waits its turn",
   work: "at work",
   need: "waits for you",

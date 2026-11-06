@@ -1,10 +1,6 @@
 // Opening a view on the test files, and watching a page for what must never happen on it.
 import { expect, type Page } from "@playwright/test";
-import { execFileSync } from "node:child_process";
-import { fixtureEnv, startBrowsers, writeShopRoadmap } from "./fixture.ts";
-
-/** Every view with an address of its own, the roadmap of the shop project among them. */
-export const VIEWS = ["/", "/web-shop/roadmap", "/usage", "/chat", "/settings"];
+import { startBrowsers, writeShopRoadmap } from "./fixture.ts";
 
 /** Writes the files, and returns once the server has read them: the page opened next finds them. */
 async function prepare(page: Page) {
@@ -32,7 +28,7 @@ async function prepare(page: Page) {
 }
 
 /** Opens a path and waits until no part of it is loading. */
-export async function show(page: Page, path: string) {
+async function show(page: Page, path: string) {
   await page.goto(path);
   await page.evaluate(() => document.fonts.ready);
   // the Dispatcher's chat beside Home keeps connecting in this fixture, which has no Dispatcher
@@ -46,18 +42,3 @@ export async function open(page: Page, path: string, marker = "") {
 }
 
 export { reread } from "./bar.ts";
-
-/** Runs the CLI on the test files, as a person would on the same data. */
-export function cli(...args: string[]): string {
-  return execFileSync("bin/lineclear", args, { env: fixtureEnv(), encoding: "utf8", stdio: "pipe" });
-}
-
-/** What goes wrong on a page from now on: a console error, an uncaught error, an answer of 400 or more, a failed call. */
-export function watch(page: Page): string[] {
-  const found: string[] = [];
-  page.on("console", (m) => m.type() === "error" && found.push(`console error: ${m.text()}`));
-  page.on("pageerror", (e) => found.push(`uncaught: ${e.message}`));
-  page.on("response", (r) => r.status() >= 400 && found.push(`${r.status()} ${r.request().method()} ${r.url()}`));
-  page.on("requestfailed", (r) => !(r.failure()?.errorText ?? "").includes("ERR_ABORTED") && found.push(`failed ${r.url()}: ${r.failure()?.errorText}`));
-  return found;
-}

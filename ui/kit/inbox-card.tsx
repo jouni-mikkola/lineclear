@@ -8,7 +8,7 @@ import { SignalPic } from "./rail.tsx";
 import { RichText } from "./rich-text.tsx";
 import { RoleIcon, type RoleName } from "./roles.tsx";
 import { InboxChecks } from "./cold-read.tsx";
-import { Button, useFlip } from "./parts.tsx";
+import { Button } from "./parts.tsx";
 
 export interface InboxItem {
   id: string;
@@ -200,54 +200,6 @@ export function InboxCard({
             <p className="mt-2 whitespace-pre-wrap break-words text-sm text-fg2">
               <RichText text={item.details} />
             </p>
-          </Collapsible.Panel>
-        </Collapsible.Root>
-      )}
-    </div>
-  );
-}
-
-const INBOX_SHOWN = 20;
-
-/** The Inbox's items, newest first. A new item drops in at the top and the rest slide down. */
-export function InboxList({
-  items,
-  onAnswer,
-  errors,
-  current,
-  level,
-}: {
-  items: InboxItem[];
-  level?: 2 | 3;
-  onAnswer?: (item: InboxItem, choice: string, note?: string) => void;
-  errors?: Record<string, string>;
-  /** The ask an address names: marked with `aria-current` and a ring. */
-  current?: string;
-}) {
-  const list = useRef<HTMLUListElement>(null);
-  // only an arrival moves the list: an answered item leaves at once
-  useFlip(list, "inbox-arrive", "inbox-arrive", undefined, true);
-  const card = (it: InboxItem) => (
-    <li
-      key={it.id}
-      id={`item-${it.id}`}
-      data-key={it.id}
-      aria-current={it.id === current ? "location" : undefined}
-      className="min-w-0 scroll-mt-6 target:[&>*]:ring-1 target:[&>*]:ring-caution/60 aria-[current]:[&>*]:ring-1 aria-[current]:[&>*]:ring-caution/60"
-    >
-      <InboxCard item={it} onAnswer={(c, note) => onAnswer?.(it, c, note)} error={errors?.[it.id]} level={level} />
-    </li>
-  );
-  return (
-    <div>
-      <ul ref={list} className="relative grid gap-3" data-inbox>
-        {items.slice(0, INBOX_SHOWN).map(card)}
-      </ul>
-      {items.length > INBOX_SHOWN && (
-        <Collapsible.Root className="mt-3">
-          <Collapsible.Trigger className="text-sm text-fg3 hover:text-fg">{items.length - INBOX_SHOWN} more waiting</Collapsible.Trigger>
-          <Collapsible.Panel>
-            <ul className="mt-3 grid gap-3">{items.slice(INBOX_SHOWN).map(card)}</ul>
           </Collapsible.Panel>
         </Collapsible.Root>
       )}
