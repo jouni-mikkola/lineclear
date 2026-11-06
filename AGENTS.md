@@ -10,10 +10,8 @@ What Lineclear is and why: [docs/idea.md](docs/idea.md). The order of work: [doc
 - `bun run gates`: Biome (lint and format), knip (dead code) and the module borders of `docs/architecture.md`. Any fault fails.
 - `bun run release <version>`: refuses on a dirty tree or a red full check; otherwise sets the version, commits and tags `v<version>` here, installs from the tag into a fresh HOME and runs its doctor. It never pushes.
 - `bun run dispatcher:eval`: asks the Dispatcher's model the 58 requests of `test/dispatcher-eval/` and prints the share it called right (goal 100 %, never below 95 %). It spends tokens: not in `check`, run before each release and in U43.
-- `bun run ui:test`: the UI bar in headless Chromium (Playwright, once: `bunx playwright install chromium`) on the pages `lineclear run` serves, on port 7432 or `LINECLEAR_UI_PORT`; the
-  design system and its bar are in `docs/design.md`; `/design` is its test page. Home is `/`,
-  the Inbox `/inbox`, both with `?state=`.
-- `bun run ui:cold`: the cold look. Fresh models from three companies get only the pictures of a first run (`docs/cold/`) and are asked who does what; goal 90 % right, answers in `docs/numbers.md`. It spends tokens: not in `check`, run on each UI release.
+- `bun run ui:test`: the UI bar in headless Chromium (Playwright, once: `bunx playwright install chromium`) on the pages `lineclear run` serves, on port 7432 or `LINECLEAR_UI_PORT`
+  The design system is in `docs/design.md`. Home is `/`, the Inbox `/inbox`, both with `?state=`.
 - `bun run shots`: starts `lineclear run --demo` (fixed demo data, no real names) and takes every view at 390 and 1440 px
   into `docs/shots/`, with `docs/shots/list.md`. A release runs it. The check fails when the README or a docs page shows a
   picture of the app that is not in that list (`bun run shots:check`).

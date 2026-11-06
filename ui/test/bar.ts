@@ -139,7 +139,7 @@ export function clickMidMotion(page: Page, first: string, second: string, shown:
   );
 }
 
-export const NAMES = Object.keys(MOTIONS) as Motion[];
+const NAMES = Object.keys(MOTIONS) as Motion[];
 
 const LIVE_READS = ["/api/home", "/api/inbox", "/api/settings"];
 

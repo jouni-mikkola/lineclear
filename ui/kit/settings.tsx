@@ -10,7 +10,7 @@ import { Shape, Stop } from "./shapes.tsx";
 // Settings: machines with their state and load, the model list of each role, and each project's commands and
 // secret names. The spec is docs/design.md.
 
-export type MachineState = "installing" | "ready" | "failed" | "unreachable";
+type MachineState = "installing" | "ready" | "failed" | "unreachable";
 
 export interface Machine {
   host: string;

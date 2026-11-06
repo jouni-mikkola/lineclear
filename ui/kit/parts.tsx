@@ -1,6 +1,5 @@
 import { Button as BaseButton } from "@base-ui/react/button";
 import { Progress } from "@base-ui/react/progress";
-import { Tabs } from "@base-ui/react/tabs";
 import { type ReactNode, type RefObject, useLayoutEffect, useRef } from "react";
 import { count as formatCount, MONTHS } from "./format.ts";
 import { useLayoutOnResize } from "./hooks.ts";
@@ -163,7 +162,7 @@ const StateLine = ({ main, className, children }: { main?: boolean; className: s
   main ? <h1 className={className}>{children}</h1> : <p className={className}>{children}</p>;
 
 /** The picture of loading: a track being laid from left to right. Under reduced motion it stands laid. */
-export function LayingTrack() {
+function LayingTrack() {
   const laid = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     if (!laid.current) return;
@@ -182,11 +181,6 @@ export function LayingTrack() {
       </div>
     </div>
   );
-}
-
-/** A raised panel that holds one part, such as a chart. */
-export function Panel({ children }: { children: ReactNode }) {
-  return <div className="min-w-0 rounded-lg bg-raised p-4">{children}</div>;
 }
 
 // The answer
@@ -393,41 +387,6 @@ export function ProjectCard({ p, onRun }: { p: Project; onRun?: (paused: boolean
 
 // Views
 
-/** The views as tabs, each with a badge of what waits for you there, which `counts` names. Changing one plays the view motion in the frame below it. */
-export function ViewNav<V extends string>({
-  views,
-  value,
-  onChange,
-}: {
-  views: { id: V; label: ReactNode; count?: number; counts?: string }[];
-  value: V;
-  onChange: (v: V) => void;
-}) {
-  return (
-    <Tabs.Root className="order-3 w-full min-w-0 sm:order-none sm:w-auto" value={value} onValueChange={(v) => onChange(v as V)}>
-      <Tabs.List className="relative flex max-w-full gap-0.5 overflow-x-auto rounded-sm bg-raised p-1 sm:gap-1" aria-label="Views">
-        {views.map((v) => (
-          <Tabs.Tab
-            key={v.id}
-            value={v.id}
-            // a click on the tab you are under, such as Home on a roadmap, goes back to its top
-            onClick={() => onChange(v.id)}
-            className="flex shrink-0 grow items-center justify-center gap-1 rounded-sm px-1.5 py-1.5 sm:grow-0 sm:gap-1.5 sm:px-3 text-sm text-fg2 hover:text-fg data-[active]:bg-raised3 data-[active]:text-fg"
-          >
-            {v.label}
-            {v.count ? (
-              <span className="rounded-full bg-caution px-1 text-xs sm:px-1.5 font-semibold text-base tabular-nums" title={v.counts} data-badge>
-                <span aria-hidden={v.counts ? true : undefined}>{v.count > 99 ? "99+" : v.count}</span>
-                {v.counts && <span className="sr-only">, {v.counts}</span>}
-              </span>
-            ) : null}
-          </Tabs.Tab>
-        ))}
-      </Tabs.List>
-    </Tabs.Root>
-  );
-}
-
 /** A link up to the view a page sits under, such as one browser under all of them. */
 export function BackLink({ href, children }: { href: string; children: ReactNode }) {
   return (
@@ -438,16 +397,4 @@ export function BackLink({ href, children }: { href: string; children: ReactNode
       {children}
     </a>
   );
-}
-
-/**
- * The one answer for a set of projects: red when a main is broken, green when the line is clear. Nothing when something
- * waits for you (the Inbox badge says so) or there is no project (the empty line is plain).
- */
-export function answer(projects: Project[], waiting?: number): { tone: Tone; text: string } | undefined {
-  const broken = projects.filter((p) => p.broken);
-  if (broken.length) return { tone: "stop", text: `${broken.map((p) => p.name).join(" and ")}: main is broken.` };
-  // `waiting` is the one count of what waits for you, from the server; without it the tasks that wait for you
-  const need = waiting ?? projects.flatMap((p) => p.tasks).filter((t) => t.state === "need").length;
-  return need || !projects.length ? undefined : { tone: "clear", text: "Line clear." };
 }

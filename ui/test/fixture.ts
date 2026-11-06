@@ -344,36 +344,6 @@ export function writeShopRoadmap() {
   );
 }
 
-/** The shop's roadmap grown to this many steps, each in a phase of fifty, with every step after the one before it. */
-export function writeBigRoadmap(steps: number) {
-  const parts = ["# Roadmap\n"];
-  for (let i = 0; i < steps; i++) {
-    if (i % 50 === 0) parts.push(`\n## Phase ${i / 50}: Part ${i / 50}\n`);
-    parts.push(
-      `\n### W${i} Step number ${i}\n- result: Step ${i} is done and shows in the shop.\n- why: the shop grows by one step at a time.\n- done when: step ${i} is merged.\n- locks: none\n- after: ${i === 0 ? "none" : `W${i - 1}`}\n`,
-    );
-  }
-  writeRoadmapProject("web-shop", parts.join(""), [{ subject: "WEB-1: W0 Step number 0", at: T0 }], SHOP_TASKS);
-}
-
-const BILLING = `# Roadmap
-
-## Phase 0: Base
-
-### B0 Webhooks that retry
-- result: A failed webhook is sent again until it arrives.
-- why: a lost payment message costs money.
-- done when: a failed webhook is retried.
-- locks: none
-- after: none
-`;
-
-/** billing-api as a project with a roadmap of one step, its tasks as the fixture wrote them: a link to its roadmap then finds one. */
-export function writeBillingRoadmap() {
-  const tasks = JSON.parse(readFileSync(join(FIXTURE, "lineclear", "task-list-billing-api.json"), "utf8"));
-  writeRoadmapProject("billing-api", BILLING, [{ subject: "API-1: B0 Webhooks that retry", at: T0 }], tasks);
-}
-
 const LIST = `# Roadmap
 
 ## Now

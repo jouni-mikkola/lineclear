@@ -5,8 +5,6 @@ import { realInbox, realProjects, realUsage } from "./real-samples.ts";
 // the same on every machine.
 
 export const STATES = ["filled", "empty", "loading", "error", "long", "many", "idle", "clear", "offline", "thirty", "one", "real"] as const;
-/** The states every page draws; the rest are Home's own: nothing at work, line clear, offline, 30 tasks at work and one ask. */
-export const PAGE_STATES = STATES.slice(0, 6);
 export type PageState = (typeof STATES)[number];
 
 /** The Chat view has states more than the others: sending, streaming, offline, none, request (a sentence to a plan to approve) and task. */
