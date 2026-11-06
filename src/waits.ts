@@ -146,7 +146,7 @@ export function parseUntil(text: string, now: Date): Date | undefined {
  * What a command costs, in slots. A browser suite starts a browser per worker and loads the machine like several
  * suites, so it takes two slots; any other command takes one. A cost above the machine's slots takes them all.
  */
-export function slotCost(command: string): number {
+function slotCost(command: string): number {
   return /playwright|ui:test|ui:record|test:e2e|\be2e\b|chromium|cypress|puppeteer/i.test(command) ? 2 : 1;
 }
 

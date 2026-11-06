@@ -298,33 +298,6 @@ export function fixTaskTools(origin: () => string, dir: string, prefix: string, 
   };
 }
 
-/**
- * What a red full check names: each failing test as `<file> > <test>: <first error line>` (scripts/check.ts prints up to
- * 20 under `check: failing tests:`, then how many more), and each failed step with its last error line. Never an empty list.
- */
-export function fullCheckWhy(out: string): string {
-  const lines = out.split("\n");
-  // each test shard prints its own block
-  const tests: string[] = [];
-  let more = 0;
-  lines.forEach((l, i) => {
-    if (l !== "check: failing tests:") return;
-    for (const t of lines.slice(i + 1)) {
-      if (!t.startsWith("  ")) break;
-      const rest = /^\s+and (\d+) more$/.exec(t);
-      if (rest) more += Number(rest[1]);
-      else tests.push(t.trim());
-    }
-  });
-  const parts: string[] = [];
-  if (tests.length > 0) {
-    const left = Math.max(0, tests.length - 20) + more;
-    parts.push(`failing tests: ${tests.slice(0, 20).join("; ")}${left > 0 ? `; and ${left} more` : ""}`);
-  }
-  for (const l of lines) if (/^check: .+ failed: /.test(l) || l.startsWith("check: too slow")) parts.push(l.slice(7));
-  return parts.join("; ") || lines.filter((l) => l.startsWith("check:")).join("; ") || tail(out);
-}
-
 const CHECK_PENDING = "GitHub check: not finished";
 
 /** What GitHub's "check" says of `commit` (`gh api`, from the clone's origin): "" when it passed, else why not. */

@@ -20,7 +20,7 @@ export interface WaitGoal {
 export const goalSince = (today: string) => new Date(Date.parse(`${today}T00:00:00Z`) - (DAYS - 1) * DAY).toISOString().slice(0, 10);
 
 /** The goal read from the numbers `measure` made with `since` = `goalSince(today)`. */
-export function waitGoal(numbers: Numbers, today: string): WaitGoal {
+function waitGoal(numbers: Numbers, today: string): WaitGoal {
   const top = causeTotals(numbers.waitCauses)[0];
   return {
     median: numbers.waitMinutes.length === 0 ? null : median(numbers.waitMinutes),

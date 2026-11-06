@@ -11,10 +11,16 @@ export interface Gate {
 }
 
 /** `ownFolders` are the env settings that keep bin/lineclear off the stable config, data folders and ports (src/paths.ts). */
-export function fastGates(ownFolders: string[], code: boolean, full = false): Gate[] {
+export function fastGates(ownFolders: string[], code: boolean): Gate[] {
   return [
     { name: "roadmap", cmd: ["env", ...ownFolders, "bin/lineclear", "roadmap", "check", "."] },
+<<<<<<< HEAD
     ...(code ? [{ name: "gates", cmd: ["bun", "run", full ? "gates:full" : "gates"] }] : []),
+=======
+    { name: "parts", cmd: ["env", ...ownFolders, "bin/lineclear", "parts", "check", "."] },
+    { name: "media", cmd: ["bun", "scripts/media.ts", "check"] },
+    ...(code ? [{ name: "gates", cmd: ["bun", "run", "gates"] }] : []),
+>>>>>>> 274b08397 (LIN-1170: Gates down to lint and types)
   ];
 }
 
