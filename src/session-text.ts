@@ -18,11 +18,12 @@ export function reviewerRound(text: string): number | undefined {
   for (const line of text.split("\n")) {
     if (!line.includes('"role":"user"')) continue;
     try {
-      const m = JSON.parse(line)?.message;
+      const entry = JSON.parse(line);
+      const m = entry?.message;
       if (m?.role !== "user") continue;
       const c = m.content;
       const body = typeof c === "string" ? c : (c ?? []).map((x: { text?: string } | null) => x?.text ?? "").join("");
-      if (!/LINECLEAR_CHAT="?[\w.-]+\/Reviewer\b/.test(body)) return undefined;
+      if (!/^\s*LINECLEAR_CHAT="?[\w.-]+\/Reviewer\b/.test(body)) return undefined;
       return Number(/review round (\d+)/i.exec(body)?.[1] ?? 0);
     } catch {
       // a half-written line is not the first message
@@ -37,7 +38,8 @@ export function sessionUsage(text: string): Usage[] {
   for (const line of text.split("\n")) {
     if (!line.includes('"usage"')) continue;
     try {
-      const m = JSON.parse(line)?.message;
+      const entry = JSON.parse(line);
+      const m = entry?.message;
       if (m?.role !== "assistant" || !m.usage) continue;
       out.push({
         model: String(m.model ?? ""),
@@ -154,6 +156,45 @@ export function roadmapReads(texts: string[]): RoadmapReads {
     const side = u.small ? out.after : out.before;
     side.sessions++;
     if (u.whole) side.whole++;
+  }
+  return out;
+}
+
+/** One model call of a pi session: when it ended, how long it took, its tokens and the tools it asked for as `name text`. */
+export interface Call {
+  at: number;
+  ms: number;
+  input: number;
+  cacheRead: number;
+  cacheWrite: number;
+  output: number;
+  tools: string[];
+}
+
+/** The model calls of one pi session file in order, each with the tools it asked for (their arguments cut to 400 characters). */
+export function sessionCalls(text: string): Call[] {
+  const out: Call[] = [];
+  for (const line of text.split("\n")) {
+    if (!line.includes('"role":"assistant"')) continue;
+    try {
+      const entry = JSON.parse(line);
+      const m = entry?.message;
+      if (m?.role !== "assistant" || !m.usage) continue;
+      const tools = (Array.isArray(m.content) ? m.content : [])
+        .filter((c: { type?: string }) => c?.type === "toolCall")
+        .map((c: { name?: string; arguments?: unknown }) => `${c.name ?? ""} ${JSON.stringify(c.arguments ?? {}).slice(0, 400)}`);
+      out.push({
+        at: Number(m.timestamp) || new Date(entry.timestamp).getTime(),
+        ms: Number(m.durationMs) || 0,
+        input: m.usage.input ?? 0,
+        cacheRead: m.usage.cacheRead ?? 0,
+        cacheWrite: m.usage.cacheWrite ?? 0,
+        output: m.usage.output ?? 0,
+        tools,
+      });
+    } catch {
+      // a half-written last line counts nothing
+    }
   }
   return out;
 }

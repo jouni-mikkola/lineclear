@@ -225,6 +225,8 @@ export const SILENT_NEED = 5 * 60_000
 /** Ready this long with no merge and no word from its agent: the agent is told once */
 export const READY_QUIET = 20 * 60_000
 export const STALL_EVERY = 60_000
+/** how often the CPU of each working task's process tree is read (cpu-meter.ts) */
+export const CPU_EVERY = 15_000
 /** main's checks on GitHub are watched this long after a task merged through its pull request */
 export const MAIN_WATCH = 3 * 3_600_000
 
