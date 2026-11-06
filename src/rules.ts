@@ -178,7 +178,7 @@ export function tick(world: World, dryRun: boolean, env = process.env): Decision
       ...routed,
       ...closeOver(name, settings, world, dryRun, env),
       ...unstick({ project: name, settings, world: held, state, waits: readWaits(env), dryRun }),
-      ...serviceWaits(name, world, dryRun, env),
+      ...serviceWaits(name, held, dryRun, env),
       ...tickProject(name, settings, held, state, dryRun, readWaits(env), loadLimit(env), env, facts),
     ];
     decisions.push(...stallsOf(name, settings, held, state, decisions, facts, dryRun, env));
