@@ -11,7 +11,7 @@ live in git history: a step's id is in its commit subject. The rules read this f
 - One server and one task store run every machine through herdr, and other machines need no Lineclear install (L95, L96).
 - A reboot, a killed service, a full disk or a power cut comes back with no loss and no manual step (L172).
 - The tests hold on a loaded machine, and the check stays fast (L116, L402 to L413).
-- A task costs under 400k input tokens and 8 minutes, and a machine runs 3 agents per core (L416 to L432).
+- A task costs under 400k input tokens and 10 minutes to ready, and a machine runs 3 agents per core (L416 to L432).
 
 **How to read it.**
 
@@ -47,7 +47,7 @@ live in git history: a step's id is in its commit subject. The rules read this f
 ### L416 Cost per phase is measured
 Result: `lineclear measure phases` shows, for the last 30 tasks on every machine, where tokens and minutes went in each phase of a task.
 - why: every step below promises fewer tokens or minutes, and only the same table before and after proves it. Task logs already hold each model call's tokens and time.
-- done when: `lineclear measure phases [--last N]` reads each task's pi session logs on every machine and prints one table: phase (start, reading, coding, tests, review, check wait, finishing), model calls, input tokens, cache writes, output tokens and wall minutes, then per task the median and the largest. A test on two fixed session logs gets each phase's numbers exactly. The table of the last 30 tasks is in `docs/numbers.md` under "Cost per phase".
+- done when: `lineclear measure phases [--last N]` reads each task's pi session logs and check runs on every machine and prints one table: phase (start, reading, coding, tests, review, check wait, finishing), model calls, input tokens, cache writes, output tokens, wall minutes and the CPU minutes of its check runs (`check-steps.jsonl`), then per task the median and the largest call, input and minutes from start to ready. A test on two fixed session logs gets each phase's numbers exactly. `docs/numbers.md` is made with the table of the last 30 tasks under "Cost per phase".
 - parts: measure
 - locks: measure-phases
 - after: none
@@ -55,7 +55,7 @@ Result: `lineclear measure phases` shows, for the last 30 tasks on every machine
 
 ### L417 A small start context
 Result: A task's agent starts with a short card of rules instead of two whole skills, and reads a skill only when a command sends it there.
-- why: each agent reads about 6k tokens of skills at its start, and they ride along in every later call, about 240k tokens of a 40-call task.
+- why: an agent reads about 6k tokens of skills at its start, and they ride along in every later call: about 240k tokens in a task of 40 calls.
 - done when: The launch prompt and the start card together are at most 3k tokens; a command that refuses names the skill section to read. The start context of 10 tasks, measured by L416, is under 3k tokens each.
 - parts: server, pi
 - locks: start-context
@@ -64,43 +64,43 @@ Result: A task's agent starts with a short card of rules instead of two whole sk
 
 ### L418 A brief names its files
 Result: Each task's brief lists the files to change and the few to read first, so its agent reads those and not the repo.
-- why: reading is 45 % to 52 % of a task's input tokens in L416's table, most of it an agent finding its way.
-- done when: `lineclear task add` and the planner put a `files` and a `read first` list in every brief, from the step's `files` line or the planner's split (L427). Over 10 tasks measured by L416, reading is under 25 % of input tokens.
+- why: about half of a task's model calls only read (find, grep, cat), most of them an agent finding its way, and each such call pays for the whole context so far.
+- done when: `lineclear task add` and the planner put a `files` and a `read first` list in every brief, from the step's `files` line or the planner's split (L427). Over 10 tasks measured by L416, the median task makes at most 10 calls that only read.
 - parts: planner, server
 - locks: brief-files
 - after: L416
 - files: src/plan-brief.ts, src/brief.ts, server/server/live/engine/briefs.ts
 
 ### L419 Tool output stays short
-Result: A command's long output reaches the agent as its first and last lines and a file path, never as a whole page.
-- why: the token pack lets a result reach 50 KB (about 12k tokens), and each result stays in every later call of the task.
-- done when: The token pack cuts any tool result over 8 KB to its head, its tail and the path of the whole text; a test checks the cut on a 200 KB output. Over 10 tasks measured by L416, the median input per model call is under 15k tokens.
+Result: A tool result reaches the agent as at most 8k characters, its head, its tail and the path of the rest.
+- why: the token pack's cut keeps up to 20k characters (about 5k tokens) of a result, and each result stays in every later call of the task.
+- done when: `CAP` in `pi/parts/cut-output.ts` is 8000 characters and test output keeps its failures and summary within it; a test checks the cut on a 200 KB output. Over 10 tasks measured by L416, the median input per model call is under 15k tokens.
 - parts: pi
 - locks: pack
 - after: L416
-- files: pi/pack.ts, src/pack.ts, test/pack.test.ts
+- files: pi/parts/cut-output.ts, test/pi-parts.test.ts
 
 ### L420 Compaction comes early
 Result: A task agent compacts its context near 50k tokens, keeping its brief, its files and its decisions.
-- why: compaction aims near 150k today and never fires: a task's largest call is 42k tokens in the median and up to 81k, and each call pays for the whole history again.
+- why: compaction aims near 150k today and never fires: a task's largest call is about 40k tokens in the median and up to 81k, and each call pays for the whole history again.
 - done when: `pi/compaction.ts` sets the task agent's target to 50k tokens and the coordinator's to 100k; a test checks the reserve per model. Over 10 tasks measured by L416, no model call of a task agent has over 60k input tokens.
 - parts: pi
 - locks: compaction
 - after: L416
 - files: pi/compaction.ts, test/pi-parts.test.ts
 
-### L421 A model for each job
-Result: Planning and review run on the strongest model, coding on the middle one, and mechanical work (a rebase, a report) on the smallest.
-- why: every call of a task runs on one model today, so a rebase or a status line costs what a design call costs.
-- done when: Settings has a model per role (planner, coder, reviewer, mechanic), with the defaults opus, sonnet and haiku; the server starts the mechanic for a clean rebase, a merge retry and `lineclear ready`. `decisions.jsonl` names the model of each start, and a test reads it for each role.
+### L421 A small model for chores
+Result: Mechanical work (a clean rebase, a merge retry, a ready report, a nudge) runs on the smallest model, not on the coder's.
+- why: `lineclear setup` already picks a worker, reviewer, planner and step checker, but every call of a task's agent, a rebase or a status line too, runs on the worker's model.
+- done when: Setup has a fifth role, mechanic, with the smallest logged-in model as its default; the server starts it for a clean rebase, a merge retry and a nudge, and `decisions.jsonl` names its model; the reviewer stays from another company than the worker. Over 10 tasks measured by L416, finishing and check wait run on the mechanic for 90 % of their calls.
 - parts: server, rules
 - locks: role-models
-- after: none
-- files: src/models.ts, src/harness-pi.ts, server/server/live/engine/engine-launch.ts, test/models.test.ts
+- after: L416
+- files: src/setup.ts, src/models.ts, src/harness-pi.ts, server/server/live/engine/engine-launch.ts, test/models.test.ts
 
 ### L422 Review is one call on the diff
 Result: A review is one model call that gets the brief, the diff and the repo's rules, and answers with tagged findings.
-- why: a review is a whole agent today: 6 to 10 calls and 11 % to 17 % of a task's input tokens, most of it reading files the diff already shows.
+- why: a review is a whole agent today, with about 6 calls and 11 % to 17 % of a task's input tokens, most of it reading files the diff already shows.
 - done when: `lineclear review <task>` sends the brief, `git diff` against the base with 20 lines of context and the repo's rules in one call to the reviewer model, with no tools, and stores its findings as JSON (severity, file, line, why). Over 10 tasks measured by L416, review is one call per round and under 5 % of input tokens.
 - parts: server, checks
 - locks: review-call
@@ -118,29 +118,29 @@ Result: A task's agent stops once it reports ready; the board merges it and wake
 
 ### L424 Agents run with no pane
 Result: A task's agent runs as one headless process, and a live pane opens only while you watch it.
-- why: one machine holds 46 herdr panes for 9 task worktrees; each pane and shell costs memory and herdr's own CPU.
-- done when: The server starts a task agent without a herdr pane and streams its log; opening the task's view attaches a pane, closing it detaches. A test starts 24 agents on a machine of 8 cores and finds no pane, load under 8 and under 300 MB of memory per agent.
+- why: each agent holds a herdr pane and a shell besides its own processes, and old panes stay open after their task, which costs memory and herdr's CPU.
+- done when: The server starts a task agent without a herdr pane, keeps its state from the process itself and streams its log; opening the task's view attaches a pane, closing it detaches. A run of 3 agents per core is recorded in `docs/numbers.md`: no agent pane, load under the core count, and memory per agent no higher than the measured pi and model bridge.
 - parts: server, install
 - locks: headless
-- after: L423
+- after: L267, L423
 - files: server/server/live/engine/engine-launch.ts, server/server/live/engine/worktrees.ts, src/herdr.ts
 
 ### L425 One install of dependencies
-Result: A new worktree is ready in seconds, linked to one shared install of the repo's dependencies.
-- why: each worktree runs its own install, which costs a minute of CPU and hundreds of MB of disk per task.
-- done when: A new worktree links `node_modules` from a store keyed by the hash of the lock file; a changed lock file makes a new entry. A test makes a worktree in under 5 s with no network and under 50 MB of new disk.
+Result: A new worktree is ready in under 5 seconds and adds under 50 MB of disk, from one shared install per lock file.
+- why: every worktree runs its own install; Bun's download cache is shared, but the time and disk of each install are not measured, and many agents multiply them.
+- done when: `docs/numbers.md` records the install seconds and new disk of 10 worktrees. When either is over its limit, a new worktree links `node_modules` from a store keyed by the hash of the lock file, and a changed lock file makes a new entry; a test checks the key and the link. 10 more worktrees then meet both limits.
 - parts: server
 - locks: deps
-- after: none
-- files: server/server/live/engine/worktrees.ts, src/worktree.ts, test/worktree.test.ts
+- after: L416
+- files: server/server/live/engine/git.ts, server/server/live/engine/worktrees.ts, docs/numbers.md
 
 ### L426 The Dispatcher uses few tokens
 Result: The Dispatcher answers each request from a fresh small context, so its day costs a tenth of today's.
-- why: one Dispatcher session spent 46M input tokens in a day, 13 % of all, because each request carries the history of every request before it.
+- why: the Dispatcher keeps one session, so each request carries the history of every request before it; on a busy day it can spend more than all reviewers together.
 - done when: The Dispatcher starts each request with the request and the board's summary only, on the smallest model that keeps `bun run dispatcher:eval` at 95 % or more. On a day with 30 tasks or more it spends under 5M input tokens.
 - parts: dispatcher
 - locks: dispatcher
-- after: L421
+- after: L416
 - files: src/dispatcher.ts, test/dispatcher-eval/
 
 ### L427 A goal splits by files
@@ -167,31 +167,31 @@ Result: A red batch or a red main finds the branch that broke it by itself, send
 - done when: A red batch checks its halves until one branch is left, returns it to its agent with the failing lines (L423) and merges the others; a red main pauses the line and Home names the cause until the fix merges. A test with 4 branches, one breaking, merges 3 and returns 1 in at most 3 check runs.
 - parts: server, checks, rules
 - locks: bisect
-- after: L428
+- after: L423, L428
 - files: server/server/live/engine/lane.ts, server/server/live/engine/merge.ts, src/rules.ts
 
 ### L430 Needs you means a question
 Result: A task shows Needs you only when it asks you something; one that stopped without a question is resumed by itself.
-- why: 10 tasks sat in Needs you with no question in them, so the Inbox hid the real ones.
+- why: a task whose turn ends without a question still shows Needs you, so the Inbox hides the real questions among them.
 - done when: A task is in Needs you only with an open card or `lineclear wait owner`; a turn that ends with neither gets one nudge from the smallest model and, if still quiet, a restart. Over a day, the Inbox holds no task without a question.
 - parts: server, rules
-- locks: needs
+- locks: stall-check
 - after: L421
 - files: server/server/live/engine/stalls.ts, src/stalls.ts, src/inbox.ts
 
 ### L431 One status view
 Result: One view lists every agent at work: its task, machine, phase, tokens so far and minutes, and what it waits for.
 - why: what runs where and what it costs is split between Home, the panes and the logs today.
-- done when: Home's task table and `lineclear top` show, from one function, each running agent's task, machine, phase (L416's names), input tokens, minutes and wait; a test reads both on the same board and finds the same rows.
+- done when: Home's task table and `lineclear top` show, from one function in `src/agent-status.ts`, each running agent's task, machine, phase (L416's names), input tokens, minutes and wait; a test reads both on the same board and finds the same rows.
 - parts: ui, measure
 - locks: home
 - after: L214, L416
-- files: src/status.ts, src/home-data.ts, ui/web/
+- files: src/agent-status.ts, src/home-data.ts, ui/web/
 
 ### L432 Targets hold for a day
-Result: A day of real work meets the targets: 400k input tokens and 8 minutes per task, 3 agents per core, one GitHub run per 3 merges.
+Result: A day of real work meets the targets: 400k input tokens and 10 minutes to ready per task, 3 agents per core, one GitHub run per 3 merges.
 - why: each step above proves its own part; only a day of normal work shows they add up.
-- done when: `docs/numbers.md` has a day of at least 30 tasks, measured by L416, with: median input under 400k tokens per task and the largest under 1.5M, a median of 8 minutes from start to ready, 3 agents per core with load under the core count, at most one GitHub run per 3 merged tasks, and no task in Needs you without a question.
+- done when: `docs/numbers.md` has a day of at least 30 tasks, measured by L416, with: median input under 400k tokens per task and the largest under 1.5M, a median under 10 minutes from start to ready, 3 agents per core with load under the core count, at most one GitHub run per 3 merged tasks, and no task in Needs you without a question.
 - parts: measure
 - locks: numbers
 - after: L417, L419, L420, L422, L424, L425, L426, L429, L430, L431
