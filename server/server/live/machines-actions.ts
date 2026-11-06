@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { clock } from '../../shared/time.ts'
 import type { Chat } from '../../shared/types.ts'
-import { type Link, machineHome } from './machines-helpers.ts'
+import { type Link, workerHome } from './machines-helpers.ts'
 import { MachinesLinks } from './machines-links.ts'
 
 export class MachinesActions extends MachinesLinks {
@@ -60,7 +60,7 @@ export class MachinesActions extends MachinesLinks {
   /** the worker's own log, for the doctor */
   log(label: string) {
     try {
-      return readFileSync(join(machineHome(label), 'worker.log'), 'utf8')
+      return readFileSync(join(workerHome(label), 'worker.log'), 'utf8')
         .split('\n')
         .slice(-20)
         .join('\n')

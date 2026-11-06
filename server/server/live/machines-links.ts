@@ -21,7 +21,20 @@ import {
 import { mirrorHomes } from './mirror.ts'
 import { q, tellRunBy } from './box.ts'
 import { MERGE_DEADLINE } from './engine/engine.ts'
-import { type Events, type Link, type Worker, type Kept, CONNECTING_FOR, codeVersion, running, machineHome, dirOf, fits, sameBox } from './machines-helpers.ts'
+import {
+  type Events,
+  type Link,
+  type Worker,
+  type Kept,
+  CONNECTING_FOR,
+  codeVersion,
+  running,
+  machineHome,
+  workerHome,
+  dirOf,
+  fits,
+  sameBox,
+} from './machines-helpers.ts'
 
 export class MachinesLinks extends Emitter<Events> {
   constructor(
@@ -52,7 +65,7 @@ export class MachinesLinks extends Emitter<Events> {
     const l = this.links.get(k.saved.label) ?? this.link(k.saved)
     l.probe = k.probe
     for (const c of k.chats ?? []) l.chats.set(c.key, c)
-    const was = readJson<{ port?: number; pid?: number; code?: string }>(join('machines', dirOf(k.saved.label), 'server.json'), {})
+    const was = readJson<{ port?: number; pid?: number; code?: string }>(join('workers', dirOf(k.saved.label), 'server.json'), {})
     const w = running(was.pid)
     if (w && was.port && was.code === codeVersion()) {
       this.own(l, w)
@@ -173,7 +186,7 @@ export class MachinesLinks extends Emitter<Events> {
           if (pending) clearTimeout(pending)
           this.keepTimers.delete(label)
           l.ws?.close()
-          const worker = l.worker ?? running(readJson<{ pid?: number }>(join('machines', dirOf(label), 'server.json'), {}).pid)
+          const worker = l.worker ?? running(readJson<{ pid?: number }>(join('workers', dirOf(label), 'server.json'), {}).pid)
           worker?.kill()
           this.links.delete(label)
           rmSync(join(machineHome(label), 'last.json'), { force: true })
@@ -197,7 +210,7 @@ export class MachinesLinks extends Emitter<Events> {
   async start(l: Link, force = false) {
     if (!this.active(l) || l.busy || l.worker) return
     l.busy = true
-    const home = machineHome(l.saved.label)
+    const home = workerHome(l.saved.label)
     mkdirSync(home, { recursive: true })
     const last = !force && l.probe && fits(l.probe) ? l.probe : undefined
     try {
@@ -274,7 +287,7 @@ export class MachinesLinks extends Emitter<Events> {
     if (!this.active(l)) return
     const box = boxInfo(l.saved, p)
     // a worker left from before (another version of the code): one worker per machine
-    const prior = running(readJson<{ pid?: number }>(join('machines', dirOf(l.saved.label), 'server.json'), {}).pid)
+    const prior = running(readJson<{ pid?: number }>(join('workers', dirOf(l.saved.label), 'server.json'), {}).pid)
     if (prior) {
       prior.kill()
       await prior.exited
@@ -300,7 +313,7 @@ export class MachinesLinks extends Emitter<Events> {
     this.own(l, w)
     // its address, once it serves
     const look = setInterval(() => {
-      const port = readJson<{ port?: number }>(join('machines', dirOf(l.saved.label), 'server.json'), {}).port
+      const port = readJson<{ port?: number }>(join('workers', dirOf(l.saved.label), 'server.json'), {}).port
       if (!port || l.worker !== w) return
       clearInterval(look)
       l.rec.url = `http://127.0.0.1:${port}`
@@ -396,7 +409,7 @@ export class MachinesLinks extends Emitter<Events> {
    *  and serves at another address: its server.json says where, and that worker is taken as this machine's. */
   protected moved(l: Link): boolean {
     if (l.busy) return false
-    const s = readJson<{ port?: number; pid?: number }>(join('machines', dirOf(l.saved.label), 'server.json'), {})
+    const s = readJson<{ port?: number; pid?: number }>(join('workers', dirOf(l.saved.label), 'server.json'), {})
     const url = s.port ? `http://127.0.0.1:${s.port}` : ''
     if (!url || url === l.rec.url) return false
     const w = s.pid === l.worker?.pid ? l.worker : running(s.pid)

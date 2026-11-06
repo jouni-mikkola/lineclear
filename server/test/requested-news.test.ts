@@ -9,7 +9,7 @@ describe('requesting coordinator mailbox', () => {
     const root = mkdtempSync(join(tmpdir(), 'requester-'))
     const other = mkdtempSync(join(tmpdir(), 'other-user-'))
     try {
-      const home = join(root, 'machines', 'desktop')
+      const home = join(root, 'workers', 'desktop')
       mkdirSync(home, { recursive: true })
       writeFileSync(
         join(home, 'agents.json'),
