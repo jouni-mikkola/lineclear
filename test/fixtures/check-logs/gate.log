@@ -1,6 +1,0 @@
-changed tests	Run bun scripts/check.ts --changed --untimed	2026-11-06T17:28:39.0063506Z prose check: rewrite the text in short plain English (src/prose.ts)
-changed tests	Run bun scripts/check.ts --changed --untimed	2026-11-06T17:28:39.0173052Z check: prose failed: prose check: rewrite the text in short plain English (src/prose.ts)
-changed tests	Run bun scripts/check.ts --changed --untimed	2026-11-06T17:28:40.8267322Z check: parts failed: src/rules.ts changed the interface `Decision` of part rules since main: update docs/parts/rules.md in the same change
-changed tests	Run bun scripts/check.ts --changed --untimed	2026-11-06T17:29:58.8085200Z check: every step ran
-changed tests	Run bun scripts/check.ts --changed --untimed	2026-11-06T17:29:58.8218541Z ##[error]Process completed with exit code 1.
-check	Run test "true" = false	2026-11-06T17:30:04.4364241Z ##[error]Process completed with exit code 1.
