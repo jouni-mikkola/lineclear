@@ -513,4 +513,5 @@ test("a check on machine B is recorded as run on B, so none is counted on the ma
   const runs = readRuns(p.repo, 0, env);
   expect(runs.length).toBeGreaterThan(0);
   expect(runs.every((r) => r.machine === "boxb")).toBe(true);
+  expect(runs.some((r) => r.machine === machineOf(p.env))).toBe(false);
 });

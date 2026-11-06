@@ -325,3 +325,20 @@ test("a task started on machine B has its merge check recorded on B and waits in
   expect(c.step === 'checked' && c.ok).toBe(true)
   expect(Runs.readRuns(dir, 0).map((r) => r.machine)).toEqual(['boxb'])
 })
+
+test('a task started on machine B: its merge check through the engine runs on B, none on the main machine', async () => {
+  const w = world()
+  const dir = repo()
+  project(dir, 'true')
+  const { t } = await started(w, dir, 'lane-b-both')
+  t.machine = 'boxb'
+  writeFileSync(join(wt(t), 'mine.txt'), 'mine\n')
+  sh('git add -A && git commit -qm mine', wt(t))
+  await w.engine.done(t.id, 'Added mine.')
+  expect((await w.engine.merge(t.id, { self: true })).ok).toBe(true)
+  const runs = Runs.readRuns(dir, 0)
+  expect(runs.map((r) => r.tier)).toContain('merge')
+  expect(runs.length).toBeGreaterThan(0)
+  expect(runs.every((r) => r.machine === 'boxb')).toBe(true)
+  expect(runs.some((r) => r.machine === Runs.machineOf())).toBe(false)
+})
