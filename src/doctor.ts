@@ -274,23 +274,25 @@ export function herdrVersions(run: Probe["run"], here: boolean): { machine: stri
   return out;
 }
 
-/** The machines of `hosts` that herdr has not saved: the server places a task only on a machine it knows by herdr's list. */
+/** The machines of `hosts` that herdr has not saved, or has turned off: the server places a task only on a machine it knows by herdr's list. */
 export function herdrUnsaved(run: Probe["run"], hosts: string[]): string[] {
-  let saved: { id?: string; label?: string; target?: string }[] = [];
+  let saved: { id?: string; label?: string; target?: string; enabled?: boolean }[];
   try {
-    saved = JSON.parse(run(herdrArgv(["machine", "list", "--json"])) ?? "[]");
+    saved = JSON.parse(run(herdrArgv(["machine", "list", "--json"])) ?? "");
   } catch {
-    // an unreadable list counts as empty
+    // a list that cannot be read says nothing about any machine
+    return [];
   }
-  return hosts.filter((h) => !saved.some((m) => [m.id, m.label, m.target].includes(h)));
+  // the server drops a machine turned off, like one never saved
+  return hosts.filter((h) => !saved.some((m) => m.enabled !== false && [m.id, m.label, m.target].includes(h)));
 }
 
 /** A Lineclear machine that herdr does not know: `lineclear room <machine>` and placing tasks there fail until it is saved. */
 function herdrKnows(p: Probe): Check[] {
   return (p.herdr?.unsaved ?? []).map((host) => ({
     name: `herdr knows ${host}`,
-    problem: `herdr has not saved ${host}, so new tasks never start there and \`lineclear room ${host}\` says no machine`,
-    fix: `herdr machine add ${host}`,
+    problem: `herdr has no enabled machine ${host}, so new tasks never start there and \`lineclear room ${host}\` says no machine`,
+    fix: `herdr machine add ${host}  # or herdr machine enable ${host} when it is saved but turned off`,
   }));
 }
 

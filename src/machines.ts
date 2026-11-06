@@ -106,9 +106,10 @@ export async function installMachine(host: string, env: Env = process.env, say: 
     done = { host, state: "failed", since, doctor: [why, ...install.lines.slice(-8)] };
   } else {
     // the server places tasks only on machines herdr has saved; a test or demo run never reaches out
-    if (env.LINECLEAR_DOCTOR_FILE === undefined && herdrUnsaved((c) => (Bun.spawnSync(c, { stdin: "ignore" }).stdout.toString() || null), [host]).length > 0) {
-      const saved = Bun.spawnSync(herdrArgv(["machine", "add", host]), { stdin: "ignore", timeout: 120_000 });
-      say(saved.exitCode === 0 ? `Saved ${host} in herdr` : `herdr could not save ${host}; run: herdr machine add ${host}`);
+    const listed = (c: string[]) => Bun.spawnSync(c, { stdin: "ignore", env: env as Record<string, string> }).stdout.toString() || null;
+    if (env.LINECLEAR_DOCTOR_FILE === undefined && Bun.which("herdr") && herdrUnsaved(listed, [host]).length > 0) {
+      const saved = await run(herdrArgv(["machine", "add", host]), undefined, 120_000, env);
+      say(saved.code === 0 ? `Saved ${host} in herdr` : `herdr could not save ${host}; run: herdr machine add ${host}`);
     }
     say(`Fixing what is safe to fix on ${host}`);
     const fixed = await run(sshArgs(env, host, `${LINECLEAR} doctor --fix --here`), undefined, 120_000, env);
