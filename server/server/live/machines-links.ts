@@ -21,7 +21,20 @@ import {
 import { mirrorHomes } from './mirror.ts'
 import { q, tellRunBy } from './box.ts'
 import { MERGE_DEADLINE } from './engine/engine.ts'
-import { type Events, type Link, type Worker, type Kept, CONNECTING_FOR, codeVersion, running, machineHome, workerHome, dirOf, fits, sameBox } from './machines-helpers.ts'
+import {
+  type Events,
+  type Link,
+  type Worker,
+  type Kept,
+  CONNECTING_FOR,
+  codeVersion,
+  running,
+  machineHome,
+  workerHome,
+  dirOf,
+  fits,
+  sameBox,
+} from './machines-helpers.ts'
 
 export class MachinesLinks extends Emitter<Events> {
   constructor(

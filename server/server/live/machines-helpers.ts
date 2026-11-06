@@ -132,7 +132,13 @@ function moveOldStore(d: string) {
   const to = join(HOME, 'workers', d)
   const files = readdirSync(from).filter((f) => f !== 'last.json')
   if (!files.length) return
-  running(readJson<{ pid?: number }>(join('machines', d, 'server.json'), {}).pid)?.kill()
+  const old = running(readJson<{ pid?: number }>(join('machines', d, 'server.json'), {}).pid)
+  if (old) {
+    old.kill()
+    // it may still write its store while it stops: move only after it is gone
+    for (let i = 0; i < 100 && running(old.pid); i++) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50)
+    if (running(old.pid)) old.kill('SIGKILL')
+  }
   mkdirSync(to, { recursive: true })
   for (const f of files) {
     if (existsSync(join(to, f))) rmSync(join(from, f), { recursive: true, force: true })
