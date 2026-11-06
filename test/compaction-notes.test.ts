@@ -234,44 +234,6 @@ test("every message of the owner is kept word for word, however many", () => {
   for (let i = 0; i < 10; i++) expect(sum).toContain(`m${i} ${"y".repeat(5000)}`);
 });
 
-test("a file lacking a heading falls back and names it", () => {
-  const s = setup();
-  s.turn(140_000);
-  s.write("## Done\nx\n## Next\ny");
-  expect(s.compact()).toBeUndefined();
-  expect(s.logged()[0].reason).toContain("In progress");
-});
-
-test("a compaction with instructions of its own falls back", () => {
-  const s = setup();
-  s.turn(140_000);
-  s.write(s.good);
-  expect(s.compact({ customInstructions: "focus on tests" })).toBeUndefined();
-  expect(s.logged()[0].reason).toContain("instructions");
-});
-
-test("after a fallback the next cycle asks again, and the share of fallbacks is counted", () => {
-  const s = setup();
-  s.turn(140_000);
-  s.compact();
-  s.turn(140_000);
-  expect(s.sent.length).toBe(2);
-  s.write(s.good);
-  s.compact();
-  const lines = readFileSync(logFile(s.env), "utf8").split("\n").filter(Boolean);
-  expect(notesStats(lines)).toEqual({ compactions: 2, used: 1, fellBack: 1, share: 0.5 });
-});
-
-test("every message of the owner is kept word for word, however many", () => {
-  const s = setup();
-  s.turn(140_000);
-  s.write(s.good);
-  const many = Array.from({ length: 10 }, (_, i) => ({ type: "message", message: { role: "user", content: `m${i} ${"y".repeat(5000)}` } }));
-  const sum: string = s.compact({ branchEntries: [{ type: "message", message: { role: "user", content: "the task" } }, ...many] }).compaction.summary;
-  expect(sum).toContain("## Task\nthe task");
-  for (let i = 0; i < 10; i++) expect(sum).toContain(`m${i} ${"y".repeat(5000)}`);
-});
-
 test("a file lacking a heading is asked for once more, with the reason, and a fixed file is used", () => {
   const s = setup();
   s.turn(140_000);

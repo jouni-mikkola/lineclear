@@ -39,7 +39,6 @@ function costByCause(u: Usage, p: Price): CauseCosts {
   return { input: dollars("input"), output: dollars("output"), cacheRead: dollars("cacheRead"), cacheWrite: dollars("cacheWrite") };
 }
 
-
 // ---- reading the files ----
 
 export function lineclearDir(env: Env): string {

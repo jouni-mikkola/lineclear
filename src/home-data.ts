@@ -17,7 +17,7 @@ import { type Export, remoteExports } from "./remotes.ts";
 import { readWaits, type Wait, type WaitGroup, waitsForOwner } from "./waits.ts";
 import { type AccountUse, usageLimits } from "./limits.ts";
 import { type Move, readAccounts, readMoves } from "./full.ts";
-import { listProjectNames, readSettings, type Role } from "./project.ts";
+import { listProjectNames, readSettings } from "./project.ts";
 import { mainRefs } from "./main-branch.ts";
 import { rowFacts } from "./task-detail.ts";
 import { type MonthSpend, type PiSpend, monthSpend, piSpendAndUsage } from "./home-spend.ts";
@@ -334,7 +334,7 @@ function farTasks(space: Raw, env: Env, now: number): HomeTask[] {
 type Roadmap = ReturnType<typeof roadmapProgress>;
 
 /** One of this machine's tasks as the home view shows it. */
-function localRow(x: { t: Raw; state: TaskState }, space: Raw, roadmap: Roadmap, line: string | undefined, ctx: SpaceContext): HomeTask {
+function localRow(x: { t: Raw; state: TaskState }, roadmap: Roadmap, line: string | undefined, ctx: SpaceContext): HomeTask {
   const { t, state } = x;
   const { cards, env, now } = ctx;
   const title = String(t.title ?? t.id);
@@ -400,9 +400,9 @@ function spaceView(s: Raw, ctx: SpaceContext, owner?: { project: string; paused:
       )
     : undefined;
   const shown = [
-    ...open.map((x) => localRow(x, s, roadmap, lines.get(x.t.id), ctx)),
+    ...open.map((x) => localRow(x, roadmap, lines.get(x.t.id), ctx)),
     ...farTasks(s, env, now),
-    ...done.slice(0, 6).map((x) => localRow(x, s, roadmap, lines.get(x.t.id), ctx)),
+    ...done.slice(0, 6).map((x) => localRow(x, roadmap, lines.get(x.t.id), ctx)),
   ];
   const retired = ctx.retired[s.key]?.merged ?? 0;
   return {
