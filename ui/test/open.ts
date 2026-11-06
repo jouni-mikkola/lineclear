@@ -1,7 +1,7 @@
 // Opening a view on the test files, and watching a page for what must never happen on it.
 import { expect, type Page } from "@playwright/test";
 import { execFileSync } from "node:child_process";
-import { FIXTURE, startBrowsers, writeShopRoadmap } from "./fixture.ts";
+import { fixtureEnv, startBrowsers, writeShopRoadmap } from "./fixture.ts";
 
 /** Every view with an address of its own, the roadmap of the shop project among them. */
 export const VIEWS = ["/", "/web-shop/roadmap", "/usage", "/chat", "/settings"];
@@ -49,16 +49,7 @@ export { reread } from "./bar.ts";
 
 /** Runs the CLI on the test files, as a person would on the same data. */
 export function cli(...args: string[]): string {
-  const env = {
-    ...process.env,
-    HOME: `${FIXTURE}/home`,
-    LINECLEAR_CONFIG: `${FIXTURE}/config`,
-    LINECLEAR_STATE: `${FIXTURE}/state`,
-    LINECLEAR_HOME: `${FIXTURE}/lineclear`,
-    PI_CODING_AGENT_DIR: `${FIXTURE}/pi`,
-    LINECLEAR_SERVER_BIN: `${process.cwd()}/ui/test/fake-lineclear`,
-  };
-  return execFileSync("bin/lineclear", args, { env, encoding: "utf8", stdio: "pipe" });
+  return execFileSync("bin/lineclear", args, { env: fixtureEnv(), encoding: "utf8", stdio: "pipe" });
 }
 
 /** What goes wrong on a page from now on: a console error, an uncaught error, an answer of 400 or more, a failed call. */

@@ -2,7 +2,7 @@
 // (bun run media check), then the server's own types and tests (server/).
 // `bun run check` is the merge lane's: only what the branch's change reaches (below), the independent steps side by side,
 // each step's time recorded (scripts/check-speed.ts) and a file or the whole run over its limit failed by name.
-// `--full` runs everything, the browser suite included: the nightly job and a release candidate. `--changed` is the
+// `--full` runs everything, the browser suite included: the heavy run and a release candidate. `--changed` is the
 // worker's loop: the same without the browser suite.
 // A test that fails and then passes alone is a flake (scripts/flaky.ts): recorded, not failed.
 // The budget is 180 s on a machine that is not busy (docs/numbers.md); a busy one is slower for reasons outside the change.

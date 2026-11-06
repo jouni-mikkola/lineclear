@@ -1,11 +1,11 @@
 // `bun run release 0.1.0`: the release of a version, made here and never pushed. It refuses on a dirty tree, an
-// existing tag a red full check (`bun scripts/check.ts --full`: on a clean main the default check reaches nothing) or a failing nightly check (gates:full, coverage, cold start). Otherwise it sets the version in package.json, commits it, tags `v<version>`,
+// existing tag a red full check (`bun scripts/check.ts --full`: on a clean main the default check reaches nothing) or a failing heavy check (gates:full, coverage, cold start). Otherwise it sets the version in package.json, commits it, tags `v<version>`,
 // installs from that tag into a fresh HOME with the README's installer and runs the doctor there. The push and the
 // GitHub release are a separate, outward step.
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { slowFailures } from "../src/nightly.ts";
+import { slowFailures } from "../src/heavy-run.ts";
 import { proposeTiers } from "../src/project.ts";
 
 // The full check and an install that downloads tools both end by this limit rather than hang.
@@ -17,8 +17,8 @@ export type Release = { ok: boolean; lines: string[] };
 export type ReleaseSteps = {
   repo: string;
   check: string[];
-  /** The nightly tier's commands; undefined means the project's own. */
-  nightly?: string[];
+  /** The heavy tier's commands; undefined means the project's own. */
+  heavy?: string[];
   /** Installs `tag` of `repo` into `home` and returns the installed lineclear's doctor. */
   install: (repo: string, tag: string, home: string) => { ok: boolean; out: string };
 };
@@ -47,7 +47,7 @@ export function installFromTag(repo: string, tag: string, home: string): { ok: b
 
 export function release(version: string, steps: Partial<ReleaseSteps> = {}): Release {
   const { repo = join(import.meta.dir, ".."), check = ["bun", "scripts/check.ts", "--full"], install = installFromTag } = steps;
-  const nightly = steps.nightly ?? proposeTiers(repo, "bun run check").nightly.commands;
+  const heavy = steps.heavy ?? proposeTiers(repo, "bun run check").heavy.commands;
   const lines: string[] = [];
   const refuse = (why: string): Release => ({ ok: false, lines: [...lines, `release: refused: ${why}`] });
   const tag = `v${version}`;
@@ -57,9 +57,9 @@ export function release(version: string, steps: Partial<ReleaseSteps> = {}): Rel
   const checked = run(check, repo);
   if (!checked.ok) return refuse(`${check.join(" ")} is red:\n${checked.out.split("\n").slice(-20).join("\n")}`);
   lines.push(`release: ${check.join(" ")} passed`);
-  const slow = slowFailures(repo, nightly);
-  if (slow.length > 0) return refuse(`a nightly check fails: ${slow.map((f) => `${f.name}\n${f.output.split("\n").slice(-20).join("\n")}`).join("\n")}`);
-  lines.push(`release: ${nightly.length} nightly check(s) passed`);
+  const slow = slowFailures(repo, heavy);
+  if (slow.length > 0) return refuse(`a heavy check fails: ${slow.map((f) => `${f.name}\n${f.output.split("\n").slice(-20).join("\n")}`).join("\n")}`);
+  lines.push(`release: ${heavy.length} heavy check(s) passed`);
 
   const file = join(repo, "package.json");
   const pkg = JSON.parse(readFileSync(file, "utf8"));

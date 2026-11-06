@@ -32,6 +32,7 @@ function build(project: string, phases: [string, Seed[]][]): RoadmapData {
         why: `People expect ${title.toLowerCase()} to just work, and the steps after it build on it.`,
         doneWhen: `- ${title} works in the shop for a signed in customer.\n- A test covers it, and the check passes.`,
         locks: after.length % 2 ? ["checkout"] : [],
+        parts: [n % 2 ? "cart" : "search"],
         after,
         commits,
         ...(state === "work" ? { task: { id: `T-${n}`, status: "work", sub: "Writing the tests" } } : {}),
@@ -50,6 +51,10 @@ function build(project: string, phases: [string, Seed[]][]): RoadmapData {
     project,
     phases: phases.map(([p]) => p),
     steps,
+    parts: [
+      { name: "cart", score: 0 },
+      { name: "search", score: 4 },
+    ],
     done: live.length - open.length,
     total: live.length,
     line: roadmapLine(plan, marks, where, 7),

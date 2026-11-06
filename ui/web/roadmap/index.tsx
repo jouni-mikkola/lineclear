@@ -90,16 +90,20 @@ function Filled({ d, plan, planNote }: { d: RoadmapData; plan?: PlanCard; planNo
   const byId = useMemo(() => new Map(d.steps.map((s) => [s.id, s])), [d.steps]);
   const [shown, setShown] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [part, setPart] = useState<string | null>(null);
   const q = query.trim().toLowerCase();
+  const inPart = (s: RoadmapStep) => part === null || (s.parts ?? []).includes(part);
 
   // A phase is done when every step in it is done or dropped. The sections: at work and next, the rest of the phase
   // you are in, the phases after it, and the done phases at the bottom.
-  const phases = d.phases.map((name) => ({ name, steps: d.steps.filter((s) => s.phase === name) })).filter((p) => p.steps.length > 0);
+  const phases = d.phases.map((name) => ({ name, steps: d.steps.filter((s) => s.phase === name && inPart(s)) })).filter((p) => p.steps.length > 0);
   const finished = (steps: RoadmapStep[]) => steps.every((s) => !isOpen(s));
   const livePhases = phases.filter((p) => !finished(p.steps));
   const open = livePhases.flatMap((p) => p.steps.filter(isOpen));
   const now = [...open.filter(needsYou), ...open.filter((s) => s.state === "work" && !needsYou(s)), ...open.filter((s) => s.state === "ready").slice(0, NEXT)];
-  const matches = q ? d.steps.filter((s) => s.id.toLowerCase().includes(q) || s.title.toLowerCase().includes(q) || s.result.toLowerCase().includes(q)) : [];
+  const matches = q
+    ? d.steps.filter((s) => inPart(s) && (s.id.toLowerCase().includes(q) || s.title.toLowerCase().includes(q) || s.result.toLowerCase().includes(q)))
+    : [];
   const card = (s: RoadmapStep) => <StepCard key={s.id} s={s} byId={byId} onOpen={() => setShown(s.id)} />;
   const current = shown ? byId.get(shown) : undefined;
   const openPhase = livePhases[0] ?? phases.at(-1);
@@ -130,12 +134,15 @@ function Filled({ d, plan, planNote }: { d: RoadmapData; plan?: PlanCard; planNo
           data-step-search
         />
 
+        {d.parts && <PartFilter parts={d.parts} value={part} onChange={setPart} />}
+
         {q ? (
           <section className="mt-8" aria-label="Matches">
             {matches.length ? <CardList steps={matches} card={card} /> : <p className="py-6 text-center text-sm text-fg2">No step matches "{query.trim()}".</p>}
           </section>
         ) : (
           <>
+            {part !== null && phases.length === 0 && <p className="py-6 text-center text-sm text-fg2">No step in {part}.</p>}
             {now.length > 0 && (
               <section className="mt-8" aria-label="At work and next" data-section="now">
                 <Label>At work and next</Label>
@@ -149,6 +156,30 @@ function Filled({ d, plan, planNote }: { d: RoadmapData; plan?: PlanCard; planNo
         <StepPanel s={current} byId={byId} rounds={d.rounds} onClose={() => setShown(null)} />
       </div>
     </ProjectContext.Provider>
+  );
+}
+
+/** One chip per part, each with its health as a lamp: green when nothing counts against it, amber when something does. A tap shows only that part's steps. */
+function PartFilter({ parts, value, onChange }: { parts: { name: string; score: number }[]; value: string | null; onChange: (p: string | null) => void }) {
+  return (
+    <div className="mt-4 flex flex-wrap gap-2">
+      {parts.map(({ name, score }) => {
+        const tone = score ? "caution" : "clear";
+        return (
+          <button
+            key={name}
+            type="button"
+            aria-pressed={value === name}
+            onClick={() => onChange(value === name ? null : name)}
+            data-part-chip={name}
+            className={`flex min-h-9 cursor-pointer items-center gap-2 rounded-sm px-3 text-sm focus-visible:outline-2 focus-visible:outline-accent ${value === name ? "bg-raised3" : "bg-raised/50 hover:bg-raised"}`}
+          >
+            <span className="size-2 rounded-full" style={{ background: `var(--lc-${tone})` }} data-part-health={tone} />
+            {name}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -174,7 +205,8 @@ function useStepFlip(ref: React.RefObject<HTMLUListElement | null>, steps: Roadm
     const list = ref.current;
     if (!list) return;
     const was = states.current;
-    const changed = was && steps.some((s) => was.get(s.id) !== s.state);
+    // a step that comes or goes, as the part filter makes it, moves the others the same way
+    const changed = was && (was.size !== steps.length || steps.some((s) => was.get(s.id) !== s.state));
     if (changed && before.current) {
       const merged = steps.some((s) => s.state === "done" && was.get(s.id) !== "done");
       // a step that moves to another section arrives with the same motion

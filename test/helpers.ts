@@ -86,6 +86,13 @@ esac`,
   enable-linger) if [ -f "${state}/linger-needs-root" ]; then exit 1; fi; touch "${state}/linger" ;;
 esac`,
   );
+  // A runner may have a real passwordless sudo; the stub keeps the "needs root" case failing there too.
+  stub(
+    "sudo",
+    `if [ -f "${state}/linger-needs-root" ]; then exit 1; fi
+[ "$1" = "-n" ] && shift
+exec "$@"`,
+  );
   return { bin, state };
 }
 

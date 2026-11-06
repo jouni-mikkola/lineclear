@@ -14,7 +14,7 @@ export interface FailedGate {
   line: string;
 }
 
-export type Tier = "inner" | "merge" | "nightly";
+export type Tier = "inner" | "merge" | "heavy";
 
 export interface CheckRun {
   kind: "run";

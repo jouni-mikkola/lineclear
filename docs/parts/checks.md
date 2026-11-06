@@ -5,7 +5,7 @@ The check tiers of each project and what keeps its checks honest: `lineclear che
 ## Invariants
 
 - Each project has three tiers with a time budget: inner (changed files, while working), merge (once per task, in the
-  merge lane) and nightly (the heavy rest). A tier it leaves out is proposed from its repo.
+  merge lane) and heavy (the slow rest, run after a merge). A tier it leaves out is proposed from its repo.
 - Every check run is in the check log, with its time, its commit, the load, the load at its start (`loadAtStart`) and the minutes it waited for a check slot (`slotWaitMin`, 0 when it did not wait): the counts come from the log only. `lineclear check --log` prints the short commit, time, slot wait and start load of the last 10 runs.
 - A test that failed and then passed on one commit is in quarantine: it no longer blocks a merge, it is never rerun
   past. A failure passes on quarantine only when nothing went unrun: a bare test runner, or a check that printed
@@ -21,7 +21,7 @@ The check tiers of each project and what keeps its checks honest: `lineclear che
   180 s fails it by name, unless the file is in `scripts/gates/baseline/slow.json` (docs/numbers.md). `--full` runs
   everything: the release loop, on the newest main, after waiting up to 30 minutes for a quiet machine. Times are scaled
   by the busiest load from the run's start to its end (`loadMeter`).
-- `check.where` = `github` (default `local`): a landing opens its pull request and waits for GitHub's checks (`.github/workflows/`: changed tests per pull request, the full check in 4 shards in the merge queue, heavy suites nightly), naming failing tests from the job log.
+- `check.where` = `github` (default `local`): a landing opens its pull request and waits for GitHub's checks (`.github/workflows/`: changed tests per pull request, the full check in 4 shards in the merge queue, heavy suites after a merge on main, .github/workflows/heavy.yml), naming failing tests from the job log.
 
 ## Interface
 
@@ -42,4 +42,4 @@ log `check-runs.jsonl`, and these names:
 
 ## Debts
 
-- The merge lane runs a merge tier of several commands as one chain, so quarantine does not apply there. Moving an unearned check to nightly is not in yet.
+- The merge lane runs a merge tier of several commands as one chain, so quarantine does not apply there. Moving an unearned check to heavy is not in yet.

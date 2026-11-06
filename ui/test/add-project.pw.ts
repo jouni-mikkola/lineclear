@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 import { execFileSync, spawnSync } from "node:child_process";
 import { rmSync } from "node:fs";
 import { join } from "node:path";
-import { FIXTURE, NEW_REPO, startEmpty } from "./fixture.ts";
+import { FIXTURE, fixtureEnv, NEW_REPO, startEmpty } from "./fixture.ts";
 
 test("the first-day card offers the home's repos and shows what it found in one, at this width", async ({ page }) => {
   await page.goto("/?state=empty");
@@ -49,7 +49,7 @@ test.describe("live", () => {
     await page.getByTestId("save-project").click();
     await expect(page.locator("[data-add-project]").getByRole("status")).toContainText("Started new-shop.");
     const list = execFileSync("bin/lineclear", ["project", "list"], {
-      env: { ...process.env, LINECLEAR_CONFIG: `${FIXTURE}/config`, LINECLEAR_HOME: `${FIXTURE}/home` },
+      env: fixtureEnv({ LINECLEAR_HOME: `${FIXTURE}/home` }),
     }).toString();
     expect(list).toContain("new-shop");
     expect(list).toContain(`space new-shop`);
@@ -69,7 +69,7 @@ test.describe("live", () => {
     const shown = await fixes.first().innerText();
     // the doctor exits 1 when it finds a problem, so its output is read from the run either way
     const run = spawnSync("bin/lineclear", ["doctor", "--here"], {
-      env: { ...process.env, LINECLEAR_CONFIG: `${FIXTURE}/config`, LINECLEAR_HOME: `${FIXTURE}/home` },
+      env: fixtureEnv({ LINECLEAR_HOME: `${FIXTURE}/home` }),
     });
     const fixLines = run.stdout
       .toString()

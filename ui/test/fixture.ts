@@ -11,6 +11,29 @@ import type { Motion } from "../kit/motion.ts";
 export const UI_PORT = Number(process.env.LINECLEAR_UI_PORT) || 7432;
 export const FIXTURE = join(tmpdir(), `lineclear-ui-${UI_PORT}`);
 
+/**
+ * The `env -u` flags that drop every LINECLEAR_ variable the shell carries (the agent's own `LINECLEAR_URL`,
+ * `LINECLEAR_CHAT`, `LINECLEAR_COMMAND`), so the tests' server can only reach the fixture's server and home.
+ * The fixture then sets back the few it needs.
+ */
+export const unsetLineclearEnv = (env: Record<string, string | undefined> = process.env) =>
+  Object.keys(env)
+    .filter((k) => k.startsWith("LINECLEAR_") && k !== "LINECLEAR_UI_PORT")
+    .map((k) => `-u ${k}`)
+    .join(" ");
+
+/** What a CLI run by the tests gets: the shell's variables without any LINECLEAR_ one, and the fixture's home, config and fake server. */
+export const fixtureEnv = (extra: Record<string, string> = {}): Record<string, string | undefined> => ({
+  ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith("LINECLEAR_"))),
+  HOME: `${FIXTURE}/home`,
+  LINECLEAR_CONFIG: `${FIXTURE}/config`,
+  LINECLEAR_STATE: `${FIXTURE}/state`,
+  LINECLEAR_HOME: `${FIXTURE}/lineclear`,
+  PI_CODING_AGENT_DIR: `${FIXTURE}/pi`,
+  LINECLEAR_SERVER_BIN: `${process.cwd()}/ui/test/fake-lineclear`,
+  ...extra,
+});
+
 export interface FixtureTask {
   id: string;
   title: string;

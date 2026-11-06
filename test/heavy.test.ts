@@ -393,7 +393,7 @@ test("with a release check holding the slots, a task's check and a browser suite
     .trim()
     .split("\n")
     .map((l) => JSON.parse(l));
-  const mine = runs.find((r) => r.tier === "nightly");
+  const mine = runs.find((r) => r.tier === "heavy");
   expect(mine.slotWaitMin).toBeGreaterThanOrEqual(0);
   expect(typeof mine.loadAtStart).toBe("number");
 });

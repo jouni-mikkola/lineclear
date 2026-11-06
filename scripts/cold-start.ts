@@ -14,7 +14,7 @@
 //                  fresh in place, so nothing of it is copied.
 //   COLD_START_LOAD the load, in cores, under which the board and the loop start a task (default 3). This machine runs other work,
 //                  which a newcomer's does not, and both hold tasks while the load is over 1x the cores.
-//   COLD_MINUTES   how long to wait for the merged step (default 25: the nightly job stops a check at 30 minutes)
+//   COLD_MINUTES   how long to wait for the merged step (default 25: the heavy run stops a check at 30 minutes)
 //   COLD_KEEP=1    keeps the fresh HOME and leaves Lineclear running there, to look at it after
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";

@@ -1,5 +1,5 @@
 // `bun run ui:changed`: the browser specs of the views the branch changed (scripts/changed.ts), after a build. The full
-// suite, `bun run ui:test`, is the nightly tier's.
+// suite, `bun run ui:test`, is the heavy tier's.
 import { changedSince } from "./gates/tools.ts";
 import { specsFor } from "./changed.ts";
 

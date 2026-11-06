@@ -1,5 +1,5 @@
 // Line coverage of the root tests per module of docs/architecture.md, against the floors in
-// baseline/coverage.json. Too slow for `bun run check`: the nightly job and a release run it.
+// baseline/coverage.json. Too slow for `bun run check`: the heavy run and a release run it.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { moduleOf, readModules } from "./borders.ts";

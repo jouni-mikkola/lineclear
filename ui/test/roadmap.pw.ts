@@ -319,6 +319,11 @@ test.describe("live 3", () => {
 });
 
 test.describe("live 4", () => {
+  const change = async (page: Page, live: { change: () => void }) => {
+    live.change();
+    for (let i = 0; i < 50 && (await (await page.request.get("/api/roadmap/web-shop")).text()) === changeSeen; i++) await page.waitForTimeout(100);
+  };
+  let changeSeen = "";
   test.skip(({ viewport }) => viewport?.width !== 1440, "the live view is checked once, at 1440 px");
 
   test("400 steps over 12 phases draw at once and fit the width", async ({ page }) => {
@@ -333,16 +338,19 @@ test.describe("live 4", () => {
   liveMotionTests({
     moves: Object.entries(ROADMAP_LIVE) as [Motion, NonNullable<(typeof ROADMAP_LIVE)[Motion]>][],
     fresh: (page) => fresh(page),
-    prepare: (live) => live.change(),
-    // the server is read every 1.5 s: the trace starts when the change reaches the page
-    act: (page, live) =>
-      page.evaluate(async (after) => {
+    // the server answers with its last read while it reads again: ask until it shows the change, so the page finds it at once
+    prepare: async (_live, page) => void (changeSeen = await page.request.get("/api/roadmap/web-shop").then((r) => r.text())),
+    act: async (page, live) => {
+      await change(page, live);
+      await page.evaluate(async (after) => {
         window.dispatchEvent(new Event("visibilitychange"));
         const done = new Function(`return ${after}`) as () => boolean;
         while (!done()) await new Promise((r) => setTimeout(r, 5));
         console.timeStamp("act");
-      }, live.after),
+      }, live.after);
+    },
     click: async (page, m, live) => {
+      await change(page, live);
       // the change reaches the page on the server's own read, which can be later than one event: wait for it
       await page.evaluate(async (after) => {
         window.dispatchEvent(new Event("visibilitychange"));
@@ -376,4 +384,20 @@ test("one switch on the track sets the project Running or Paused", async ({ page
   await expect.poll(async () => (await (await page.request.get("/api/roadmap/web-shop")).json()).paused).toBe(true);
   await sw.click();
   await expect(sw).toHaveAttribute("data-run-state", "running");
+});
+
+test("the part filter shows one part's steps and each part's health as a mark with no text", async ({ page }) => {
+  await page.goto("/web-shop/roadmap/track?state=filled");
+  await page.waitForSelector("[data-step]");
+  const chips = page.locator("[data-part-chip]");
+  await expect(chips).toHaveCount(2);
+  await expect(chips.first().locator("[data-part-health]")).toHaveAttribute("data-part-health", "clear");
+  await expect(chips.nth(1).locator("[data-part-health]")).toHaveAttribute("data-part-health", "caution");
+  const all = await page.locator("[data-step]").count();
+  await chips.nth(1).click();
+  const some = await page.locator("[data-step]").count();
+  expect(some).toBeGreaterThan(0);
+  expect(some).toBeLessThan(all);
+  await chips.nth(1).click();
+  await expect(page.locator("[data-step]")).toHaveCount(all);
 });

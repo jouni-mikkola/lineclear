@@ -59,12 +59,12 @@ const run = (repo: string, o: Partial<CheckRun>): Omit<CheckRun, "kind"> => ({
   ...o,
 });
 
-test("proposeTiers puts fast scripts in inner, the check in merge and heavy ones in nightly", () => {
+test("proposeTiers puts fast scripts in inner, the check in merge and heavy ones in heavy", () => {
   const p = project();
   expect(proposeTiers(p.repo, "bun run check")).toEqual({
     inner: { commands: ["bun run types:fast"], budgetS: 30 },
     merge: { commands: ["bun run check"], budgetS: 180 },
-    nightly: { commands: ["bun run coverage"], budgetS: 3600 },
+    heavy: { commands: ["bun run coverage"], budgetS: 3600 },
   });
 });
 

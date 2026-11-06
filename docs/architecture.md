@@ -44,7 +44,7 @@ imports count for the borders but not for cycles, since they are gone when the c
 
 `bun run coverage` runs the root tests and measures line coverage per module of the table above. A module below its
 floor in `scripts/gates/baseline/coverage.json` fails. `bun run coverage --raise` lifts floors to what is measured and
-never lowers one. It is slower than the check allows, so the nightly job and a release run it, not `bun run check`.
+never lowers one. It is slower than the check allows, so the heavy run and a release run it, not `bun run check`.
 The run gives each test 60 s, since coverage slows it and a timed-out test leaves its lines out of the count.
 A source file no test loads counts as uncovered only under `src/`, `bin/`, `pi/`, `ui/brand/` and `ui/kit/`: the server, Playwright, the repo's own drivers and the eval run under other runners. A module the root tests do not reach has no floor.
 `bunfig.toml` leaves out `scripts/media.ts`, `scripts/budget.ts` and `scripts/smoke.ts`: they drive Blender, Chromium and a live
