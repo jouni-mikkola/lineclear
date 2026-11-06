@@ -636,7 +636,16 @@ test("a task started on machine B runs its agent, checks, review, step check and
   // the server starts the agent on the task's machine, then the agent checks, reviews and the lane checks there
   recordWork("LIN-9", "agent", env, "boxb");
   for (const tier of ["inner", "merge"]) {
-    expect(await checkTier(["--tier", tier], p.settings(), () => {}, env, p.repo, async () => 0)).toBe(0);
+    expect(
+      await checkTier(
+        ["--tier", tier],
+        p.settings(),
+        () => {},
+        env,
+        p.repo,
+        async () => 0,
+      ),
+    ).toBe(0);
   }
   recordWork("LIN-9", "review", env);
 
