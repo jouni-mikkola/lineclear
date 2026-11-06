@@ -19,7 +19,7 @@ import {
   type Saved,
 } from './install.ts'
 import { mirrorHomes } from './mirror.ts'
-import { q, tellRunBy } from './box.ts'
+import { q, tellRunBy, type BoxInfo } from './box.ts'
 import { MERGE_DEADLINE } from './engine/engine.ts'
 import {
   type Events,
@@ -146,6 +146,12 @@ export class MachinesLinks extends Emitter<Events> {
 
   list() {
     return [...this.links.values()]
+  }
+
+  /** the machine as a worker is told of it, once it has been looked at (box.ts) */
+  boxOf(label: string): BoxInfo | undefined {
+    const l = this.links.get(label)
+    return l?.probe ? boxInfo(l.saved, l.probe) : undefined
   }
 
   protected syncing = false

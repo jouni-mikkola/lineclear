@@ -161,6 +161,13 @@ export abstract class EngineState extends Emitter<Events> {
     if (wt) this.machineWt.set(box.label, wt)
   }
 
+  /** makes these the machines tasks may run on, those saved in herdr: a machine herdr no longer has is dropped, one
+   *  with a herdr socket of its own (tests) stays */
+  setMachines(boxes: BoxInfo[]) {
+    for (const [label, box] of this.machines) if (!box.socket && !boxes.some((b) => b.label === label)) this.machines.delete(label)
+    for (const box of boxes) if (!this.machines.get(box.label)?.socket) this.machines.set(box.label, box)
+  }
+
   /** the worktree keeper for the task's machine */
   protected wtOf(t: Pick<TaskRec, 'machine'>): Worktrees {
     return (t.machine && this.machineWt.get(t.machine)) || this.wt

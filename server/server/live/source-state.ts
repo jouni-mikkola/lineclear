@@ -22,7 +22,8 @@ import { sh } from './engine/git.ts'
 import { userName } from './timer-off.ts'
 import { Artifacts, browserChecker, type Checker } from './artifacts.ts'
 import { Machines } from './machines.ts'
-import { agentEnv, BOX } from './box.ts'
+import { agentEnv, BOX, type BoxInfo } from './box.ts'
+import { savedMachines, type Saved } from './install.ts'
 import { asMode, HOST, NAME, placeId, Places } from './places.ts'
 import { privatePrompt, coordinatorPrompt, settingsBlock } from './prompts.ts'
 import { harnessWords, type Harness } from './restart.ts'
@@ -117,6 +118,32 @@ export class LiveSourceState extends Emitter<SourceEvents> {
   /** the main machine runs every other machine saved in herdr, each from a worker of its own (machines.ts); a worker
    *  is one of those (box.ts) */
   peers: Machines | null = BOX ? null : new Machines(process.env.NODE_ENV === 'test' || process.env.LINECLEAR_SCRATCH ? null : undefined)
+  /** herdr's list of machines, which tasks may run on; none (tests, a worker) leaves the engine's machines as set */
+  machineList: (() => Promise<Saved[]>) | null = BOX || process.env.NODE_ENV === 'test' || process.env.LINECLEAR_SCRATCH ? null : savedMachines
+  protected savedNow: Saved[] = []
+
+  /** reads the machines herdr has saved and enabled, and makes them the engine's: the room command and placement see them */
+  async syncMachines() {
+    if (!this.machineList) return
+    this.savedNow = (await this.machineList().catch(() => this.savedNow)).filter((m) => m.enabled !== false)
+    this.applyMachines()
+  }
+
+  /** the engine's machines from the last list; a machine looked at already has its home and PATH, else a plain one */
+  protected applyMachines() {
+    if (!this.machineList) return
+    const plain = (m: Saved): BoxInfo => ({
+      label: m.label,
+      target: m.target,
+      session: m.session,
+      herdr: 'herdr',
+      home: '',
+      path: '/usr/local/bin:/usr/bin:/bin',
+      os: '',
+    })
+    this.engine.setMachines(this.savedNow.map((m) => this.peers?.boxOf(m.label) ?? plain(m)))
+  }
+
   /** each task's shared browser */
   browsers = has('browser')
     ? new Browsers({
