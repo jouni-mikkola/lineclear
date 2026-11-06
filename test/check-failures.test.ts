@@ -3,8 +3,13 @@ import { firstCause, renderReport, sortRuns, type GhRun } from "../src/check-fai
 
 const line = (job: string, step: string, text: string) => `${job}\t${step}\t2026-11-06T21:19:20.1785389Z ${text}`;
 const CHECK = "Run bun scripts/check.ts --changed --untimed";
-const testLog = (name: string, ms = "32.87ms") => [line("full check (1/4)", CHECK, `(fail) ${name} [${ms}]`), line("full check (1/4)", CHECK, "check: server tests failed")].join("\n");
-const gateLog = [line("changed tests", CHECK, "lint: 1 fault"), line("changed tests", CHECK, "check: gates failed: error: script exited"), line("check", "Run test", "##[error]Process completed with exit code 1.")].join("\n");
+const testLog = (name: string, ms = "32.87ms") =>
+  [line("full check (1/4)", CHECK, `(fail) ${name} [${ms}]`), line("full check (1/4)", CHECK, "check: server tests failed")].join("\n");
+const gateLog = [
+  line("changed tests", CHECK, "lint: 1 fault"),
+  line("changed tests", CHECK, "check: gates failed: error: script exited"),
+  line("check", "Run test", "##[error]Process completed with exit code 1."),
+].join("\n");
 const setupLog = line("changed tests", "Run bun install --frozen-lockfile", "##[error]Process completed with exit code 1.");
 const limitLog = line("full check (2/4)", "UNKNOWN STEP", "##[error]The job running on runner X has exceeded the maximum execution time of 5 minutes.");
 
@@ -35,7 +40,12 @@ test("a test that failed and passed on the same commit is flaky, one that stays 
 });
 
 test("on main a red run followed by a green one is flaky unless a fix lies between", () => {
-  const runs = () => [run({ conclusion: "failure", log: testLog("m") }), run({}), run({ conclusion: "failure", log: setupLog }), run({ conclusion: "failure", log: limitLog })];
+  const runs = () => [
+    run({ conclusion: "failure", log: testLog("m") }),
+    run({}),
+    run({ conclusion: "failure", log: setupLog }),
+    run({ conclusion: "failure", log: limitLog }),
+  ];
   expect(sortRuns(runs()).main.causes).toMatchObject({ "flaky test": 1, setup: 1, "time limit": 1 });
   expect(sortRuns(runs(), () => true).main.causes).toMatchObject({ "flaky test": 0, "real break": 1 });
 });

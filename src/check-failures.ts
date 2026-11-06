@@ -3,7 +3,7 @@
 // with no fix commit before the next run, is flaky. The sort is pure; only `readRuns` talks to gh and git.
 import { DAY } from "./time.ts";
 
-export type Cause = "flaky test" | "real break" | "gate" | "setup" | "time limit";
+type Cause = "flaky test" | "real break" | "gate" | "setup" | "time limit";
 
 export interface GhRun {
   id: number;
@@ -16,7 +16,7 @@ export interface GhRun {
   log: string;
 }
 
-export interface FailedTest {
+interface FailedTest {
   name: string;
   ms: number;
 }
@@ -55,9 +55,9 @@ export function firstCause(log: string): FirstCause {
 }
 
 /** Whether a red run is a pull request's (a merge queue run is one too) or main's. */
-export const side = (r: GhRun): "main" | "pull requests" => (r.event === "push" && r.branch === "main" ? "main" : "pull requests");
+const side = (r: GhRun): "main" | "pull requests" => (r.event === "push" && r.branch === "main" ? "main" : "pull requests");
 
-export interface Tally {
+interface Tally {
   runs: number;
   green: number;
   red: number;
@@ -106,8 +106,7 @@ export function sortRuns(runs: GhRun[], fixBetween: (from: string, to: string) =
 const CAUSES: Cause[] = ["flaky test", "real break", "gate", "setup", "time limit"];
 
 export function renderReport(report: Report, days: number): string[] {
-  const row = (label: string, t: Tally) =>
-    `| ${label} | ${t.runs} | ${t.green} | ${t.red} | ${t.cancelled} | ${CAUSES.map((c) => t.causes[c]).join(" | ")} |`;
+  const row = (label: string, t: Tally) => `| ${label} | ${t.runs} | ${t.green} | ${t.red} | ${t.cancelled} | ${CAUSES.map((c) => t.causes[c]).join(" | ")} |`;
   const lines = [
     `Check failures, the last ${days} days`,
     "",
@@ -130,9 +129,11 @@ const gh = (args: string[]): string => {
 };
 
 /** The runs of the `check` workflow in the last `days` days, with the log of each red one. */
-export function readRuns(days: number, now = Date.now()): GhRun[] {
+function readRuns(days: number, now = Date.now()): GhRun[] {
   const since = new Date(now - days * DAY).toISOString();
-  const list: any[] = JSON.parse(gh(["run", "list", "--workflow", "check", "--limit", "500", "--json", "databaseId,event,headBranch,headSha,conclusion,createdAt"]));
+  const list: any[] = JSON.parse(
+    gh(["run", "list", "--workflow", "check", "--limit", "500", "--json", "databaseId,event,headBranch,headSha,conclusion,createdAt"]),
+  );
   return list
     .filter((r) => r.createdAt >= since)
     .map((r) => {
@@ -150,9 +151,15 @@ export function readRuns(days: number, now = Date.now()): GhRun[] {
 }
 
 /** A commit between two main commits has a subject that starts with "fix". */
-export function fixBetweenGit(from: string, to: string): boolean {
+function fixBetweenGit(from: string, to: string): boolean {
   const p = Bun.spawnSync(["git", "log", "--format=%s", `${from}..${to}`], { stdin: "ignore", stderr: "ignore" });
-  return p.exitCode === 0 && p.stdout.toString().split("\n").some((s) => /^fix/i.test(s));
+  return (
+    p.exitCode === 0 &&
+    p.stdout
+      .toString()
+      .split("\n")
+      .some((s) => /^fix/i.test(s))
+  );
 }
 
 export function checksMain(args: string[], out: (l: string) => void): number {
