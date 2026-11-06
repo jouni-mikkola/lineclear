@@ -55,22 +55,22 @@ Result: `lineclear measure checks --days 2` shows how often main and pull reques
 - files: src/check-failures.ts, src/measure.ts, test/check-failures.test.ts, docs/numbers.md
 
 ### L435 Two flaky tests fixed at cause
-Result: The needs-you card test and the box-share read test pass 50 runs in a row under load, by a fix of what they wait on.
-- why: the card test waits at most 4 s for a task's worktree and then fails, up to its 60 s limit; the box-share test races a fake commit against a read. On a loaded machine both fail with no change to blame.
-- done when: The tests are "a task's question on its needs-you card in its space's chat > answered in the task chat instead" and "a read that began while a write ran is not shared once the write is done"; both names go in the commit message. Each waits on the event it needs, not on a count of sleeps. No time limit is raised, no assertion dropped, no retry added. Each passes `bun test --rerun-each 50` while 4 copies of the server's suite run at once.
+Result: The needs-you card test and the box-share read test pass 50 runs in a row under load, by a fix of their cause.
+- why: on GitHub the card test fails after about 4 s with "got no worktree" though it waits up to 60 s for one, so a worktree is set and then cleared, maybe in the product; the box-share test's fake ssh races a commit against a read with a count of sleeps.
+- done when: The tests are "a task's question on its needs-you card in its space's chat > answered in the task chat instead" and "a read that began while a write ran is not shared once the write is done"; both names and their causes go in the commit message. The card test's cause is found and fixed where it is, in the engine or the fixture; the box-share test waits on the read it needs. No time limit is raised, no assertion dropped, no retry added. Each passes `bun test --rerun-each 50` while 4 copies of the server's suite run at once.
 - parts: server
 - locks: server-tests
 - after: none
-- files: server/test/source-fixture.ts, server/test/source-b.test.ts, server/test/box-share.test.ts
+- files: server/test/source-fixture.ts, server/test/source-b.test.ts, server/test/box-share.test.ts, server/server/live/engine/worktrees.ts
 
 ### L436 Flaky tests quarantined
 Result: A test that flakes on GitHub stops blocking merges within one run and gets its own fix task; it leaves quarantine only once fixed.
-- why: the rerun of `scripts/flaky.ts` and the quarantine of `src/check-runs.ts` read only the machine's own check log, so on GitHub a flaky test keeps main red run after run.
-- done when: When L434 finds a flaky test, the server adds it to `test/quarantine.json` on main with its fix task's id and files that task (`flakeFixIn`, its brief asks for the cause and forbids a weaker test). The check, here and on GitHub, still runs a test in that file and prints its result, but its failure alone does not fail the run. The fix task's merge takes the test out, and a test failing 3 runs in a row while quarantined is a break, not a flake, and fails the check. At most 5 tests are in quarantine; a 6th pauses the merge line and asks the owner. A test with a planted flake shows each case.
+- why: the check reruns a failed test alone only in steps named `tests` (`scripts/check.ts`), so a server test that flakes is never rerun, and the quarantine of `src/check-runs.ts` reads only the machine's own log, which a GitHub runner lacks.
+- done when: The server suite's failures are rerun alone from `server/` like the others. A test that fails and then passes alone on the same commit is a flake: the server adds it to `test/quarantine.json` on main with its fix task's id and files that task (`flakeFixIn`, its brief asks for the cause and forbids a weaker test). The check, here and on GitHub, still runs a quarantined test and prints its result, but its failure alone does not fail the run; a quarantined test that also fails alone is a break and fails the check. The fix task's merge takes the test out. At most 5 tests are in quarantine; a 6th pauses the merge line and asks the owner. A test plants a flake that fails 10 runs in a row, a break and a 6th flake.
 - parts: checks, server, rules
 - locks: quarantine
 - after: L434
-- files: src/check-runs.ts, src/check-tier.ts, scripts/flaky.ts, scripts/check.ts, test/quarantine.json, test/check-runs.test.ts
+- files: scripts/check.ts, scripts/flaky.ts, src/check-runs.ts, src/check-tier.ts, test/quarantine.json, test/check-runs.test.ts
 
 ### L437 A fix never weakens a test
 Result: A commit that raises a test's time limit, adds a retry or drops an assertion fails the check unless it names the cause.
@@ -82,9 +82,9 @@ Result: A commit that raises a test's time limit, adds a retry or drops an asser
 - files: scripts/gates/test-strength.ts, test/test-strength.test.ts
 
 ### L438 Tests hold under parallel load
-Result: The whole suite passes with 4 copies running at once on one GitHub runner, every test in its own folder, ports and time.
+Result: Every test shard passes with 4 copies running at once on one GitHub runner, each test in its own folder and ports.
 - why: agents run several checks at once on one machine; a test that sleeps a fixed time, binds a fixed port or shares a path passes alone and fails then.
-- done when: One helper `waitFor(condition, what)` in `test/helpers.ts` (and its server twin) waits on an event to a deadline and names what never came. A gate fails a test that binds a fixed port, writes outside its temp folder or polls with a fixed count of sleeps. A GitHub job runs 4 copies of the full suite at once each night; it is green 5 nights in a row, and every test case stays under 2 s.
+- done when: One helper `waitFor(condition, what)` in `test/helpers.ts` (and its server twin `until`) waits on an event to a deadline and names what never came. A gate fails a test that binds a fixed port, writes outside its temp folder or polls with a fixed count of sleeps. A nightly job per shard runs 4 copies of that shard at once within the 5-minute job limit, untimed like the other GitHub jobs; every shard is green 5 nights in a row.
 - parts: checks, server
 - locks: server-tests, gates
 - after: L435
@@ -246,7 +246,7 @@ Result: Whatever uses the most CPU per task in L416's table (tests, servers or t
 ### L432 Targets hold for a day
 Result: A day of real work meets the targets: 400k tokens and 10 minutes per task, 3 agents per core, 1 GitHub run per 3 merges.
 - why: each step above proves its own part; only a day of normal work shows they add up.
-- done when: `docs/numbers.md` has a day of at least 30 tasks, measured by L416, with: median input under 400k tokens per task and the largest under 1.5M, a median under 10 minutes from start to ready on every machine, 3 agents per core with load under the core count, at most one GitHub run per 3 merged tasks, no task in Needs you without a question, under 5 % of main checks red (L434) and none red from a flaky test, and 12 agents running on the least hardware named, 4 cores and 8 GB.
+- done when: `docs/numbers.md` has a day of at least 30 tasks, measured by L416, with: median input under 400k tokens per task and the largest under 1.5M, a median under 10 minutes from start to ready on every machine, 3 agents per core with load under the core count, at most one GitHub run per 3 merged tasks, no task in Needs you without a question, under 5 % of main checks red (L434) and none red from a flaky test, and a run of 12 tasks on the measured machine held to 4 cores and 8 GB (a systemd slice with `AllowedCPUs` and `MemoryMax`) where all 12 reach ready with no out-of-memory kill and load under 4.
 - parts: measure
 - locks: numbers
 - after: L417, L419, L420, L422, L424, L425, L426, L429, L430, L431, L433, L437, L438
