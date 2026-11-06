@@ -73,3 +73,20 @@ when that need is measured.
 ## Cost per merged step
 
 - The nightly `cost goal` fails: the cost per merged step is above the goal, and cache write is the largest share. Find which sessions write the most cache (a prompt prefix that changes between calls rewrites it) and cut that. It needs `lineclear measure` on a machine with the project set up.
+
+## Frozen roadmap steps
+
+Parked by the owner on 5 Nov 2026; moved back to the roadmap only by the owner.
+
+- L268 Herdr calls are counted: only a count from herdr's own log shows the polling is gone and stays gone.
+- L276 Home shows a looping step: a step that starts again and again burns tokens out of sight, and the owner learns of it only when the count is huge.
+- L219 The Dispatcher session rotates: one session that grows with each message and event is read again on every call, and the chat role is 7.4 % of cost.
+- L173 Commands return a handle: a command that waits for a merge, a start or a plan holds the Dispatcher's turn, so the owner's next message cannot be answered.
+- L174 An Operator keeps the line: polling, re-adding failed starts and promotions are chores that fill the Dispatcher's turns. A role of their own does them without taking a worker slot.
+- L175 Owner message reaches mid-turn: today a message waits until the turn ends, which can be minutes. The owner takes the silence for a hang.
+- L176 Answer within 30 s, tested: L173 to L175 are each tested alone. The promise to the owner is the whole chain, so one test holds it.
+- L191 Operations have ids: a pi turn is serial, so a 2 to 10 min merge or release in the Dispatcher's own call holds every owner message
+- L192 Op events: the Dispatcher polls with `sleep` and `tail` today, which resends about 100 k context tokens per tick.
+- L193 The Dispatcher wakes on an event: "No news reaches you" in its template makes it poll; an event push removes the polling.
+- L194 The Dispatcher never waits: the owner's message must be answered in seconds, and a long call in the Dispatcher's turn blocks it.
+- L195 Reply time is measured: the goal is an answer within seconds, and only a measure shows whether L190 to L194 reached it.
