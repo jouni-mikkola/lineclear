@@ -55,6 +55,7 @@ A zero in restarts or gate failures can mean the log has no such line on this ma
 | loop `CANDIDATE_EVERY_MS` | 0 | 0 | 0 | A new build is not tried on a side instance before it is offered. |
 | loop `FETCH_EVERY_MS` | 0 | 0 | 0 | A project's main goes stale, so steps start from old code. |
 | loop `EVERY_MS` | 0 | 0 | 0 | The home doctor stops: faults on the board show late. |
+| loop `DRILL_EVERY_MS` | 0 | 0 | 0 | The weekly restore drill stops: a backup that cannot restore goes unnoticed. |
 | loop `REFRESH_MS` | 0 | 0 | 0 | Other machines' tasks and load are read late. |
 | loop `SWEEP_EVERY_MS` | 0 | 0 | 0 | Temp folders and compile caches of finished runs fill the disk. |
 | loop `CHECK_EVERY_MS` | 0 | 0 | 0 | A built update is never checked, so it is never promoted. |
