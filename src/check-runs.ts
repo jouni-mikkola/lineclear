@@ -83,7 +83,15 @@ interface FixFiled {
   test: string;
 }
 
-type Entry = CheckRun | Release | BudgetFault | FixFiled;
+/** The test files that passed in one check, each under its key (scripts/result-cache.ts): a later check with the same key does not run it again. */
+interface Pass {
+  kind: "pass";
+  at: number;
+  repo: string;
+  keys: Record<string, string>;
+}
+
+type Entry = CheckRun | Release | BudgetFault | FixFiled | Pass;
 type Env = Record<string, string | undefined>;
 
 const configDir = (env: Env) => env.LINECLEAR_CONFIG ?? join(homedir(), ".config", "lineclear");
@@ -136,6 +144,18 @@ export const recordFixFiled = (repo: string, test: string, env: Env = process.en
 export const releaseTest = (repo: string, test: string, env: Env = process.env, now = Date.now()) =>
   append({ kind: "release", at: now, repo: repoKey(repo), test }, env);
 
+export const recordPasses = (repo: string, keys: Record<string, string>, env: Env = process.env, now = Date.now()) => {
+  if (Object.keys(keys).length > 0) append({ kind: "pass", at: now, repo: repoKey(repo), keys }, env);
+};
+
+/** The key each test file last passed under, from the pass lines of the log. */
+export function readPasses(repo: string, env: Env = process.env): Record<string, string> {
+  const key = repoKey(repo);
+  const out: Record<string, string> = {};
+  for (const e of entries(env)) if (e.kind === "pass" && e.repo === key) Object.assign(out, e.keys);
+  return out;
+}
+
 /** The log, oldest first. A line cut short by a crash is skipped. */
 function entries(env: Env): Entry[] {
   let text: string;
@@ -149,7 +169,7 @@ function entries(env: Env): Entry[] {
     if (!line.trim()) continue;
     try {
       const e = JSON.parse(line) as Entry;
-      if (e?.kind === "run" || e?.kind === "release" || e?.kind === "budget" || e?.kind === "fix") out.push(e);
+      if (e?.kind === "run" || e?.kind === "release" || e?.kind === "budget" || e?.kind === "fix" || e?.kind === "pass") out.push(e);
     } catch {
       // a partial last line
     }
@@ -215,7 +235,7 @@ function scan(repo: string, env: Env): Scan {
   const broken = new Set<string>();
   const failedOn = new Map<string, CheckRun[]>();
   for (const e of entries(env)) {
-    if (e.repo !== key || e.kind === "budget") continue;
+    if (e.repo !== key || e.kind === "budget" || e.kind === "pass") continue;
     if (e.kind === "fix") {
       fixed.set(e.test, e.at);
       continue;

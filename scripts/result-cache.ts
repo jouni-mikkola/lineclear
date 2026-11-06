@@ -1,13 +1,10 @@
-// A test file's passing result is cached by the hash of what it loads (the load map, scripts/load-map.ts): a file whose
+// A test file's passing result is stored in the check log (src/check-runs.ts) under the hash of what it loads (the load map, scripts/load-map.ts): a file whose
 // own text and every file it loads are unchanged, on the same bun and lockfile, does not run again. A full run
 // (`check --full`, the release) ignores the cache, so it also catches a load the map missed.
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { cacheDir } from "../src/tmpdirs.ts";
-
-const KEEP = 5000;
-const path = () => join(cacheDir(), "test-results.json");
+import { readPasses, recordPasses } from "../src/check-runs.ts";
 
 const textOf = (root: string, file: string): string => {
   try {
@@ -28,14 +25,6 @@ export function testKey(root: string, file: string, loads: string[], salt: strin
   return h.digest("hex");
 }
 
-function read(): Record<string, string> {
-  try {
-    return JSON.parse(readFileSync(path(), "utf8")) as Record<string, string>;
-  } catch {
-    return {};
-  }
-}
-
 /** The files (as `./test/x.test.ts`) that passed before with the same key, and the files that must run. */
 export function splitCached(
   root: string,
@@ -43,7 +32,7 @@ export function splitCached(
   map: Record<string, string[]>,
   salt: string,
 ): { cached: string[]; run: string[]; keys: Record<string, string> } {
-  const passed = read();
+  const passed = readPasses(root);
   const keys: Record<string, string> = {};
   const cached: string[] = [];
   const run: string[] = [];
@@ -61,11 +50,7 @@ export function splitCached(
   return { cached, run, keys };
 }
 
-/** Remembers the keys of the files that passed. */
-export function recordPassed(keys: Record<string, string>, files: string[]): void {
-  const next = read();
-  for (const f of files) if (keys[f]) next[f.replace(/^\.\//, "")] = keys[f] as string;
-  const kept = Object.fromEntries(Object.entries(next).slice(-KEEP));
-  mkdirSync(cacheDir(), { recursive: true });
-  writeFileSync(path(), JSON.stringify(kept));
+/** Remembers the keys of the files that passed, as one line of the check log. */
+export function recordPassed(root: string, keys: Record<string, string>, files: string[]): void {
+  recordPasses(root, Object.fromEntries(files.flatMap((f) => (keys[f] ? [[f.replace(/^\.\//, ""), keys[f]]] : []))));
 }
