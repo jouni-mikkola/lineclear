@@ -443,11 +443,13 @@ test("a step's fix tasks that end twice with no merge get no third, one fix-loop
   expect(t.adds.map((a) => a[0])).toEqual(["A Fix: one", "A Fix: two"]);
   // the held skip is the one stall: its class files one planning fix with both tasks as evidence
   const why = (held as { why: string }).why;
-  expect(classify({ kind: "skip", reason: `A: ${why}` })).toBe("fix-loop");
+  expect(classify({ kind: "skip", reason: `A: its fix task ended, and no closed fix task started: ${why}` })).toBe("fix-loop");
   const out = stallOnce(t, "fix-loop", "A");
   expect(out.map((d) => d.kind)).toEqual(["start"]);
   expect(t.adds.at(-1)?.[0]).toBe("Plan: fix fix loop");
-  // a merged fix starts the count again
-  end("A Fix: four", { status: "done" });
+  // a task taken up again is not an end until it ends again, and a merged end starts the count again
+  t.tasks.list = t.tasks.list.map((x) => (x.title === "A Fix: two" ? { ...x, status: "work" } : x));
+  fileFix(t.world, spec("A Fix: held"), t.env);
+  end("A Fix: two", { status: "done" });
   expect(fileFix(t.world, spec("A Fix: five"), t.env)).toEqual({ filed: true });
 });

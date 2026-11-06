@@ -80,6 +80,7 @@ export const CLASS_INFO: Record<StallClass, ClassInfo> = {
 const OWNER = /paid key|waits for your answer|declared wait|is paused|^would |^rung 4: would/;
 
 const PATTERNS: [RegExp, StallClass][] = [
+  [/no \w+ fix task started: fix loop: /, "fix-loop"],
   [/signed out/i, "signed-out"],
   [/outdated settings|couldn.t start it again|revive loop/i, "revive-loop"],
   [
@@ -97,7 +98,6 @@ const PATTERNS: [RegExp, StallClass][] = [
   [/^machine \S+ skipped/, "machine-unreachable"],
   [/coordinator\b.*\b(is gone|is not running|cannot restart|could not restart)/i, "coordinator-gone"],
   [/isn.t through after|another merge into this repo still runs/, "head-of-line"],
-  [/fix loop: /, "fix-loop"],
   [/failed|cannot read|did not give JSON|could not|pi offers none/, "command-failed"],
 ];
 

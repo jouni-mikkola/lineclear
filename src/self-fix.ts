@@ -216,9 +216,9 @@ function planningFlags(settings: Settings): string[] {
 
 const endsPath = (env = process.env) => join(configDir(env), "fix-ends.json");
 const outcomesPath = (env = process.env) => join(configDir(env), "fix-outcomes.json");
-const OUTCOMES_KEPT = 10;
+const OUTCOMES_KEPT = 30 * DAY;
 
-/** How a step's fix task ended: nothing merged, or merged. Oldest first in `Outcomes`, by when it was first seen ended. */
+/** How a step's fix task ended: nothing merged, or merged. Oldest first in `Outcomes`, by when it was seen ended, kept for 30 days. */
 interface Outcome {
   task: string;
   title: string;
@@ -234,7 +234,8 @@ function stepOfSpec(spec: FixSpec): string | undefined {
 }
 
 /**
- * The step's fix tasks on every machine that are open or ended in the last 24 hours, or a reason it cannot tell.
+ * The step's fix tasks on every machine that are open or ended in the last 24 hours, as the reason each holds a new one.
+ * It also records how each end went (`fix-outcomes.json`), for `fixLoopReason`.
  * A local task is the step's by the rules' record, another machine's by its title, `Fix <id> <title>` or `<id> Fix: <title>`.
  * A task has no end time in the list, so it ends when it was first seen not open.
  */
@@ -259,13 +260,16 @@ function stepFixHeld(world: World, spec: FixSpec, step: string, local: Task[], e
     if (t.status !== "done" && t.status !== "closed") {
       held.open ??= `a fix task of ${step} is open: ${t.title}`;
       if (key in ends) delete ends[key], (changed = true);
+      // a task taken up again has not ended yet: its next end is the one that counts
+      const was = seenEnds.findIndex((o) => o.task === key);
+      if (was >= 0) seenEnds.splice(was, 1), (outcomesChanged = true);
       continue;
     }
     if (!(key in ends)) (ends[key] = now), (changed = true);
     if (!seenEnds.some((o) => o.task === key)) {
       seenEnds.push({ task: key, title: t.title, unmerged: endedUnmerged(t, false), at: ends[key] ?? now });
       seenEnds.sort((a, b) => a.at - b.at);
-      seenEnds.splice(0, seenEnds.length - OUTCOMES_KEPT);
+      seenEnds.splice(0, seenEnds.filter((o) => now - o.at >= OUTCOMES_KEPT).length);
       outcomesChanged = true;
     }
     if (now - (ends[key] ?? 0) < DAY) held.recent ??= `a fix task of ${step} ended in the last 24 hours: ${t.title}`;
@@ -286,7 +290,7 @@ function fixLoopReason(step: string, space: string, env: NodeJS.ProcessEnv): str
 
 /**
  * The one way to file a fix task. Not while the fix's task is open (the title is looked up in the task list), not
- * while the Inbox item for its last unmerged end waits, and not over DAY_CAP fixes in 24 hours, all kinds together.
+ * while the Inbox item for its last unmerged end waits, not for a step whose last two fix tasks both ended unmerged, and not over DAY_CAP fixes in 24 hours, all kinds together.
  */
 export function fileFix(world: World, spec: FixSpec, env = process.env): { filed: true } | { filed: false; why: string } {
   const fixes = readFixes(env);
