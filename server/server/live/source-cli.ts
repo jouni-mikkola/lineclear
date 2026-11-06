@@ -207,7 +207,11 @@ export class LiveSourceCli extends LiveSourceSubcommands {
       case 'task': {
         // a task the list shows "(on desktop)" is run by that machine's worker: its show, tell, close, merge and delete go there
         const ref = machineRef(rest[0] ?? '')
-        const args = ref.machine ? [ref.id, ...rest.slice(1)] : rest
+        // "machine-b:OMA-91" may be an old id a rename kept: that machine's task is then called by its new id
+        const kept = ref.machine
+          ? this.peers?.byName(ref.machine)?.snap?.tasks.find((t) => t.aliases?.some((a) => a.toUpperCase() === (rest[0] ?? '').toUpperCase()))
+          : undefined
+        const args = ref.machine ? [kept?.id ?? ref.id, ...rest.slice(1)] : rest
         const news = this.requestedNews.known(ctx.chat)
         if (ref.machine) return (await forwardTask(this.peers, a1, args, p.opts, p.flags, news, ref.machine)) ?? this.taskCommand(a1, args, p, ctx)
         if (!this.engine.task(rest[0] ?? '')) return (await forwardTask(this.peers, a1, rest, p.opts, p.flags, news)) ?? this.taskCommand(a1, rest, p, ctx)

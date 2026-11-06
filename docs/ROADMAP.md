@@ -123,7 +123,7 @@ Result: `lineclear task show <id>` and `close <id>` find the one task with that 
 - parts: server, core, install
 - locks: task-ids
 - after: none
-- files: server/server/live/task-ids.ts, server/server/live/machines.ts, src/doctor.ts, test/contracts/server.test.ts
+- files: server/server/live/task-ids.ts, server/server/live/machines.ts, src/doctor.ts, src/doctor-task-ids.ts, test/contracts/server.test.ts, server/server/live/machines-links.ts, server/server/live/source.ts, server/server/live/source-views.ts, server/server/live/source-cli.ts, server/server/live/engine/engine-state.ts, server/server/live/engine/engine-helpers.ts, server/server/live/engine/engine-launch.ts, server/shared/types-core.ts, server/test/task-ids-unique.test.ts, test/doctor.test.ts, docs/parts/install.md, server/test/loop-board.ts
 
 ### L316 One store, read over the link
 Result: Each machine keeps one task store; other machines read it over the link and keep no copy, so a task's state cannot differ between machines.

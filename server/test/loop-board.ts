@@ -71,7 +71,14 @@ export async function startBoard() {
     /** a change of the board every 100 ms, and a read of the snapshot every 250 ms, as busy screens do */
     churn() {
       const a = setInterval(() => src.emit('snapshot'), 100)
-      const b = setInterval(() => void fetch(`${base}/api/snapshot`).then((r) => r.arrayBuffer()), 250)
+      const b = setInterval(
+        () =>
+          void fetch(`${base}/api/snapshot`).then(
+            (r) => r.arrayBuffer(),
+            () => undefined,
+          ),
+        250,
+      )
       return () => (clearInterval(a), clearInterval(b))
     },
     stop() {
