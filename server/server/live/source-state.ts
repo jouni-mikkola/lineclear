@@ -1,3 +1,4 @@
+import { chooseModel } from './models.ts'
 import { randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
 import { sortPlaces } from '../../shared/order.ts'
@@ -271,7 +272,9 @@ export class LiveSourceState extends Emitter<SourceEvents> {
       throw new Error(pilot?.error || 'coordinator timer is stopped. Turn it off or retry its settings.')
     const set = this.places.mode(id) === 'autopilot' ? pilot!.config.harness : this.settings.harness('coordinator', this.spaceKey(id))
     const rec = this.agents.record(id)
-    const h = o.as ?? (this.places.mode(id) === 'autopilot' ? set : rec ? undefined : set)
+    // a record made before its CLI listed models (pi's registry) has no model, and that CLI won't start without one
+    const unset = !!rec && rec.kind === set.kind && !!chooseModel(rec.kind, rec.model)
+    const h = o.as ?? (this.places.mode(id) === 'autopilot' ? set : rec && !unset ? undefined : set)
     const spec: Spec = {
       key: id,
       name: c.name,

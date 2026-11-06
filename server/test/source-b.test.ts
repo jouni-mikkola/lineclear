@@ -5,6 +5,7 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { seedModels } from './model-fixture.ts'
+import { setRegistry } from '../server/live/models.ts'
 
 seedModels()
 
@@ -161,6 +162,31 @@ describe("a task's CLI, model and effort, continued", () => {
       src.agents.ensure = ensure
       src.settings.set('coordinator.agent', null)
       src.settings.set('coordinator.effort', null)
+    }
+  })
+  test("a coordinator that ran with no model starts on Settings' model once its CLI lists models (pi)", async () => {
+    const seen: { kind: string; model?: string }[] = []
+    const { ensure, record } = src.agents
+    src.agents.ensure = (async (spec: { kind: string; model?: string }) => (seen.push(spec), null)) as never
+    try {
+      const place = placeId.home()
+      setRegistry([{ harness: 'pi', provider: 'fakeco', name: 'zeta-1' }])
+      src.settings.set('coordinator.agent', 'pi')
+      src.settings.set('coordinator.model', 'fakeco/zeta-1')
+      const run = () => (src as unknown as { coordinator(id: string): Promise<unknown> }).coordinator(place)
+      src.agents.record = (() => ({ kind: 'pi', model: '', effort: '' })) as never
+      await run()
+      expect(seen.at(-1)).toMatchObject({ kind: 'pi', model: 'fakeco/zeta-1' })
+      // one that runs on a model keeps it
+      src.agents.record = (() => ({ kind: 'pi', model: 'fakeco/zeta-1', effort: '' })) as never
+      await run()
+      expect(seen.at(-1)?.model).toBeUndefined()
+    } finally {
+      src.agents.ensure = ensure
+      src.agents.record = record
+      setRegistry([])
+      src.settings.set('coordinator.agent', null)
+      src.settings.set('coordinator.model', null)
     }
   })
   test('each CLI is started with its own flags for model and effort', () => {
