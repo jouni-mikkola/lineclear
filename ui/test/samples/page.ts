@@ -1,7 +1,7 @@
-import type { TaskDetail } from "../../src/task-detail.ts";
-import type { AccountUse, MonthSpend, Detection, InboxItem, Project, Task, TaskState } from "../kit/index.ts";
+import type { TaskDetail } from "../../../src/task-detail.ts";
+import type { AccountUse, MonthSpend, Detection, InboxItem, Project, Task, TaskState } from "../../kit/index.ts";
 import { realInbox, realProjects, realUsage } from "./real-samples.ts";
-import type { PageState } from "../web/states.ts";
+import type { PageState } from "../../web/states.ts";
 
 // Sample data for each state of a page (`?state=`): the design page and the views draw it, so their pictures stay
 // the same on every machine.

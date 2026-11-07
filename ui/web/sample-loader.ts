@@ -1,11 +1,11 @@
 // Sample data lives in ui/test/ and loads only on a `?state=` page, so a real run carries none of it.
 const loaded = new URLSearchParams(location.search).has("state")
   ? await Promise.all([
-      import("../test/samples.ts"),
-      import("../test/browser-samples.ts"),
-      import("../test/roadmap-samples.ts"),
-      import("../test/chat-samples.ts"),
-      import("../test/settings-samples.ts"),
+      import("../test/samples/page.ts"),
+      import("../test/samples/browser-samples.ts"),
+      import("../test/samples/roadmap-samples.ts"),
+      import("../test/samples/chat-samples.ts"),
+      import("../test/samples/settings-samples.ts"),
     ]).then(([page, browser, roadmap, chat, settings]) => ({ page, browser, roadmap, chat, settings }))
   : undefined;
 

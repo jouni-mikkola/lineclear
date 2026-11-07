@@ -1,7 +1,7 @@
-import type { ProjectSettings } from "../kit/index.ts";
-import type { SettingsData } from "../web/settings-empty.ts";
-import type { PageState } from "../web/states.ts";
-import type { SetupView } from "../../src/setup.ts";
+import type { ProjectSettings } from "../../kit/index.ts";
+import type { SettingsData } from "../../web/settings-empty.ts";
+import type { PageState } from "../../web/states.ts";
+import type { SetupView } from "../../../src/setup.ts";
 
 // Sample Settings for each state of the page (`?state=`), so its pictures stay the same on every machine.
 

@@ -1,4 +1,4 @@
-import type { AccountUse, InboxItem, Project, Task, TaskState } from "../kit/index.ts";
+import type { AccountUse, InboxItem, Project, Task, TaskState } from "../../kit/index.ts";
 
 // The `?state=real` board: the shape of a sanitized copy of a real board, made the same on every run. Four spaces and
 // about 300 tasks, most of them merged, a few at work or waiting, titles from two words to two lines, full accounts

@@ -1,9 +1,8 @@
-import type { RoadmapData, RoadmapStep } from "../../src/roadmap-view.ts";
-import { whereTo } from "../../src/progress.ts";
-import { roadmapLine } from "../../src/roadmap-line.ts";
-import type { StepRecord } from "../../src/step-page.ts";
-import type { PageState } from "../web/states.ts";
-
+import type { RoadmapData, RoadmapStep } from "../../../src/roadmap-view.ts";
+import { whereTo } from "../../../src/progress.ts";
+import { roadmapLine } from "../../../src/roadmap-line.ts";
+import type { StepRecord } from "../../../src/step-page.ts";
+import type { PageState } from "../../web/states.ts";
 // Sample roadmaps for each state of the Roadmap view (`?state=`), the same on every machine.
 
 const AT = Date.UTC(2026, 0, 12, 9, 0);

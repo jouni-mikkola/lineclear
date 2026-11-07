@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { BrowserCard, type Browser, splitSessions } from "../ui/kit/browsers.tsx";
-import { browserSamples } from "../ui/test/browser-samples.ts";
+import { browserSamples } from "../ui/test/samples/browser-samples.ts";
 
 // What Browsers show, on sample data (U14).
 

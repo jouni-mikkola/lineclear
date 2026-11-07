@@ -1,5 +1,5 @@
-import type { Browser } from "../kit/index.ts";
-import type { PageState } from "../web/states.ts";
+import type { Browser } from "../../kit/index.ts";
+import type { PageState } from "../../web/states.ts";
 
 // Sample browsers for each state of the Agent browsers view (`?state=`), with still pictures drawn here, so their
 // screenshots are the same on every machine.
