@@ -118,7 +118,10 @@ export function review(i: ReviewInput, env: NodeJS.ProcessEnv = process.env): Re
   recordWork(i.task, "review", env);
   const path = reviewPath(i.task, env);
   mkdirSync(dirname(path), { recursive: true });
-  writeAtomic(path, `${JSON.stringify({ task: i.task, model, time: new Date().toISOString(), inputTokens: Math.ceil(question.length / 4), findings }, null, 2)}\n`);
+  writeAtomic(
+    path,
+    `${JSON.stringify({ task: i.task, model, time: new Date().toISOString(), inputTokens: Math.ceil(question.length / 4), findings }, null, 2)}\n`,
+  );
   return { ok: true, findings, model, note };
 }
 
