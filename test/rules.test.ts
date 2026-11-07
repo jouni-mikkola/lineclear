@@ -4,7 +4,7 @@ import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from "node:
 import { cpus } from "node:os";
 import { join } from "node:path";
 import { readItems } from "../src/inbox.ts";
-import { storeFile } from "../src/decisions-store.ts";
+import { decisionsSince } from "../src/decisions-store.ts";
 import { readState, realWorld, runMain, tick, TICK_MS } from "../src/rules.ts";
 import { pickReviewer } from "../src/stalls.ts";
 import { company } from "../src/company.ts";
@@ -356,7 +356,7 @@ test("--once --dry-run prints the decisions and changes nothing", async () => {
   const d = t.doTick(true);
   expect(d.some((x) => x.step === "A" && x.kind === "start")).toBe(true);
   expect(t.adds()).toHaveLength(0);
-  expect(existsSync(storeFile(t.env))).toBe(false);
+  expect(decisionsSince(t.env, 0)).toEqual([]);
   expect(existsSync(join(t.dir, "config", "projects", "demo", "state.json"))).toBe(false);
   expect(await runMain(["--dry-run"], () => {}, realWorld(t.env))).toBe(2);
 });

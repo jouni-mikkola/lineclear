@@ -87,7 +87,7 @@ export function addDecisionOnce(env: Env, d: StoredDecision, once: string): bool
 
 /** The decisions after `sinceMs`, oldest first. */
 export function decisionsSince<T extends StoredDecision = StoredDecision>(env: Env, sinceMs: number): T[] {
-  if (!existsSync(storeFile(env))) return [];
+  if (!existsSync(storeFile(env)) && !existsSync(join(decisionsDir(env), "decisions.jsonl"))) return [];
   const rows = open(env).query("select body from decisions where ms > ? order by ms, id").all(sinceMs) as { body: string }[];
   return rows.map((r) => JSON.parse(r.body) as T);
 }
