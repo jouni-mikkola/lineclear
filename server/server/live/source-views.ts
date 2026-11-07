@@ -13,6 +13,7 @@ import { BOX } from './box.ts'
 import { HOST, NAME, placeId } from './places.ts'
 import { restartHint, type Harness } from './restart.ts'
 import { room } from './herdr-forward.ts'
+import { has } from '../plugins.ts'
 import { repositorySection } from './settings.ts'
 import { secretPages } from './secrets.ts'
 import { pluginSection } from '../plugins.ts'
@@ -37,7 +38,9 @@ export class LiveSourceViews extends LiveSourceState {
 
   /** the load of each machine tasks run on besides this one, read at most once a minute; held tasks look again when it is in */
   protected readBoxes(now: number) {
-    const limit = this.settings.machine().startLoad
+    // only while a task waits for room: each look opens a tab on that machine
+    if (!has('health') || !this.engine.heldTasks().length) return
+    const { startLoad, startMemory } = this.settings.machine()
     for (const label of this.engine.machines.keys()) {
       const had = this.boxes.get(label)
       if (had?.reading || (had && now - had.at < 60_000)) continue
@@ -45,7 +48,9 @@ export class LiveSourceViews extends LiveSourceState {
       this.boxes.set(label, box)
       void room(label)
         .then((r) => {
-          box.read = { herdr: !!r, busy: r && limit !== null && r.load > limit * r.cores ? ('cpu' as const) : undefined }
+          const used = r?.totalKb ? ((r.totalKb - r.freeKb) / r.totalKb) * 100 : 0
+          const busy = r && startLoad !== null && r.load > startLoad * r.cores ? 'cpu' : r && startMemory !== null && used > startMemory ? 'memory' : undefined
+          box.read = { herdr: !!r, busy }
         })
         .catch(() => undefined)
         .finally(() => {

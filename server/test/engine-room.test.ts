@@ -194,4 +194,18 @@ describe('room on the machine', () => {
     expect(w.engine.room('elite')).toEqual({ why: 'machine' })
     expect(w.engine.room()).toEqual({})
   })
+
+  test('a held task starts on a machine that gets room, though home stays full', async () => {
+    const w = fresh({ 'machine.maxTasks': '1' })
+    const a = await started(w, repo(), 'room-held', 'First', 'Add a.txt.')
+    w.brief(a.key)
+    w.engine.addMachine({ label: 'elite', target: 'elite', session: 's', herdr: 'herdr', home: '/home/e', path: '/bin', os: 'Linux' })
+    a.p.machines = { elite: '~/repo' }
+    const b = w.engine.add({ project: a.p.name, title: 'Held', desc: 'Add b.txt.', by: 'test' })
+    expect(b.held?.why).toBe('slots')
+    w.engine.machine = (m) => (m ? { herdr: true } : undefined)
+    w.engine.release()
+    expect(b.held).toBeUndefined()
+    expect(b.machine).toBe('elite')
+  })
 })

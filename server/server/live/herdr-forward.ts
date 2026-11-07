@@ -102,14 +102,16 @@ export function forwardArgs(method: string, p: Record<string, unknown>): string[
   }
 }
 
-/** what a machine has room for: its 1-minute load, its cores and its free memory in kB */
+/** what a machine has room for: its 1-minute load, its cores, and its free and total memory in kB */
 export interface Room {
   load: number
   cores: number
   freeKb: number
+  totalKb: number
 }
 
-const ROOM_LINE = 'printf \'ROOM %s %s %s\\n\' "$(cut -d\' \' -f1 /proc/loadavg)" "$(nproc)" "$(awk \'/MemAvailable/{print $2}\' /proc/meminfo)"'
+const ROOM_LINE =
+  'printf \'ROOM %s %s %s %s\\n\' "$(cut -d\' \' -f1 /proc/loadavg)" "$(nproc)" "$(awk \'/MemAvailable/{print $2}\' /proc/meminfo)" "$(awk \'/MemTotal/{print $2}\' /proc/meminfo)"'
 
 /** a machine's room, read over the same connection as every other call: a tab runs one line there, is read, and is closed */
 export async function room(machine?: string): Promise<Room | undefined> {
@@ -123,8 +125,8 @@ export async function room(machine?: string): Promise<Room | undefined> {
       await call('pane.send_keys', { pane_id: pane, keys: ['Enter'] })
       for (let i = 0; i < 25; i++) {
         const text = await call<{ read?: { text: string } }>('pane.read', { pane_id: pane, source: 'recent', format: 'text', lines: 20 })
-        const hit = /^ROOM ([\d.]+) (\d+) (\d+)$/m.exec(text.read?.text ?? '')
-        if (hit) return { load: Number(hit[1]), cores: Number(hit[2]), freeKb: Number(hit[3]) }
+        const hit = /^ROOM ([\d.]+) (\d+) (\d+) (\d+)$/m.exec(text.read?.text ?? '')
+        if (hit) return { load: Number(hit[1]), cores: Number(hit[2]), freeKb: Number(hit[3]), totalKb: Number(hit[4]) }
         await Bun.sleep(200)
       }
       return undefined
