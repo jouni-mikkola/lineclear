@@ -158,10 +158,10 @@ function routeCoordinator(project: string, space: { name: string; key: string },
   const tasks = spaceTasks(dir, space);
   const ids = tasks.map((t) => String(t.id));
   // a task that declared an owner wait (`lineclear ask`, `wait owner`) asked for the owner, whatever the card's words
-  const ownerWaits = new Set(
+  const ownerWaits = new Map(
     readWaits(env)
       .filter(waitsForOwner)
-      .map((w) => w.task),
+      .map((w) => [w.task, w] as const),
   );
   for (const card of coordinatorCards(liveChats(dir, space, true), ids)) {
     const task = tasks.find((t) => t.id === card.task);
@@ -181,11 +181,13 @@ function routeCoordinator(project: string, space: { name: string; key: string },
       if (!err) r.done.add(told);
       err ??= close(space.name, card.id, action.text);
     } else {
-      const route = askRoute[askKind(card)];
+      const owned = ownerWaits.get(card.task);
+      const route = askRoute[askKind(card)] ?? (owned?.ownerKind === "login" || owned?.kind === "login" ? "login" : undefined);
       const choices = card.ask?.choices ?? [];
       addItem(
         {
           kind: route ?? (ownerMatter(title(card)) || ownerWaits.has(card.task) ? "outward" : "step"),
+          ...(route === "login" ? { session: card.task } : {}),
           task: card.task,
           project,
           question: title(card),

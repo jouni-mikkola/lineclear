@@ -298,7 +298,7 @@ function preApproved(
   return true;
 }
 
-/** `lineclear ask`: puts a question in its project's chat (the Inbox when it has none) and declares an owner wait. The phone hears of the new item from the web server (`src/notify.ts`). */
+/** `lineclear ask`: puts a question in its project's chat (the Inbox when it has none) and declares an owner wait. The card has a task named in it, which is how the rule loop finds it: an owner matter becomes an Inbox item there and the phone hears of it from the web server (`src/notify.ts`). */
 export function askMain(
   args: string[],
   out: (l: string) => void,

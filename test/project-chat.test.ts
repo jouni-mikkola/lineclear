@@ -28,7 +28,12 @@ test("ask and wait owner post a card in the project's chat, and a question the r
   expect(await waitsMain("wait", ["owner", "--kind", "login", "A captcha waits"], () => {}, env, t.repo, at, post)).toBe(0);
   expect(readItems(t.env)).toEqual([]);
 
-  // LIN-8 asks a question its roadmap answers: it declared no owner wait
+  // a question the roadmap answers is refused by `lineclear ask`: no card, no item, no wait
+  const lines: string[] = [];
+  expect(askMain(["Which reviewer?", "--choice", "a", "--choice", "b"], (l) => lines.push(l), { ...t.env, LINECLEAR_TASK: "LIN-8" }, t.repo, at, post)).toBe(1);
+  expect(lines.join("\n")).toContain("first model of another company");
+  expect(posted).toHaveLength(2);
+  // the same question from a task that declared no owner wait, asked in the chat by hand
   post("p_host_demo", "LIN-8: Which reviewer should I use?", ["a", "b"]);
   const told: string[] = [];
   const tell = (task: string, text: string) => (told.push(`${task}: ${text}`), undefined);
