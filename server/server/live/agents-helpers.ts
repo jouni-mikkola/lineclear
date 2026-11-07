@@ -7,6 +7,8 @@ import { boxDir } from './mfs.ts'
 export interface AgentRecord {
   /** identity for startup instructions; every replacement invalidates the old ones */
   launch?: string
+  /** the files it was started with: another set now means a restored older command runs, to be started again */
+  files?: string
   /** chat key, then herdr's agent name and kind, and the herdr workspace label it lives in */
   key: string
   name: string

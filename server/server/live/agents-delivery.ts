@@ -101,6 +101,7 @@ export class AgentsDelivery extends AgentsLink {
     const unset = chooseModel(r.kind, r.model)
     if (unset) throw new Error(unset)
     const args = await this.args(r)
+    r.files = JSON.stringify(this.filesOf(r))
     if (input.rpc && r.kind === 'pi' && !BOX) return this.launchRpc(r, args, chosen, first)
     const pane = place ? await place() : await paneFor(r, was)
     this.startedIn.set(r.key, pane)

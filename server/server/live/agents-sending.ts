@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { herdr, type AgentInfo, type HerdrEvent } from './herdr.ts'
 import { holdBack, machineNews } from './quiet.ts'
-import { paneWrong, type Wrong } from './revive.ts'
+import type { Wrong } from './revive.ts'
 import { sleep, type OutItem, type Hold, type SendOpts, type Sent } from './agents-helpers.ts'
 import { isNews } from './agents-sent.ts'
 import { putInto } from './agent-input.ts'
@@ -18,7 +18,7 @@ export class AgentsSending extends AgentsDelivery {
   /** agents whose pane is to be compared: new, or its CLI exited */
   private due = new Set<string>()
   /** what the last compare found wrong with each agent's pane */
-  private verdict = new Map<string, Wrong | undefined>()
+  private exited = new Set<string>()
 
   protected override take(list: AgentInfo[]) {
     super.take(list)
@@ -26,7 +26,7 @@ export class AgentsSending extends AgentsDelivery {
       const pane = this.info(key)?.pane_id
       if (!pane || isRpcPane(pane)) {
         this.compared.delete(key)
-        this.verdict.delete(key)
+        this.exited.delete(key)
         this.due.delete(key)
       } else if (this.compared.get(key) !== pane) {
         this.compared.set(key, pane)
@@ -55,7 +55,7 @@ export class AgentsSending extends AgentsDelivery {
     return this.due.size > 0
   }
 
-  /** what is wrong with an agent's run: gone from herdr, or (see paneWrong) exited or on outdated files; null when herdr
+  /** what is wrong with an agent's run: gone from herdr, or its CLI exited, or it was launched with other files; null when herdr
    *  can't say. Asks herdr only for a pane not compared yet. Outdated files are left alone while it works or asks (a
    *  turn is never cut for this) */
   async wrong(key: string): Promise<Wrong | undefined | null> {
@@ -67,10 +67,12 @@ export class AgentsSending extends AgentsDelivery {
       const p = await herdr.processInfo(a.pane_id).catch(() => null)
       if (!p) return null
       this.due.delete(key)
-      this.verdict.set(key, paneWrong(r.kind, p, this.filesOf(r)))
+      if (p.shell_pid && p.foreground_process_group_id === p.shell_pid) this.exited.add(key)
+      else this.exited.delete(key)
     }
-    const w = this.verdict.get(key)
-    return w === 'stale' && (a.agent_status === 'working' || a.agent_status === 'blocked') ? undefined : w
+    if (this.exited.has(key)) return 'exited'
+    const stale = r.files !== undefined && r.files !== JSON.stringify(this.filesOf(r))
+    return stale && a.agent_status !== 'working' && a.agent_status !== 'blocked' ? 'stale' : undefined
   }
 
   wasWorking(key: string) {
