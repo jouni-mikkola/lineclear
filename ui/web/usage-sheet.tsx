@@ -5,7 +5,13 @@ import type { HomeData } from "./data.ts";
 // Usage in its own file so the first script does not carry the charts: the page at /usage and the sheet behind Home's usage mark.
 
 function noUse(d?: HomeData) {
-  return !!d && (d.usage ?? []).every((u) => u.unreported) && (d.spend ?? []).every((s) => s.dollars === 0) && (d.month?.paid ?? []).every((m) => m.amount === 0) && !d.month?.apiEquivalent;
+  return (
+    !!d &&
+    (d.usage ?? []).every((u) => u.unreported) &&
+    (d.spend ?? []).every((s) => s.dollars === 0) &&
+    (d.month?.paid ?? []).every((m) => m.amount === 0) &&
+    !d.month?.apiEquivalent
+  );
 }
 
 function Charts({ d }: { d?: HomeData }) {
