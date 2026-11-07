@@ -103,7 +103,7 @@ const TEST_SHARDS = 4;
 // a GitHub runner has 4 cores: each job runs its share of the test files in this many processes
 const SHARD_PROCESSES = 2;
 // install.sh builds the web pages with vite for real: a run on GitHub, never in a worker's loop
-const BUILDING_TESTS = ["test/install.test.ts"];
+const BUILDING_TESTS = ["test/install.test.ts", "test/install-rollback.test.ts", "test/install-uninstall.test.ts"];
 
 // the tests the change reaches: a failure in any other file is not the change's
 // none when the change reaches every test or the whole run is asked for: then no failure is outside it
