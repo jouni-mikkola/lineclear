@@ -85,15 +85,12 @@ test("a step whose task appeared since the tick read its list is not started aga
   expect(t.decisions().some((x) => x.step === "A" && x.reason.includes("does not start twice"))).toBe(true);
 });
 
-test("a step asked for in an earlier tick, or closed as done, is not started again", () => {
-  const pending = setup({ steps: [step("A", "none")] });
-  writeFileSync(join(pending.config, "projects", "demo", "state.json"), JSON.stringify({ pendingStarts: { "A Title A": "A" } }));
-  pending.doTick();
-  expect(pending.adds()).toEqual([]);
-  const closed = setup({ steps: [step("A", "none")] });
-  writeFileSync(join(closed.config, "projects", "demo", "state.json"), JSON.stringify({ closedSteps: { A: "LIN-1" } }));
-  closed.doTick();
-  expect(closed.adds()).toEqual([]);
+test("the same step added twice gives one start and one refusal, before its task shows in the list", () => {
+  const t = setup({ steps: [step("A", "none")] });
+  t.doTick();
+  t.doTick();
+  expect(t.adds().length).toBe(1);
+  expect(t.decisions().some((x) => x.step === "A" && x.reason.includes("does not start twice"))).toBe(true);
 });
 
 test("a step merged on origin/main since the tick read it is not started", () => {
