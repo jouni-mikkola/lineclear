@@ -70,10 +70,10 @@ export function readMachineTasks(env: Env, host: string): { tasks: Listed[] } | 
  * an empty list would free the steps and locks of tasks that are still there.
  */
 export function machineTasks(env: Env, space: string, host?: string): Task[] | string {
-  const all = readList(["--space", space], env);
+  const all = readList([], env);
   if (!("tasks" in all)) return `task list failed: ${all.why}`;
   return all.tasks
-    .filter((t) => t.machine !== undefined && (host === undefined || t.machine === host))
+    .filter((t) => t.machine !== undefined && (host === undefined || t.machine === host) && (t.space === undefined || t.space === space))
     .map((t) => ({ ...t, ...(t.id ? { id: `${t.id}@${t.machine}` } : {}), sub: t.sub ? `${t.sub} · on ${t.machine}` : `on ${t.machine}` }));
 }
 
