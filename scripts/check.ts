@@ -40,6 +40,7 @@ import {
 import { fastGates } from "./fast-gates.ts";
 import { describeFailure, type Failure, outsideChange, parseFailures } from "./failures.ts";
 import { changedSince } from "./gates/tools.ts";
+import { addQuarantine, judge, passesAlone, QUARANTINE_FILE, readQuarantine, testKey } from "./quarantine.ts";
 
 // Every step but the server's (below) runs with TMPDIR in a folder of this run, on disk. Each test process clears its own
 // folder inside it (tmp-scope.ts), so anything left in it when the steps end was left by a process that did not get
@@ -227,6 +228,21 @@ const started = performance.now();
 const times: StepTime[] = [];
 const outcome = new Map<string, Promise<boolean>>();
 
+/** A failed test step's failures, each run alone: a flake listed in test/quarantine.json does not fail the step. */
+function rerunAlone(step: Step, failing: Failure[]) {
+  const prefix = step.cwd ? `${step.cwd}/` : "";
+  const alone = new Map(failing.map((f) => [testKey(prefix, f), passesAlone(f, step.cwd, step.cwd === "server" ? serverEnv : env)]));
+  const verdict = judge([...alone.keys()], alone, readQuarantine());
+  if (verdict.ok) addQuarantine(verdict.added);
+  const lines = [
+    ...verdict.ignored.map((k) => `check: quarantined, failed once and passed alone: ${k}`),
+    ...verdict.added.map((k) => `check: flaky, passed alone, added to ${QUARANTINE_FILE}, file its fix task: ${k}`),
+    ...verdict.faults.map((k) => `check: ${k}`),
+  ];
+  if (lines.length > 0) console.error(lines.join("\n"));
+  return verdict;
+}
+
 /** Runs one step after the steps it needs. Resolves to whether it passed; a step skipped for a failed need counts as failed. */
 async function runStep(step: Step): Promise<boolean> {
   // every step is in the map before any looks for its needs, whatever their order in the plan
@@ -235,7 +251,8 @@ async function runStep(step: Step): Promise<boolean> {
   const at = performance.now();
   const { code, failing, output } = await run(step);
   const isTests = step.name.startsWith("tests");
-  const ok = code === 0;
+  const rerun = code !== 0 && failing.length > 0 && (isTests || step.name === "server tests") ? rerunAlone(step, failing) : undefined;
+  const ok = code === 0 || rerun?.ok === true;
   times.push({ step: step.name, seconds: (performance.now() - at) / 1000, ok });
   if (!ok) {
     console.error(
