@@ -24,7 +24,7 @@ Kept because other code uses it: `pi/atomic.ts` (state writes), `pi/config.ts`, 
 
 Installed packages: `pi-claude-bridge`, `pi-web-access`. Local in `~/.pi/agent/extensions` (4,500 lines): `tool-policy` (777), `state-file` (643), `secret-guard` (~820), `tool-output-cap` (~680), `quota-switch` (352), `usage-ledger` (259), `herdr-agent-state` (261), `read-batch` (245), `web-tools`, `api-guard`, `claude-bridge-b`, `lineclear`.
 - Used, all loaded by pi on every run. Unused: none found by name; `state-file` (643 lines) duplicates `compaction-notes` above and is the likelier keeper.
-- Not installed: `pi-subagents`, `pi-lens`, `pi-usage` (listed in `kit.json` as "no trial yet"). `pi-usage` would replace `quota-switch`, `usage-ledger` and `src/quota.ts` (~800 lines). Nothing else well known is missing. Do not add any: the rule is delete-only.
+- Not installed: `pi-subagents` and `pi-lens` (measured and skipped, `docs/pi-packages.md`), `pi-usage` (no trial yet). `pi-usage` would replace `quota-switch`, `usage-ledger` and `src/quota.ts` (~800 lines). Nothing else well known is missing. Do not add any: the rule is delete-only.
 - Machine-wide extensions are 4,500 lines to guard a board. `tool-policy` alone is larger than the three tool caps it enforces together.
 
 ## 3. Do agents use find-docs and playwright-cli?
