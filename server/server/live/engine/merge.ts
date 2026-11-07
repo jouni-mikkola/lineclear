@@ -4,7 +4,7 @@ import type { Space } from '../places.ts'
 import * as G from './git.ts'
 import * as GH from './github.ts'
 import * as Lane from './lane.ts'
-import { type TaskRec, ended, ANSWER_GRACE, LAND_RETRY } from './engine-helpers.ts'
+import { type TaskRec, ended, LAND_RETRY } from './engine-helpers.ts'
 import { EngineHandoff } from './engine-handoff.ts'
 
 /** how long a ready task's agent may finish its turn before the board merges without ending it */
