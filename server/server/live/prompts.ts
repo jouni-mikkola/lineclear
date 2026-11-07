@@ -4,7 +4,6 @@ import { SET_BY, SETTINGS_HEAD, type SetBy } from '../../shared/brief.ts'
 import { ROOT } from '../root.ts'
 import { BOX, helperDir } from './box.ts'
 
-/** where an agent finds Lineclear's files: this checkout, or the helper's copy on another machine */
 const OWN = BOX ? helperDir(BOX.home) : ROOT
 
 const SKILLS = join(OWN, 'skill')
@@ -13,13 +12,11 @@ const skill = (name: string) => join(SKILLS, name, 'SKILL.md')
 const commandLine = (chat: string) =>
   `Your authoritative command is LINECLEAR_CHAT=${JSON.stringify(chat)} ${join(OWN, 'bin', 'lineclear')}. Use it if a shell finds another lineclear. Never start a server to repair routing. For a dev/demo server use the repo command with --url <URL>.`
 
-/** what a refusing command adds so the agent reads one section of a skill, not the whole of it */
 export const readSection = (name: string, section: string) => `Read the section "${section}" of ${skill(name)}.`
 
 const base = (who: string, own: string) =>
   `You are ${who}, running inside Lineclear (the board the human uses). Read ${skill('lineclear')} first, then ${skill(own)}. The human reads your replies in a calm chat: keep them short and plain.`
 
-/** a task agent starts with a short card of rules, not two whole skills: a command that refuses names the section to read */
 const taskBase = (id: string) =>
   `You are the agent of task ${id}, running inside Lineclear (the board the human uses). Read ${join(SKILLS, 'lineclear-agent', 'START.md')} first: it is your whole start. Open a skill (${skill('lineclear')}, ${skill('lineclear-agent')}) only at the section a command names. The human reads your replies in a calm chat: keep them short and plain.`
 
@@ -102,14 +99,12 @@ export function splitBrief(desc: string): [work: string, how: string] {
   return i < 0 ? [desc, ''] : [desc.slice(0, i).trimEnd(), desc.slice(i)]
 }
 
-/** The Settings block that ends a brief; the coordinator's words win where they differ. */
 export function settingsBlock(id: string, t: Told) {
   return `${SETTINGS_HEAD}\n${settingsLines(id, t)
     .map((l) => `- ${l.text}`)
     .join('\n')}`
 }
 
-/** a space's coordinator; a home space's also looks after its machine, the main one's also every machine */
 export function coordinatorPrompt(place: { role: 'space' | 'home' | 'main'; name: string; path?: string; machine: string; chat?: string }) {
   const who = `the coordinator of the space ${place.name} on ${place.machine} (${place.path})`
   const duties =
@@ -136,7 +131,6 @@ export function taskFirst(t: { title: string; desc: string }) {
   return t.desc && t.desc !== t.title ? `${t.title}\n\n${t.desc}` : t.title
 }
 
-/** what an agent restarted on another CLI is told: who ran it, and what was said and done */
 export function restartLine(o: { from: string; to: string; chat: string; commits?: string; changes?: string }) {
   const task = o.commits !== undefined
   return [
@@ -155,7 +149,6 @@ export function resumedLine(on: string) {
   return `The human restarted you on ${on}, session as it was. Carry on; if idle, reply with only <no-reply>restarted</no-reply>.`
 }
 
-/** what a queued task is told: with its brief (start), queued while running (later), or its wait changed */
 export function queuedLine(ids: string[], when: 'start' | 'later' | 'changed', id = '<id>') {
   const them = ids.length === 1 ? 'it is' : 'they are'
   const rest = `Lineclear tells you "Go: … start now." once ${them} done. A go from the human or coordinator: run lineclear task queue ${id} --after none and start.`
@@ -170,14 +163,12 @@ export function goLine(ids: string[], notes: string[], cleared = false) {
   return [`Go: ${ids.join(', ')} ${ids.length === 1 ? 'is' : 'are'} done, start now.`, ...notes].join('\n')
 }
 
-/** GitHub news on a done task's pull request: what happened, never what to do */
 export function prNewsLine(id: string, pr: { number: number; url: string }, news: string[]) {
   return [`GitHub news on PR #${pr.number} (${pr.url}), since you reported ${id} ready:`, ...news, 'The lineclear-agent skill says how to handle it.'].join(
     '\n',
   )
 }
 
-/** Personal settings are supplemental to repository rules and the human's requests. */
 export function privatePrompt(own: string, reviewer?: string): string {
   return [
     'Private instruction snapshot for this start; it replaces earlier ones, even when empty. Follow the repository AGENTS.md, CLAUDE.md and REVIEW.md too. Never write these rules into repository instruction files, git, briefs, reports or GitHub. Human instructions and the brief win over private rules; if private and team rules conflict, explain and ask. Not a secret store.',
