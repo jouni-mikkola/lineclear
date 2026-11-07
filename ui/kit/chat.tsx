@@ -5,6 +5,7 @@ import { paint, Shapes } from "./rail.tsx";
 import { DispatcherIcon, WorkerIcon } from "./roles.tsx";
 import { type ChatFile, FileChip, Thumb } from "./chat-files.tsx";
 import { FOCUS } from "./composer.tsx";
+import { DRAWN, foldRepeats, newest } from "./chat-fold.ts";
 import * as rail from "../brand/rail.ts";
 
 // The chat with the Dispatcher: who you talk to, the thread, the typing dots, the files, and the composer.
@@ -20,6 +21,8 @@ export interface ThreadItem {
   key: string;
   who: "you" | "dispatcher";
   text?: string;
+  /** How many equal notices in a row this row stands for. */
+  count?: number;
   file?: ChatFile;
   status?: "sending" | "waiting" | "failed";
   error?: string;
@@ -109,6 +112,11 @@ const Row = memo(function Row({ item, first, agent, onImage }: { item: ThreadIte
         <div className="min-w-0 text-sm">
           {item.above}
           {item.card ?? media ?? <Markdown text={item.text ?? ""} onImage={onImage} />}
+          {item.count && item.count > 1 && (
+            <span className="mt-1 inline-block text-xs tabular-nums text-fg3" data-count>
+              x{item.count}
+            </span>
+          )}
           {item.question && <Choices question={item.question} onChoose={item.onChoose} />}
           {item.below}
         </div>
@@ -229,7 +237,9 @@ export function Handoff({ project, href, children }: { project: string; href?: s
  * The thread, oldest first. A message that arrives after the first draw slides in (`chat-arrive`); what was there
  * at first is drawn at once. With `agent` the other side is a task's agent, not the Dispatcher.
  */
-export function ChatThread({ items, onImage, agent, children }: { items: ThreadItem[]; onImage: OnImage; agent?: boolean; children?: ReactNode }) {
+export function ChatThread({ items: all, onImage, agent, children }: { items: ThreadItem[]; onImage: OnImage; agent?: boolean; children?: ReactNode }) {
+  const [more, setMore] = useState(0);
+  const { items, hidden } = newest(foldRepeats(all), more);
   const list = useRef<HTMLOListElement>(null);
   const seen = useRef<Set<string> | null>(null);
   useLayoutEffect(() => {
@@ -249,6 +259,13 @@ export function ChatThread({ items, onImage, agent, children }: { items: ThreadI
     <>
       <h2 className="sr-only">Messages</h2>
       <ol ref={list} className="flex flex-col" data-thread aria-label="Messages">
+        {hidden > 0 && (
+          <li data-earlier>
+            <button type="button" onClick={() => setMore((n) => n + DRAWN)} className={`mb-4 min-h-11 rounded-sm px-3 text-sm text-fg2 hover:text-fg ${FOCUS}`}>
+              Show {Math.min(hidden, DRAWN)} earlier
+            </button>
+          </li>
+        )}
         {items.map((it, i) => {
           const first = items[i - 1]?.who !== it.who;
           return (
