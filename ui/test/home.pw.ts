@@ -116,13 +116,14 @@ test("the table keeps a 200-character Last and 200 rows inside its edge, shows n
     ...(i === 0 ? {} : { step: `S${i}` }),
     last: { text: "x".repeat(200), at: now - 60_000 },
     // the first row knows nothing of its model and time: the cells stay empty
-    ...(i === 0 ? {} : { since: now - 5 * 60_000, model: "vendor-b/a-model-with-a-long-name" }),
+    ...(i === 0 ? {} : { since: now - 60_000, started: now - 5 * 60_000, model: "vendor-b/a-model-with-a-long-name" }),
   });
   const body = {
     projects: [{ name: "shop", done: 0, total: 200, unit: "steps", broken: false, tasks: Array.from({ length: 200 }, (_, i) => task(i)) }],
     host: "this machine",
   };
   await page.route("**/api/home", (r) => r.fulfill({ json: body }));
+  await page.route("**/api/task/*", (r) => r.fulfill({ json: { log: ["a card"], diff: "", review: [] } }));
   await page.goto("/");
   await page.waitForSelector("[data-row-id]:visible");
   await expect(page.locator('[data-table="Working tasks"]')).toHaveAttribute("data-rows", "200");
@@ -163,5 +164,11 @@ test("the table keeps a 200-character Last and 200 rows inside its edge, shows n
       .first()
       .evaluate((el) => el.scrollWidth > el.clientWidth);
     expect(cut).toBe(true);
+    // the cut cell holds the whole text in its title
+    await expect(row.nth(1).locator("td").nth(4).locator("span").first()).toHaveAttribute("title", new RegExp(`^${"x".repeat(200)}`));
   }
+  // the open row reads it in full
+  await row.nth(1).click();
+  await expect(page.locator("[data-in-full]:visible")).toContainText("x".repeat(200));
+  await expect(page.locator("[data-in-full]:visible")).toContainText("vendor-b/a-model-with-a-long-name");
 });

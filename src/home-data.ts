@@ -67,6 +67,8 @@ export interface HomeTask {
   model?: string;
   /** Since when the task is at its stage (ms). */
   since: number;
+  /** When the task was created (ms): the start of its run time. */
+  started?: number;
   /** Tokens sent to the model so far: fresh and cache reads. */
   input?: number;
   /** The other machine the task runs on, when it is not this one. */
@@ -270,6 +272,7 @@ function localRow(x: { t: TaskRecord; state: TaskState }, roadmap: Roadmap, line
     ...(result ? { result } : {}),
     ...(typeof model === "string" && stage !== "queued" ? { model } : {}),
     since: stageSince(t, stage, now),
+    ...(typeof t.created === "number" ? { started: t.created } : {}),
     ...(stage === "work" || stage === "review" ? liveStatus(t, env, now) : {}),
     ...(state !== "done" ? rowFacts(t, cards.get(t.id), stage !== "queued", now) : {}),
     ...(stage === "work" && typeof t.report?.progress === "number" ? { progress: Math.max(0, Math.min(1, t.report.progress / 100)) } : {}),
