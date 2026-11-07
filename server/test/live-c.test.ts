@@ -29,9 +29,9 @@ describe("the brief's default way of working", () => {
   })
   const ways = { review: true, mustFix: 'major', rounds: 3, merge: 'on its own', waitChecks: false }
   test("the human's defaults only, one line each: review, the reviewer, the bar, the rounds and merge on its own", () => {
-    expect(settingsBlock('X-1', { ways, reviewer: { kind: 'codex' } })).toBe(`Settings: (from lineclear show; where the brief above says otherwise, it wins)
+    expect(settingsBlock('X-1', { ways, reviewer: { kind: 'pi' } })).toBe(`Settings: (from lineclear show; where the brief above says otherwise, it wins)
 - Review: on. Have your change reviewed by fresh eyes before it merges.
-- Reviewer: a headless Codex or a Codex subagent (its default model and effort).
+- Reviewer: a headless pi or a pi subagent (its default model and effort).
 - Must fix: major. Findings are tagged critical/major/minor/trivial; fix critical and major, then review again.
 - Review rounds: 3. Stop when a round finds none to fix, at most 3 rounds.
 - Merge: on its own. Merge it yourself once it works (lineclear merge X-1). Don't wait for GitHub's checks.
@@ -50,9 +50,9 @@ describe("the brief's default way of working", () => {
       "- Merge: after GitHub checks. Merge it yourself once it works and GitHub's checks pass (lineclear checks X-1, then lineclear merge X-1).",
     )
     // review off still shows every line, an override among them
-    const off = settingsBlock('X-1', { ways: { ...ways, review: false, rounds: 1 }, reviewer: { kind: 'codex' }, by: { review: 'task', rounds: 'task' } })
+    const off = settingsBlock('X-1', { ways: { ...ways, review: false, rounds: 1 }, reviewer: { kind: 'pi' }, by: { review: 'task', rounds: 'task' } })
     expect(off).toContain("- Review: off. No review; the lines on reviewing below don't apply. (set by coordinator for this task)")
-    expect(off).toContain('- Reviewer: a headless Codex')
+    expect(off).toContain('- Reviewer: a headless pi')
     expect(off).toContain('- Review rounds: 1. One round, no review again. (set by coordinator for this task)')
     expect(settingsBlock('X-1', { ways: { ...ways, mustFix: 'critical', rounds: 5 } })).toContain(
       '- Must fix: critical. Findings are tagged critical/major/minor/trivial; fix critical, then review again.\n- Review rounds: 5. Stop when a round finds none to fix, at most 5 rounds.',
@@ -173,7 +173,7 @@ describe('interactive chat capabilities', () => {
       expect(LOG_FINDERS[kind]).toBeFunction()
     }
     expect(settings.set('task.fallback', 'off').ok).toBe(true)
-    expect(REVIEWERS).toEqual(['Codex', 'Claude Code', 'pi'])
+    expect(REVIEWERS).toEqual(['Claude Code', 'pi'])
   })
 
   test('unsupported starts and restarts fail before callbacks or agent state changes', async () => {

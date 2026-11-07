@@ -191,7 +191,7 @@ export function tasks(): Task[] {
       place: HP,
       sub: 'Reading the call helper',
       age: '8m',
-      agent: agent('HP-202', 'Codex', 'work', '8m', 'Reading the call helper'),
+      agent: agent('HP-202', 'pi', 'work', '8m', 'Reading the call helper'),
       report: { msg: 'Tracing why mute ends the call', progress: 40, eta: 12 },
     },
     {
@@ -258,7 +258,7 @@ export function tasks(): Task[] {
       age: '3d',
       archived: Date.now() - 3 * 86_400_000,
       state: 'Archived · 3d ago',
-      agent: agent('GTM-11', 'Codex', 'need', '3d', 'Stopped'),
+      agent: agent('GTM-11', 'pi', 'need', '3d', 'Stopped'),
     },
   ]
   const projectName = (id: string) => id.split(':').pop()!
@@ -354,11 +354,11 @@ export const REPLIES: Record<string, string> = {
   f7: 'Going with that. Building it now.',
 }
 
-/** each demo machine's defaults: a few set (high effort on vm-str, gtm's tasks on Codex, mac's max 3 tasks); the main
+/** each demo machine's defaults: a few set (high effort on vm-str, gtm's tasks on pi, mac's max 3 tasks); the main
  *  one's Everywhere is the other's too */
 export function settingStores() {
   return {
-    'vm-str': new Settings({ everywhere: { 'time.zone': DEMO_ZONE }, machine: { 'task.effort': 'high' }, spaces: { gtm: { 'task.agent': 'Codex' } } }),
+    'vm-str': new Settings({ everywhere: { 'time.zone': DEMO_ZONE }, machine: { 'task.effort': 'high' }, spaces: { gtm: { 'task.agent': 'pi' } } }),
     mac: new Settings({ everywhere: { 'time.zone': DEMO_ZONE }, machine: { 'machine.maxTasks': '3' }, spaces: {} }),
   }
 }

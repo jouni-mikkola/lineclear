@@ -37,15 +37,15 @@ describe("a task's CLI, model and effort", () => {
       [['--model', 'opus;rm'], 'Write a model id'],
       [['--prio', 'high'], 'Task add takes no --prio'],
       [['--effort'], '--effort needs a value'],
-      [['--agent', 'gemini', '--model', 'x'], 'Claude Code, Codex and pi only'],
+      [['--agent', 'gemini', '--model', 'x'], 'Claude Code and pi only'],
     ]) {
       await expectRefused(place, args, says)
     }
     expect(src.engine.tasks.length).toBe(before)
-    const r = await src.cli(['task', 'add', 'On Codex', '--desc', 'x', '--agent', 'codex', '--model', 'GPT-6-Sol', '--effort', 'Ultra'], { chat: place })
-    expect(r.out).toContain('Its agent (Codex, gpt-6-sol, ultra effort) starts on the brief now')
+    const r = await src.cli(['task', 'add', 'On pi', '--desc', 'x', '--agent', 'pi', '--model', 'openai/gpt-5.5', '--effort', 'High'], { chat: place })
+    expect(r.out).toContain('Its agent (pi, openai/gpt-5.5, high effort) starts on the brief now')
     const t = src.engine.task(r.out.match(/([A-Z]+-\d+)/)![1])!
-    expect(t.agent).toEqual({ kind: 'codex', model: 'gpt-6-sol', effort: 'ultra' })
+    expect(t.agent).toEqual({ kind: 'pi', model: 'openai/gpt-5.5', effort: 'high' })
     // default: the CLI's own, whatever Settings say
     ;(src.settings as any).at('all')['task.model'] = 'opus'
     const d = await src.cli(['task', 'add', 'Plain', '--desc', 'x', '--model', 'default'], { chat: place })
@@ -61,28 +61,30 @@ describe("a task's CLI, model and effort", () => {
     })
     const place = placeId.space((await src.places.add(dir, 'reviewer-source')).name)
     for (const [args, says] of <[string[], string][]>[
-      [['--reviewer', 'gemini'], '--reviewer gemini: Pick one of: Codex · Claude Code · pi.'],
-      [['--reviewer-effort', 'extreme'], '--reviewer-effort takes default, low, medium, high, xhigh, max, ultra on Codex'],
-      [['--reviewer-model', 'opus'], 'Codex has no such model'],
+      [['--reviewer', 'gemini'], '--reviewer gemini: Pick one of: Claude Code · pi.'],
+      [['--reviewer-effort', 'extreme'], '--reviewer-effort takes default, low, medium, high, xhigh, max on Claude Code'],
+      [['--reviewer-model', 'opus 9'], 'Claude Code has no such model'],
     ]) {
       await expectRefused(place, args, says)
     }
     const id = (out: string) => out.match(/([A-Z]+-\d+)/)![1]
     const plain = src.engine.task(id((await src.cli(['task', 'add', 'Plain review', '--desc', 'x'], { chat: place })).out))!
-    expect(plain.reviewer).toEqual({ kind: 'codex', model: undefined, effort: undefined })
-    expect(plain.desc).toContain('- Reviewer: a headless Codex or a Codex subagent (its default model and effort).\n')
-    ;(src.settings as any).at('all')['reviewer.model'] = 'gpt-6-sol'
+    expect(plain.reviewer).toEqual({ kind: 'claude', model: undefined, effort: undefined })
+    expect(plain.desc).toContain('- Reviewer: a headless Claude Code or a Claude Code subagent (its default model and effort).\n')
+    ;(src.settings as any).at('all')['reviewer.agent'] = 'pi'
+    ;(src.settings as any).at('all')['reviewer.model'] = 'openai/gpt-5.5'
     const own = src.engine.task(
       id((await src.cli(['task', 'add', 'Claude review', '--desc', 'x', '--reviewer', 'claude', '--reviewer-effort', 'High'], { chat: place })).out),
     )!
-    // another CLI drops Settings' model, which names one of Codex's
+    // another CLI drops Settings' model, which names one of pi's
     expect(own.reviewer).toEqual({ kind: 'claude', model: undefined, effort: 'high' })
     expect(own.desc).toContain(
       '- Reviewer: a headless Claude Code or a Claude Code subagent (its default model, high effort). (set by coordinator for this task)',
     )
-    const codex = src.engine.task(id((await src.cli(['task', 'add', 'Codex review', '--desc', 'x', '--reviewer-effort', 'low'], { chat: place })).out))!
-    expect(codex.desc).toContain('- Reviewer: a headless Codex or a Codex subagent (model gpt-6-sol, low effort). (set by coordinator for this task)')
+    const pi = src.engine.task(id((await src.cli(['task', 'add', 'pi review', '--desc', 'x', '--reviewer-effort', 'low'], { chat: place })).out))!
+    expect(pi.desc).toContain('- Reviewer: a headless pi or a pi subagent (model openai/gpt-5.5, low effort). (set by coordinator for this task)')
     src.settings.set('reviewer.model', null)
+    src.settings.set('reviewer.agent', null)
   })
   test('task add --set changes a line of its Settings block for that task alone, marked as set by its coordinator', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'shep-src-repo-'))
@@ -121,7 +123,6 @@ describe("a task's CLI, model and effort, continued", () => {
     const out = (await src.cli(['models'], {})).out
     expect(out).toContain('Claude Code (--agent claude), effort levels low, medium, high, xhigh, max:\n  claude-fable-5-1')
     expect(out).toContain('claude-haiku-5-5             Haiku 5.5: low, medium, high, xhigh, max')
-    expect(out).toContain('gpt-6-luna                   GPT-6-Luna: low, medium, high, xhigh, max\n')
     expect(out).toContain('pi (--agent pi), effort levels off, minimal, low, medium, high, xhigh, max:\n  any model id it knows')
     expect((await src.cli(['models', 'gemini'], {})).out).toContain('Lineclear passes it no model or effort')
   })
@@ -131,10 +132,10 @@ describe("a task's CLI, model and effort, continued", () => {
     expect(out).toContain('review.mustFix         major')
     expect(out).toContain('review.rounds          3 rounds')
     expect(out).not.toContain('brief.plan')
-    expect(out).toContain('reviewer.agent         Codex')
+    expect(out).toContain('reviewer.agent         Claude Code')
     expect(out).toContain('reviewer.model         default')
     expect(out).toContain('reviewer.effort        default')
-    expect(out).toContain('- Reviewer: a headless Codex or a Codex subagent (its default model and effort).')
+    expect(out).toContain('- Reviewer: a headless Claude Code or a Claude Code subagent (its default model and effort).')
     expect(out).toContain('What agents are told (')
     expect(out).toContain('How Lineclear runs:')
     expect(out).toContain('--set review.rounds=1')
@@ -210,13 +211,6 @@ describe("a task's CLI, model and effort, continued", () => {
     expect(src.agents.args(rec('claude', 'default', 'default'), false)).toEqual(hooks)
     // a level its model lacks goes in as the nearest it has
     expect(src.agents.args(rec('claude', 'Haiku 5.5', 'ultra'), false)).toEqual([...hooks, '--model', 'claude-haiku-5-5', '--effort', 'max'])
-    expect(src.agents.args(rec('codex', 'gpt-6-luna', 'ultra'), false).slice(2)).toEqual([
-      '--dangerously-bypass-approvals-and-sandbox',
-      '-m',
-      'gpt-6-luna',
-      '-c',
-      'model_reasoning_effort="max"',
-    ])
     for (const key of ['space-key', 'SHE-9/Agent', 'SHE-9/Reviewer']) {
       for (const resume of [false, true]) {
         const args = src.agents.args({ ...rec('codex', '', ''), key, env: { LINECLEAR_CHAT: 'ST-1/Reviewer', LINECLEAR_URL: 'http://127.0.0.1:7787' } }, resume)

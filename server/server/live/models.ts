@@ -1,6 +1,6 @@
 // What each CLI's models and effort levels really are, so the + menu, Settings and task add offer only what it takes.
 // Each CLI is asked itself where it can tell: Claude Code's own model catalog in its install (which models it knows
-// and which take xhigh and max) and its --help, `codex debug models`, `pi --list-models` and pi's --help. What they
+// and which take xhigh and max) and its --help, `pi --list-models` and pi's --help. What they
 // said is kept in cli-models.json and asked again by version (claude) or every few hours; where a CLI can't tell, its models come from the registry (src/models.ts: what
 // every installed harness lists), and none are built in. A level a model lacks becomes the nearest it has (nearest), never an error at start.
 import { realpathSync, statSync } from 'node:fs'
@@ -37,7 +37,7 @@ export const LEVELS = Object.keys(RANK)
 const CLAUDE_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max']
 const PI_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']
 /** the CLIs Lineclear passes a model and effort to, with the levels each takes before it is asked */
-const LEVELS_OF: Record<string, string[]> = { claude: CLAUDE_LEVELS, codex: [...CLAUDE_LEVELS, 'ultra'], pi: PI_LEVELS }
+const LEVELS_OF: Record<string, string[]> = { claude: CLAUDE_LEVELS, pi: PI_LEVELS }
 
 /** Claude Code's families as its /model menu offers them, newest of each; its aliases (opus, haiku) name these too */
 const FAMILIES = ['fable', 'opus', 'sonnet', 'haiku']
@@ -160,7 +160,6 @@ async function read(kind: string, from?: string): Promise<CliModels | undefined>
     ])
     return parseClaude(catalog, help)
   }
-  if (kind === 'codex') return parseCodex(await run(['codex', 'debug', 'models']))
   return undefined
 }
 
@@ -199,36 +198,6 @@ export function parseClaude(catalog: string, help: string): CliModels | undefine
     others: all.filter((m) => !models.includes(m)).map(tidy),
     efforts: levels.length ? levels : CLAUDE_LEVELS,
   }
-}
-
-/** `codex debug models`: the ones it lists in its own picker, and the hidden ones it still takes */
-export function parseCodex(json: string): CliModels | undefined {
-  type Raw = { slug?: string; display_name?: string; visibility?: string; default_reasoning_level?: string; supported_reasoning_levels?: { effort?: string }[] }
-  let raw: Raw[]
-  try {
-    const d = JSON.parse(json.slice(json.indexOf('{')))
-    raw = Array.isArray(d) ? d : d.models
-  } catch {
-    return undefined
-  }
-  if (!Array.isArray(raw)) return undefined
-  const model = (m: Raw): Model => {
-    const efforts = (m.supported_reasoning_levels ?? [])
-      .map((l) => l.effort ?? '')
-      .filter((l) => l in RANK)
-      .sort((a, b) => RANK[a] - RANK[b])
-    return {
-      id: m.slug!,
-      label: m.display_name || m.slug!,
-      efforts,
-      ...(m.default_reasoning_level && efforts.includes(m.default_reasoning_level) ? { effort: m.default_reasoning_level } : {}),
-    }
-  }
-  const ok = raw.filter((m) => m.slug)
-  const models = ok.filter((m) => m.visibility !== 'hide').map(model)
-  if (!models.length) return undefined
-  const efforts = [...new Set(models.flatMap((m) => m.efforts))].sort((a, b) => RANK[a] - RANK[b])
-  return { models, others: ok.filter((m) => m.visibility === 'hide').map(model), efforts }
 }
 
 /** the registry's models of one harness: provider/name ids, every level pi takes */
