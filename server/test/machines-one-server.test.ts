@@ -3,11 +3,8 @@ import { existsSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { sh, repo, world, until, fakeHerdr } from './engine-world.ts'
-import { seedModels } from './model-fixture.ts'
 import { Worktrees } from '../server/live/engine/worktrees.ts'
 import type { BoxInfo } from '../server/live/box.ts'
-
-seedModels()
 
 // A second herdr session stands for another machine: its own socket, its own worktree keeper. One engine, one store.
 const vm: BoxInfo = {

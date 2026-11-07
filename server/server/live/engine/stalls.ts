@@ -77,7 +77,7 @@ export class EngineStalls extends EngineStatus {
     this.save()
   }
 
-  /** its last sign of life: its status changed, it was written to or reported, a tool call beat (lineclear alive), its hooks or its CLI's log moved */
+  /** its last sign of life: its status changed, it was written to or reported, a tool call beat (lineclear alive) or its CLI's log moved */
   protected lifeOf(t: TaskRec) {
     const key = this.key(t)
     const logs = (this.agents.record(key)?.logs ?? []).slice(-2).map((p) => {
@@ -87,7 +87,7 @@ export class EngineStalls extends EngineStatus {
         return 0
       }
     })
-    return Math.max(t.updated, this.wrote.get(t.id) ?? 0, this.heard.get(t.id) ?? 0, this.beat.get(t.id) ?? 0, this.agents.said(key)?.at ?? 0, ...logs)
+    return Math.max(t.updated, this.wrote.get(t.id) ?? 0, this.heard.get(t.id) ?? 0, this.beat.get(t.id) ?? 0, ...logs)
   }
 
   /** what Lineclear saw of a stall: how long quiet (or past its estimate), its last status line, whether its agent runs */
@@ -95,14 +95,10 @@ export class EngineStalls extends EngineStatus {
     const key = this.key(t)
     const mins = (ms: number) => `${Math.max(0, Math.round(ms / 60_000))}m`
     const r = t.report
-    const bg = this.agents.status(key) !== 'working' && this.agents.background(key)
-    const ran = { agents: 'a subagent', shells: 'a shell', servers: 'a server' }
     const why =
       quietSince === undefined
         ? `it has worked ${mins(now - r!.at)} since its agent said ${r!.left}m were left`
-        : bg
-          ? `its agent's turn ended while ${ran[bg]} it started runs on, and nothing has changed for ${mins(now - quietSince)}`
-          : `its agent shows as working, but nothing has changed for ${mins(now - quietSince)}: no new output, status report or commit`
+        : `its agent shows as working, but nothing has changed for ${mins(now - quietSince)}: no new output, status report or commit`
     const heard = this.heard.get(t.id)
     const last = r ? `Its last status: "${r.msg}", ${r.progress}% done${heard ? `, ${mins(now - heard)} ago` : ''}` : 'It has reported no status'
     const info = this.agents.info(key)

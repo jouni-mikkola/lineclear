@@ -1,16 +1,14 @@
 import { randomUUID } from 'node:crypto'
 import { herdr } from './herdr.ts'
 import { holdBack, machineNews } from './quiet.ts'
-import { mirrored } from './mfs.ts'
 import { paneWrong, type Wrong } from './revive.ts'
-import type { OutItem, Hold, SendOpts, Sent } from './agents-helpers.ts'
-import { holdFrom } from './agent-start.ts'
+import { holdFrom, type OutItem, type Hold, type SendOpts, type Sent } from './agents-helpers.ts'
 import { AgentsDelivery } from './agents-delivery.ts'
 
 export class AgentsSending extends AgentsDelivery {
   /** what is wrong with this agent's run: gone from herdr, its CLI exited in its pane, or it runs on outdated files;
    *  nothing while it is fine, null when herdr can't say. One on outdated files is left alone while herdr sees it at
-   *  work or asking (a turn is never cut for this); its hooks don't count, as what they last said may be from before */
+   *  work or asking (a turn is never cut for this) */
   async wrong(key: string): Promise<Wrong | undefined | null> {
     const r = this.records[key]
     const a = this.info(key)
@@ -23,11 +21,9 @@ export class AgentsSending extends AgentsDelivery {
     return w === 'stale' && (a.agent_status === 'working' || a.agent_status === 'blocked') ? undefined : w
   }
 
-  /** whether its hooks last said it was at work, even while it is gone: a turn its log shows over is over */
+  /** whether it was at work when last seen running, even while it is gone */
   wasWorking(key: string) {
-    const r = this.records[key]
-    const said = r?.hooks ? this.hooks.read(mirrored(r.hooks)).said : undefined
-    return (said?.state === 'working' && !this.endedSince?.(key, said.at)) || !!r?.working
+    return !!this.records[key]?.working
   }
 
   /** being started or stopped right now */

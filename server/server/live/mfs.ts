@@ -102,9 +102,6 @@ export const boxDir = () => (remoteBox() ? helperDir(remoteBox()!.home) : HOME)
 /** where the main machine keeps its copy of another machine's file as it grows (mirror.ts); a file here is itself */
 export const mirrored = (p: string) => (remoteBox() && !local(p) ? `${HOME}/mirror${p}` : p)
 
-/** the other machine's path of a mirrored file */
-export const unmirrored = (p: string) => (remoteBox() && p.startsWith(`${HOME}/mirror/`) ? p.slice(`${HOME}/mirror`.length) : p)
-
 /** a file Lineclear made on the main machine (a check's picture, an artifact's page), for an agent on the other machine
  *  to open: copied into a folder of the helper's there, where those over a day old go. Here it is itself */
 export function forAgent(p: string, sub: string, name = p.split('/').pop()!): string {

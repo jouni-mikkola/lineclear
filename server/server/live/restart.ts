@@ -3,7 +3,7 @@
 // What the restart sheet offers (restartInfo) and the calm hint a chat shows once Settings say something else than
 // what its agent runs on (restartHint) come from here.
 import type { Message, RestartCli, RestartHint, RestartInfo } from '../../shared/types.ts'
-import { effortFor, effortsOf, findModel, modelArg, modelsOf } from './models.ts'
+import { effortFor, effortsOf, findModel, modelArg, modelsOf } from '../../../src/models.ts'
 import { chatProblem } from './readers/index.ts'
 import { CLI_NAME } from './settings.ts'
 import type { Harness } from './engine/engine.ts'
@@ -65,7 +65,7 @@ export function restartClis(kinds: string[]): RestartCli[] {
         name: name(kind),
         ...(c
           ? {
-              models: c.models.map((m) => ({ id: m.id, label: m.label, efforts: m.efforts, defaultEffort: m.effort })),
+              models: c.models.map((m) => ({ id: m.id, label: m.label, efforts: m.efforts })),
               efforts: effortsOf(kind),
             }
           : {}),
@@ -91,7 +91,7 @@ export function restartInfo(o: {
   for (const h of [o.on, o.want]) {
     const m = findModel(h.kind, h.model)
     const cli = clis.find((c) => c.kind === h.kind)
-    if (m && cli?.models && !cli.models.some((x) => x.id === m.id)) cli.models.push({ id: m.id, label: m.label, efforts: m.efforts, defaultEffort: m.effort })
+    if (m && cli?.models && !cli.models.some((x) => x.id === m.id)) cli.models.push({ id: m.id, label: m.label, efforts: m.efforts })
   }
   const on = launchHarness(o.on)
   return { role: o.role, space: o.space, onKnown: o.onKnown, on, onWords: harnessWords(on), want: fitHarness(o.want), clis, working: o.working }

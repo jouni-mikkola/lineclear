@@ -34,9 +34,6 @@ export class EngineStatus extends EngineState {
     if (st === 'working' || this.handing.has(t.id)) return 'work'
     if (this.agents.waiting(key).length || Date.now() - (this.wrote.get(t.id) ?? 0) < ANSWER_GRACE) return 'work'
     if (t.reported) return 'ready'
-    // its turn ended while work it started in the background (a subagent, a shell, a monitor) still runs and will wake
-    // it: a pause, not a question, unless what it said last asks you something
-    if (this.agents.background(key) && !this.asks(key)) return 'work'
     // its turn ended (or it stopped) without reporting done: it waits for you
     return 'need'
   }
@@ -68,15 +65,10 @@ export class EngineStatus extends EngineState {
 
   /**
    * why its agent waits on you: a standard reason, or the agent's own question cut to a status line. From what the agent
-   * reports (its hooks, its log, its cards), never a model's reading of it.
+   * reports (its log, its cards), never a model's reading of it.
    */
   protected reasonOf(key: string): string | undefined {
-    const said = this.agents.said(key)
     if (this.agents.status(key) === 'blocked') {
-      if (said?.state === 'blocked')
-        return said.kind === 'plan' ? NEED.plan : said.kind === 'question' ? (said.ask && fitStatus(said.ask)) || NEED.question : NEED.permission
-      // a subagent of its own asks for a permission
-      if (said?.helper) return NEED.permission
       const q = this.chats.openQuestion(key)
       if (q) return fitStatus(q.items[0]?.question ?? '') || NEED.question
       return loginGone(this.chats.menu(key)?.title) ? NEED.login : NEED.permission
@@ -86,7 +78,7 @@ export class EngineStatus extends EngineState {
     const question = this.chats.openQuestion(key)
     if (question) return fitStatus(question.items[0]?.question ?? '') || NEED.question
     const last = this.chats.lastReply(key)
-    if (said?.kind === 'auth' || loginGone(last)) return NEED.login
+    if (loginGone(last)) return NEED.login
     return askOf(last)
   }
 }

@@ -1,13 +1,11 @@
-// Where each CLI keeps an agent's log file. Homes follow the CLIs' own settings: CLAUDE_CONFIG_DIR, CODEX_HOME,
-// PI_CODING_AGENT_DIR (tests point these at fixtures).
-import { closeSync, existsSync, openSync, readdirSync, readSync, statSync } from 'node:fs'
+// Where each CLI keeps an agent's log file. Homes follow the CLIs' own settings: CODEX_HOME, PI_CODING_AGENT_DIR (tests point these at fixtures).
+import { closeSync, openSync, readdirSync, readSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 const env = (k: string) => process.env[k] || undefined
 
-export const claudeHome = () => env('CLAUDE_CONFIG_DIR') ?? join(homedir(), '.claude')
-export const codexHome = () => env('CODEX_HOME') ?? join(homedir(), '.codex')
+const codexHome = () => env('CODEX_HOME') ?? join(homedir(), '.codex')
 const piHome = () => env('PI_CODING_AGENT_DIR') ?? join(homedir(), '.pi', 'agent')
 
 const trimSlash = (p: string) => (p.length > 1 ? p.replace(/[/\\]+$/, '') : p)
@@ -31,30 +29,6 @@ function newestLog(dir: string, sinceMs = 0): string | undefined {
   }
   return best?.f
 }
-
-/* ---------- Claude Code ---------- */
-
-// Claude Code names a project folder after its cwd with every character but letters and digits turned into '-';
-// long names are cut at 200 characters and get a hash on the end
-const MAX_NAME = 200
-
-/** the project folder for a cwd */
-export function claudeProjectDir(cwd: string): string {
-  const root = join(claudeHome(), 'projects')
-  const name = trimSlash(cwd).replace(/[^a-zA-Z0-9]/g, '-')
-  const dir = join(root, name)
-  if (name.length <= MAX_NAME || existsSync(dir)) return dir
-  try {
-    const hit = readdirSync(root).find((n) => n.startsWith(name.slice(0, MAX_NAME)))
-    if (hit) return join(root, hit)
-  } catch {}
-  return dir
-}
-
-export const claudeLogPath = (cwd: string, sessionId: string) => join(claudeProjectDir(cwd), `${sessionId}.jsonl`)
-
-/** the newest Claude Code session log for this cwd, changed at or after sinceMs */
-export const findClaudeLog = (cwd: string, sinceMs?: number) => newestLog(claudeProjectDir(cwd), sinceMs)
 
 /* ---------- Codex ---------- */
 
@@ -158,7 +132,6 @@ export const findPiLog = (cwd: string, sinceMs?: number) => newestLog(piSessionD
 
 /** Runtime log discovery, also used to decide which kinds can supply chat. */
 export const LOG_FINDERS: Record<string, (cwd: string, sinceMs?: number) => string | undefined> = {
-  claude: findClaudeLog,
   codex: findCodexLog,
   pi: findPiLog,
 }
@@ -171,7 +144,6 @@ export function findLog(cli: string, cwd: string, sinceMs?: number): string | un
 /** which CLI wrote this log, by where it lies: an agent a backup took over from has logs of two CLIs */
 export function logKind(file: string): string | undefined {
   const under = (dir: string) => file.startsWith(`${trimSlash(dir)}/`)
-  if (under(join(claudeHome(), 'projects'))) return 'claude'
   if (under(join(codexHome(), 'sessions'))) return 'codex'
   if (under(join(piHome(), 'sessions'))) return 'pi'
   return undefined

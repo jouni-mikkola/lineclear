@@ -8,49 +8,14 @@ export const parse = (cli: string, objs: object[]) =>
   )
 
 // token usage, turn starts and steps are checked on their own below; the other tests read the conversation
-export const STEPS = new Set(['step', 'step-end', 'job', 'job-end'])
+const STEPS = new Set(['step', 'step-end', 'job', 'job-end'])
 export const brief = (ev: LogEvent[]) =>
   ev
     .filter((e) => e.kind !== 'runtime' && e.kind !== 'usage' && e.kind !== 'turn-start' && !STEPS.has(e.kind))
     .map((e) => (e.kind === 'user' || e.kind === 'agent' ? `${e.kind}:${e.text}` : e.kind === 'question' ? `question:${e.id}` : `${e.kind}:${e.id}`))
 
-/* ---------- Claude Code ---------- */
-
-export const S = 'b1f0c2d4-0000-4000-8000-000000000001'
-export const base = { isSidechain: false, userType: 'external', entrypoint: 'cli', cwd: '/work/app', sessionId: S, version: '2.1.283', gitBranch: 'main' }
 let n = 0
 export const ts = () => `2026-10-24T10:00:${String(n++).padStart(2, '0')}.000Z`
-export const cuser = (uuid: string, content: unknown, extra: object = {}) => ({
-  parentUuid: null,
-  ...base,
-  promptId: 'p-1',
-  type: 'user',
-  message: { role: 'user', content },
-  uuid,
-  timestamp: ts(),
-  ...extra,
-})
-export const typed = { origin: { kind: 'human' }, promptSource: 'typed', turnOrigin: 'human' }
-export const cassistant = (uuid: string, id: string, block: object, stop: string | null) => ({
-  parentUuid: null,
-  ...base,
-  message: {
-    model: 'claude-opus-5-5',
-    id,
-    type: 'message',
-    role: 'assistant',
-    content: [block],
-    stop_reason: stop,
-    stop_sequence: null,
-    usage: { input_tokens: 1, output_tokens: 1 },
-  },
-  requestId: 'req_1',
-  type: 'assistant',
-  uuid,
-  timestamp: ts(),
-})
-export const toolResult = (uuid: string, id: string, content: string) =>
-  cuser(uuid, [{ tool_use_id: id, type: 'tool_result', content }], { toolUseResult: { stdout: content }, sourceToolAssistantUUID: 'x' })
 
 export const T = '01a172ce-0000-7000-8000-000000000002'
 const line = (type: string, payload: object) => ({ timestamp: ts(), type, payload })

@@ -1,17 +1,13 @@
 import { chatProblem } from './readers/index.ts'
 import { randomUUID } from 'node:crypto'
-import { mkdirSync, watch } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname } from 'node:path'
 import { herdr, paneEvents, type AgentInfo, type AgentStatus, type HerdrEvent } from './herdr.ts'
 import { findLog, logKind } from './readers/find.ts'
-import { chooseModel, effortFor, modelArg } from './models.ts'
-import { hookSettings } from './readers/hooks.ts'
+import { chooseModel, effortFor, modelArg } from '../../../src/models.ts'
 import * as task from './mfs.ts'
-import { mirrored } from './mfs.ts'
 import { agentEnv, BOX } from './box.ts'
 import { ROOT } from '../root.ts'
-import { carryClaudeSession, holdFrom, canResume, ownOldPane } from './agent-start.ts'
-import { type AgentRecord, type Spec, HOOKS_DIR, promptPath, hidden } from './agents-helpers.ts'
+import { type AgentRecord, type Spec, holdFrom, ownOldPane, promptPath, hidden } from './agents-helpers.ts'
 import { addLog } from './log-list.ts'
 import { AgentsState } from './agents-state.ts'
 import { listAfter } from './agent-events.ts'
@@ -54,18 +50,6 @@ export class AgentsDelivery extends AgentsState {
       if (this.reachable) this.lastReach = Date.now()
       this.settle()
     }, 2000)
-    // a hook event is read at once, not at the next look
-    try {
-      mkdirSync(mirrored(HOOKS_DIR), { recursive: true })
-      this.hookWatch = watch(mirrored(HOOKS_DIR), () => {
-        this.soon ??= setTimeout(() => {
-          this.soon = null
-          this.settle()
-        }, 150)
-      })
-    } catch {
-      /* read at the next look */
-    }
   }
 
   stop() {
@@ -74,8 +58,6 @@ export class AgentsDelivery extends AgentsState {
     if (this.retryTimer) clearTimeout(this.retryTimer)
     this.terminalClock.stop()
     this.paste.stop()
-    if (this.soon) clearTimeout(this.soon)
-    this.hookWatch?.close()
     this.sub.stop()
   }
 
@@ -86,14 +68,6 @@ export class AgentsDelivery extends AgentsState {
   /** Private routing was bound to this session's actual CLI process. */
   routed(key: string) {
     return this.reachable && !!this.info(key)?.agent && !this.record(key)?.finished && this.routes.has(key)
-  }
-
-  /** Runtime fields reported by this launch's main Claude process, never its subagents. */
-  runtimeHook(key: string) {
-    const r = this.records[key]
-    if (!r?.hooks || r.kind !== 'claude' || !this.info(key)) return undefined
-    const h = this.hooks.read(mirrored(r.hooks)).runtime
-    return h && h.at >= r.started && (!h.session || h.session === r.sessionId) ? h : undefined
   }
 
   /** a name herdr accepts: [a-z][a-z0-9_-]{0,31} */
@@ -119,7 +93,6 @@ export class AgentsDelivery extends AgentsState {
       return
     }
     this.refreshing = true
-    this.saidAt.clear()
     try {
       const list = await herdr.snapshot()
       if (this.stopped) return
@@ -187,8 +160,6 @@ export class AgentsDelivery extends AgentsState {
       const was = this.told.get(key) ?? 'gone'
       this.told.set(key, now)
       if (was !== now) {
-        // the screen is read again for a change of status, nothing else
-        this.screenDue.add(key)
         this.pasteDue.add(key)
         this.changed(key, now, was)
       }
@@ -199,19 +170,9 @@ export class AgentsDelivery extends AgentsState {
         this.routes.delete(r.key)
       }
     }
-    // Slow pane reads must not hold up transport health checks.
-    if (!this.readingBackground) {
-      this.readingBackground = true
-      void this.readBackground()
-        .catch(() => undefined)
-        .finally(() => {
-          this.readingBackground = false
-        })
-    }
+    this.lookAtPastes()
     // learn log files herdr names (its agent integrations report them)
     for (const [name, key] of this.byName) this.learnSession(key, this.live.get(name))
-    // and the session its hooks say it is in now, which herdr doesn't name: a /clear starts another
-    for (const key of this.byName.values()) this.followSession(key)
     // what waits goes in as soon as its agent can take it
     for (const key of new Set(this.outbox.map((o) => o.key))) if (!this.heldBy(key)) this.deliver(key)
     this.checkStranded()
@@ -229,15 +190,15 @@ export class AgentsDelivery extends AgentsState {
     if (status !== 'gone') this.emit('logs', key)
   }
 
-  /** after a command that may start another session (/new, /clear, /resume), for an agent whose hooks don't say so: its
+  /** after a command that may start another session (/new, /clear, /resume), : its
    *  CLI's newest log changed since then, once it is one the chat doesn't read yet */
   follow(key: string, since: number) {
     const r = this.records[key]
-    if (!r || (r.kind === 'claude' && r.hooks)) return
+    if (!r) return
     const look = () => {
       const f = findLog(r.kind, r.cwd, since - 1000)
       if (!f || !addLog(r, f)) return
-      // Claude Code and pi resume by the id in its name; Codex by its last log
+      // pi resumes by the id in its name; Codex by its last log
       if (r.kind !== 'codex') r.sessionId = f.match(/([0-9a-f-]{36})\.jsonl$/)?.[1] ?? r.sessionId
       this.save()
       this.emit('logs', key)
@@ -304,11 +265,10 @@ export class AgentsDelivery extends AgentsState {
     this.secretAccess.revoke(spec.key)
     this.routes.delete(spec.key)
     const old = this.records[spec.key]
-    const resume = !fresh && old && old.kind === spec.kind && canResume(old, spec.cwd)
+    const resume = !fresh && old && old.kind === spec.kind && !!(old.sessionId || old.logs.length)
     const lost = !fresh && !!old && old.kind === spec.kind && !resume && !!(old.sessionId || old.logs.length)
     const r: AgentRecord = old ?? { ...spec, logs: [], started: Date.now() }
     const changedPrompt = old?.system !== spec.system
-    const from = old?.cwd
     if (fresh) {
       r.model = ''
       r.effort = ''
@@ -318,19 +278,10 @@ export class AgentsDelivery extends AgentsState {
     if (fresh) this.outbox = this.outbox.filter((item) => item.key !== spec.key || item.cid || !item.text.startsWith('<lineclear>'))
     r.started = Date.now()
     if (!resume) r.sessionId = r.kind === 'codex' ? undefined : randomUUID()
-    // a run of its own: what its hooks record starts over
-    if (r.hooks) this.hooks.forget(mirrored(r.hooks))
-    r.hooks = undefined
     this.records[spec.key] = r
     this.byName.set(r.name, r.key)
     this.save()
     task.mkdirSync(r.cwd, { recursive: true })
-    // it starts in another folder now: its session goes with it, where --resume looks for it
-    if (resume && r.kind === 'claude' && r.sessionId && from !== r.cwd) {
-      const id = r.sessionId
-      const log = carryClaudeSession(id, r.cwd)
-      if (log) r.logs = [...r.logs.filter((f) => !f.endsWith(`/${id}.jsonl`)), log]
-    }
     const unset = chooseModel(r.kind, r.model)
     if (unset) throw new Error(unset)
     const pane = place ? await place() : await this.paneFor(r, was)
@@ -368,7 +319,7 @@ export class AgentsDelivery extends AgentsState {
     this.queue(
       r.key,
       [
-        r.kind !== 'claude' && r.kind !== 'pi' && (!resume || changedPrompt) && r.system ? hidden(r.system) : '',
+        r.kind !== 'pi' && (!resume || changedPrompt) && r.system ? hidden(r.system) : '',
         lost ? hidden('Your earlier conversation could not be resumed. Read your brief and your branch, then carry on from where you were.') : '',
         first ?? '',
       ].filter(Boolean),
@@ -387,17 +338,7 @@ export class AgentsDelivery extends AgentsState {
     // goes in as the nearest it has
     const model = modelArg(r.kind, r.model)
     const effort = effortFor(r.kind, r.effort, r.model)
-    if (r.kind === 'claude') {
-      if (resume && r.sessionId) a.push('--resume', r.sessionId)
-      else if (r.sessionId) a.push('--session-id', r.sessionId)
-      // its hooks tell Lineclear what it does (readers/hooks.ts), from a settings file of its own: yours stay untouched
-      const h = hookSettings(HOOKS_DIR, r.name)
-      r.hooks = h.events
-      a.push('--settings', h.settings)
-      if (r.system) a.push('--append-system-prompt-file', this.promptFile(r))
-      if (model) a.push('--model', model)
-      if (effort) a.push('--effort', effort)
-    } else if (r.kind === 'pi') {
+    if (r.kind === 'pi') {
       if (r.sessionId) a.push('--session-id', r.sessionId)
       if (r.system) a.push('--append-system-prompt', this.promptFile(r))
       if (model) a.push('--model', model)
@@ -432,11 +373,9 @@ export class AgentsDelivery extends AgentsState {
     return f
   }
 
-  /** the files Lineclear starts its CLI with now, by flag: its hooks' settings and its instructions. One started with
-   *  others (herdr restored an older command after it restarted) runs without them */
+  /** the files Lineclear starts its CLI with now, by flag: its instructions. One started with others (herdr restored
+   *  an older command after it restarted) runs without them */
   filesOf(r: AgentRecord): Record<string, string> {
-    if (r.kind === 'claude')
-      return { '--settings': join(HOOKS_DIR, `${r.name}.settings.json`), ...(r.system ? { '--append-system-prompt-file': promptPath(r.name) } : {}) }
     if (r.kind === 'pi' && r.system) return { '--append-system-prompt': promptPath(r.name) }
     return {}
   }

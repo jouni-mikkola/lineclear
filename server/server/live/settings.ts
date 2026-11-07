@@ -1,4 +1,4 @@
-import { effortFor } from './models.ts'
+import { effortFor } from '../../../src/models.ts'
 export type { MachineLimits, Level } from './settings-catalog.ts'
 export {
   CLIS,

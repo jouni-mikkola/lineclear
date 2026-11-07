@@ -3,10 +3,10 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { appendFileSync, mkdirSync, mkdtempSync, renameSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { claudeLogPath, findClaudeLog, findCodexLog, findPiLog, piSessionDir } from '../server/live/readers/find.ts'
+import { findCodexLog, findPiLog, piSessionDir } from '../server/live/readers/find.ts'
 import { LogTail, readerFor } from '../server/live/readers/index.ts'
 import type { LogEvent } from '../server/live/readers/types.ts'
-import { parse, brief, base, ts, cuser, typed, cassistant, toolResult, cxmsg, sessionMeta, pimsg, T } from './readers-fixture.ts'
+import { parse, brief, cxmsg, sessionMeta, pimsg, T } from './readers-fixture.ts'
 
 let dir = ''
 beforeAll(() => {
@@ -70,14 +70,14 @@ describe('LogTail', () => {
   })
 
   test('a missing file reads as nothing', () => {
-    expect(new LogTail(join(dir, 'none.jsonl'), readerFor('claude')!).read()).toEqual([])
+    expect(new LogTail(join(dir, 'none.jsonl'), readerFor('pi')!).read()).toEqual([])
   })
 })
 
 describe('finding logs', () => {
   const env = { ...process.env }
   afterAll(() => {
-    for (const k of ['CLAUDE_CONFIG_DIR', 'CODEX_HOME', 'PI_CODING_AGENT_DIR']) {
+    for (const k of ['CODEX_HOME', 'PI_CODING_AGENT_DIR']) {
       if (env[k] === undefined) delete process.env[k]
       else process.env[k] = env[k]
     }
@@ -87,18 +87,6 @@ describe('finding logs', () => {
     writeFileSync(f, text)
     utimesSync(f, mtimeMs / 1000, mtimeMs / 1000)
   }
-
-  test('claude: project folder from the cwd, newest session after a time', () => {
-    process.env.CLAUDE_CONFIG_DIR = join(dir, 'claude')
-    const cwd = '/home/me/.herdr/work_1'
-    expect(claudeLogPath(cwd, 'abc')).toBe(join(dir, 'claude', 'projects', '-home-me--herdr-work-1', 'abc.jsonl'))
-    const now = Date.now()
-    touch(claudeLogPath(cwd, 'old'), '', now - 60_000)
-    touch(claudeLogPath(cwd, 'new'), '', now - 1000)
-    expect(findClaudeLog(cwd)).toBe(claudeLogPath(cwd, 'new'))
-    expect(findClaudeLog(cwd, now)).toBeUndefined()
-    expect(findClaudeLog('/nowhere')).toBeUndefined()
-  })
 
   test("codex: today's rollout whose session_meta has the cwd, not a subagent's", () => {
     process.env.CODEX_HOME = join(dir, 'codex')
@@ -130,26 +118,6 @@ describe('finding logs', () => {
 })
 
 describe('token usage', () => {
-  test('Claude Code: once per reply, all input and output', () => {
-    const ev = parse('claude', [
-      {
-        type: 'assistant',
-        sessionId: 's1',
-        uuid: 'x1',
-        timestamp: '2026-10-25T10:00:00.000Z',
-        message: {
-          id: 'msg_U',
-          role: 'assistant',
-          content: [{ type: 'text', text: 'Hi' }],
-          stop_reason: 'end_turn',
-          usage: { input_tokens: 10, cache_creation_input_tokens: 5, cache_read_input_tokens: 100, output_tokens: 7 },
-        },
-      },
-    ])
-    const u = ev.filter((e) => e.kind === 'usage')
-    expect(u).toHaveLength(1)
-    expect(u[0]).toMatchObject({ id: 'usage-msg_U', tokens: 122 })
-  })
   test('pi: each reply from its usage', () => {
     const ev = parse('pi', [
       {
@@ -165,28 +133,6 @@ describe('token usage', () => {
 
 describe('turn marks', () => {
   const turns = (ev: LogEvent[]) => ev.filter((e) => e.kind === 'turn-start' || e.kind === 'turn-end').map((e) => e.kind)
-
-  test('Claude Code: your prompt starts a turn, its reply ends it; a finished background job wakes it into a new one', () => {
-    const ev = parse('claude', [
-      cuser('u1', 'Research four options', typed),
-      cassistant('a1', 'msg_T1', { type: 'tool_use', id: 'toolu_B', name: 'Agent', input: { run_in_background: true } }, 'tool_use'),
-      toolResult('u2', 'toolu_B', 'Started in the background.'),
-      cassistant('a2', 'msg_T2', { type: 'text', text: 'Research is running.' }, 'end_turn'),
-      { ...base, type: 'system', subtype: 'turn_duration', durationMs: 1000, uuid: 's1', timestamp: ts() },
-      // the subagent's own lines never start or end anything
-      { ...cassistant('a3', 'msg_side', { type: 'text', text: 'Searching.' }, 'end_turn'), isSidechain: true },
-      cuser('u3', '<task-notification>\n<task-id>abc</task-id>\n</task-notification>', { origin: { kind: 'task-notification', producer: 'session-task' } }),
-      cassistant('a4', 'msg_T3', { type: 'text', text: '1 of 4 in.' }, 'end_turn'),
-      { ...base, type: 'system', subtype: 'turn_duration', durationMs: 1000, uuid: 's2', timestamp: ts() },
-    ])
-    expect(turns(ev)).toEqual(['turn-start', 'turn-end', 'turn-start', 'turn-end'])
-    expect(brief(ev).filter((e) => e.startsWith('agent:'))).toEqual(['agent:Research is running.', 'agent:1 of 4 in.'])
-  })
-
-  test('Claude Code: a reply that starts without a prompt starts a turn too', () => {
-    const ev = parse('claude', [cassistant('a1', 'msg_W', { type: 'tool_use', id: 't', name: 'Bash', input: {} }, 'tool_use')])
-    expect(turns(ev)).toEqual(['turn-start'])
-  })
 
   test("pi: each prompt and the reply's stop, and a retry after an error", () => {
     const pi = parse('pi', [

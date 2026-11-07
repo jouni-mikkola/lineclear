@@ -4,10 +4,7 @@ import { execSync } from 'node:child_process'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { seedModels } from './model-fixture.ts'
-import { setRegistry } from '../server/live/models.ts'
-
-seedModels()
+import { setRegistry } from '../../src/models.ts'
 
 describe("a task's CLI, model and effort", () => {
   /** task add with these flags is turned down, with this said */

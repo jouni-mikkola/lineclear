@@ -2,7 +2,7 @@ import { apart, cardMessage, type Chat, type Job, type Message, type Reaction } 
 import { stripHidden } from './agents.ts'
 import { agentLines, excerpt, findQuoted, parseBrowserNotes, parseReply, parseUserLine, userLines } from './chatlines.ts'
 import { shortUrl } from '../../shared/browser.ts'
-import { findModel } from './models.ts'
+import { findModel } from '../../../src/models.ts'
 import { sameCommand } from './commands.ts'
 import { sessionRuntime } from './runtime.ts'
 import { launchHarness } from './restart.ts'
@@ -298,15 +298,9 @@ export class ChatsReplies extends ChatsLogs {
         : r?.sessionId
           ? r.logs.find((f) => f.endsWith(`${r.sessionId}.jsonl`))
           : r?.logs.at(-1)
-    let runtime = sessionRuntime(ev, file, r?.started ?? 0)
-    const hook = this.agents.runtimeHook(key)
-    if (hook)
-      runtime =
-        !runtime || hook.at >= runtime.at
-          ? { ...(hook.model && runtime?.model && hook.model !== runtime.model ? {} : runtime), ...hook, source: 'hook' }
-          : { ...(hook.model && runtime.model && hook.model !== runtime.model ? {} : hook), ...runtime }
+    const runtime = sessionRuntime(ev, file, r?.started ?? 0)
     if (runtime?.model) runtime.modelLabel = findModel(kind, runtime.model)?.label
-    const jobs = this.jobs(key, act).map(({ log: _l, output: _o, ...j }): Job => j)
+    const jobs = this.jobs(key, act).map(({ output: _o, ...j }): Job => j)
     return {
       key,
       cli: CLI_NAME[kind] ?? kind,
@@ -320,12 +314,11 @@ export class ChatsReplies extends ChatsLogs {
       messages: msgs,
       failed: failed.length ? failed : undefined,
       working: st === 'working' || undefined,
-      // its turn is over, or ended while work it started still runs: a subagent, a shell
-      background: (st === 'working' && !this.replying(key, ev)) || !!this.agents.background(key) || undefined,
+      background: (st === 'working' && !this.replying(key, ev)) || undefined,
       finished: (r?.finished && st === 'gone') || undefined,
       live: st === 'working' && act.open ? lineOf(act.open, true) : undefined,
       jobs: jobs.length ? jobs : undefined,
-      controls: this.controls(key, kind),
+      controls: this.controls(),
     }
   }
 }

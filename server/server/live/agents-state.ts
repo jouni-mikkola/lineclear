@@ -1,5 +1,4 @@
 import { LinkBackoff } from './recovery.ts'
-import type { FSWatcher } from 'node:fs'
 import { join } from 'node:path'
 import { Emitter } from '../source.ts'
 import { readJson, writeJson } from '../store.ts'
@@ -7,20 +6,17 @@ import { ColdAgents } from './engine/cold.ts'
 import { addLog } from './log-list.ts'
 import type { AgentHerdr, TermScreen } from '../../shared/types.ts'
 import { herdr, type Subscription, type AgentInfo, type AgentStatus } from './herdr.ts'
-import { ClaudeSessions, Reviewers, screenBackground, sessionBackground, type Background } from './readers/background.ts'
-import { claudeLogPath, findClaudeLog, findCodexLog, findPiLog } from './readers/find.ts'
+import { findCodexLog, findPiLog } from './readers/find.ts'
 import { PasteWatch } from './paste-watch.ts'
 import { TerminalClock } from './terminal-clock.ts'
 import { machineNews } from './quiet.ts'
-import { HookLogs, type Said } from './readers/hooks.ts'
 import { mirrored } from './mfs.ts'
 import { agentEnv, BOX, helperDir, run } from './box.ts'
 import { ROOT } from '../root.ts'
 import { inputHoldsText, leftAtPrompt } from './commands.ts'
 import { SecretAccess } from './secret-access.ts'
 import { isAgentProcess } from './agent-process.ts'
-import { type AgentRecord, type OutItem, type Hold, type Sent, ROUTING_FAILURE, type Events, SAID_MS } from './agents-helpers.ts'
-import { holdFrom, statusFrom } from './agent-start.ts'
+import { type AgentRecord, type OutItem, type Hold, type Sent, ROUTING_FAILURE, type Events, holdFrom } from './agents-helpers.ts'
 
 export class AgentsState extends Emitter<Events> {
   private cold = new ColdAgents<AgentRecord>()
@@ -33,7 +29,6 @@ export class AgentsState extends Emitter<Events> {
   protected sub!: Subscription
   readonly secretAccess = new SecretAccess()
   secretScope: (chat: string) => string[] | undefined = () => undefined
-  protected readingBackground = false
   protected refreshing = false
   protected readAgain = false
   /** the subscription dropped and has not opened again: a read that answers meanwhile does not make herdr reachable */
@@ -95,35 +90,15 @@ export class AgentsState extends Emitter<Events> {
     (k, s) => this.emit('output', k, s),
     BOX ? 1500 : 500,
   )
-  sessions = new ClaudeSessions()
-  /** headless reviewers of another CLI (codex exec, claude -p) each chat's agent runs: subagents, not shells */
-  reviewers = new Reviewers()
-  /** what the screen of a Claude Code with no session file says still runs in the background */
-  protected screens = new Map<string, Background>()
-  /** what its hooks, session file or screen say still runs in the background, since when, and after which turn */
-  protected seen = new Map<string, { what: Background; since: number; turn?: number }>()
-  /** the background work last told, so a change is told once */
-  protected bg = new Map<string, Background | undefined>()
-  /** servers alone (a dev server, a preview) keep it at work this long after its turn ended: one it started for you
-   *  to look at never wakes it, and what it said then may want an answer */
-  serversFor = 10 * 60_000
-  /** shells and monitors that end (a test run, a review) keep it at work this long after its turn ended: each wakes it
-   *  when it ends, but one may hang */
-  shellsFor = 60 * 60_000
   /** each watched pane's size in cells, and when it was read */
   protected sizes = new Map<string, { at: number; size: { cols: number; rows: number } | null }>()
-  hooks = new HookLogs()
   /** the status last told, by chat key */
   protected told = new Map<string, AgentStatus | 'gone'>()
-  protected hookWatch: FSWatcher | null = null
-  protected saidAt = new Map<string, { at: number; said?: Said }>()
   protected soon: ReturnType<typeof setTimeout> | null = null
   /** whether a menu a slash command opened is up, which herdr doesn't see: typed text could pick an option */
   menuUp?: (key: string) => boolean
   /** Read startup menus herdr may classify as idle before any text can choose from them. */
   beforeInput?: (key: string) => Promise<void>
-  /** whether its log shows its turn ended after this time: a turn cut short (Esc, a prompt turned down) runs no hook */
-  endedSince?: (key: string, at: number) => boolean
 
   protected deliveryPaused = new Set<string>()
   acceptInput?: (item: OutItem) => boolean
@@ -166,23 +141,7 @@ export class AgentsState extends Emitter<Events> {
   }
 
   status(key: string): AgentStatus | 'gone' {
-    return statusFrom(this.said(key), this.info(key)?.agent_status ?? 'gone')
-  }
-
-  /** what the agent reports of itself, from its hooks; nothing when it reports nothing (see statusFrom). A turn its log
-   *  shows ended after its last event was cut short with no hook: it is over. */
-  said(key: string): Said | undefined {
-    const r = this.records[key]
-    if (!r?.hooks || !this.info(key)) return undefined
-    // asked many times over for one screen: read at most every SAID_MS
-    const now = Date.now()
-    const c = this.saidAt.get(key)
-    if (c && now - c.at < SAID_MS) return c.said
-    let said = this.hooks.read(mirrored(r.hooks)).said
-    if (said && said.state !== 'idle' && this.endedSince?.(key, said.at))
-      said = { state: 'idle', turnAt: said.turnAt, at: said.at, last: said.last, helper: said.helper, paused: said.paused }
-    this.saidAt.set(key, { at: now, said })
-    return said
+    return this.info(key)?.agent_status ?? 'gone'
   }
 
   /** Bind the actual CLI process, not HERDR_PANE_ID (old shells can inherit another pane's id). */
@@ -256,64 +215,11 @@ export class AgentsState extends Emitter<Events> {
     }
   }
 
-  /**
-   * Its turn ended, but work it started in the background still runs and will wake it: a subagent, a shell, a monitor
-   * (Claude Code; see readers/background.ts). Nothing while it works, asks in a menu, or is gone.
-   */
-  background(key: string, now = Date.now()): Background | undefined {
-    const what = this.stillRuns(key)
-    if (what !== 'shells' && what !== 'servers') return what
-    const s = this.seen.get(key)
-    return s?.what === what && now - s.since >= (what === 'servers' ? this.serversFor : this.shellsFor) ? undefined : what
-  }
-
-  /** what its hooks said still ran as its turn ended, else its session file, else its screen; a shell that is a
-   *  headless reviewer counts as a subagent. However long it has run (background() leaves shells out after a while) */
-  stillRuns(key: string): Background | undefined {
-    const what = this.ranOn(key)
-    return what && what !== 'agents' && this.reviewers.runs(key) ? 'agents' : what
-  }
-
-  protected ranOn(key: string): Background | undefined {
-    const r = this.records[key]
-    const st = this.status(key)
-    if (r?.kind !== 'claude' || st === 'working' || st === 'blocked' || st === 'gone') return undefined
-    const file = this.sessions.status(r.sessionId, r.cwd)
-    // its hooks said what still ran as its turn ended; its session file is newer once that work is gone, or once a
-    // subagent runs again (one that paused on shells of its own woke)
-    const said = this.said(key)
-    if (said) return file === 'idle' ? undefined : said.bg && file === 'busy' ? 'agents' : said.bg
-    return file === undefined ? this.screens.get(key) : sessionBackground(file)
-  }
-
-  /** what still runs in the background, read again: from the screen where there is no session file. A change is told
-   *  as a status change, since the agent may have woken, said a word and stopped again in between herdr's looks. */
-  protected async readBackground() {
+  /** a paste herdr may have swallowed is looked at when the agent is read again */
+  protected lookAtPastes() {
     for (const key of this.byName.values()) {
       if (this.stopped) return
-      const r = this.records[key]
-      const st = this.status(key)
-      const pane = this.info(key)?.pane_id
-      if (this.pasteDue.delete(key)) void this.paste.look(key, r?.started ?? 0, () => this.info(key)?.pane_id)
-      const reads =
-        r?.kind === 'claude' && pane && (st === 'idle' || st === 'done') && !this.said(key) && this.sessions.status(r.sessionId, r.cwd) === undefined
-      if (!reads) this.screens.delete(key)
-      else if (this.screenDue.delete(key)) {
-        const seen = screenBackground(await herdr.visible(pane).catch(() => ''))
-        if (seen) this.screens.set(key, seen)
-        else this.screens.delete(key)
-      }
-      // counted from when it was first seen after its turn ended: a turn that woke and ended again in between herdr's
-      // looks, which its hooks tell, starts the count again
-      const what = this.stillRuns(key)
-      const turn = this.said(key)?.turnAt
-      const was = this.seen.get(key)
-      if (!what) this.seen.delete(key)
-      else if (was?.what !== what || was.turn !== turn) this.seen.set(key, { what, since: Date.now(), turn })
-      const now = this.background(key)
-      if (now === this.bg.get(key)) continue
-      this.bg.set(key, now)
-      this.emit('status', key, st)
+      if (this.pasteDue.delete(key)) void this.paste.look(key, this.records[key]?.started ?? 0, () => this.info(key)?.pane_id)
     }
   }
 
@@ -335,28 +241,7 @@ export class AgentsState extends Emitter<Events> {
     if (s.kind === 'path' && addLog(r, mirrored(s.value))) {
       this.save()
       this.emit('logs', key)
-    } else if (s.kind === 'id' && r.kind === 'claude') {
-      if (addLog(r, claudeLogPath(r.cwd, s.value))) {
-        r.sessionId = s.value
-        this.save()
-        this.emit('logs', key)
-      }
     }
-  }
-
-  /** the session a Claude Code's hooks say it is in now (a /clear, /resume or new one), followed: its transcript
-   *  joins the chat's logs, and resuming it resumes that one */
-  followSession(key: string) {
-    const r = this.records[key]
-    if (r?.kind !== 'claude' || !r.hooks) return
-    const s = this.hooks.read(mirrored(r.hooks)).session
-    // another machine's copy of its events may still be an earlier run's, until the new run's first event comes
-    if (!s || s.id === r.sessionId || s.at < r.started - 5000) return
-    const log = s.log ? mirrored(s.log) : claudeLogPath(r.cwd, s.id)
-    r.sessionId = s.id
-    addLog(r, log)
-    this.save()
-    this.emit('logs', key)
   }
 
   /** find a log file this CLI started since the agent (re)started, when herdr didn't name one */
@@ -364,16 +249,7 @@ export class AgentsState extends Emitter<Events> {
     const r = this.records[key]
     if (!r) return
     const since = r.started - 5000
-    const f =
-      r.kind === 'claude'
-        ? r.sessionId
-          ? claudeLogPath(r.cwd, r.sessionId)
-          : findClaudeLog(r.cwd, since)
-        : r.kind === 'codex'
-          ? findCodexLog(r.cwd, since)
-          : r.kind === 'pi'
-            ? findPiLog(r.cwd, since)
-            : undefined
+    const f = r.kind === 'codex' ? findCodexLog(r.cwd, since) : r.kind === 'pi' ? findPiLog(r.cwd, since) : undefined
     if (f && addLog(r, f)) {
       this.save()
       this.emit('logs', key)

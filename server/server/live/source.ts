@@ -75,8 +75,6 @@ export class LiveSource extends LiveSourceUpkeep implements Source {
       if (this.terms.includes(key)) this.emit('terminal', key, screen)
     })
     this.engine.on('changed', () => this.emit('snapshot'))
-    // a turn cut short (Esc, a prompt turned down) runs no hook: its log says it is over
-    this.agents.endedSince = (key, at) => this.chats.endedSince(key, at)
     this.agents.beforeInput = async (key) => {
       if (!['working', 'gone'].includes(this.agents.status(key)) && (await this.chats.readMenu(key, true))) this.emit('chat', key)
     }

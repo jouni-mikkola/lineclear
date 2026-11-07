@@ -22,15 +22,14 @@ describe('EngineStalls', () => {
     expect(w.cards.filter((c) => c.status === 'work')).toEqual([{ task: t.id, status: 'work', sub: 'may be stuck: quiet for 21m' }])
     w.engine.checkStalls(later(STALL_QUIET / 60_000 + 30))
     expect(stalled().length).toBe(1)
-    // it shows life again (its hooks moved): the next stall is news again
-    w.said[key] = { state: 'working', turnAt: Date.now(), at: later(40) }
+    // it shows life again (a tool call beat): the next stall is news again
+    w.engine.alive(t.id, later(40))
     w.engine.checkStalls(later(45))
     expect(stalled().length).toBe(1)
     w.engine.checkStalls(later(40 + STALL_QUIET / 60_000 + 1))
     expect(stalled().length).toBe(2)
     // never while it waits on you
     w.agentIs(key, 'idle')
-    w.said[key] = undefined
     w.engine.checkStalls(later(500))
     expect(stalled().length).toBe(2)
   })
@@ -43,7 +42,7 @@ describe('EngineStalls', () => {
     const stalled = () => w.news.filter((n) => n.includes('may have stalled'))
     // a sign of life every minute: never quiet
     const busy = (min: number) => {
-      w.said[key] = { state: 'working', turnAt: Date.now(), at: Date.now() + min * 60_000 }
+      w.engine.alive(t.id, Date.now() + min * 60_000)
       w.engine.checkStalls(Date.now() + min * 60_000)
     }
     busy(29)

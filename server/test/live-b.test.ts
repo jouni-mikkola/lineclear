@@ -1,8 +1,5 @@
 import { Settings, effortFor, pastTimes, span, readJson, writeJson } from './live-fixture.ts'
 import { describe, expect, test } from 'bun:test'
-import { seedModels } from './model-fixture.ts'
-
-seedModels()
 
 describe('browser settings', () => {
   test('Settings: an idle browser closes after 10 min; a space or machine sets its own, or off', () => {

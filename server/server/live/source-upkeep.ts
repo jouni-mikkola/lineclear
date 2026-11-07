@@ -20,7 +20,7 @@ export class LiveSourceUpkeep extends LiveSourceCli {
     const c = key.includes('/') ? null : this.places.coordinator(key)
     const r = this.agents.record(key)
     const st = this.agents.status(key)
-    if (!c?.home || !r || r.cwd === c.cwd || this.reseating.has(key) || (st !== 'idle' && st !== 'done') || this.agents.background(key)) return
+    if (!c?.home || !r || r.cwd === c.cwd || this.reseating.has(key) || (st !== 'idle' && st !== 'done')) return
     this.reseating.add(key)
     this.agents
       .finish(key)

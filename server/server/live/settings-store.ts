@@ -4,7 +4,7 @@ import type { SettingSection } from '../../shared/types.ts'
 import { readJson, writeJson } from '../store.ts'
 import type { SetBy } from '../../shared/brief.ts'
 import { settingsBlock, settingsLines, type Said, type Ways } from './prompts.ts'
-import { effortFor, effortsOf, findModel, knowsModels, modelsOf } from './models.ts'
+import { effortFor, effortsOf, findModel, knowsModels, modelsOf } from '../../../src/models.ts'
 import {
   type MachineLimits,
   defaultMaxTasks,

@@ -1,15 +1,11 @@
 // Picks the reader for a CLI, and tails a log file: each read() returns the events of the lines written since the
 // last one.
 import { closeSync, openSync, readSync, statSync } from 'node:fs'
-import { ClaudeReader } from './claude.ts'
 import { PiReader } from './pi.ts'
 import { LOG_FINDERS } from './find.ts'
 import type { LogEvent, Reader } from './types.ts'
 
-export { ClaudeReader, PiReader }
-
 const READERS: Record<string, () => Reader> = {
-  claude: () => new ClaudeReader(),
   pi: () => new PiReader(),
 }
 
@@ -17,18 +13,16 @@ const READERS: Record<string, () => Reader> = {
 export const CHAT_KINDS = Object.keys(READERS).filter((kind) => !!LOG_FINDERS[kind])
 
 export function chatProblem(kind: string): string | undefined {
-  if (!CHAT_KINDS.includes(kind))
-    return `${kind} does not support Lineclear chat: no chat log reader is available. Choose ${CHAT_KINDS.join(', ')}. Headless review support is separate.`
+  if (!CHAT_KINDS.includes(kind)) return `${kind} does not support Lineclear chat: no chat log reader is available. Choose ${CHAT_KINDS.join(', ')}.`
 }
 
 /** a fresh reader for herdr's agent kind (readers remember open questions and split replies per file) */
 export function readerFor(cli: string): Reader | undefined {
   const kind = cli.toLowerCase()
-  const key = kind === 'claude-code' || kind === 'claudecode' ? 'claude' : kind
-  return Object.hasOwn(READERS, key) ? READERS[key]() : undefined
+  return Object.hasOwn(READERS, kind) ? READERS[kind]() : undefined
 }
 
-// read big files a piece at a time; Claude Code logs reach tens of MB
+// read big files a piece at a time; agent logs reach tens of MB
 const CHUNK = 4 << 20
 
 export class LogTail {

@@ -15,8 +15,8 @@ interface CliChoice {
   description?: string
 }
 
-/** One question of a CLI's own question tool (Claude Code AskUserQuestion, Codex request_user_input). */
-export interface CliQuestionItem {
+/** One question of a CLI's own question tool. */
+interface CliQuestionItem {
   header?: string
   question: string
   options: CliChoice[]

@@ -1,4 +1,4 @@
-import { chooseModel } from './models.ts'
+import { chooseModel } from '../../../src/models.ts'
 import { randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
 import { sortPlaces } from '../../shared/order.ts'
