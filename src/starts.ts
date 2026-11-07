@@ -106,7 +106,7 @@ export function liveSteps(steps: Step[], tasks: Task[], remote: Task[], taskStep
 const CLAIM_MS = 10 * 60_000;
 
 /**
- * Takes the one start of a step before its task is added. Two ticks, or two machines' rules, that reach the same step
+ * Takes the one start of a step before its task is added. Two ticks on this machine that reach the same step
  * at once cannot both take it: the file is created exclusively. Returns the refusal, or undefined when this call holds it.
  */
 export function claimStart(dir: string, step: string, now: number): string | undefined {

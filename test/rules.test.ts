@@ -90,13 +90,14 @@ test("the same step added twice gets one start and one refusal", () => {
   t.doTick();
   t.doTick();
   expect(t.adds().length).toBe(1);
-  expect(t.decisions().some((x) => x.step === "A" && x.reason.includes("does not start twice"))).toBe(true);
+  expect(t.decisions().some((x) => x.step === "A" && x.reason.includes("claimed a short while ago"))).toBe(true);
 });
 
 test("a landed step gets no start", () => {
   const t = setup({ steps: [step("A", "none")], commits: ["start", "LIN-9: A Title A"] });
   t.doTick();
   expect(t.adds()).toEqual([]);
+  expect(t.decisions().some((x) => x.step === "A" && x.reason.includes("merged on origin/main"))).toBe(true);
 });
 
 test("a step merged on origin/main since the tick read it is not started", () => {
