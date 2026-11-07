@@ -61,10 +61,10 @@ export function spaceTasks(dir: string, space: { key: string }, retired = false)
   return [...byId.values()].filter((t) => String(t.id).startsWith(`${space.key}-`));
 }
 
-/** The chat logs of a space's tasks, with the ones of retired tasks in archive/chatlog. */
-export function chatFiles(dir: string, space: { name: string; key: string }): any[] {
-  const own = (f: string) => f.startsWith(`${space.key}-`) || (f.startsWith("p_") && f.endsWith(`_${space.name}.json`));
-  return [join(dir, "chatlog"), join(dir, "archive", "chatlog")]
+/** The chat logs of a space's tasks, with the ones of retired tasks in archive/chatlog. `coordinatorOnly`: just the space's coordinator chat. */
+export function chatFiles(dir: string, space: { name: string; key: string }, coordinatorOnly = false): any[] {
+  const own = (f: string) => (!coordinatorOnly && f.startsWith(`${space.key}-`)) || (f.startsWith("p_") && f.endsWith(`_${space.name}.json`));
+  return [join(dir, "chatlog"), ...(coordinatorOnly ? [] : [join(dir, "archive", "chatlog")])]
     .filter((log) => existsSync(log))
     .flatMap((log) =>
       readdirSync(log)

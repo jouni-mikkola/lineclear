@@ -2,11 +2,12 @@ import { afterAll, afterEach, expect, mock, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { promisesNext } from "../pi/nudge.ts";
-import { saysDone, allowanceReset, closedReports, openNeedCards, routeAsks, ruleFor } from "../src/asks.ts";
+import { saysDone, closedReports, openNeedCards, routeAsks, ruleFor } from "../src/asks.ts";
 import { askKind, type Card, isIdle } from "../src/cards.ts";
 import { inboxMain } from "../src/inbox-answer.ts";
 import { addItem, closeItem, isOpen, readItems } from "../src/inbox.ts";
 import { storedLogin } from "../server/server/live/secrets.ts";
+import { allowanceReset } from "../src/zone.ts";
 import { readWaits } from "../src/waits.ts";
 import { tmp } from "./helpers.ts";
 
