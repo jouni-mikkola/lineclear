@@ -50,6 +50,149 @@ Result: A test that flakes on GitHub stops blocking merges within one run and ge
 - after: none
 - files: scripts/check.ts, scripts/failures.ts, src/check-runs.ts, test/quarantine.json
 
+## The line target
+
+The goal: at most 40,000 lines of non-test code, from 47,311 (the count and the reasoning are in [scope.md](scope.md)
+under "The line target"). Each step cuts named files, deletes the tests of what it deletes, and loses no feature. Every
+step has `after: none`, its own lock and its own files, so all of them run at once. A step's line count is `wc -l` of
+its files on the commit that merges it.
+
+### L470 Sample data leaves the bundle
+Result: The pages ship no sample data; the `?state=` pictures read their samples from the UI test folder.
+- why: 1222 lines of sample data (`samples.ts` and six more) ship in every page bundle but only `?state=` and the tests draw them.
+- done when: The seven `*samples.ts` files of `ui/web/` are under `ui/test/`; `?state=` still draws every state in `bun run ui:test`; `wc -l` of the non-test files of `ui/web/` prints 2800 or less (4033 today).
+- locks: web-samples
+- after: none
+- files: ui/web/samples.ts, ui/web/real-samples.ts, ui/web/roadmap-samples.ts, ui/web/chat-samples.ts, ui/web/settings-samples.ts, ui/web/browser-samples.ts, ui/web/lazy-samples.ts, ui/web/data.ts, ui/web/chat.tsx, ui/web/home-table.tsx, ui/web/browsers.tsx, ui/web/setup.tsx
+
+### L471 Reactions gone
+Result: A task's chat has no emoji reactions; replies still quote the message they answer.
+- why: area D3 of scope.md: no page of `ui/web/` offers a reaction, yet 18 lines of `chatlines.ts` and a kit part still parse and draw one.
+- done when: `ui/kit/task-chat.tsx` is deleted; `chatlines.ts` is 90 lines or less (255 today) and `chats-replies.ts` 170 or less (264); `Reaction` is gone from the types; `git grep -il reaction` lists no non-test file.
+- locks: chat-reactions
+- after: none
+- files: server/server/live/chatlines.ts, server/server/live/chats-replies.ts, server/shared/types-chat.ts, ui/kit/task-chat.tsx
+
+### L472 Only pi's log is read
+Result: The server reads the logs and start prompts of pi alone; the code and samples of other agent CLIs are gone.
+- why: area D2 of scope.md: pi runs every agent, but `readers/find.ts` and `trust.ts` still know how Claude and Codex write logs and ask for trust.
+- done when: `wc -l` of `server/server/live/readers/`, `trust.ts`, `streaming.ts` and `runtime.ts` prints 300 or less in all (541 today); `server/test/samples/` and `server/test/fixtures/startup/` hold no claude or codex file; `git grep -il codex` lists no non-test file.
+- locks: pi-only
+- after: none
+- files: server/server/live/readers/, server/server/live/trust.ts, server/server/live/streaming.ts, server/server/live/runtime.ts
+
+### L473 One chat log reader
+Result: The Dispatcher's chat and a task's chat read their log through one path, so a chat bug is fixed once.
+- why: `chats-helpers.ts` and `chats-logs.ts` (662 lines) are the biggest files of the two chat paths; the step merges what they share.
+- done when: `wc -l` of `chats-helpers.ts`, `chats-logs.ts` and `chats.ts` prints 420 or less in all (672 today); the server's chat tests pass on GitHub with no test deleted that still tests a live feature.
+- locks: chat-log
+- after: none
+- files: server/server/live/chats-helpers.ts, server/server/live/chats-logs.ts, server/server/live/chats.ts
+
+### L474 The board command is one table
+Result: Each `lineclear` word of the board is one row of a table, not a case in three files.
+- why: `source-cli.ts`, `source-subcommands.ts` and `source-helpers.ts` (779 lines) hold the board command's words; the step puts each word in one table row.
+- done when: `wc -l` of those three files prints 520 or less in all; `lineclear --help` prints the same words as before; the server's CLI tests pass on GitHub.
+- locks: board-words
+- after: none
+- files: server/server/live/source-cli.ts, server/server/live/source-subcommands.ts, server/server/live/source-helpers.ts
+
+### L475 One git helper
+Result: Every git call of the rule loop and the server goes through one helper; the copies are gone.
+- why: `src/git.ts` is called the one git helper, yet `engine/git.ts` (407 lines) and `engine/worktrees.ts` (328) hold more git code; the step moves what repeats into the helper.
+- done when: `wc -l` of `engine/git.ts`, `engine/worktrees.ts`, `src/git.ts`, `src/main-branch.ts` and `src/worktree.ts` prints 560 or less in all (851 today); `git grep -n "spawnSync('git'"` lists one non-test file.
+- locks: git-helper
+- after: none
+- files: server/server/live/engine/git.ts, server/server/live/engine/worktrees.ts, src/git.ts, src/main-branch.ts, src/worktree.ts
+
+### L476 One project settings reader
+Result: A project's settings are read by one function, so the Roadmap, Home and Settings never disagree.
+- why: `projectSettings` is written twice (`web-settings.ts`, `roadmap-view.ts`) and `project.ts` is the biggest file of the CLI (579 lines).
+- done when: `git grep -c "function projectSettings"` over non-test files prints 1; `wc -l` of `project.ts`, `web-settings.ts`, `roadmap-view.ts` and `add-project.ts` prints 760 or less in all (1057 today).
+- locks: project-settings
+- after: none
+- files: src/project.ts, src/web-settings.ts, src/roadmap-view.ts, src/add-project.ts
+
+### L477 One line picture
+Result: Home and the Roadmap draw the line of steps with the same parts, and the picture keeps its motion.
+- why: the kit's line (`line.tsx`, `line-parts.tsx`, `line-glide.tsx`, `line-motion.tsx`) and the Roadmap's `line.tsx` are 1387 lines for one picture; the step merges the parts that draw a station twice.
+- done when: `wc -l` of those five files prints 900 or less in all; `bun run ui:test` still passes its motion and screenshot cases at 1440 and 390 px on GitHub.
+- locks: line-picture
+- after: none
+- files: ui/kit/line.tsx, ui/kit/line-parts.tsx, ui/kit/line-glide.tsx, ui/kit/line-motion.tsx, ui/web/roadmap/line.tsx
+
+### L478 One list of browsers
+Result: The agents' browsers are listed and drawn from one shape of data, in less code.
+- why: area D4 of scope.md left `src/browsers.ts` (354 lines) and the kit's `browsers.tsx` (388) are 742 lines for one list.
+- done when: `wc -l` of those two files prints 500 or less in all (742 today); the browser view and `lineclear` browser tests pass on GitHub.
+- locks: browser-list
+- after: none
+- files: src/browsers.ts, ui/kit/browsers.tsx
+
+### L479 Machine links in less code
+Result: Machines and their links work as before from a third less code, with one retry path.
+- why: `machines-links.ts` (502 lines), `machines-helpers.ts`, `mfs.ts`, `herdr-forward.ts` and `recovery.ts` are 1050 lines; `recovery.ts` retries a link and `machines-links.ts` keeps its state.
+- done when: `wc -l` of `machines*.ts`, `mfs.ts`, `herdr-forward.ts` and `recovery.ts` in `server/server/live/` prints 720 or less in all (1050 today); the server's machine tests pass on GitHub.
+- locks: machine-links
+- after: none
+- files: server/server/live/machines-links.ts, server/server/live/machines-helpers.ts, server/server/live/machines-actions.ts, server/server/live/machines.ts, server/server/live/mfs.ts, server/server/live/herdr-forward.ts, server/server/live/recovery.ts
+
+### L480 Release tools in one place
+Result: The update reads old store files through one script, and the release scripts share their helpers.
+- why: `scripts/formats.ts` and `server/scripts/store-formats.ts` both list old store formats; the other scripts are small files a step can merge.
+- done when: `scripts/formats.ts` is deleted; `wc -l` of `store-formats.ts`, `changed.ts`, `fast-gates.ts`, `ui-changed.ts`, `fake-sessions.ts`, `release-tag.ts` and `release-notes.ts` prints 330 or less in all (504 today with `formats.ts`); `bun scripts/smoke.ts` still passes.
+- locks: release-tools
+- after: none
+- files: scripts/formats.ts, server/scripts/store-formats.ts, scripts/changed.ts, scripts/fast-gates.ts, scripts/ui-changed.ts, scripts/fake-sessions.ts, scripts/release-tag.ts, scripts/release-notes.ts
+
+### L481 Docs nobody reads are gone
+Result: The docs folder holds only pages that code, a check or another page uses.
+- why: `fit-audit.md`, `web-audit.md` and `rivals.md` (241 lines) are linked from no file, and `fit-audit.md` lists deletes that are already done.
+- done when: those three files are deleted; `git grep` finds no link to them; `wc -l docs/*.md` prints 1780 or less in all (2025 today).
+- locks: docs-cut
+- after: none
+- files: docs/fit-audit.md, docs/web-audit.md, docs/rivals.md
+
+### L482 The knip config fits the repo
+Result: `bun run gates` prints no configuration hint, so a real dead-code finding is not buried.
+- why: knip prints 9 configuration hints today (a stale ignore, entry patterns that match nothing), so people stop reading its output.
+- done when: `bunx knip` prints no "Configuration hints" block and no finding; `wc -l knip.jsonc` prints 20 or less (24 today).
+- locks: knip-config
+- after: none
+- files: knip.jsonc
+
+### L483 The engine's state in one place
+Result: A task's state and handoff are kept by one module, not three that copy each other's fields.
+- why: `engine-handoff.ts` (520 lines), `engine-state.ts` (491) and `engine-tidy.ts` (281) are the biggest files of the engine's state.
+- done when: `wc -l` of those three files prints 900 or less in all (1292 today); the server's engine tests pass on GitHub.
+- locks: engine-state
+- after: none
+- files: server/server/live/engine/engine-handoff.ts, server/server/live/engine/engine-state.ts, server/server/live/engine/engine-tidy.ts
+
+### L484 Home reads once
+Result: Home's data comes from one read per tick, not one per widget.
+- why: `home-data.ts`, `home-waits.ts`, `kept-read.ts` and `progress.ts` (935 lines) are Home's data.
+- done when: `wc -l` of those four files prints 650 or less in all; `lineclear top` and the Home tests pass on GitHub.
+- locks: home-read
+- after: none
+- files: src/home-data.ts, src/home-waits.ts, src/kept-read.ts, src/progress.ts
+
+### L485 The Inbox's answers in one path
+Result: A card, a push and an answer share one path, so a new kind of ask needs one change.
+- why: `asks.ts` (436 lines), `inbox-answer.ts`, `cards.ts` and `notify.ts` turn an ask into a card, a push and an answer.
+- done when: `wc -l` of those four files prints 500 or less in all (726 today); the Inbox and asks tests pass on GitHub.
+- locks: inbox-path
+- after: none
+- files: src/asks.ts, src/inbox-answer.ts, src/cards.ts, src/notify.ts
+
+### L486 Recount and the next cuts
+Result: scope.md shows the line count after the cuts, and ROADMAP.md holds the steps for the rest of the way to 40,000.
+- why: the cuts above reach about 41,000 with L95; the last 1,000 lines cannot be named until the others are gone.
+- done when: `wc -l` by the rule of scope.md prints 41,500 or less on main and scope.md shows it; if it prints more than 40,000, at least 3 new steps with disjoint locks name the next cuts.
+- locks: recount
+- after: L470, L471, L472, L473, L474, L475, L476, L477, L478, L479, L480, L481, L482, L483, L484, L485
+- files: docs/scope.md, docs/ROADMAP.md
+
 ## Speed and stability
 
 The goal: the fastest AI development system with the fewest bugs, light and with no old code. Baselines are in
