@@ -323,7 +323,7 @@ describe('what you send shows at once', () => {
       expect(agents.outbox.some((o) => o.key === chat)).toBe(false)
     } finally {
       Object.assign(herdr, { prompt, paneText, paneKeys, paneIdle })
-      Object.assign(agents, { status, info, beforeInput, paneAfter: 10_000, briefFor: 300_000, backoffMs: 2000 })
+      Object.assign(agents, { status, info, beforeInput, paneAfter: 2000, briefFor: 300_000, backoffMs: 2000 })
       agents.backoff.clear()
       if (record) agents.records[chat] = record
       else delete agents.records[chat]
