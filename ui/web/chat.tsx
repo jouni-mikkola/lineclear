@@ -1,9 +1,9 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { type Dispatch, type SetStateAction, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatView } from "../../src/chat.ts";
 import type { PlanCard } from "../../src/web.ts";
-import { MAX_FILE_BYTES, MAX_FILES } from "../../src/chat-limits.ts";
-import { type Attached, sizeText } from "../kit/index.ts";
+import type { Attached } from "../kit/index.ts";
+import { newId, useAttach } from "./chat-attach.ts";
 import { get, isList, post } from "./data.ts";
 import { samples } from "./sample-loader.ts";
 import { CHAT_STATES, type ChatState } from "./states.ts";
@@ -29,67 +29,20 @@ export function chatState(): ChatState | undefined {
   return (CHAT_STATES as readonly string[]).includes(s) ? (s as ChatState) : undefined;
 }
 
-const newId = () => Math.random().toString(36).slice(2, 12) + Date.now().toString(36);
-
-const base64 = (f: File) =>
-  new Promise<string>((ok, fail) => {
-    const r = new FileReader();
-    r.onload = () => ok(String(r.result).replace(/^data:[^,]*,/, ""));
-    r.onerror = () => fail(r.error);
-    r.readAsDataURL(f);
-  });
-
-/** Adding and removing the files of the next message: each is uploaded at once and shows its own state. */
-function useAttach(sample: ChatState | undefined, api: string, attached: Attached[], setAttached: Dispatch<SetStateAction<Attached[]>>, pending: Pending[]) {
-  const attach = (files: File[]) => {
-    const room = MAX_FILES - attached.filter((a) => a.state !== "failed").length;
-    for (const [i, f] of files.entries()) {
-      const id = newId();
-      const image = /^image\/(png|jpeg|gif|webp)$/.test(f.type);
-      const a: Attached = { id, name: f.name || "pasted-image.png", size: f.size, image, url: image ? URL.createObjectURL(f) : undefined, state: "uploading" };
-      const fail = (error: string) => setAttached((as) => as.map((x) => (x.id === id ? { ...x, state: "failed", error } : x)));
-      setAttached((as) => [...as, a]);
-      if (i >= room) {
-        fail(`A message can carry at most ${MAX_FILES} files.`);
-        continue;
-      }
-      if (f.size > MAX_FILE_BYTES) {
-        fail(`${a.name} is too big: a file can be at most ${sizeText(MAX_FILE_BYTES)}.`);
-        continue;
-      }
-      if (sample) {
-        setAttached((as) => as.map((x) => (x.id === id ? { ...x, state: "ready" } : x)));
-        continue;
-      }
-      void base64(f)
-        .then((data) => post<{ id: string }>(`${api}/files`, { name: a.name, data }))
-        .then((r) => (r.ok ? setAttached((as) => as.map((x) => (x.id === id ? { ...x, id: r.data.id, state: "ready" } : x))) : fail(r.error)))
-        .catch(() => fail(`${a.name} could not be read.`));
-    }
-  };
-
-  const remove = (id: string) =>
-    setAttached((as) => {
-      const gone = as.find((a) => a.id === id);
-      if (gone?.url?.startsWith("blob:") && !pending.some((p) => p.files.includes(gone))) URL.revokeObjectURL(gone.url);
-      return as.filter((a) => a.id !== id);
-    });
-  return { attach, remove };
-}
-
 /** The plans you asked for here: each comes back as one approval, the same item as in the Inbox. */
 function usePlanCards(sample: ChatState | undefined, on: boolean, api: string) {
   const client = useQueryClient();
-  const plansQuery = useQuery({ queryKey: ["plans"], queryFn: () => get<PlanCard[]>("/api/plans", isList), enabled: !sample && on && api === "/api/chat" });
-  const plans = api !== "/api/chat" ? [] : (sample ? samples().chat.planSamples(sample) : (plansQuery.data ?? [])).filter((p) => p.by === "dispatcher");
-  const [planErrors, setPlanErrors] = useState<Record<string, string>>({});
+  const here = api === "/api/chat";
+  const query = useQuery({ queryKey: ["plans"], queryFn: () => get<PlanCard[]>("/api/plans", isList), enabled: !sample && on && here });
+  const plans = (here ? (sample ? samples().chat.planSamples(sample) : (query.data ?? [])) : []).filter((p) => p.by === "dispatcher");
+  const [planErrors, setPlanErrors] = useState<Record<string, string | undefined>>({});
   const answerPlan = useCallback(
     async (p: PlanCard, choice: string, note?: string) => {
       if (sample || !p.item) return;
       // a new answer clears the last failure, so a second one with the same words still shows
-      setPlanErrors(({ [p.task]: _, ...rest }) => rest);
+      setPlanErrors((e) => ({ ...e, [p.task]: undefined }));
       const r = await post<{ said: string }>(`/api/inbox/${p.item.id}`, { choice, note });
-      setPlanErrors(({ [p.task]: _, ...rest }) => (r.ok ? rest : { ...rest, [p.task]: r.error }));
+      setPlanErrors((e) => ({ ...e, [p.task]: r.ok ? undefined : r.error }));
       await Promise.all([client.invalidateQueries({ queryKey: ["plans"] }), client.invalidateQueries({ queryKey: ["inbox"] })]);
     },
     [sample, client],
