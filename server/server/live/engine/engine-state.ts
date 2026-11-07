@@ -2,13 +2,13 @@ import { answersTo, renameLater, type TaskIds } from '../task-ids.ts'
 import { onMachine, type BoxInfo } from '../box.ts'
 import type { TaskStatus } from '../../../shared/types.ts'
 import { Emitter } from '../../source.ts'
-import { readJson, writeJson } from '../../store.ts'
 import type { Agents } from '../agents.ts'
 import type { Chats } from '../chats.ts'
 import { HOST, type Places, type Space } from '../places.ts'
 import type { Settings } from '../settings.ts'
 import { Briefs, withoutBrief } from './briefs.ts'
 import { COLD_AFTER, ColdLog, withCold } from './cold.ts'
+import { TaskStore } from './task-store.ts'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { join } from 'node:path'
 import { HeadWatch } from './lane-watch.ts'
@@ -28,15 +28,8 @@ export abstract class EngineState extends Emitter<Events> {
   /** main: by project path, the failing commit on GitHub's main its coordinator was told of, until main is green */
   private cold = new ColdLog<TaskRec>()
   private briefs = new Briefs()
-  protected data = this.briefs.loaded(
-    withCold(
-      this.cold,
-      readJson<{ next: Record<string, number>; tasks: TaskRec[]; red?: Record<string, string> }>('tasks.json', {
-        next: {},
-        tasks: [],
-      }),
-    ),
-  )
+  protected store = new TaskStore<TaskRec>()
+  protected data = this.briefs.loaded(withCold(this.cold, this.store.load()))
   taskIds!: TaskIds
   protected starting = new Set<string>()
   /** started, its brief not yet taken up: To do until its agent works on it */
@@ -125,7 +118,7 @@ export abstract class EngineState extends Emitter<Events> {
     const now = Date.now()
     this.briefs.write(this.data.tasks)
     const hot = this.cold.save(this.data.tasks, (t) => ended(t) && now - (t.doneAt ?? t.updated) >= COLD_AFTER, withoutBrief)
-    writeJson('tasks.json', { ...this.data, tasks: hot.map(withoutBrief) })
+    this.store.save({ ...this.data, tasks: hot.map(withoutBrief) })
     this.emit('changed')
   }
 

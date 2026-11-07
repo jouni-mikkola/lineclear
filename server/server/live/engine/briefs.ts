@@ -1,8 +1,9 @@
 // A task's brief sits in a file of its own, tasks/<id>/brief.md, written when it changes. tasks.json and the cold log
 // keep only its path and size, so a change to any task rewrites a small file. The brief stays in memory as `desc`.
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { HOME } from '../../store.ts'
+import { durableWrite } from './task-store.ts'
 
 interface Briefed {
   id: string
@@ -14,6 +15,8 @@ interface Briefed {
 export class Briefs {
   /** each brief as last written to its file */
   private written = new Map<string, string>()
+  /** tasks whose brief file is gone, by id, with its path: they run with no brief, and say so */
+  readonly lost = new Map<string, string>()
 
   /** `data` with each brief read back from its file */
   loaded<D extends { tasks: Briefed[] }>(data: D): D {
@@ -30,6 +33,8 @@ export class Briefs {
         this.written.set(t.id, t.desc)
       } catch {
         // a lost file stays lost: no empty one is written over its place
+        this.lost.set(t.id, t.briefPath)
+        console.error(`${t.id}: its brief file ${join(HOME, t.briefPath)} is missing`)
         t.desc ??= ''
         this.written.set(t.id, t.desc)
       }
@@ -43,14 +48,13 @@ export class Briefs {
       const text = t.desc ?? ''
       const path = `tasks/${t.id}/brief.md`
       if (this.written.get(t.id) !== text) {
-        const file = join(HOME, path)
-        mkdirSync(dirname(file), { recursive: true, mode: 0o700 })
-        writeFileSync(`${file}.tmp`, text)
-        renameSync(`${file}.tmp`, file)
+        durableWrite(join(HOME, path), text)
         this.written.set(t.id, text)
+        this.lost.delete(t.id)
+        t.briefSize = Buffer.byteLength(text)
       }
       t.briefPath = path
-      t.briefSize = Buffer.byteLength(text)
+      t.briefSize ??= Buffer.byteLength(text)
     }
   }
 }

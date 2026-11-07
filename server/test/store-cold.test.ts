@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { world } from './engine-world.ts'
 import { COLD_AFTER, COLD_FILE, ColdLog, withCold } from '../server/live/engine/cold.ts'
 import { HOME, writeJson } from '../server/store.ts'
+import { readStore } from '../server/live/engine/task-store.ts'
 
 type T = { id: string; done?: boolean; at: number }
 
@@ -52,7 +53,7 @@ test('the engine writes a task merged or closed over a day ago to tasks-cold.jso
   const w = world()
   w.engine.pin('CLD-4', true)
 
-  const hot = (JSON.parse(readFileSync(join(HOME, 'tasks.json'), 'utf8')).tasks as { id: string }[]).map((t) => t.id)
+  const hot = readStore<{ id: string }>(HOME).data.tasks.map((t) => t.id)
   expect(hot).toEqual(['CLD-3', 'CLD-4'])
   expect(existsSync(join(HOME, COLD_FILE))).toBe(true)
   const cold = readFileSync(join(HOME, COLD_FILE), 'utf8')

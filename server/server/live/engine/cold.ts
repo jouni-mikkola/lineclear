@@ -2,9 +2,10 @@
 // one of them (the last line of an id wins, `{"gone": id}` drops it). Finished agents' records do the same, from
 // agents.json to agents-cold.jsonl. They stay in memory as before, but a change writes only the ones still at work
 // whole, so each write stays small however many tasks the board has kept.
-import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { appendFileSync, closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, writeSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { HOME, readJson, writeJson } from '../../store.ts'
+import { durableWrite } from './task-store.ts'
 
 export const COLD_AFTER = 86_400_000
 export const COLD_FILE = 'tasks-cold.jsonl'
@@ -12,21 +13,30 @@ export const COLD_AGENTS = 'agents-cold.jsonl'
 
 type Rec = Record<string, unknown>
 
-/** The records of a log, by `idKey`, in the order they first went cold. */
-function readCold(file: string, idKey = 'id'): Rec[] {
+/** The records of a log, by `idKey`, in the order they first went cold, and how many lines it has. A line that does not
+ *  parse is kept in <file>.bad, where `lineclear doctor` finds it; the one before it stands. */
+function readCold(file: string, idKey = 'id'): { recs: Rec[]; lines: number; skipped: string[] } {
   const by = new Map<string, Rec>()
-  if (!existsSync(file)) return []
-  for (const line of readFileSync(file, 'utf8').split('\n')) {
+  const skipped: string[] = []
+  if (!existsSync(file)) return { recs: [], lines: 0, skipped }
+  const text = readFileSync(file, 'utf8')
+  let lines = 0
+  for (const line of text.split('\n')) {
     if (!line) continue
+    lines++
     try {
       const r = JSON.parse(line) as Rec
       if (typeof r?.gone === 'string') by.delete(r.gone)
       else if (typeof r?.[idKey] === 'string') by.set(r[idKey] as string, r)
+      else skipped.push(line)
     } catch {
-      // a line cut short by a stop mid-write: the one before it stands
+      skipped.push(line)
     }
   }
-  return [...by.values()]
+  if (skipped.length) appendFileSync(`${file}.bad`, `${skipped.join('\n')}\n`)
+  // a last line cut short has no end: the next line must not join onto it
+  if (text && !text.endsWith('\n')) appendFileSync(file, '\n')
+  return { recs: [...by.values()], lines, skipped }
 }
 
 /** a top-level copy: a cold task changes by assignment, so a changed field is a new value here */
@@ -40,6 +50,8 @@ export class ColdLog<T extends object> {
   /** each cold record as last written */
   private written = new Map<string, Record<string, unknown>>()
   private lines = 0
+  /** lines of the log that did not parse when it was read */
+  skipped: string[] = []
   private id: (t: T) => string
 
   constructor(
@@ -55,9 +67,11 @@ export class ColdLog<T extends object> {
    *  writes). */
   load(hot: T[]): T[] {
     const ids = new Set(hot.map(this.id))
-    const cold = readCold(this.file, this.idKey).filter((t) => !ids.has(t[this.idKey] as string)) as unknown as T[]
+    const read = readCold(this.file, this.idKey)
+    const cold = read.recs.filter((t) => !ids.has(t[this.idKey] as string)) as unknown as T[]
     for (const t of cold) this.written.set(this.id(t), { ...(t as Record<string, unknown>) })
-    this.lines = existsSync(this.file) ? readFileSync(this.file, 'utf8').split('\n').filter(Boolean).length : 0
+    this.lines = read.lines
+    this.skipped = read.skipped
     return [...cold, ...hot]
   }
 
@@ -91,16 +105,20 @@ export class ColdLog<T extends object> {
     // a log many times its tasks is written again whole, from memory
     if (this.lines + lines.length > 2 * this.written.size + 1000) this.compact(tasks.filter((t) => this.written.has(this.id(t))).map(out))
     else {
-      appendFileSync(this.file, `${lines.join('\n')}\n`)
+      const fd = openSync(this.file, 'a')
+      try {
+        writeSync(fd, `${lines.join('\n')}\n`)
+        fsyncSync(fd)
+      } finally {
+        closeSync(fd)
+      }
       this.lines += lines.length
     }
     return hot
   }
 
   private compact<T>(cold: T[]) {
-    const tmp = `${this.file}.tmp`
-    writeFileSync(tmp, cold.map((t) => `${JSON.stringify(t)}\n`).join(''))
-    renameSync(tmp, this.file)
+    durableWrite(this.file, cold.map((t) => `${JSON.stringify(t)}\n`).join(''))
     this.lines = cold.length
   }
 }

@@ -3,6 +3,7 @@ import { describe, expect, test } from 'bun:test'
 import { readFileSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { repo, started, world } from './engine-world.ts'
+import { readStore } from '../server/live/engine/task-store.ts'
 
 describe('briefs', () => {
   test('a store of 100 tasks with their briefs inside migrates with every brief unchanged and tasks.json under 10 %', async () => {
@@ -49,7 +50,7 @@ describe('briefs', () => {
     const { HOME } = await import('../server/store.ts')
     const w = world()
     const { t } = await started(w, repo(), 'briefnew', 'Brief file', 'Add hello.txt.\nÜnï ✓')
-    const rec = (JSON.parse(readFileSync(join(HOME, 'tasks.json'), 'utf8')).tasks as Record<string, unknown>[]).find((x) => x.id === t.id)!
+    const rec = readStore<Record<string, unknown> & { id: string }>(HOME).data.tasks.find((x) => x.id === t.id)!
     expect(rec.briefPath).toBe(`tasks/${t.id}/brief.md`)
     expect(rec.desc).toBeUndefined()
     const text = readFileSync(join(HOME, rec.briefPath as string), 'utf8')

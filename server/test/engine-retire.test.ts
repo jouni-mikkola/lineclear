@@ -3,6 +3,7 @@ import { describe, expect, test } from 'bun:test'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { world } from './engine-world.ts'
+import { readStore } from '../server/live/engine/task-store.ts'
 
 const day = 86_400_000
 const now = Date.now()
@@ -65,7 +66,7 @@ describe('retiring', () => {
       rec('COLD-4', 3, { merged: false }, big),
     )
     w.engine.pin('COLD-4', true)
-    const hot = () => (JSON.parse(readFileSync(join(HOME, 'tasks.json'), 'utf8')).tasks as { id: string }[]).map((t) => t.id)
+    const hot = () => readStore<{ id: string }>(HOME).data.tasks.map((t) => t.id)
     const log = () => linesOf(join(HOME, COLD_FILE))
     // the one still at work, and the one ended half a day ago, are written whole; the rest once
     expect(hot()).toEqual(['COLD-3', 'COLD-4'])

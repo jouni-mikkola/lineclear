@@ -1,9 +1,10 @@
 // Ended tasks leave tasks.json after RETIRE_AFTER, and their chat logs leave chatlog/, so the files read and written on
 // every change stay small however long the board runs. Their records go to archive/tasks-<month>.jsonl, their chats
 // to archive/chatlog/, and how many per space key to archive/counts.json, where `lineclear measure` and Home read them.
-import { appendFileSync, existsSync, mkdirSync, readdirSync, renameSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync } from 'node:fs'
 import { join } from 'node:path'
-import { HOME, readJson, writeJson } from '../../store.ts'
+import { HOME } from '../../store.ts'
+import { durableWrite, keepBad } from './task-store.ts'
 
 const RETIRE_AFTER = 90 * 86_400_000
 
@@ -16,10 +17,23 @@ export interface Retired {
   merged?: boolean
 }
 
+type Counts = Record<string, { merged: number; closed: number }>
+
+/** The counts file; one that does not parse is kept as counts.json.bad-<time> and counted again from nothing, never lost. */
+function readCounts(file: string): Counts {
+  if (!existsSync(file)) return {}
+  try {
+    return JSON.parse(readFileSync(file, 'utf8')) as Counts
+  } catch {
+    keepBad(file)
+    return {}
+  }
+}
+
 function retireTasks(tasks: Retired[]) {
   const dir = join(HOME, 'archive')
   mkdirSync(join(dir, 'chatlog'), { recursive: true })
-  const counts = readJson<Record<string, { merged: number; closed: number }>>('archive/counts.json', {})
+  const counts = readCounts(join(dir, 'counts.json'))
   for (const t of tasks) {
     // written before the task leaves tasks.json: a stop in between keeps it twice, never loses it
     appendFileSync(join(dir, `tasks-${month(t.doneAt ?? t.updated)}.jsonl`), `${JSON.stringify(t)}\n`)
@@ -29,7 +43,7 @@ function retireTasks(tasks: Retired[]) {
     if (t.merged) c.merged++
     else c.closed++
   }
-  writeJson('archive/counts.json', counts)
+  durableWrite(join(dir, 'counts.json'), JSON.stringify(counts, null, 2))
   const log = join(HOME, 'chatlog')
   if (!existsSync(log)) return
   const ids = new Set(tasks.map((t) => t.id))
