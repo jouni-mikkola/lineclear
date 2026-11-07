@@ -14,7 +14,7 @@ const isUser = (m: Raw) => m?.role === "user";
 const textOf = (m: Raw): string => (typeof m.content === "string" ? m.content : Array.isArray(m.content) ? String(m.content[0]?.text ?? "") : "");
 
 /** True in the Dispatcher: its role is set, or it runs in its folder (<config>/dispatcher). */
-function inDispatcher(cwd: string, env: Env): boolean {
+export function inDispatcher(cwd: string, env: Env): boolean {
   if (env.LINECLEAR_ROLE === "dispatcher") return true;
   const dir = join(env.LINECLEAR_CONFIG || join(env.HOME ?? homedir(), ".config", "lineclear"), "dispatcher");
   return cwd === dir || cwd.startsWith(`${dir}/`);

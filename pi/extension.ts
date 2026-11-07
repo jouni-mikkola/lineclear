@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { quietNudge } from "./nudge.ts";
 import freshDispatcher from "./fresh-dispatcher.ts";
+import compactChats from "./compact-chats.ts";
 import accountFallback from "./account-fallback.ts";
 
 type Env = Record<string, string | undefined>;
@@ -107,6 +108,7 @@ export default async function lineclearExtension(pi: Pi): Promise<void> {
   nudgeQuietTurns(pi);
   beatDuringCalls(pi);
   freshDispatcher(pi);
+  compactChats(pi);
   accountFallback(pi);
   pi.on("resources_discover", () => (lineclearAgent(process.env) ? { skillPaths: kitSkills() } : undefined));
   pi.on("before_agent_start", (event) => {
