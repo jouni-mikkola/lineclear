@@ -200,7 +200,7 @@ export class EngineTidy extends EngineMerge {
   }
 
   /** Ended tasks are marked retired RETIRE_AFTER after they ended, with their chats (retire.ts); never a pinned one
-   *  or one whose agent you are talking to. Their agents' records go too, so agents-cold.jsonl does not grow for ever. */
+   *  or one whose agent you are talking to. Their agents' records go too, so the agents table does not grow for ever. */
   retireOld(now = Date.now()) {
     const gone = retireDue(this.store, this.data.tasks, (t) => ended(t) && !t.pinned && this.agents.status(this.key(t)) !== 'working', now)
     for (const t of gone) this.agents.forget(this.key(t))

@@ -2,7 +2,7 @@
 // stand-in that makes and removes real git worktrees. Each file that imports it gets its own Lineclear home.
 import { afterEach } from 'bun:test'
 import { execSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -13,7 +13,7 @@ export const { placeId } = await import('../server/live/places.ts')
 export const { Settings } = await import('../server/live/settings.ts')
 export const { settingsBlock } = await import('../server/live/prompts.ts')
 const store = await import('../server/store.ts')
-/** a test's tasks.json or agents.json is the whole of them: the rows earlier tests left and the cold log go, and the file is imported again */
+/** a test's tasks.json or agents.json is the whole of them: the rows earlier tests left go, and the file is imported again */
 export const writeJson = (name: string, value: unknown) => {
   if (name === 'tasks.json') {
     for (const table of ['tasks', 'task_briefs', 'task_meta', 'imports']) {
@@ -24,7 +24,11 @@ export const writeJson = (name: string, value: unknown) => {
       }
     }
   }
-  if (name === 'agents.json') rmSync(join(store.HOME, 'agents-cold.jsonl'), { force: true })
+  if (name === 'agents.json') {
+    store.db.exec(
+      "create table if not exists agents (key text primary key, json text not null); create table if not exists imports (name text primary key); delete from agents; delete from imports where name = 'agents.json'",
+    )
+  }
   store.writeJson(name, value)
 }
 export const { fakeHerdr } = await import('./fake-herdr.ts')

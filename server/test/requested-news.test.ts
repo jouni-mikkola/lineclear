@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test'
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { AgentRows } from '../server/live/agent-rows.ts'
 import { RequestedNewsMailbox } from '../server/live/requested-news.ts'
 
 describe('requesting coordinator mailbox', () => {
@@ -11,14 +12,11 @@ describe('requesting coordinator mailbox', () => {
     try {
       const home = join(root, 'workers', 'desktop')
       mkdirSync(home, { recursive: true })
-      writeFileSync(
-        join(home, 'agents.json'),
-        JSON.stringify({
-          'p:desktop:repo': { key: 'p:desktop:repo' },
-          'p:desktop:old': { key: 'p:desktop:old', finished: true },
-          'TASK-1/Agent': { key: 'TASK-1/Agent' },
-        }),
-      )
+      new AgentRows(home).write({
+        'p:desktop:repo': { key: 'p:desktop:repo', started: 1 },
+        'p:desktop:old': { key: 'p:desktop:old', started: 1, finished: true } as { key: string; started: number },
+        'TASK-1/Agent': { key: 'TASK-1/Agent', started: 1 },
+      })
       const mail = new RequestedNewsMailbox(root)
       expect(mail.known('p:desktop:repo')).toBe('p:desktop:repo')
       for (const chat of [undefined, 'repo', 'p:desktop:invented', 'p:desktop:old', 'TASK-1/Agent']) expect(mail.known(chat)).toBeUndefined()

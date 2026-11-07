@@ -3,7 +3,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { readAgentRows } from './engine/cold.ts'
+import { readAgentRows } from './agent-rows.ts'
 
 export interface RequestedNews {
   id: string
