@@ -39,13 +39,13 @@ export function diskTrouble(dirs: string[], minFreeMb: string | undefined, free:
 }
 
 /** The addresses that say the network is up: any one that answers is enough. */
-const hosts = (env: Env) =>
+const _hosts = (env: Env) =>
   (env.LINECLEAR_NET_CHECK ?? "github.com:443,1.1.1.1:443")
     .split(",")
     .map((h) => h.trim())
     .filter(Boolean);
 
-async function reaches(target: string, ms: number): Promise<boolean> {
+async function _reaches(target: string, ms: number): Promise<boolean> {
   const i = target.lastIndexOf(":");
   const hostname = target.slice(0, i);
   const port = Number(target.slice(i + 1));
@@ -59,16 +59,4 @@ async function reaches(target: string, ms: number): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-/** The network is lost when none of the addresses answers. `LINECLEAR_NET_CHECK=off` skips it. */
-export async function networkTrouble(env: Env = process.env, ms = 3000): Promise<Trouble | undefined> {
-  if (env.LINECLEAR_NET_CHECK === "off") return undefined;
-  const list = hosts(env);
-  for (const h of list) if (await reaches(h, ms)) return undefined;
-  return {
-    name: "network lost",
-    problem: `this machine cannot reach ${list.join(" or ")}, so agents cannot reach their models or GitHub`,
-    fix: "Check the cable, Wi-Fi or VPN. Lineclear goes on by itself once the network is back.",
-  };
 }
