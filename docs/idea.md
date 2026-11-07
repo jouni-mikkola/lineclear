@@ -66,7 +66,7 @@ A rule is a goal until its check exists.
     broken only. Checked by: the UI bar (`bun run ui:test`). Open: the command center page (LIN-139).
 11. **The owner gets only a login, money beyond the budget, or something that leaves the machine.** Everything else is
     settled without them; if something still waits for them, it becomes a task (LIN-163). Held today by: the Inbox
-    rules; `lineclear measure` counts the asks. Open: a check that fails on any other ask.
+    rules. Open: a check that fails on any other ask.
 12. **The scope limit.** One server, SSH machines and a one-command install. No new services, containers or queues.
     Open: a check that fails on a new service, container or queue (LIN-167).
 
@@ -105,7 +105,6 @@ From [pi](https://pi.dev) (its docs ship with it, under `docs/`):
 - Skills: `resources_discover` hands pi the kit's skills in `kit/`, so an agent needs no personal skill folder.
 - Compaction: the token pack sets when a session compacts and writes its notes first.
 - Models: `pi --list-models` tells Home which models you are logged in to.
-- Sessions: `lineclear measure` reads pi's session files for tokens and cost per step.
 - Not used yet: pi packages (`pi install`), which could ship the kit and the extension as one package, and pi's RPC
   mode, which could run a headless reviewer without a terminal.
 
@@ -267,10 +266,6 @@ It follows three principles:
   the AI coordinator, on one pilot project first.
 - At phase 5 Lineclear forks herdr-projects 2.0 at `ebb17d5`, its first commit with the MIT license, and fixes its known
   faults. The migration moves every machine and keeps a way back in one command. Lineclear is retired at the end.
-- `lineclear measure` prints the numbers with no AI. Goals: under 3 asks a day, owner taps per merged step near 0, a median wait from ready to start
-  under 5 min, a cost per merged step at least 15 % below the pilot's before Lineclear, and 0 model turns that no
-  step and no owner message started. From phase 2 on, each
-  phase is measured before and after; a phase that does not move its number is not built further.
 - The README stays short: one animation that shows the idea, links to these docs, and the status.
 
 **Not in it:** a hosted service, teams, its own model runtime (that is pi), a quota cap, a database before a measured

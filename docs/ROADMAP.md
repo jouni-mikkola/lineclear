@@ -37,8 +37,6 @@ live in git history: a step's id is in its commit subject. The rules read this f
   step is open again.
 - A step that needs you asks once and waits: `lineclear ask` until L7, then `lineclear ask`.
 - There are no time trials. A step is done when its checks pass, and the owner reviews the result.
-- From phase 2 on, each phase is measured before and after with `lineclear measure` (L4). The numbers go to
-  `docs/numbers.md` without project names.
 - New ideas go to [backlog.md](backlog.md), never into this file.
 - The section "Frozen by the owner 5 Nov 2026" holds open steps the rule loop never starts. Moving a step out of it is the owner's call.
 - An `after` names only a step whose code the later step needs, so as many steps as possible are ready at once.

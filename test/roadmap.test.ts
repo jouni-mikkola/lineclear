@@ -160,7 +160,6 @@ test("usage prints the usage lines and nothing else", () => {
     "       lineclear roadmap show <id> [<repo>]",
     "       lineclear roadmap status <repo> --space <name> [--json]",
     "       lineclear roadmap locks <repo> --space <name>",
-    "       lineclear roadmap import <file.json> <repo> [--force] [--no-commit]",
   ];
   for (const args of [["--help"], ["status", "."]]) {
     // like console.log: every argument is printed, so a stray index or array shows up
@@ -207,28 +206,15 @@ test("a result written as a plain Result line is read, and a build without resul
   expect(resultOf(parsed.steps[0] as Step)).toBe("Title works.");
 });
 
-test("a done step whose recorded run is missing fails the check until it is reopened, and is then open", () => {
-  const proof = (extra = "", id = "L9", under = id) =>
-    `### ${id} Title ${id}\n- result: Title ${id} works.\n- why: because\n- done when:\n  - A run is in \`docs/numbers.md\` under "${under}".\n${extra}- locks: repo\n- after: none\n\n`;
-  const numbers = "# Numbers\n\n## L9: a run\n\nNot yet recorded: the run.\n\n## Pack\n\nNot yet recorded: L8 only.\n";
-  const planted = repoWith(doc(proof(), proof("", "L7", "Pack")), ["LIN-1: L9 Run", "LIN-2: L7 Pack"]);
-  writeFileSync(join(planted, "docs", "numbers.md"), numbers);
-  const r = run(["check", planted]);
-  expect(r.code).toBe(1);
-  expect(r.out).toHaveLength(1);
-  expect(r.out[0]).toMatch(/ROADMAP\.md:\d+: step L9 is done, but docs\/numbers\.md under "L9" says its run is not yet recorded/);
-
+test("a reopened done step passes the check and is open", () => {
+  const proof = (extra = "", id = "L9") =>
+    `### ${id} Title ${id}\n- result: Title ${id} works.\n- why: because\n- done when:\n  - A run is in \`docs/numbers.md\` under "${id}".\n${extra}- locks: repo\n- after: none\n\n`;
   const reopened = repoWith(doc(proof("  - Reopened: the run is missing\n")), ["LIN-1: L9 Run"]);
-  writeFileSync(join(reopened, "docs", "numbers.md"), numbers);
   expect(run(["check", reopened]).code).toBe(0);
   expect(run(["status", reopened, "--space", "s"]).out[1]).toContain("ready");
   // Home's count and phase say the same
   const plan = readPlan(doc(proof("  - Reopened: the run is missing\n")), [{ subject: "LIN-1: L9 Run", body: "" }]);
   expect(countSteps(plan)).toEqual({ done: 0, total: 1 });
-
-  const recorded = repoWith(doc(proof()), ["LIN-1: L9 Run"]);
-  writeFileSync(join(recorded, "docs", "numbers.md"), "## L9: a run\n\nIt ran in 4 minutes.\n");
-  expect(run(["check", recorded]).code).toBe(0);
 });
 
 test("a task title is cut at the end of a word", () => {
@@ -311,26 +297,4 @@ test("`roadmap check <repo>` prints the exact file line of each error kind", () 
   expect(has(at("- after: D"), "circular")).toBe(true);
   expect(has(at("### E"), "no 'done when' field")).toBe(true);
   expect(has(at("- colour"), "unknown field 'colour'")).toBe(true);
-});
-
-test("L319: a new measuring step is refused unless it waits for L271 or is an existing one", () => {
-  const measure = "- parts: measure\n";
-  const text = doc(
-    step("L271", "none"),
-    step("N1", "none", measure),
-    step("N2", "L271", measure),
-    step("N3", "N2", "- files: docs/numbers.md\n"),
-    step("N4", "none", "- files: ui/web/report-view.ts\n"),
-    step("OLD", "none", measure),
-    step("N5", "none", "- files: src/other.ts\n"),
-  );
-  const dir = repoWith(text, ["init"]);
-  writeFileSync(join(dir, "docs", "simplify.md"), "# Parts\n\nExisting: OLD\n");
-  const lines: string[] = [];
-  expect(roadmapMain(["check", dir], (l) => lines.push(l))).toBe(1);
-  const out = lines.join("\n");
-  expect(out).toContain("N1 adds measuring before tier 2 is done (rule L319");
-  expect(out).toContain("L271");
-  expect(out).toContain("step N4");
-  for (const kept of ["step N2", "step N3", "step OLD", "step N5", "step L271"]) expect(out).not.toContain(kept);
 });

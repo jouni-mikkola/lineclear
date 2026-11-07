@@ -54,7 +54,7 @@ server's data, again every 1.5 seconds, so a change shows within 3 s and wheneve
   - A task's state is its Lineclear state, and "waits for you" when its last card asks for you. A project's main is
     broken when Lineclear marks it red: only then is anything red.
   - Progress is roadmap steps merged on main when the project has `docs/ROADMAP.md`, else merged tasks.
-  - Spend is the equivalent dollars of pi's session files per day, as in `lineclear measure`. Usage is how much of each
+  - Spend is the equivalent dollars of pi's session files per day. Usage is how much of each
     account's session and week limit is used, with when each resets, as its provider last reported it. pi's Lineclear
     extension keeps that in `<config>/limits.json`, from the rate limit headers of Claude subscriptions; `lineclear run` asks Codex and OpenCode Go for theirs, with pi's stored login, at most every five minutes. An account
     marked full is at 100% until its reset. One whose provider reports no limit says so.
@@ -541,9 +541,8 @@ Every step check and every merge check reads these six lines. A change that brea
 Machine news never wakes an AI (idea.md principles 1 and 4). Load, memory, disk, quota and account state, provider
 cut-offs, check slots and task status changes are handled by rules and shown on the status line and Usage. They never
 become a message to an agent. Only the lines below reach an agent's chat or start a model turn. Each is a step's own
-line, an owner's, or a rule resuming work that stopped. `lineclear measure` counts every other model turn per day
-(column `turns`, goal 0); it reads the agent's pi session and skips the brief, owner messages, `<lineclear><go>` and
-the two marks below.
+line, an owner's, or a rule resuming work that stopped. Every other model turn is a fault
+(goal 0): the brief, owner messages, `<lineclear><go>` and the two marks below are not.
 
 Marks in an agent's log: `[lineclear:resume]` goes on with the step's own work, `[lineclear:answer]` is a rule answering
 the agent's own question. A `[lineclear]` line with no kind, and any `<lineclear>` line other than `go`, is counted.
