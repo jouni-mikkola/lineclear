@@ -37,6 +37,8 @@ export interface FakeGitHub {
   /** what gh api answers for a path ("repos/acme/app/pulls/1/reviews"), without its query: each item on a line, as
    *  its --jq would pick them */
   api?: Record<string, unknown[]>
+  /** gh api graphql answers with something that is no JSON */
+  badGraphql?: boolean
   /** what gh run list answers: Actions' runs, newest first */
   runs?: { headSha: string; status: string; conclusion: string; url: string; workflowName: string }[]
   /** a job's log, by job id (gh api repos/…/actions/jobs/<id>/logs) */
@@ -111,6 +113,89 @@ if (import.meta.main) {
   if (a0 === 'repo' && a1 === 'view') {
     if (st.authed === false || st.down) fail('Cannot read repository permissions')
     out(st.permission ?? 'WRITE')
+  }
+  if (a0 === 'api' && a1 === 'graphql') {
+    if (st.authed === false || st.down) fail('Cannot read repository')
+    if (st.badGraphql) out('<html>bad gateway</html>')
+    if (st.noChecks && args.some((a) => a.includes('statusCheckRollup'))) fail('GraphQL: Resource not accessible by personal access token')
+    type R = {
+      id: number
+      user?: { login: string }
+      body?: string
+      html_url: string
+      created_at?: string
+      submitted_at?: string
+      state?: string
+      path?: string
+      line?: number
+      pull_request_review_id?: number
+    }
+    const read = (n: number, kind: string) => (st.api?.[`repos/${st.repo}/${kind}`.replace('{n}', String(n))] ?? []) as R[]
+    const nodes = st.prs
+      .filter((p) => p.state === 'OPEN')
+      .map((p) => ({
+        ...json(p),
+        commits: {
+          nodes: [
+            {
+              commit: {
+                statusCheckRollup: {
+                  contexts: {
+                    nodes: (st.checks ?? []).map((c) => ({
+                      __typename: 'CheckRun',
+                      name: c.name,
+                      status: c.bucket === 'pending' ? 'IN_PROGRESS' : 'COMPLETED',
+                      conclusion: { pass: 'SUCCESS', fail: 'FAILURE', cancel: 'CANCELLED', skipping: 'SKIPPED' }[c.bucket] ?? null,
+                      detailsUrl: c.link,
+                    })),
+                  },
+                },
+              },
+            },
+          ],
+        },
+        reviews: {
+          nodes: read(p.number, `pulls/${p.number}/reviews`).map((r) => ({
+            databaseId: r.id,
+            author: r.user,
+            body: r.body,
+            state: r.state,
+            url: r.html_url,
+            submittedAt: r.submitted_at,
+          })),
+        },
+        comments: {
+          nodes: read(p.number, `issues/${p.number}/comments`).map((r) => ({
+            databaseId: r.id,
+            author: r.user,
+            body: r.body,
+            url: r.html_url,
+            createdAt: r.created_at,
+          })),
+        },
+        reviewThreads: {
+          nodes: read(p.number, `pulls/${p.number}/comments`).map((r) => ({
+            comments: {
+              nodes: [
+                {
+                  databaseId: r.id,
+                  author: r.user,
+                  body: r.body,
+                  url: r.html_url,
+                  createdAt: r.created_at,
+                  path: r.path,
+                  line: r.line,
+                  pullRequestReview: {
+                    databaseId: r.pull_request_review_id,
+                    submittedAt: read(p.number, `pulls/${p.number}/reviews`).find((v) => v.id === r.pull_request_review_id)?.submitted_at,
+                  },
+                },
+              ],
+            },
+          })),
+        },
+      }))
+    out(JSON.stringify({ data: { repository: { pullRequests: { nodes } } } }))
   }
   if (a0 === 'api') {
     if (/^repos\/[^/]+\/[^/]+$/.test(a1 ?? '')) {

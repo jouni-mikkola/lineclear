@@ -22,6 +22,17 @@ export async function ghLogin(g: GitHub, cwd: string): Promise<{ state: 'yes' | 
   }
 }
 
+/** gh answered, but not with what GitHub's API gives: GitHub is down for now, never "no pull request" or "no runs" */
+export class GhDown extends Error {}
+
+function parseJson<T>(out: string, empty: string): T {
+  try {
+    return JSON.parse(out.trim() || empty) as T
+  } catch {
+    throw new GhDown('GitHub answered with something unreadable')
+  }
+}
+
 export interface Pr {
   number: number
   url: string
@@ -37,22 +48,15 @@ const PR_FIELDS = 'number,url,state,isDraft,headRefOid,baseRefName'
 /** the branch's pull request: its open one, else one merged already */
 export async function findPr(g: GitHub, cwd: string, branch: string): Promise<Pr | null> {
   const r = await gh(g, cwd, 'pr', 'list', ...R(g), '--head', branch, '--state', 'all', '--json', PR_FIELDS, '--limit', '10')
-  if (!r.ok) return null
-  try {
-    const list = JSON.parse(r.out || '[]') as Pr[]
-    return list.find((p) => p.state === 'OPEN') ?? list.find((p) => p.state === 'MERGED') ?? null
-  } catch {
-    return null
-  }
+  // a list gh could not read is not an empty one: no pull request would open a second
+  if (!r.ok) throw new GhDown((r.err || r.out || `gh exited ${r.code}`).split('\n')[0])
+  const list = parseJson<Pr[]>(r.out, '[]')
+  return list.find((p) => p.state === 'OPEN') ?? list.find((p) => p.state === 'MERGED') ?? null
 }
 
 export async function viewPr(g: GitHub, cwd: string, n: number): Promise<Pr | null> {
   const r = await gh(g, cwd, 'pr', 'view', String(n), ...R(g), '--json', PR_FIELDS)
-  try {
-    return r.ok ? (JSON.parse(r.out) as Pr) : null
-  } catch {
-    return null
-  }
+  return r.ok ? parseJson<Pr>(r.out, 'null') : null
 }
 
 /** open a pull request from the branch (pushed already); its number and link, or gh's words */
@@ -144,6 +148,10 @@ export async function prChecks(g: GitHub, cwd: string, n: number): Promise<PrChe
   } catch {
     return { state: 'error', passed: 0, failed: [], error: 'GitHub answered with something unreadable' }
   }
+  return summarize(list)
+}
+
+function summarize(list: Check[]): PrChecks {
   if (!list.length) return { state: 'none', passed: 0, failed: [] }
   const failed = list.filter((c) => c.bucket === 'fail' || c.bucket === 'cancel').map((c) => ({ name: c.name, link: c.link || undefined }))
   const pending = list.some((c) => c.bucket === 'pending')
@@ -218,12 +226,7 @@ export async function branchRuns(g: GitHub, cwd: string, branch: string, limit =
     'headSha,status,conclusion,url,workflowName',
   )
   if (!r.ok) return null
-  let runs: { headSha: string; status: string; conclusion: string; url: string; workflowName: string }[]
-  try {
-    runs = JSON.parse(r.out || '[]')
-  } catch {
-    return null
-  }
+  const runs = parseJson<{ headSha: string; status: string; conclusion: string; url: string; workflowName: string }[]>(r.out, '[]')
   const out: BranchRun[] = []
   for (const sha of [...new Set(runs.map((x) => x.headSha))]) {
     const of = runs.filter((x) => x.headSha === sha && x.conclusion !== 'cancelled')
@@ -255,14 +258,10 @@ export interface PrComment {
 async function items<T>(g: GitHub, cwd: string, path: string): Promise<T[] | null> {
   const r = await gh(g, cwd, 'api', '--paginate', '--jq', '.[]', path)
   if (!r.ok) return null
-  try {
-    return r.out
-      .split('\n')
-      .filter((l) => l.trim())
-      .map((l) => JSON.parse(l) as T)
-  } catch {
-    return null
-  }
+  return r.out
+    .split('\n')
+    .filter((l) => l.trim())
+    .map((l) => parseJson<T>(l, 'null'))
 }
 
 type Raw = {
@@ -306,6 +305,118 @@ export async function prComments(g: GitHub, cwd: string, n: number): Promise<PrC
     ...notes.map((c) => of(c, 'i')),
   ].sort((a, b) => a.at.localeCompare(b.at))
 }
+
+/** an open pull request with what the engine watches on it: its checks (unset when the token can't read them) and words */
+export interface OpenPr {
+  pr: Pr
+  checks?: PrChecks
+  comments: PrComment[]
+}
+
+const CONTEXTS = `commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {
+  __typename
+  ... on CheckRun { name status conclusion detailsUrl }
+  ... on StatusContext { context state targetUrl }
+} } } } } }`
+
+const OPEN_PRS = (checks: boolean) => `query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) {
+  pullRequests(states: OPEN, first: 100, orderBy: { field: UPDATED_AT, direction: DESC }) { nodes {
+    number url state isDraft headRefOid baseRefName
+    ${checks ? CONTEXTS : ''}
+    reviews(last: 50) { nodes { databaseId author { login } body state url submittedAt } }
+    comments(last: 50) { nodes { databaseId author { login } body url createdAt } }
+    reviewThreads(last: 30) { nodes { comments(last: 30) { nodes {
+      databaseId author { login } body url createdAt path line originalLine pullRequestReview { databaseId submittedAt }
+    } } } }
+  } }
+} }`
+
+type Node<T> = { nodes?: (T | null)[] | null } | null | undefined
+type Author = { login?: string } | null
+type RawComment = {
+  databaseId: number
+  author?: Author
+  body?: string
+  url: string
+  createdAt?: string
+  submittedAt?: string
+  state?: string
+  path?: string
+  line?: number | null
+  originalLine?: number | null
+  pullRequestReview?: { databaseId?: number; submittedAt?: string } | null
+}
+type RawContext = {
+  __typename: string
+  name?: string
+  status?: string
+  conclusion?: string | null
+  detailsUrl?: string
+  context?: string
+  state?: string
+  targetUrl?: string
+}
+type RawPr = Pr & {
+  commits?: Node<{ commit?: { statusCheckRollup?: { contexts?: Node<RawContext> } | null } }>
+  reviews?: Node<RawComment>
+  comments?: Node<RawComment>
+  reviewThreads?: Node<{ comments?: Node<RawComment> }>
+}
+
+const nodesOf = <T>(n: Node<T>): T[] => (n?.nodes ?? []).filter((x): x is T => !!x)
+const STATUS: Record<string, string> = { SUCCESS: 'pass', PENDING: 'pending', EXPECTED: 'pending' }
+
+function bucketOf(c: RawContext): Check {
+  if (c.__typename === 'CheckRun')
+    return { name: c.name ?? '', link: c.detailsUrl, bucket: c.status !== 'COMPLETED' ? 'pending' : (JOB[(c.conclusion ?? '').toLowerCase()] ?? 'fail') }
+  return { name: c.context ?? '', link: c.targetUrl, bucket: STATUS[c.state ?? ''] ?? 'fail' }
+}
+
+function commentsOf(p: RawPr): PrComment[] {
+  const of = (c: RawComment, kind: string): PrComment => ({
+    id: `${kind}${c.databaseId}`,
+    at: c.submittedAt ?? c.createdAt ?? '',
+    who: c.author?.login ?? 'someone',
+    body: (c.body ?? '').trim(),
+    url: c.url,
+  })
+  return [
+    ...nodesOf(p.reviews)
+      .filter((c) => c.state !== 'PENDING')
+      .map((c) => ({ ...of(c, 'r'), state: c.state })),
+    ...nodesOf(p.reviewThreads)
+      .flatMap((t) => nodesOf(t.comments))
+      .map((c) => {
+        const line = c.line ?? c.originalLine
+        return { ...of(c, 'c'), at: c.pullRequestReview?.submittedAt ?? c.createdAt ?? '', where: c.path ? `${c.path}${line ? `:${line}` : ''}` : undefined }
+      }),
+    ...nodesOf(p.comments).map((c) => of(c, 'i')),
+  ].sort((a, b) => a.at.localeCompare(b.at))
+}
+
+/**
+ * Every open pull request of the repo in one call: its commit, checks, reviews and comments (the first 100 pull requests,
+ * last touched first). A token that can't read checks gets the rest, with `checks` unset. GhDown when GitHub did not
+ * answer, or answered with something that isn't a pull request list.
+ */
+export async function openPrs(g: GitHub, cwd: string, withChecks = true): Promise<OpenPr[]> {
+  const [owner, name] = g.repo.split('/')
+  const r = await gh(g, cwd, 'api', 'graphql', '-f', `query=${OPEN_PRS(withChecks)}`, '-F', `owner=${owner}`, '-F', `name=${name}`)
+  if (!r.ok) {
+    if (withChecks && noChecksAccess(`${r.out}\n${r.err}`)) return openPrs(g, cwd, false)
+    throw new GhDown((r.err || r.out || `gh exited ${r.code}`).split('\n')[0])
+  }
+  const raw = parseJson<{ data?: { repository?: { pullRequests?: Node<RawPr> } | null } }>(r.out, '{}').data?.repository?.pullRequests
+  if (!raw || !Array.isArray(raw.nodes)) throw new GhDown('GitHub answered with something unreadable')
+  return nodesOf(raw).map((p) => ({
+    pr: { number: p.number, url: p.url, state: p.state, isDraft: p.isDraft, headRefOid: p.headRefOid, baseRefName: p.baseRefName },
+    checks: withChecks ? summarize(nodesOf(nodesOf(p.commits)[0]?.commit?.statusCheckRollup?.contexts).map(bucketOf)) : undefined,
+    comments: commentsOf(p),
+  }))
+}
+
+/** the repo's key for sharing what is read of it */
+export const repoKey = (g: GitHub) => `${g.host}/${g.repo}`
 
 /** the names of the tests a failed check's job log shows as failed (the check's own report, read by check-runs); none when gh can't tell */
 export async function failedTestNames(g: GitHub, cwd: string, link: string): Promise<string[]> {
