@@ -52,11 +52,11 @@ export abstract class LinkPoll extends Emitter<Events> {
 
   /** the machines that have been looked at, as a worker is told of them (box.ts): where tasks may be placed */
   boxes(): BoxInfo[] {
-    return this.list().flatMap((l) => (l.probe ? [boxInfo(l.saved, l.probe)] : []))
+    return [...this.links.values()].flatMap((l) => (l.probe ? [boxInfo(l.saved, l.probe)] : []))
   }
 
   protected async pollAll() {
-    await Promise.all(this.list().map((l) => this.poll(l)))
+    await Promise.all([...this.links.values()].map((l) => this.poll(l)))
   }
 
   protected async poll(l: Link): Promise<void> {
@@ -193,7 +193,7 @@ export abstract class LinkPoll extends Emitter<Events> {
     const m = key.match(/^[mp]:([^:]+)/)
     if (m) return this.links.get(m[1])
     const task = key.split('/')[0].toUpperCase()
-    return this.list().find((l) => l.snap?.tasks.some((t) => t.id.toUpperCase() === task || t.aliases?.some((a) => a.toUpperCase() === task)))
+    return [...this.links.values()].find((l) => l.snap?.tasks.some((t) => t.id.toUpperCase() === task || t.aliases?.some((a) => a.toUpperCase() === task)))
   }
 
   ownerOfAction(a: Action): Link | undefined {
@@ -202,7 +202,7 @@ export abstract class LinkPoll extends Emitter<Events> {
   }
 
   byName(machine: string) {
-    return this.list().find((l) => l.rec.machine.toLowerCase() === machine.toLowerCase())
+    return [...this.links.values()].find((l) => l.rec.machine.toLowerCase() === machine.toLowerCase())
   }
 
   async act(l: Link, a: Action): Promise<unknown> {
@@ -224,7 +224,7 @@ export abstract class LinkPoll extends Emitter<Events> {
   }
 
   watch(chats: string[], term: string | null) {
-    for (const l of this.list()) {
+    for (const l of this.links.values()) {
       const next = { chats: chats.filter((k) => this.owner(k) === l), term: term && this.owner(term) === l ? term : null }
       if (JSON.stringify(next) === JSON.stringify(l.watching)) continue
       l.watching = next
