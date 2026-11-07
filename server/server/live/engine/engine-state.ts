@@ -47,7 +47,13 @@ export abstract class EngineState extends Emitter<Events> {
   private cold = new ColdLog<TaskRec>()
   private briefs = new Briefs()
   protected data = this.briefs.loaded(
-    withCold(this.cold, readJson<{ next: Record<string, number>; tasks: TaskRec[]; red?: Record<string, string> }>('tasks.json', { next: {}, tasks: [] })),
+    withCold(
+      this.cold,
+      readJson<{ next: Record<string, number>; tasks: TaskRec[]; red?: Record<string, string>; redLet?: Record<string, string> }>('tasks.json', {
+        next: {},
+        tasks: [],
+      }),
+    ),
   )
   taskIds!: TaskIds
   protected starting = new Set<string>()
@@ -79,6 +85,9 @@ export abstract class EngineState extends Emitter<Events> {
   /** how long a stopping Lineclear waits for the merges on their way, and after which a merge's caller may be gone
    *  (tests shorten it) */
   mergeDeadline = MERGE_DEADLINE
+  /** how often and how long a merge held for a red main looks for a green run */
+  holdEvery = 10_000
+  holdMax = 9 * 60_000
   /** stopping: no merge starts */
   protected closing = false
   /** how long GitHub's checks took lately, per repo, and when that was asked */

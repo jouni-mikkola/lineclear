@@ -127,6 +127,25 @@ export class EngineMerge extends EngineLand {
     }
   }
 
+  /**
+   * One red stops the merges: while main is red on GitHub, the first merge goes (it may be the fix) and every later
+   * one waits for a green run, so a burst of failures stays one failure.
+   */
+  protected override async holdForRedMain(t: TaskRec, p: Space): Promise<string | undefined> {
+    await this.watchMain(p).catch(() => undefined)
+    if (!this.data.red?.[p.path]) return undefined
+    const first = ((this.data.redLet ??= {})[p.path] ??= t.id)
+    this.save()
+    if (first === t.id) return undefined
+    for (const t0 = Date.now(); this.data.red?.[p.path] && Date.now() - t0 < this.holdMax; ) {
+      await Bun.sleep(this.holdEvery)
+      await this.watchMain(p).catch(() => undefined)
+    }
+    return this.data.red?.[p.path]
+      ? `${p.base} is red on GitHub and ${first} merged since: ${t.id} is held until a run on ${p.base} is green. Run lineclear merge ${t.id} again later. Nothing was merged.`
+      : undefined
+  }
+
   protected async watchMain(p: Space) {
     const red = this.data.red?.[p.path]
     const lately = Date.now() - MAIN_WATCH
@@ -138,8 +157,11 @@ export class EngineMerge extends EngineLand {
     if (!g || !runs || i < 0) return
     const now = runs[i]
     if (now.state === 'pass') {
-      if (red) delete this.data.red![p.path]
-      if (red) this.save()
+      if (red) {
+        delete this.data.red![p.path]
+        delete this.data.redLet?.[p.path]
+        this.save()
+      }
       return
     }
     // told once while it stays red, whatever else merges meanwhile

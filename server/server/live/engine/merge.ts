@@ -359,6 +359,8 @@ export class EngineLand extends EngineHandoff {
       await this.sendBack(t, `${why} ${this.fixIt(t)}`)
       return { ok: false, error: `${why} Sent back to ${t.id}'s agent to fix.` }
     }
+    const held = await this.holdForRedMain(t, p)
+    if (held) return { ok: false, error: held }
     const m = await GH.mergePr(g, wt, n, head, `${t.id}: ${t.title} (#${n})`, t.said ?? '')
     let state = (await GH.viewPr(g, wt, n))?.state
     // a repo with a merge queue only queues the pull request: GitHub's full check runs there and merges it when green
@@ -381,6 +383,11 @@ export class EngineLand extends EngineHandoff {
     }
     await G.git(p.path, 'push', '--quiet', 'origin', '--delete', t.branch!)
     return this.mergedOnGitHub(t, p, `merged PR #${n} on GitHub${wait ? '' : ', not waiting for its checks'}`)
+  }
+
+  /** a merge waits here while its base is red on GitHub; the text says why it did not merge, none when it may go */
+  protected async holdForRedMain(_t: TaskRec, _p: Space): Promise<string | undefined> {
+    return undefined
   }
 
   /** main here comes up to GitHub's, so the merge is here too (and Lineclear's own update sees it), then it is marked */
