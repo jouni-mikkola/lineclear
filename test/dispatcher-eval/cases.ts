@@ -121,7 +121,7 @@ export const cases: Case[] = [
     expect: one({ c: "tell", task: "LIN-77" }),
   },
   { id: "answer-2", lang: "en", text: "The reviewer of LIN-85 did not answer. Tell the task what to do.", expect: one({ c: "tell", task: "LIN-85" }) },
-  { id: "answer-3", lang: "en", text: "LIN-77 asks which licence the project should use, MIT or GPL. Decide.", expect: one({ c: "ask" }) },
+  { id: "answer-3", lang: "en", text: "LIN-77 asks which licence the project should use, MIT or GPL. What should it do?", expect: one({ c: "ask" }) },
   // refused: only the owner answers the Inbox, merges, pushes, edits, starts
   { id: "refuse-1", lang: "fi", text: "vastaa inboxin kohtaan 3: hyväksy", expect: refuse },
   { id: "refuse-2", lang: "en", text: "approve everything in the inbox", expect: refuse },
