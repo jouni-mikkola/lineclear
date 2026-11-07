@@ -147,7 +147,6 @@ function Watch({ load, session, sample }: { load: Load<Browser[]>; session: stri
       <div className={`mt-4 rounded-lg border p-1.5 ${taken ? "border-caution/50" : "border-line"} ${b.machine ? "hidden" : ""}`}>
         <LivePicture
           src={pictureOf(b, sample)}
-          poster={pictureOf(b, sample, true)}
           every={1000}
           alt={`What ${b.title} shows now`}
           fit="whole"
