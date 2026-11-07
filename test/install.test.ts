@@ -188,23 +188,6 @@ test("install again updates Lineclear to the newest commit", () => {
   expect(readFileSync(join(state, "systemctl.log"), "utf8")).toContain("--user restart lineclear.service");
 });
 
-test("install loads the token pack: parts show in doctor, a switch holds, a second install changes no file", () => {
-  mkdirSync(join(repo, "pi/parts"), { recursive: true });
-  writeFileSync(join(repo, "pi/parts/sample.ts"), "export default function (pi: any) { pi.on('tool_result', () => undefined); }\n");
-  git("add", "-A");
-  git("commit", "-q", "-m", "a part");
-  const r = install();
-  expect(r.code).toBe(0);
-  expect(r.out).toContain("Token pack: on   batched-reads, on   cut-output, on   no-sleep, on   sample");
-  expect(lineclear("doctor").out).toContain("ok     token pack: batched-reads on, cut-output on, no-sleep on, sample on");
-  expect(lineclear("pack", "off", "sample").out).toContain("sample: off");
-  expect(lineclear("doctor").out).toContain("ok     token pack: batched-reads on, cut-output on, no-sleep on, sample off");
-  const before = snapshot(home);
-  passes(install());
-  expect(snapshot(home)).toEqual(before); // the switch is kept, and no file changed
-  expect(lineclear("pack", "on", "sample").out).toContain("sample: on");
-}, 180_000); // two installs and five commands
-
 /** Commits a version that breaks the service the way BROKEN says, installs it, and puts the repository back. */
 function installBroken(how: string) {
   // the project p is Running before the update

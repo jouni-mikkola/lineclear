@@ -209,7 +209,7 @@ test("git push is refused in each form, other git and the project's work are not
 test("the extension blocks through pi's tool_call event and lets a check and pi -p run", async () => {
   const handlers: ((e: any, c: any) => any)[] = [];
   await lineclearExtension({ on: (n, h) => void (n === "tool_call" && handlers.push(h)) });
-  const handler = handlers[0]!; // its own handler, before the token pack's parts
+  const handler = handlers[0]!; // its own handler
   const bash = (command: string) => handler({ toolName: "bash", input: { command } }, { cwd: alphaTask });
   const old = { ...process.env };
   Object.assign(process.env, env);

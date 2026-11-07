@@ -11,7 +11,6 @@ import { exportMain, inboxAll, statusAll } from "./export.ts";
 import { machineMain } from "./machines.ts";
 import { readMachines } from "./machine-list.ts";
 import { fetchExportSync, relationOf } from "./remotes.ts";
-import { packMain } from "./pack.ts";
 import { planMain } from "./plan.ts";
 import { planStatus } from "./requests.ts";
 import { resolveProject } from "./resolve.ts";
@@ -36,7 +35,6 @@ import { recordReviewCall } from "./task-work.ts";
 export const commands: Record<string, string> = {
   export: "Print what this machine holds as JSON, for the machine that shows all of them",
   doctor: "Check each part and name the command that fixes a problem (--here checks only this machine)",
-  pack: "List the token pack's parts, or turn one on or off (pack on <part>, pack off <part>)",
   machine: "Add a machine by its SSH host (installs Lineclear there and runs its doctor), list, remove or update machines",
   project: "Add, list, change, remove and check projects",
   roadmap: "Check or show the roadmap (roadmap show <id> prints one step)",
@@ -204,7 +202,6 @@ const COMMANDS: Record<string, (rest: string[], out: Out) => number | Promise<nu
   ask: askMain,
   asks: (rest, out) => asksMain(rest, out),
   inbox: inboxCommand,
-  pack: packMain,
 };
 
 async function installCommand(name: "doctor" | "uninstall", rest: string[], out: (line: string) => void): Promise<number> {

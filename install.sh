@@ -212,7 +212,6 @@ install_lineclear() {
   link "$app/bin/lineclear" "$bindir/lineclear"
   extension_file "$app" "$ext"
   say "Lineclear: command in $bindir, pi extension in $ext"
-  say "Token pack: $("$bindir/lineclear" pack 2>/dev/null | tr '\n' ';' | sed 's/;$//;s/;/, /g' || true)"
 }
 
 # write_unit <file> <description> <command>: writes a user unit when its text changed. Sets changed=1 when it did.

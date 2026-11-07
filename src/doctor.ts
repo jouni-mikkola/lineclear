@@ -10,7 +10,6 @@ import { follows, type ReleaseState, readRelease, releaseLines } from "./release
 import { cacheEnvFile, dataDir, extensionFile, INSTALL_URL, type Paths, SERVICE } from "./paths.ts";
 import type { Relation } from "./remotes.ts";
 import { diskTrouble, freeBytes } from "./health.ts";
-import { parts } from "./pack.ts";
 import { readModelFile } from "./models.ts";
 import { checkoutPointers } from "./install-paths.ts";
 import { buildNames, buildProblem, buildsDir, installReleaseCommand, type RunFrom, unitCommand } from "./builds.ts";
@@ -334,13 +333,6 @@ function publishedPages(p: Probe): Check {
   };
 }
 
-/** The token pack's parts and which are on. A part turned off is a choice, not a problem. */
-function tokenPack(p: Probe): Check {
-  const all = parts({ ...process.env, LINECLEAR_CONFIG: p.paths.config, LINECLEAR_PACK_PARTS: join(p.paths.app, "pi", "parts") });
-  const shown = all.length === 0 ? "no parts yet" : all.map((x) => `${x.name} ${x.on ? "on" : "off"}`).join(", ");
-  return { name: `token pack: ${shown}`, problem: "", fix: "" };
-}
-
 /** An installed file or pi setting that points into a git checkout runs that branch's code, and breaks when the checkout goes. */
 function checkoutFree(p: Probe, env: Record<string, string | undefined>): Check {
   const { paths } = p;
@@ -389,7 +381,6 @@ export function doctorChecks(probe: Probe): Check[] {
       problem: extensionProblem(paths),
       fix: INSTALL_AGAIN,
     },
-    tokenPack(p),
     checkoutFree(p, process.env),
     service(p),
     oneServer(p),

@@ -79,15 +79,6 @@ Result: Each task's brief lists the files to change and the few to read first, s
 - after: none
 - files: src/plan-brief.ts, src/brief.ts, server/server/live/engine/briefs.ts
 
-### L419 Tool output stays short
-Result: A tool result reaches the agent as at most 8k characters, its head, its tail and the path of the rest.
-- why: the token pack's cut keeps up to 20k characters (about 5k tokens) of a result, and each result stays in every later call of the task.
-- done when: `CAP` in `pi/parts/cut-output.ts` is 8000 characters and test output keeps its failures and summary within it; a test checks the cut on a 200 KB output. Over 10 tasks measured by L416, the median input per model call is under 15k tokens.
-- parts: pi
-- locks: pi-context
-- after: none
-- files: pi/parts/cut-output.ts, test/pi-parts.test.ts
-
 ### L420 Compaction comes early
 Result: A task agent compacts its context near 50k tokens, keeping its brief, its files and its decisions.
 - why: compaction aims near 150k today and never fires: a task's largest call is about 40k tokens in the median and up to 81k, and each call pays for the whole history again.
@@ -95,7 +86,7 @@ Result: A task agent compacts its context near 50k tokens, keeping its brief, it
 - parts: pi
 - locks: pi-context
 - after: none
-- files: pi/compaction.ts, test/pi-parts.test.ts
+- files: pi/compaction.ts,
 
 ### L421 A small model for chores
 Result: Mechanical work (a clean rebase, a merge retry, a ready report, a nudge) runs on the smallest model, not on the coder's.
@@ -202,7 +193,7 @@ Result: A day of real work meets the targets: 400k tokens and 10 minutes per tas
 - done when: `docs/numbers.md` has a day of at least 30 tasks, measured by L416, with: median input under 400k tokens per task and the largest under 1.5M, a median under 10 minutes from start to ready on every machine, 3 agents per core with load under the core count, at most one GitHub run per 3 merged tasks, no task in Needs you without a question, under 5 % of main checks red (L434) and none red from a flaky test, and a run of 12 tasks on the measured machine held to 4 cores and 8 GB (a systemd slice with `AllowedCPUs` and `MemoryMax`) where all 12 reach ready with no out-of-memory kill and load under 4.
 - parts: measure
 - locks: numbers
-- after: L417, L419, L420, L422, L424, L425, L426, L429, L430, L431, L433, L438
+- after: L417, L420, L422, L424, L425, L426, L429, L430, L431, L433, L438
 - files: docs/numbers.md
 
 ### L267 The rule loop spawns no herdr
