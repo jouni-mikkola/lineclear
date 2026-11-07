@@ -12,7 +12,7 @@ import { statusesFrom, stepInputs } from "./task-steps.ts";
 import type { Decision, State } from "./rules.ts";
 import { askMachines, type Candidate, mostRoom, type Room, roomLack } from "./spread.ts";
 import { routineWorker } from "./routine.ts";
-import { askKey, availability, revertLast, reviewerFor, serviceAccounts } from "./stalls.ts";
+import { askKey, availability, climbStalls, revertLast, reviewerFor, serviceAccounts } from "./stalls.ts";
 import { bindStarts, liveSteps, recordStart, lockWhy, reservedLocks, settleLockWaits } from "./starts.ts";
 import type { Wait } from "./waits.ts";
 import type { World } from "./world.ts";
@@ -439,7 +439,9 @@ export function tickProject(
     (host, why) => note("skip", why, `machine:${host}`),
   );
   bindStarts(state, tasks);
-  serviceAccounts({ project: name, settings, world, state, dryRun, waits, tasks, steps: parsed.steps, offered, note, env });
+  const stallArgs = { project: name, settings, world, state, dryRun, waits, tasks, steps: parsed.steps, offered, note, env };
+  serviceAccounts(stallArgs);
+  climbStalls(stallArgs);
   const { status, byId, held } = stepStates(t, parsed.steps, main, tasks, remote);
 
   if (settings.paused) {

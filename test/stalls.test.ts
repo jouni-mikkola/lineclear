@@ -225,3 +225,22 @@ test("an error read after its own reset time marks nothing", () => {
   expect(t.log).toEqual([]);
   expect(readAccounts(t.env)).toEqual({});
 });
+
+test("a quiet task the server reported gets one nudge, then one restart, then the Inbox", () => {
+  const t = setup();
+  t.tick();
+  t.stall("s1");
+  t.tick();
+  t.tick();
+  expect(t.log.filter((l) => l.startsWith("tell") || l.startsWith("stop")).map((l) => l.split(" ").slice(0, 2).join(" "))).toEqual(["tell LIN-5"]);
+  t.stall("s2");
+  t.tick();
+  t.tick();
+  expect(t.log.filter((l) => l.startsWith("stop"))).toEqual(["stop LIN-5"]);
+  expect(t.log.filter((l) => l.startsWith("tell"))).toHaveLength(2);
+  expect(readItems(t.env)).toHaveLength(0);
+  t.stall("s3");
+  t.tick();
+  expect(readItems(t.env)).toHaveLength(1);
+  expect(t.decisions().filter((d) => /^rung \d: (nudged|restarted)/.test(d.reason))).toHaveLength(2);
+});

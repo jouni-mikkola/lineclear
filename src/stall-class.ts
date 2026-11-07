@@ -42,6 +42,7 @@ export interface ClassInfo {
   remedy: string;
 }
 
+/** The server alone judges `no-sign-of-life` and `late` (STALL_QUIET in engine-helpers.ts) and posts a card; their limit here is 0, never a second one. */
 export const CLASS_INFO: Record<StallClass, ClassInfo> = {
   "signed-out": { label: "signed out", limit: 0, remedy: "hand the step to the next model (rung 3)" },
   "account-full": { label: "account full", limit: 0, remedy: "hand the step to the next model with room, or wait for the reset" },
