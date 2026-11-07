@@ -1,5 +1,5 @@
 import type { TaskDetail } from "../../src/task-detail.ts";
-import { type Browser, type Column, DataTable, dollars, exact, type InboxItem, LivePicture, ago } from "../kit/index.ts";
+import { type Browser, type Column, DataTable, dollars, exact, type InboxItem, LivePicture, ago, Lamp } from "../kit/index.ts";
 import { type Load, useTaskDetail } from "./data.ts";
 import type { Row } from "./home-rows.ts";
 import { AskInRow } from "./inbox-strip.tsx";
@@ -10,45 +10,55 @@ import { samplePictureOf } from "./browser-samples.ts";
 // Home's table of working tasks: one row each, the row opens in place with the log tail, the diff stat, the check,
 // the review's findings and the task's browser.
 
+// A value that is not known leaves its cell empty; nothing stands in for it. Each cell ends in an ellipsis inside its
+// own width, so the table never grows past its column.
+const cut = (width: string, text: string, tone = "") => (
+  <span className={`inline-block truncate align-bottom ${width} ${tone}`} title={text}>
+    {text}
+  </span>
+);
+
+// In a table cell the wait sits under the phase; in a phone card it follows on the same line, so the title keeps its two lines.
+const stateOf = (r: Row, stacked = true) => (
+  <span className="flex min-w-0 items-center gap-2" title={r.wait ? `${r.phase}: ${r.wait}` : r.phase}>
+    <Lamp tone={r.stuck ? "caution" : "clear"} size={8} />
+    <span className={`min-w-0 ${stacked ? "" : "flex gap-2"}`}>
+      <span className="block whitespace-nowrap text-fg">{r.phase}</span>
+      {r.wait && <span className={`block max-w-28 truncate text-xs ${stacked ? "" : "self-center"} ${r.stuck ? "text-caution" : "text-fg2"}`}>{r.wait}</span>}
+    </span>
+  </span>
+);
+
 const columns: Column<Row>[] = [
-  { key: "project", label: "Project" },
+  { key: "phase", label: "State", show: (r) => stateOf(r) },
   {
     key: "step",
     label: "Step",
     show: (r) => (
-      <span className="block min-w-14" title={r.title}>
-        {r.step || r.title}
+      <span className="block max-w-40 truncate" title={`${r.project}: ${r.title}`}>
+        <span className="text-fg3">{r.project}</span> {r.step || r.title}
       </span>
     ),
+    sortBy: (r) => `${r.project} ${r.step}`,
   },
-  { key: "machine", label: "Machine", show: (r) => <span className="whitespace-nowrap">{r.machine}</span> },
-  { key: "phase", label: "Phase", show: (r) => <span className="whitespace-nowrap text-fg2">{r.phase}</span> },
-  { key: "input", label: "Input", num: true, show: (r) => (r.input === undefined ? "-" : `${Math.round(r.input / 1000)}k`), sortBy: (r) => r.input ?? 0 },
-  { key: "minutes", label: "Min", num: true },
-  { key: "wait", label: "Wait", show: (r) => <span className={`inline sm:block sm:min-w-28 ${r.stuck ? "text-caution" : "text-fg2"}`}>{r.wait || "-"}</span> },
+  { key: "model", label: "Model", show: (r) => (r.task.model ? cut("max-w-28", r.task.model, "text-fg2") : null), sortBy: (r) => r.task.model ?? "" },
+  {
+    key: "time",
+    label: "Time",
+    num: true,
+    show: (r) => (r.task.since === undefined ? null : <span className="whitespace-nowrap">{ago(r.task.since)}</span>),
+    sortBy: (r) => r.task.since ?? 0,
+  },
   {
     key: "last",
     label: "Last",
     show: (r) =>
       r.last ? (
-        <span className="block max-w-32 truncate" title={`${r.last.text} · ${exact(r.last.at)}`}>
+        <span className="block max-w-28 truncate" title={`${r.last.text} · ${exact(r.last.at)}`}>
           {r.last.text} · {ago(r.last.at)}
         </span>
-      ) : (
-        <span className="text-fg3">-</span>
-      ),
+      ) : null,
     sortBy: (r) => r.last?.at ?? 0,
-  },
-  { key: "files", label: "Files", num: true, show: (r) => (r.files === undefined ? "-" : r.files) },
-  {
-    key: "check",
-    label: "Check",
-    show: (r) =>
-      r.check ? (
-        <span className={r.check === "fail" ? "text-caution" : "text-clear"}>{r.check === "pass" ? "passed" : "failed"}</span>
-      ) : (
-        <span className="text-fg3">-</span>
-      ),
   },
 ];
 
@@ -114,6 +124,13 @@ function Details({ row, sample, browsers, onChoose }: { row: Row; sample: boolea
         ),
       )}
       {section(
+        "Runs on",
+        <p className="break-words text-fg2" data-runs-on>
+          {row.machine}
+          {row.input !== undefined && ` · ${Math.round(row.input / 1000)}k tokens in`}
+        </p>,
+      )}
+      {section(
         "Cost so far",
         <p className="text-fg2" data-cost>
           {d.cost === undefined ? "not reported" : dollars(d.cost)}
@@ -139,10 +156,16 @@ export function TaskTable({ rows, sample, browsers, onChoose }: { rows: Row[]; s
       label="Working tasks"
       columns={columns}
       rows={rows}
-      card={["wait", "check"]}
+      card={["time", "model"]}
       height="fill"
       group={(r) => r.project}
-      cardTitle={(r) => `${r.id}: ${r.step && !r.title.startsWith(r.step) ? `${r.step} ` : ""}${r.title}`}
+      cardTitle={(r) => (
+        <>
+          <span className="mb-1 block text-xs">{stateOf(r, false)}</span>
+          {r.id}: {r.step && !r.title.startsWith(r.step) ? `${r.step} ` : ""}
+          {r.title}
+        </>
+      )}
       details={(r) => <Details row={r} sample={sample} browsers={browsers} onChoose={onChoose} />}
     />
   );

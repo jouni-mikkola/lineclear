@@ -97,3 +97,63 @@ test("the line shows every project to its main end, and +N names what it opens",
   await expect(more).toHaveAccessibleName(/^Show \d+ more asks?$/);
   await expect(line).toHaveScreenshot("home-line-two.png");
 });
+
+test("the table keeps a 200-character Last and 200 rows inside its edge, shows no dash, and a phone row leads with its state", async ({ page }) => {
+  const now = Date.now();
+  const task = (i: number) => ({
+    id: `t${i}`,
+    title: `S${i} ${"a long title ".repeat(i === 0 ? 20 : 1)}`,
+    state: "work",
+    stage: "work",
+    ...(i === 0 ? {} : { step: `S${i}` }),
+    last: { text: "x".repeat(200), at: now - 60_000 },
+    // the first row knows nothing of its model and time: the cells stay empty
+    ...(i === 0 ? {} : { since: now - 5 * 60_000, model: "vendor-b/a-model-with-a-long-name" }),
+  });
+  const body = {
+    projects: [{ name: "shop", done: 0, total: 200, unit: "steps", broken: false, tasks: Array.from({ length: 200 }, (_, i) => task(i)) }],
+    host: "this machine",
+  };
+  await page.route("**/api/home", (r) => r.fulfill({ json: body }));
+  await page.goto("/");
+  await page.waitForSelector("[data-row-id]:visible");
+  await expect(page.locator('[data-table="Working tasks"]')).toHaveAttribute("data-rows", "200");
+  const fit = await page.evaluate(() => {
+    const visible = (el: Element) => (el as HTMLElement).offsetParent !== null;
+    const holders = [...document.querySelectorAll('[data-table="Working tasks"] table, [data-table-cards]')].filter(visible);
+    const scroll = holders.map((h) => (h.closest("div,ul") as HTMLElement).scrollWidth - (h.closest("div,ul") as HTMLElement).clientWidth);
+    const edge = holders[0]?.closest("div,ul")?.getBoundingClientRect().right ?? 0;
+    let past = 0;
+    for (const c of document.querySelectorAll('[data-table="Working tasks"] td, [data-table-cards] button *')) {
+      if (visible(c)) past = Math.max(past, c.getBoundingClientRect().right - edge);
+    }
+    const cells = [...document.querySelectorAll('[data-table="Working tasks"] td, [data-table-cards] button')]
+      .filter(visible)
+      .map((c) => c.textContent?.trim());
+    return {
+      scroll,
+      past,
+      dash: cells.filter((t) => t === "-" || /(^|\s)-($|\s)/.test(t ?? "")).length,
+    };
+  });
+  expect(fit.scroll.every((s) => s <= 0)).toBe(true);
+  expect(fit.past).toBeLessThanOrEqual(0);
+  expect(fit.dash).toBe(0);
+  const phone = (page.viewportSize()?.width ?? 0) < 640;
+  const row = page.locator(phone ? "[data-table-cards] [data-row-id]:visible" : "tr[data-row-id]:visible");
+  // the first row knows no model or time: nothing stands in for them; the next shows both
+  await expect(row.nth(1)).toContainText("vendor-b/");
+  await expect(row.nth(1)).toContainText("5 min");
+  if (phone) await expect(row.nth(1).locator("button")).toHaveText(/^at work/);
+  // the 200-character Last ends in an ellipsis in its cell
+  if (!phone) {
+    const cut = await row
+      .nth(1)
+      .locator("td")
+      .nth(4)
+      .locator("span")
+      .first()
+      .evaluate((el) => el.scrollWidth > el.clientWidth);
+    expect(cut).toBe(true);
+  }
+});
