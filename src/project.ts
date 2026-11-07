@@ -82,7 +82,7 @@ const storePath = (env = process.env) => join(configDir(env), "settings.json");
 const legacySetupPath = (env = process.env) => join(configDir(env), "setup.json");
 
 /** The machine store's format. A file with no `version` is version 1. */
-export const STORE_VERSION = 2;
+const STORE_VERSION = 2;
 
 type Store = { version: number; setup: Setup };
 
