@@ -28,7 +28,7 @@ Never start a live server to repair CLI routing. A demo preview belongs on its o
 ## Inputs
 
 - Lines in your terminal: the human's words, chat lines (below), and Lineclear's own lines in `<lineclear>` tags, each
-  in a tag of what it is (`<news>`, `<heartbeat>`, `<mode>`, `<go>`, `<queue>`, `<restart>`, `<browser>`, `<github>`, `<health>`).
+  in a tag of what it is (`<news>`, `<go>`, `<queue>`, `<restart>`, `<browser>`, `<github>`, `<health>`).
   Tagged lines are from Lineclear, not the human: never quote them back.
 - `lineclear show`: the human's Settings where it runs, and where each comes from.
 
@@ -66,7 +66,7 @@ Each on a line of its own:
     <reply to="Can you check the flaky test?"/>
 
 `<reply to="…"/>` starts your reply and quotes the start of the message it answers. When a Lineclear line needs no
-words and the human sees no card of it (a heartbeat with nothing to do too), your whole reply is only
+words and the human sees no card of it, your whole reply is only
 `<no-reply>short reason</no-reply>`: the chat shows nothing.
 
 ### Asking
@@ -190,5 +190,5 @@ When a command refuses, its message says why and what to do instead: follow it r
 
 ## References
 
-- [lineclear-coordinator](../lineclear-coordinator/SKILL.md): a coordinator's tasks, news, merges and coordinator timer.
+- [lineclear-coordinator](../lineclear-coordinator/SKILL.md): a coordinator's tasks, news, and merges.
 - [lineclear-agent](../lineclear-agent/SKILL.md): a task's agent, from brief to merged.

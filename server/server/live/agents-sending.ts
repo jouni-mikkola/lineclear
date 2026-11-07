@@ -3,7 +3,6 @@ import { herdr } from './herdr.ts'
 import { holdBack, machineNews } from './quiet.ts'
 import { mirrored } from './mfs.ts'
 import { paneWrong, type Wrong } from './revive.ts'
-import { privateRuntimePath } from './autopilot-sandbox.ts'
 import type { OutItem, Hold, SendOpts, Sent } from './agents-helpers.ts'
 import { holdFrom } from './agent-start.ts'
 import { AgentsDelivery } from './agents-delivery.ts'
@@ -27,7 +26,7 @@ export class AgentsSending extends AgentsDelivery {
   /** whether its hooks last said it was at work, even while it is gone: a turn its log shows over is over */
   wasWorking(key: string) {
     const r = this.records[key]
-    const said = r?.hooks ? this.hooks.read(r.isolation ? (privateRuntimePath(r.isolation.home, r.hooks) ?? '') : mirrored(r.hooks)).said : undefined
+    const said = r?.hooks ? this.hooks.read(mirrored(r.hooks)).said : undefined
     return (said?.state === 'working' && !this.endedSince?.(key, said.at)) || !!r?.working
   }
 

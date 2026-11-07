@@ -46,10 +46,6 @@ export abstract class EngineState extends Emitter<Events> {
     super()
   }
 
-  pilotOwner?: (requester?: string) => string | undefined
-  pilotGate?: (task: TaskRec) => void
-  pilotClaim?: (task: TaskRec) => void
-
   /** main: by project path, the failing commit on GitHub's main its coordinator was told of, until main is green */
   private cold = new ColdLog<TaskRec>()
   private briefs = new Briefs()
@@ -422,7 +418,7 @@ export abstract class EngineState extends Emitter<Events> {
     const env = this.env(key)
     // a task from before tasks kept their own CLI starts on Settings'
     const h = t.agent ?? this.settings.harness('task', this.nameOf(t))
-    if (!t.pilot) trustWorktree(t.worktree!, as?.kind ?? rec?.kind ?? h.kind, env)
+    trustWorktree(t.worktree!, as?.kind ?? rec?.kind ?? h.kind, env)
     const spec: Spec = {
       access: 'full',
       key,

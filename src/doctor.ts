@@ -7,10 +7,9 @@ import { readJson } from "../pi/config.ts";
 import { failureTail } from "./secrets.ts";
 import { copiesProblem, runByNote } from "./store-copies.ts";
 import { follows, type ReleaseState, readRelease, releaseLines } from "./release.ts";
-import { cacheEnvFile, dataDir, extensionFile, INSTALL_URL, type Paths, SERVICE, serverBin } from "./paths.ts";
+import { cacheEnvFile, dataDir, extensionFile, INSTALL_URL, type Paths, SERVICE } from "./paths.ts";
 import type { Relation } from "./remotes.ts";
 import { diskTrouble, freeBytes } from "./health.ts";
-import { retiredChecks } from "./retire.ts";
 import { parts } from "./pack.ts";
 import { readModelFile } from "./models.ts";
 import { checkoutPointers } from "./install-paths.ts";
@@ -37,8 +36,6 @@ export interface Probe {
   dataDir?: string;
   /** Whether Lineclear's own server runs now. */
   running?: () => boolean;
-  /** Turns a space's timer off through the running server, which keeps its modes in memory. */
-  setRegular?: (space: string) => boolean;
   pathDirs: string[];
   which(cmd: string): string | null;
   /** Runs a command and returns its output, or null when it failed. */
@@ -88,7 +85,6 @@ export function realProbe(paths: Paths, env: Record<string, string | undefined> 
         return false;
       }
     },
-    setRegular: (space) => Bun.spawnSync([serverBin(env), "mode", space, "regular"], { stdin: "ignore", timeout: 60_000 }).exitCode === 0,
     pathDirs: (env.PATH ?? "").split(delimiter),
     listen: env.LINECLEAR_HOST,
     published: publishedAddress(env),
@@ -372,7 +368,6 @@ export function doctorChecks(probe: Probe): Check[] {
     tool(p, "rsync", "sudo apt install rsync"),
     tool(p, "herdr", "curl -fsSL https://herdr.dev/install.sh | sh"),
     tool(p, "pi", "curl -fsSL https://pi.dev/install.sh | sh"),
-    ...retiredChecks(p),
     { name: "models.json", problem: readModelFile(p.dataDir ?? dataDir()).problem, fix: "fix or delete models.json in the data folder" },
     {
       name: "lineclear files",

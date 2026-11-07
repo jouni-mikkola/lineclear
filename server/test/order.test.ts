@@ -63,7 +63,6 @@ const p = (machine: string, name: string, home = false): Place => ({
   ...(home ? { home } : {}),
   level: home ? 1 : 2,
   status: 'idle',
-  mode: 'regular',
   chat: `p:${machine}:${name}`,
 })
 const places = [p('vm', 'b'), p('vm', 'a'), p('vm', 'home', true), p('mac', 'x'), p('mac', 'home', true)]

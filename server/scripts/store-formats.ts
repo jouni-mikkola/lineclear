@@ -15,8 +15,8 @@ type ChatFile = { posted?: { id?: unknown; card?: { id?: unknown; status?: unkno
 type Values = Record<string, string>
 type Levels = { everywhere?: Values; machine?: Values; spaces?: Record<string, Values> }
 
-/** The files the server keeps its settings, spaces, modes and tasks in; the database with its journals. */
-const FILES = ['settings.json', 'tasks.json', 'spaces.json', 'modes.json', 'task-ids.sqlite', 'task-ids.sqlite-wal', 'task-ids.sqlite-shm']
+/** The files the server keeps its settings, spaces and tasks in; the database with its journals. */
+const FILES = ['settings.json', 'tasks.json', 'spaces.json', 'task-ids.sqlite', 'task-ids.sqlite-wal', 'task-ids.sqlite-shm']
 
 const [verb, dir] = process.argv.slice(2)
 const older = process.argv.includes('--older')
@@ -33,7 +33,7 @@ if (verb !== 'write') {
 process.env.LINECLEAR_HOME = home
 const { writeJson } = await import('../server/store.ts')
 const { Settings } = await import('../server/live/settings.ts')
-const { Places, placeId, asMode } = await import('../server/live/places.ts')
+const { Places, placeId } = await import('../server/live/places.ts')
 const { TaskIds } = await import('../server/live/task-ids.ts')
 type TaskRec = import('../server/live/engine/engine.ts').TaskRec
 type Space = import('../server/live/places.ts').Space
@@ -56,14 +56,6 @@ function settings(): string[] {
     for (const [key, value] of Object.entries(values)) if (read.pick(key, level).value !== value) lost.push(`${name} ${key}`)
   }
   return lost.length ? [`settings.json: this build would drop ${lost.join(', ')}`] : []
-}
-
-/** A mode this build does not know is dropped when the server starts (places.ts). */
-function modes(): string[] {
-  const d = json('modes.json')
-  if (typeof d !== 'object' || d === null || Array.isArray(d)) return ['modes.json: not a map of modes']
-  const lost = older ? [] : Object.entries(d).filter(([, m]) => !asMode(m))
-  return lost.length ? [`modes.json: this build would drop the mode of ${lost.map(([id]) => id).join(', ')}`] : []
 }
 
 // The server reads tasks.json and spaces.json as they are (engine.ts, places.ts), with no reader of its own to call:
@@ -127,7 +119,6 @@ function read(): string[] {
     ['settings.json', settings],
     ['tasks.json', tasks],
     ['spaces.json', spaces],
-    ['modes.json', modes],
     ['chatlog', chats],
     ['task-ids.sqlite', taskIds],
   ]
@@ -148,7 +139,6 @@ function write() {
   settings.set('brief.review', 'off', 'machine')
   const places = new Places()
   places.spaces.push({ name: 'sample', path: '/tmp/sample', key: 'SAM', github: null, base: 'main', added: 1 })
-  places.modes[placeId.space('sample')] = 'autopilot'
   places.save()
   const task: TaskRec = { id: 'SAM-1', n: 1, project: placeId.space('sample'), title: 'A sample task', desc: 'Its brief', by: 'sample', created: 1, updated: 1 }
   const store = { next: { SAM: 1 }, tasks: [task] }

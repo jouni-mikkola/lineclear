@@ -1,7 +1,7 @@
 // Automations, as OpenClaw's cron jobs: a space's task template (a title, a brief, and the agent, model and effort it
 // starts with) and its trigger (trigger.ts): a time rule, event rules (a task is added, is ready, went wrong, needs you,
 // is merged, stalls; main goes red), or both. Each run adds a new task with a fresh agent of its own; it never runs in
-// the coordinator's chat (that is coordinator timer's heartbeat, heartbeat.ts, on the same kind of trigger).
+// the coordinator's chat.
 import { randomUUID } from 'node:crypto'
 import type { Automation as AutomationView } from '../../shared/types.ts'
 import { readJson, writeJson } from '../store.ts'

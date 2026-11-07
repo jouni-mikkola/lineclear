@@ -12,9 +12,8 @@
       "ignoreUnresolved": ["bin/lineclear"]
     },
     "server": {
-      // server/bin/lineclear runs server/cli.ts by path; the build's registries import the plugins' parts; a remote
-      // machine runs the autopilot bootstrap
-      "entry": ["server/cli.ts", "scripts/*.ts", "plugins/*/client.tsx", "plugins/*/server.ts", "helper/autopilot/bootstrap.ts", "test/**/*.test.{ts,tsx}"],
+      // server/bin/lineclear runs server/cli.ts by path; the build's registries import the plugins' parts
+      "entry": ["server/cli.ts", "scripts/*.ts", "plugins/*/client.tsx", "plugins/*/server.ts", "test/**/*.test.{ts,tsx}"],
       "project": ["server/**/*.{ts,tsx}", "src/**/*.{ts,tsx}", "shared/**/*.{ts,tsx}", "plugins/**/*.{ts,tsx}", "helper/**/*.ts", "scripts/**/*.ts", "test/**/*.{ts,tsx}"],
       // agent-browser runs as a command; CSS imports inter-ui (the font) and tailwindcss
       "ignoreDependencies": ["agent-browser", "inter-ui", "tailwindcss"]

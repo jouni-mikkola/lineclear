@@ -6,7 +6,6 @@ import { main } from "../src/cli.ts";
 import { doctorChecks, type Probe } from "../src/doctor.ts";
 import { statusAll } from "../src/export.ts";
 import { projectsData } from "../src/home-data.ts";
-import { fixAll } from "../src/retire.ts";
 import { pathsFor } from "../src/paths.ts";
 import { refreshRemotes, relationOf } from "../src/remotes.ts";
 import { waitingForYou } from "../src/waiting.ts";
@@ -169,23 +168,6 @@ test("doctor compares machines by git ancestry and says which is stable", () => 
   expect(check(probe, "machine new").problem).toBe("");
   expect(check(probe, "machine new").info).toBe("new runs ccccccc, newer than this machine's aaaaaaa; stable is bbbbbbb, which neither runs");
   expect(check(probe, "machine odd").problem).toContain("apart from this machine's aaaaaaa");
-});
-
-test("doctor --fix runs on each machine, once, and says what each removed", async () => {
-  const { env } = world();
-  const fake = join(root, "ssh-fix");
-  put(
-    fake,
-    `#!/bin/sh\nwhile [ "$1" != "--" ]; do shift; done\nshift\nshift\necho "$1" >> '${join(root, "fix.log")}'\necho "Removed the skill /x/lineclear"\n`,
-  );
-  chmodSync(fake, 0o755);
-  const probe: Probe = { paths: pathsFor({ HOME: "/nonexistent-home" }), pathDirs: [], which: () => null, run: () => null };
-  const lines: string[] = [];
-  await fixAll(probe, (l) => lines.push(l), { ...env, LINECLEAR_SSH: fake });
-  expect(lines).toEqual(["This machine", "  Nothing to remove.", "box", "  Removed the skill /x/lineclear"]);
-  const sent = readFileSync(join(root, "fix.log"), "utf8").trim().split("\n");
-  expect(sent).toHaveLength(1);
-  expect(sent[0]).toContain("'doctor' '--fix' '--here'");
 });
 
 test("relationOf reads git ancestry", () => {

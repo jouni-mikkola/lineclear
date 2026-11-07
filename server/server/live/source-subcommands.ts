@@ -306,7 +306,7 @@ export class LiveSourceSubcommands extends LiveSourceActions {
         result,
         desc: one(p, 'brief') ?? one(p, 'desc'),
         by: this.byWho(ctx),
-        requester: this.pilotOf(ctx.chat) ? ctx.chat : this.requestedNews.known(ctx.chat),
+        requester: this.requestedNews.known(ctx.chat),
         after,
         later: p.flags.has('later'),
         agent,

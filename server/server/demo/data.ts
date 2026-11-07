@@ -1,7 +1,6 @@
 // Fictional data for the demo source: the same world the frozen prototype shows, so a reviewer can put the
 // build and the prototype side by side. Nothing here is real.
 import type { Artifact, Automation, Machine, MachineHealth, Place, SettingSection, Task, TaskAgent } from '../../shared/types.ts'
-import { firstChecklist } from '../live/heartbeat.ts'
 import { nextWords, timeRule, timeWords } from '../live/trigger.ts'
 import { Settings } from '../live/settings.ts'
 import { pluginCatalog, pluginsPage } from '../plugins.ts'
@@ -41,30 +40,28 @@ const HEALTH: Record<string, MachineHealth> = {
 
 export function places(): Place[] {
   return [
-    { id: VM, name: 'home', machine: 'vm-str', home: true, level: 0, status: 'need', mode: 'regular', chat: VM },
-    { id: 'p:vm-str:gtm', name: 'gtm', machine: 'vm-str', level: 2, status: 'need', mode: 'regular', chat: 'p:vm-str:gtm', githubRemote: true },
+    { id: VM, name: 'home', machine: 'vm-str', home: true, level: 0, status: 'need', chat: VM },
+    { id: 'p:vm-str:gtm', name: 'gtm', machine: 'vm-str', level: 2, status: 'need', chat: 'p:vm-str:gtm', githubRemote: true },
     {
       id: 'p:vm-str:herdr-projects',
       name: 'herdr-projects',
       machine: 'vm-str',
       level: 2,
       status: 'need',
-      mode: 'regular',
       chat: 'p:vm-str:herdr-projects',
       githubRemote: true,
     },
-    { id: MAC, name: 'home', machine: 'mac', home: true, level: 1, status: 'need', mode: 'regular', chat: MAC },
+    { id: MAC, name: 'home', machine: 'mac', home: true, level: 1, status: 'need', chat: MAC },
     {
       id: 'p:mac:lilla-varlden',
       name: 'lilla-varlden',
       machine: 'mac',
       level: 2,
       status: 'need',
-      mode: 'regular',
       chat: 'p:mac:lilla-varlden',
       githubRemote: false,
     },
-    { id: NAS, name: 'home', machine: 'nas', home: true, level: 1, status: 'off', mode: 'regular', chat: NAS, unreachableSince: '14:02' },
+    { id: NAS, name: 'home', machine: 'nas', home: true, level: 1, status: 'off', chat: NAS, unreachableSince: '14:02' },
   ]
 }
 
@@ -366,27 +363,27 @@ export function settingStores() {
   }
 }
 
-/** the live catalog at its levels, as an install shows it; alerts on two devices. `checklists`: each place's
- *  HEARTBEAT.md as edited here, else its first one */
+/** the live catalog at its levels, as an install shows it; alerts on two devices */
 /** the plugins of the demo install (a build with plugins of your own shows its own): the base ones, voice replaced by
  *  one of the human's own, and a stand-up plugin of theirs (none failing: the screen would say so at its top, over
  *  every screen the tests measure) */
 const DEMO_PLUGINS: PluginEntry[] = [
-  ...['places', 'coordinators', 'tasks', 'chat', 'reactions', 'artifacts', 'terminal', 'worktree', 'browser', 'health', 'alerts', 'keyboard', 'autopilot'].map(
-    (name) => ({ name, from: 'base' as const, on: true }),
-  ),
+  ...['places', 'coordinators', 'tasks', 'chat', 'reactions', 'artifacts', 'terminal', 'worktree', 'browser', 'health', 'alerts', 'keyboard'].map((name) => ({
+    name,
+    from: 'base' as const,
+    on: true,
+  })),
   { name: 'voice', from: 'user', overrides: true, on: true },
   { name: 'standup', from: 'user', on: true },
 ]
 
-export function settings(stores = settingStores(), checklists: Record<string, string> = {}, pluginsOff: string[] = []): SettingSection[] {
-  const checklist = (id: string) => checklists[id] ?? firstChecklist(id === VM ? 'main' : id.endsWith(':~') ? 'home' : 'space')
+export function settings(stores = settingStores(), pluginsOff: string[] = []): SettingSection[] {
   const r = (label: string, value: string, key: string, more: Partial<SettingSection['rows'][number]> = {}) => ({ label, value, key, ...more })
   const devices = ['This phone', 'this Mac']
   const own = (x: SettingSection) => !['Plugins', 'Machines'].includes(x.name)
   return [
-    ...stores['vm-str'].sections(devices, [], null, 'vm-str', ['~', 'gtm', 'herdr-projects'], 'vm-str', checklist).filter(own),
-    ...stores.mac.sections(devices, [], null, 'mac', ['~', 'lilla-varlden'], 'mac', checklist).filter((x) => own(x) && x.machine === 'mac'),
+    ...stores['vm-str'].sections(devices, [], null, 'vm-str', ['~', 'gtm', 'herdr-projects'], 'vm-str').filter(own),
+    ...stores.mac.sections(devices, [], null, 'mac', ['~', 'lilla-varlden'], 'mac').filter((x) => own(x) && x.machine === 'mac'),
     pluginsPage(
       (pluginCatalog.some((p) => p.from === 'user') ? pluginCatalog : DEMO_PLUGINS).map((p) => ({ ...p, on: p.on && !pluginsOff.includes(p.name) })),
       pluginsOff,
@@ -400,28 +397,7 @@ export function settings(stores = settingStores(), checklists: Record<string, st
         r('nas', "Can't reach since 14:02", '', { fixed: true }),
       ],
     },
-  ].map((section) =>
-    section.name === 'Coordinator timer' && section.level?.startsWith('p:')
-      ? {
-          ...section,
-          rows: section.rows
-            .map((row) =>
-              row.doc
-                ? {
-                    ...row,
-                    instructions:
-                      'Wake-ups: Every 30 minutes (Stockholm). Events: All news.\nAgent: Codex (inherited coordinator defaults).\nPermission profile: Isolated workspace. The coordinator reads this project; workers write their own worktrees. Host files, sockets and local network are hidden.\nNetwork: HTTPS to api.openai.com, chatgpt.com, api.anthropic.com.\nAccounts: agent provider login. Available secrets: none.\nHuman approval: merges. Settings, deleting tasks and unrelated work always need the human.\nShared reported tokens: off (delayed reports; not a hard token or money cap).\nShared runtime: off. Maximum parallel Lineclear tasks: 3.\nNo automatic fallback.',
-                  }
-                : row,
-            )
-            .concat([
-              { label: 'Time zone', key: '', value: 'Europe/Stockholm', fixed: true, group: 'Wake-up' },
-              { label: 'Next', key: '', value: 'Today 15:00 · Schedule', fixed: true, group: 'Wake-up' },
-              { label: 'Last run', key: '', value: 'Today 14:30 · Schedule · Turn ended; inspect chat for the result · 42 s', fixed: true, group: 'Wake-up' },
-            ]),
-        }
-      : section,
-  )
+  ]
 }
 
 export const ASKS: Record<string, string> = { [GTM]: 'f1' }

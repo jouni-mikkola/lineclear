@@ -93,8 +93,6 @@ export interface TaskRec {
   paused?: 'sent' | 'idle'
   /** when it was pinned: it shows in the Pinned group at the top of its lists; archiving or deleting it drops the pin */
   pinned?: number
-  /** Trusted owner of a coordinator-timer task and every restart/backup. */
-  pilot?: string
   /** the CLI, model and effort its agent first starts with: from Settings, or task add's flags */
   agent?: Harness
   /** the CLI, model and effort its brief says reviews its change: from Settings, or task add's --reviewer flags */

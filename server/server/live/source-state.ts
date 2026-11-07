@@ -8,24 +8,20 @@ import { Emitter, type SourceEvents } from '../source.ts'
 import { HOME, readJson, writeJson } from '../store.ts'
 import { ROOT } from '../root.ts'
 import { wrapPage } from '../frame.ts'
-import { PilotRuns, type PilotRun } from './autopilot.ts'
-import { PilotUsage } from './autopilot-usage.ts'
-import { prepareSandbox, sandboxAvailable, type SandboxLaunch } from './autopilot-sandbox.ts'
 import { Agents, hidden, type Spec } from './agents.ts'
 import { Automations, type Automation } from './automations.ts'
-import { Heartbeats } from './heartbeat.ts'
-import { eventWords, timeWords, type Happened } from './trigger.ts'
+import type { Happened } from './trigger.ts'
 import { Browsers } from './browser.ts'
 import { Chats } from './chats.ts'
 import { ended, Engine } from './engine/engine.ts'
 import { sh } from './engine/git.ts'
-import { userName } from './timer-off.ts'
+import { userName } from './user-name.ts'
 import { Artifacts, browserChecker, type Checker } from './artifacts.ts'
 import { Machines } from './machines.ts'
 import { agentEnv, BOX } from './box.ts'
-import { asMode, HOST, NAME, placeId, Places } from './places.ts'
-import { privatePrompt, coordinatorPrompt, settingsBlock } from './prompts.ts'
-import { harnessWords, type Harness } from './restart.ts'
+import { HOST, NAME, placeId, Places } from './places.ts'
+import { privatePrompt, coordinatorPrompt } from './prompts.ts'
+import type { Harness } from './restart.ts'
 import { Revivals } from './revive.ts'
 import { carryOn, cutCardId, Retries, type Retry, wakePlan } from './retry.ts'
 import { Settings, type Level } from './settings.ts'
@@ -49,11 +45,6 @@ export class LiveSourceState extends Emitter<SourceEvents> {
   )
   engine = new Engine(this.agents, this.chats, this.places, this.settings)
   automations = new Automations()
-  heartbeats = new Heartbeats()
-  pilots = new PilotRuns()
-  protected pilotUsage = new PilotUsage()
-  pilotRuntime = { available: sandboxAvailable, prepare: prepareSandbox }
-  protected pilotSandboxes = new Map<string, SandboxLaunch>()
   artifacts = new Artifacts()
   /** agents' secrets: one file on the main machine, which a worker for another machine reads there */
   vault = new Vault(process.env.LINECLEAR_MAIN_HOME || HOME)
@@ -205,7 +196,6 @@ export class LiveSourceState extends Emitter<SourceEvents> {
             this.places.spaces.map((p) => placeId.space(p.name)),
             [id],
           ),
-      mode: this.places.mode(id),
       chat: id,
       ...(space ? { githubRemote: !!space.github } : {}),
       // herdr gone: this machine's chats say so plainly
@@ -229,11 +219,10 @@ export class LiveSourceState extends Emitter<SourceEvents> {
           home: true,
           level: 1 as const,
           status: 'off' as const,
-          mode: 'regular' as const,
           chat: placeId.home(l.rec.machine),
         },
       ]
-      for (const p of theirs) places.push({ ...p, mode: asMode(p.mode) ?? 'regular', ...(p.home ? { level: 1 as const } : {}), ...away })
+      for (const p of theirs) places.push({ ...p, ...(p.home ? { level: 1 as const } : {}), ...away })
     }
     // the names the human gave them: a space's by the space rules (another on its machine with it keeps its own)
     for (const m of machines) {
@@ -271,14 +260,11 @@ export class LiveSourceState extends Emitter<SourceEvents> {
   protected coordinator(id: string, o: { as?: Harness; restart?: () => Promise<string | void> } = {}) {
     const c = this.places.coordinator(id)
     if (!c) throw new Error(`No place ${id}`)
-    const pilot = this.pilots.current(id)
-    if (this.places.mode(id) === 'autopilot' && (!pilot || !['on', 'starting'].includes(pilot.state)))
-      throw new Error(pilot?.error || 'coordinator timer is stopped. Turn it off or retry its settings.')
-    const set = this.places.mode(id) === 'autopilot' ? pilot!.config.harness : this.settings.harness('coordinator', this.spaceKey(id))
+    const set = this.settings.harness('coordinator', this.spaceKey(id))
     const rec = this.agents.record(id)
     // a record made before its CLI listed models (pi's registry) has no model, and that CLI won't start without one
     const unset = !!rec && rec.kind === set.kind && !!chooseModel(rec.kind, rec.model)
-    const h = o.as ?? (this.places.mode(id) === 'autopilot' ? set : rec && !unset ? undefined : set)
+    const h = o.as ?? (rec && !unset ? undefined : set)
     const spec: Spec = {
       key: id,
       name: c.name,
@@ -290,27 +276,12 @@ export class LiveSourceState extends Emitter<SourceEvents> {
       was: (c as { was?: string }).was,
       tab: c.tab,
       system:
-        coordinatorPrompt({ role: this.roleOf(id), name: c.label, path: c.path, machine: NAME, chat: id }, this.places.mode(id)) +
-        (pilot && this.places.mode(id) === 'autopilot'
-          ? `\n\nHeartbeat instructions:\n${this.heartbeats.read(id, this.roleOf(id), true)}\n\nRuntime settings:\n${this.pilotWords(pilot)}\n\nSaved progress:\n${readJson<Record<string, string>>('autopilot-progress.json', {})[id] ?? '(none yet)'}`
-          : '') +
+        coordinatorPrompt({ role: this.roleOf(id), name: c.label, path: c.path, machine: NAME, chat: id }) +
         '\n\n' +
         privatePrompt(this.settings.instructions('coordinator', this.spaceKey(id))),
       env: agentEnv(id, ROOT),
     }
-    return o.restart ? this.agents.restart({ ...spec, fresh: this.pilots.busy(id) }, o.restart) : this.agents.ensure(spec)
-  }
-
-  protected pilotOf(key?: string) {
-    if (!key) return undefined
-    const owned = key.includes('/') ? this.engine.task(key.split('/')[0])?.pilot : undefined
-    return owned ? this.pilots.runs.find((r) => r.id === owned) : this.places.mode(key) === 'autopilot' ? this.pilots.current(key) : undefined
-  }
-
-  protected pilotWords(r: PilotRun) {
-    const h = this.settings.heartbeat(this.levelOf(r.place))
-    const space = this.spaceKey(r.place)
-    return `Wake-ups: ${timeWords(h.time, h.zone)}. Events: ${eventWords(h.on)}. Time zone: ${h.zone}.\nAgent: ${harnessWords(r.config.harness)}\nPermission profile: Isolated workspace (Linux namespaces). Coordinator reads the project; workers write only their own worktree. Git metadata is read-only; save commits through lineclear checkpoint. System programs and certificate configuration are read-only. Other home files, control sockets and local network are hidden. Project files, including any credentials kept there, are readable.\nNetwork: HTTPS to ${r.config.hosts.join(', ') || 'no hosts'} through the CONNECT gateway. Only destination hosts/IPs are checked; encrypted application traffic is not inspected.\nAccounts: selected agent and reviewer provider logins; repository account through checked PR/merge commands. Secrets: ${r.config.secrets.join(', ') || 'none'}.\nHuman approval: ${r.config.approvals.join(', ') || 'no merges require approval'}; settings, deleting tasks and unrelated work always need the human.\nShared HTTPS allowance: ${r.config.traffic ? `${r.config.traffic / 1048576} MiB, counted at the gateway across every agent/reviewer` : 'off'}. This measures encrypted traffic, not money or tokens.\nShared reported token allowance: ${r.config.tokens ?? 'off'} (best effort from agent-written delayed logs, can overshoot; not a hard token or money cap).\nShared runtime: ${r.config.runtime ? `${r.config.runtime / 60000} min elapsed since ON` : 'off'}.\nMaximum parallel Lineclear tasks: ${r.config.parallel}. Native helpers and reviewers remain inside their parent's runtime and share its allowance. No automatic fallback.\n\nTask and reviewer defaults:\n${settingsBlock('<task>', { ways: this.settings.ways(space), reviewer: this.settings.harness('reviewer', space), agent: this.settings.harness('task', space) })}`
+    return o.restart ? this.agents.restart(spec, o.restart) : this.agents.ensure(spec)
   }
 
   /** the chat card is posted: tell the watchers, and raise an alert that opens it */
@@ -329,7 +300,7 @@ export class LiveSourceState extends Emitter<SourceEvents> {
     this.stoppedAlert(key, id, `${r.reason}. ${r.words}`.slice(0, 200), `cut:${key}`)
   }
 
-  /* ---------- heartbeat ---------- */
+  /* ---------- spaces ---------- */
 
   /** a space's folder key: its name as added, or a home space's ~ */
   protected spaceKey(id: string) {
@@ -347,23 +318,6 @@ export class LiveSourceState extends Emitter<SourceEvents> {
   protected roleOf(id: string): 'space' | 'home' | 'main' {
     if (id !== placeId.home()) return 'space'
     return BOX ? 'home' : 'main'
-  }
-
-  /** does news wake this coordinator: never (quiet.ts). The news is not sent either, and not kept for a heartbeat */
-  protected wakes(id: string, _h: Happened, line: string) {
-    if (this.pilots.busy(id)) {
-      this.heartbeats.hold(id, line)
-      return false
-    }
-    if (this.places.mode(id) !== 'autopilot') return true
-    const r = this.pilotOf(id)
-    if (r?.state !== 'on') {
-      this.heartbeats.hold(id, line)
-      return false
-    }
-    // an event never wakes a coordinator (quiet.ts): its heartbeat's schedule, or the owner's Run now, does
-    this.heartbeats.hold(id, line)
-    return false
   }
 
   /* ---------- machine health ---------- */
@@ -457,10 +411,8 @@ export class LiveSourceState extends Emitter<SourceEvents> {
       ? [`Lineclear closed ${swept.length} shared browser${swept.length > 1 ? 's' : ''} that finished tasks left open (${swept.join(', ')}).`]
       : []
     const text = [`Machine ${NAME}: ${words}.`, summary(s), `Tasks: ${this.workingLine()}.`, ...closed, ...procs, what].join('\n')
-    const mode = this.places.mode(machine)
     if (e.what === 'over') this.fireTaskAutomations({ event: 'health' }, machine)
-    if (!this.wakes(machine, { event: 'health' }, `Machine ${NAME}: ${words}`)) return
-    const tail = `${mode === 'regular' ? 'Act on it if the human asked you to handle such things.' : 'Act on it by your machine health rules.'} If it can’t wait, alert the human with lineclear alert and say why. A card in this chat already shows the human the news: ${REPLY_AFTER_CARD}`
+    const tail = `Act on it if the human asked you to handle such things. If it can’t wait, alert the human with lineclear alert and say why. A card in this chat already shows the human the news: ${REPLY_AFTER_CARD}`
     this.agents
       .send(machine, hidden(`${text}\n${tail}`, 'health', { kind: e.kind, what: e.what }), { ensure: () => this.coordinator(machine) })
       .catch(() => undefined)

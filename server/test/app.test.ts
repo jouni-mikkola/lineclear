@@ -63,7 +63,7 @@ const post = (headers: Record<string, string>) =>
   fetch(`${base}/api/action`, {
     method: 'POST',
     headers: { 'content-type': 'text/plain', ...headers },
-    body: JSON.stringify({ type: 'mode', place: 'all', mode: 'autopilot' }),
+    body: JSON.stringify({ type: 'read', chats: {} }),
   })
 
 describe('who may act', () => {

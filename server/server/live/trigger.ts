@@ -1,4 +1,4 @@
-// One trigger for coordinator timer's heartbeat and for automations: a time rule, event rules, or both. The time rule is an
+// One trigger for automations: a time rule, event rules, or both. The time rule is an
 // iCalendar recurrence rule (RFC 5545: DTSTART, RRULE, EXDATE), read by the rrule package, or "once <date> <time>"; its
 // times are wall-clock times in the time zone Settings sets (time.zone, Everywhere). Event rules name the news that
 // sets it off (a task added, ready, gone wrong…), each with optional filters (space, branch, title). Humans never write
@@ -349,7 +349,7 @@ export function timeWords(kept: string | undefined, zone: string, now = Date.now
 }
 
 /** when a run is, as people say it in that zone: "Today 14:30", "Tomorrow 8:00", "Thu 30 Oct 8:00" */
-export function runWords(at: number, zone: string, now = Date.now()) {
+function runWords(at: number, zone: string, now = Date.now()) {
   const w = wall(at, zone)
   const today = wall(now, zone)
   const dayOf = (d: Date) => Math.floor(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / 86_400_000)
@@ -458,7 +458,7 @@ const EVENT_WORDS: Record<TriggerEvent | 'news', string> = {
 }
 
 /** event rules in plain words: "All news", "When a task is ready or merged in gtm" */
-export function eventWords(rules: EventRule[] | undefined): string {
+function eventWords(rules: EventRule[] | undefined): string {
   if (!rules?.length) return 'No news'
   if (rules.length === 1 && rules[0].event === 'news' && !rules[0].space && !rules[0].branch && !rules[0].title) return 'All news'
   const one = (r: EventRule) =>
@@ -554,10 +554,3 @@ function fromCron(expr: string) {
   ]
   return timeRule(parts.filter(Boolean).join(';'))
 }
-
-/**
- * Does one space's news cost the home coordinator a model turn? Only on coordinator timer, where its event rules pick what wakes
- * it; the news of a space is its own coordinator's to act on, and the human sees it as a card. A machine's health is
- * told by its own rule.
- */
-export const overviewWakes = (homeMode: string, kind: string) => kind === 'health' || homeMode === 'autopilot'

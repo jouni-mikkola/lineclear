@@ -1,4 +1,4 @@
-import { type Question, type ArtifactPost, type Reaction, type ReplyQuote, type UpdateCard, type Task, type Mode, MODES } from './types-core.ts'
+import type { Question, ArtifactPost, Reaction, ReplyQuote, UpdateCard, Task } from './types-core.ts'
 
 /** what kind of step a tool call is, for its icon and its row */
 export type StepKind = 'run' | 'read' | 'edit' | 'search' | 'web' | 'agent' | 'other'
@@ -164,21 +164,12 @@ export const doneNewestFirst = <T extends Pick<Task, 'status' | 'doneAt'>>(ts: T
   ...ts.filter((t) => t.status === 'done').sort((a, b) => (b.doneAt ?? 0) - (a.doneAt ?? 0)),
 ]
 
-/** a mode card, coordinator timer switched on or off: "coordinator timer on · works on its own", "coordinator timer off · does what you ask" */
-export function modeCard(id: string, mode: Mode): UpdateCard {
-  const what = MODES.find(([m]) => m === mode)?.[2] ?? ''
-  return { id, mode: 'autopilot', text: `${mode === 'autopilot' ? 'on' : 'off'} · ${what.toLowerCase()}` }
-}
-
-/** a mode's name: "Coordinator timer" */
-const modeName = (mode: Mode) => MODES.find(([m]) => m === mode)?.[1] ?? mode
-
 /** an update card as a message in the chat: its words are what a reaction or a reply quotes */
 export const cardMessage = (card: UpdateCard, at?: number): Message => ({
   id: card.id,
   who: 'agent',
   at,
-  text: `${card.task ?? (card.mode ? modeName(card.mode) : (card.health?.machine ?? card.red ?? ''))} ${card.text}`,
+  text: `${card.task ?? card.health?.machine ?? card.red ?? ''} ${card.text}`,
   card,
 })
 
@@ -258,14 +249,6 @@ export interface RestartInfo {
   working: boolean
 }
 
-/** a trigger setting as Settings shows it: in plain words, its next runs (a time rule's), and a few ready-made values
- *  to pick; anything else the coordinator writes from the human's words */
-export interface TriggerRow {
-  words: string
-  next: string[]
-  presets: { label: string; value: string }[]
-}
-
 interface SettingRow {
   label: string
   key: string
@@ -274,12 +257,6 @@ interface SettingRow {
   text?: boolean
   /** private instruction text, saved explicitly without a repository file */
   multiline?: boolean
-  /** a trigger's time rule or event rules (Coordinator timer's heartbeat): shown in words, never as written */
-  trigger?: TriggerRow
-  /** a whole file's words (a coordinator's HEARTBEAT.md), in a box as wide as the page */
-  doc?: boolean
-  /** Complete generated launch settings, plain text after the editable Heartbeat. */
-  instructions?: string
   /** read-only row (plugins, machines) */
   fixed?: boolean
   /** a page of Lineclear this row's value is set on (its path); the row is read-only here */

@@ -7,7 +7,6 @@ import { trimCache } from "../src/tmpdirs.ts";
 import { doctor, doctorChecks, herdrUnsaved, herdrVersions, realProbe, testedHerdr, type Probe } from "../src/doctor.ts";
 import { storedTaskIds } from "../src/doctor-task-ids.ts";
 import { cacheEnvFile, pathsFor } from "../src/paths.ts";
-import { fixRetired } from "../src/retire.ts";
 
 const paths = pathsFor({ HOME: "/nonexistent-home" });
 const probe = (over: Partial<Probe> = {}): Probe => ({
@@ -80,67 +79,6 @@ test("doctor warns when the server listens beyond 127.0.0.1, with the command th
   mkdirSync(join(own.unit, ".."), { recursive: true });
   writeFileSync(own.unit, `ExecStart=${own.app}/bin/lineclear run\nEnvironment=LINECLEAR_HOST=0.0.0.0\n`);
   expect(find({ paths: own }).problem).toContain("0.0.0.0");
-  rmSync(dir, { recursive: true });
-});
-
-test("doctor names coordinator timers, and --fix turns them off", () => {
-  const timerSetting = process.env.LINECLEAR_COORDINATOR_TIMER;
-  delete process.env.LINECLEAR_COORDINATOR_TIMER;
-  const dir = mkdtempSync(join(tmpdir(), "doctor-retired-"));
-  const data = join(dir, "data");
-  mkdirSync(data, { recursive: true });
-  writeFileSync(join(data, "modes.json"), JSON.stringify({ a: "autopilot", b: "regular" }));
-  const p = probe({ dataDir: data });
-  const mine = ["no coordinator on a timer"];
-  const bad = () =>
-    doctorChecks(p)
-      .filter((c) => mine.includes(c.name) && c.problem !== "")
-      .map((c) => c.name);
-  expect(bad()).toEqual(["no coordinator on a timer"]);
-  const out: string[] = [];
-  fixRetired(p, (l) => out.push(l));
-  expect(out).toEqual(["Turned off the timer of a"]);
-  expect(bad()).toEqual([]);
-  writeFileSync(join(data, "modes.json"), JSON.stringify({ a: "autopilot" }));
-  const live: string[] = [];
-  const asked: string[] = [];
-  expect(
-    fixRetired(
-      {
-        ...p,
-        running: () => true,
-        setRegular: (id) => {
-          asked.push(id);
-          return true;
-        },
-      },
-      (l) => live.push(l),
-    ),
-  ).toBe(0);
-  expect(asked).toEqual(["a"]);
-  expect(JSON.parse(readFileSync(join(data, "modes.json"), "utf8"))).toEqual({ a: "autopilot" });
-  expect(fixRetired({ ...p, running: () => true, setRegular: () => false }, (l) => live.push(l))).toBe(1);
-  expect(live.at(-1)).toContain("did not take the change");
-  writeFileSync(join(data, "modes.json"), JSON.stringify({ a: "regular", b: "regular" }));
-  expect(JSON.parse(readFileSync(join(data, "modes.json"), "utf8"))).toEqual({ a: "regular", b: "regular" });
-  if (timerSetting !== undefined) process.env.LINECLEAR_COORDINATOR_TIMER = timerSetting;
-  rmSync(dir, { recursive: true });
-});
-
-test("the doctor honours LINECLEAR_COORDINATOR_TIMER like the server", () => {
-  const dir = mkdtempSync(join(tmpdir(), "doctor-timer-"));
-  const data = join(dir, "data");
-  mkdirSync(data, { recursive: true });
-  writeFileSync(join(data, "modes.json"), JSON.stringify({ a: "autopilot" }));
-  const p = probe({ dataDir: data });
-  const was = process.env.LINECLEAR_COORDINATOR_TIMER;
-  process.env.LINECLEAR_COORDINATOR_TIMER = "on";
-  try {
-    expect(doctorChecks(p).find((c) => c.name === "no coordinator on a timer")?.problem).toBe("");
-  } finally {
-    if (was === undefined) delete process.env.LINECLEAR_COORDINATOR_TIMER;
-    else process.env.LINECLEAR_COORDINATOR_TIMER = was;
-  }
   rmSync(dir, { recursive: true });
 });
 

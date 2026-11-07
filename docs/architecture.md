@@ -14,7 +14,7 @@ imports count for the borders but not for cycles, since they are gone when the c
 | --- | --- | --- | --- |
 | `brand` | `ui/brand/` | the mark, the wordmark and the colour tokens | none |
 | `pi` | `pi/` | the pi extension and the token pack's parts | none |
-| `cli` | `src/` | the CLI and its commands, the rules loop, config and data paths, the web API | `pi`, `check-line`, `registry`, `timer-rule` |
+| `cli` | `src/` | the CLI and its commands, the rules loop, config and data paths, the web API | `pi`, `check-line`, `registry` |
 | `bin` | `bin/` | the `lineclear` command | `cli` |
 | `kit` | `ui/kit/` | the design system's parts and motion | `brand`, `cli` |
 | `web` | `ui/web/` | the pages `lineclear run` serves | `kit`, `brand`, `cli` |
@@ -23,15 +23,14 @@ imports count for the borders but not for cycles, since they are gone when the c
 | `scripts` | `scripts/` | repo tools: the check, the smoke check, measurements | `cli`, `brand`, `gates`, `check-line` |
 | `tests` | `test/` | the bun tests, one file per command | `cli`, `pi`, `kit`, `web`, `brand`, `scripts`, `gates`, `ui-test`, `check-line`, `registry` |
 | `shared` | `server/shared/` | types and pure helpers the server shares | none |
-| `server` | `server/server/` | the server: the live source, agents, chats, the engine and the merge lane | `shared`, `generated`, `check-line`, `registry`, `timer-rule` |
+| `server` | `server/server/` | the server: the live source, agents, chats, the engine and the merge lane | `shared`, `generated`, `check-line`, `registry` |
 | `registry` | `src/models.ts` | the models every installed harness lists | none |
 | `check-line` | `server/server/live/engine/machine.ts`, `src/check-runs.ts`, `src/task-work.ts`, `src/git.ts`, `src/time.ts` | each machine's name and load limit, the log of every check run and of the work a task does on its machine, files `lineclear check` and the merge lane share, and the one git helper and time constants | none |
-| `timer-rule` | `server/server/live/timer-rule.ts` | whether a coordinator may wake on a timer, one rule for the server's refusal and the CLI's heal | none |
 | `generated` | `server/generated/` | the plugin registries the build writes | `plugins` |
 | `plugins` | `server/plugins/` | the server's plugins, each a server part | `server`, `shared` |
 | `helper` | `server/helper/` | what runs on a remote machine | `shared` |
 | `server-scripts` | `server/scripts/` | the server's build, update, supervisor and test runner | `server`, `plugins`, `shared`, `server-tests` |
-| `server-tests` | `server/test/` | the server's tests | `server`, `plugins`, `shared`, `server-scripts`, `generated`, `helper`, `check-line`, `registry`, `timer-rule` |
+| `server-tests` | `server/test/` | the server's tests | `server`, `plugins`, `shared`, `server-scripts`, `generated`, `helper`, `check-line`, `registry` |
 
 ## Rules of thumb
 

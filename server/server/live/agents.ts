@@ -1,7 +1,7 @@
 import { Subscription } from './herdr.ts'
 import { AgentsSending } from './agents-sending.ts'
 import { uniqueLogs } from './log-list.ts'
-export type { AgentRecord, OutItem, Spec } from './agents-helpers.ts'
+export type { OutItem, Spec } from './agents-helpers.ts'
 export { ROUTING_FAILURE, hidden, stripHidden } from './agents-helpers.ts'
 
 export class Agents extends AgentsSending {

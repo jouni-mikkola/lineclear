@@ -1,4 +1,4 @@
-import { asEmoji, artifactQuote, cardMessage, modeCard, nameProblem, type Action } from '../../shared/types.ts'
+import { asEmoji, artifactQuote, cardMessage, nameProblem, type Action } from '../../shared/types.ts'
 import * as D from './data.ts'
 import { ARTIFACT_DATA } from './artifacts.ts'
 import { CLI_NAME, kindOf } from '../live/settings.ts'
@@ -137,22 +137,6 @@ export class DemoWorldActions extends DemoWorldState {
         this.emit('snapshot')
         return {}
       }
-      case 'autopilot-run':
-        this.emit('snapshot')
-        return { ok: true }
-      case 'mode': {
-        const p = this.places.find((x) => x.id === a.place)
-        if (!p || p.mode === a.mode) return {}
-        p.mode = a.mode
-        // a small card in its chat marks when the mode began
-        const chat = this.chats[p.chat]
-        if (chat) {
-          chat.messages.push(cardMessage(modeCard(`mode-${id()}`, a.mode), Date.now() + seq))
-          this.emit('chat', p.chat)
-        }
-        this.emit('snapshot')
-        return {}
-      }
       case 'model':
       case 'effort':
         return { ok: false, error: 'Use the + menu agent controls and Restart to apply model or effort changes. Chat and work are preserved.' }
@@ -200,14 +184,7 @@ export class DemoWorldActions extends DemoWorldState {
         if (a.key.startsWith('plugin.')) {
           const name = a.key.slice('plugin.'.length)
           this.pluginsOff = a.value === 'off' ? [...this.pluginsOff.filter((n) => n !== name), name] : this.pluginsOff.filter((n) => n !== name)
-          this.sections = D.settings(this.stores, this.checklists, this.pluginsOff)
-          this.emit('snapshot')
-          return { ok: true }
-        }
-        if (a.key === 'heartbeat.md') {
-          if (!a.place) return { ok: false, error: 'No such space.' }
-          this.checklists[a.place] = a.value ?? ''
-          this.sections = D.settings(this.stores, this.checklists, this.pluginsOff)
+          this.sections = D.settings(this.stores, this.pluginsOff)
           this.emit('snapshot')
           return { ok: true }
         }
@@ -219,7 +196,7 @@ export class DemoWorldActions extends DemoWorldState {
           const r = st.set(a.key, a.value, level)
           if (!r.ok) return r
         }
-        this.sections = D.settings(this.stores, this.checklists, this.pluginsOff)
+        this.sections = D.settings(this.stores, this.pluginsOff)
         this.emit('snapshot')
         return {}
       }

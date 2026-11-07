@@ -77,7 +77,7 @@ also has a side panel: its live herdr terminal, its files, its diff against main
 - From before spaces (projects, machine coordinators and an All machines coordinator): the first start moves it all
   over once (`server/live/migrate.ts`). Projects become spaces with their ids, names and chats (`projects.json` becomes
   `spaces.json`); each machine coordinator's chat moves into that machine's home space, and All machines' into the main
-  machine's home space, which takes over its jobs; modes, settings, pins, unread marks, heartbeats and artifacts
+  machine's home space, which takes over its jobs; settings, pins, unread marks and artifacts
   follow. A pinned machine becomes its pinned home space. `lineclear project …` and `--project` still work, as
   `space`.
 

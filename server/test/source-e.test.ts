@@ -1,5 +1,4 @@
-import { stopSource, HOST, placeId, heartbeatFile, src, until, workedTask } from './source-fixture.ts'
-import { readJson } from '../server/store.ts'
+import { stopSource, HOST, placeId, src, until, workedTask } from './source-fixture.ts'
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { execSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync } from 'node:fs'
@@ -84,33 +83,23 @@ describe('news for coordinators', () => {
 })
 
 describe('news for coordinators, continued', () => {
-  test("every space starts regular; the main machine's home space hears every space's news, a task added only on coordinator timer", async () => {
+  test("the main machine's home space hears every space's news, ", async () => {
     const project = placeId.space('newsco')
     const home = placeId.home()
     const sent: string[] = []
     const send = src.agents.send
     src.agents.send = (async (k: string) => (k === project || k === home ? sent.push(k) : 0, { waiting: false })) as never
-    const modes = { ...src.places.modes }
     const news = (kind: 'added' | 'ready', at = project) => (
       (sent.length = 0), src.engine.emit('news', at, 'NC-1 is ready', kind, { task: 'NC-1', event: kind }), [...sent].sort()
     )
     try {
-      for (const id of [project, home]) delete src.places.modes[id]
-      // off coordinator timer the home space is woken by no other space's news: its own coordinator acts on it
+      // the home space is woken by no other space's news: its own coordinator acts on it
       expect(news('ready')).toEqual([project])
-      expect(news('added')).toEqual([])
-      src.places.modes[project] = 'regular'
-      src.places.modes[home] = 'autopilot'
-      const homeRun = src.pilots.begin(home, src.settings.pilot())
-      homeRun.state = 'on'
-      expect(news('ready')).toEqual([project])
-      // on coordinator timer an event never wakes the coordinator: no news goes to it at all
       expect(news('added')).toEqual([])
       // the home space's own news goes to it once
-      expect(news('ready', home)).toEqual([])
+      expect(news('ready', home)).toEqual([home])
     } finally {
       src.agents.send = send
-      src.places.modes = modes
     }
   })
   test("news the human sees as a card gets its coordinator's short reply after it; unseen news may get <no-reply>", async () => {
@@ -118,10 +107,8 @@ describe('news for coordinators, continued', () => {
     const said = new Map<string, string>()
     const send = src.agents.send
     src.agents.send = (async (k: string, text: string) => (said.set(k, text), { waiting: false })) as never
-    const modes = { ...src.places.modes }
     const engine = src.engine as unknown as { emit(e: string, ...a: unknown[]): void }
     try {
-      for (const id of [project, placeId.home()]) delete src.places.modes[id]
       // a status's card goes up, then its news: the coordinator replies after the card, never quietly
       const t = { id: 'NR-1', project, posted: 'ready|' } as never
       engine.emit('card', t, 'ready', '')
@@ -152,7 +139,6 @@ describe('news for coordinators, continued', () => {
       expect(said.get(project)).toContain('Never <no-reply> to it.')
     } finally {
       src.agents.send = send
-      src.places.modes = modes
     }
   })
 })
@@ -234,122 +220,6 @@ describe("every machine's news reaches the main machine's home space", () => {
       off()
       src.agents.send = send
     }
-  })
-})
-
-describe('coordinator timer switch failures are truthful', () => {
-  test('unsupported home isolation fails without changing mode or posting an ON card', async () => {
-    const place = placeId.home(HOST)
-    src.places.setMode(place, 'regular')
-    const result = (await src.act({ type: 'mode', place, mode: 'autopilot' })) as { error?: string }
-    expect(result.error).toContain('repository space')
-    expect(src.places.mode(place)).toBe('regular')
-    expect(await src.act({ type: 'mode', place, mode: 'copilot' as never })).toEqual({ ok: false, error: 'No such mode.' })
-  })
-})
-
-describe("Coordinator timer's heartbeat", () => {
-  const min = 60_000
-  test('on its time rule, only while its coordinator is idle; the news its event rules name wakes it at once, the rest waits for it', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'shep-beat-'))
-    execSync('git init -q -b main', { cwd: dir })
-    const p = await src.places.add(dir, 'beat')
-    const place = placeId.space(p.name)
-    const sent: { k: string; text: string }[] = []
-    const send = src.agents.send
-    const status = src.agents.status
-    const reachable = src.agents.reachable
-    let st = 'working'
-    src.agents.send = (async (k: string, text: string) => (sent.push({ k, text }), { waiting: false })) as typeof send
-    src.agents.status = ((k: string) => (k === place ? st : 'gone')) as typeof status
-    src.agents.reachable = true
-    const beats = () => sent.filter((x) => x.k === place && x.text.includes('<heartbeat>'))
-    // on a half hour: every 30 minutes runs on the clock's :00 and :30
-    const t0 = Math.floor(Date.now() / (30 * min)) * 30 * min
-    try {
-      const run = src.pilots.begin(place, src.settings.pilot(p.name))
-      run.state = 'on'
-      src.places.setMode(place, 'autopilot')
-      src.heartbeats.switched(place, true, t0)
-      src.heartbeat(t0 + 29 * min)
-      expect(beats()).toEqual([])
-      // due, but busy: it waits for the turn to end
-      src.heartbeat(t0 + 31 * min)
-      expect(beats()).toEqual([])
-      // news never wakes the coordinator on coordinator timer, and none is kept for the heartbeat (quiet.ts)
-      src.engine.emit('news', place, 'BE-1 was added: Fix it', 'added', { task: 'BE-1', event: 'added' })
-      src.engine.emit('news', place, 'BE-2 needs you: a question', 'need', { task: 'BE-2', event: 'needs-you' })
-      src.engine.emit('news', place, 'BE-3 is merged', 'done', { task: 'BE-3', event: 'merged' })
-      expect(sent.filter((x) => x.k === place)).toEqual([])
-      // the same when its event rules name it
-      expect(src.settings.set('heartbeat.on', 'needs-you', { space: p.name }).ok).toBe(true)
-      src.engine.emit('news', place, 'BE-4 is ready to merge', 'ready', { task: 'BE-4', event: 'ready' })
-      expect(sent.filter((x) => x.k === place).some((x) => x.text.includes('BE-4'))).toBe(false)
-      st = 'idle'
-      src.heartbeat(t0 + 32 * min)
-      expect(beats()).toHaveLength(1)
-      const beat = beats()[0].text
-      expect(beat).toStartWith('<lineclear><heartbeat>Heartbeat. Go through your HEARTBEAT.md: ')
-      expect(beat).toContain('Your HEARTBEAT.md:\n# Heartbeat')
-      expect(beat).not.toContain('BE-1')
-      expect(beat).not.toContain('News since the last heartbeat')
-      expect(beat).not.toContain('BE-4')
-      src.settings.set('heartbeat.on', null, { space: p.name })
-      expect(beat).toContain('<no-reply>heartbeat: nothing to do</no-reply>')
-      // the quiet marker the coordinator answers with shows nothing in the chat
-      expect((await src.cli(['heartbeat'], { chat: place })).out).toMatch(
-        /heartbeat: Every 30 minutes \(.+\); last .+; next .+ once idle\. Wakes at once on: all news\./,
-      )
-      // read and changed with the command, from any machine: the checklist itself, never its path
-      expect((await src.cli(['heartbeat'], { chat: place })).out).toContain('HEARTBEAT.md:\n# Heartbeat')
-      expect((await src.cli(['heartbeat', 'set'], { chat: place })).out).toContain('on stdin')
-      src.places.setMode(place, 'regular')
-      src.pilots.current(place)!.state = 'stopped'
-      expect((await src.cli(['heartbeat', 'set', p.name], { stdin: '- Check the ROM builds\n' })).out).toContain('is saved')
-      const shown = (await src.cli(['heartbeat', p.name], {})).out
-      expect(shown).toContain('HEARTBEAT.md:\n- Check the ROM builds')
-      expect(shown).not.toContain(heartbeatFile(place))
-      const show = (await src.cli(['show'], { chat: place })).out
-      expect(show).toContain('Heartbeat on coordinator timer: Every 30 minutes (')
-      expect(show).toContain("news that wakes it at once: all news, the rest waits for the heartbeat. Each brings the place's HEARTBEAT.md")
-      // Restore only this fake run after editing while OFF; never start a real CLI in this fixture.
-      src.places.setMode(place, 'autopilot')
-      run.state = 'on'
-      // once given, the next is the rule's next run
-      src.heartbeat(t0 + 40 * min)
-      expect(beats()).toHaveLength(1)
-      src.heartbeat(t0 + 62 * min)
-      expect(beats()).toHaveLength(2)
-      // an empty HEARTBEAT.md, edited in Settings: no heartbeat
-      src.places.setMode(place, 'regular')
-      run.state = 'stopped'
-      expect(await src.act({ type: 'setting', key: 'heartbeat.md', value: '', place })).toEqual({ ok: true })
-      expect(
-        src
-          .snapshot()
-          .settings.find((x) => x.level === place && x.name === 'Coordinator timer')!
-          .rows.find((r) => r.key === 'heartbeat.md'),
-      ).toMatchObject({ value: '', doc: true })
-      src.places.setMode(place, 'autopilot')
-      run.state = 'on'
-      src.heartbeat(t0 + 93 * min)
-      expect(beats()).toHaveLength(2)
-      // off coordinator timer: no heartbeat however long it waits
-      src.places.setMode(place, 'regular')
-      run.state = 'stopped'
-      src.heartbeats.switched(place, false)
-      await src.act({ type: 'setting', key: 'heartbeat.md', value: '- check things', place })
-      src.heartbeat(t0 + 300 * min)
-      expect(beats()).toHaveLength(2)
-    } finally {
-      src.agents.send = send
-      src.agents.status = status
-      src.agents.reachable = reachable
-    }
-  })
-  test('the quiet marker shows nothing in the chat', async () => {
-    const { agentLines } = await import('../server/live/chatlines.ts')
-    expect(agentLines('<no-reply>heartbeat: nothing to do</no-reply>').text).toBe('')
   })
 })
 
@@ -468,8 +338,6 @@ describe('adding a space from the sidebar', () => {
     try {
       src.peers!.adopt('far', `http://127.0.0.1:${far.port}`)
       for (let i = 0; i < 50 && !src.peers!.list().find((l) => l.rec.machine === 'far')?.reachable; i++) await new Promise((r) => setTimeout(r, 20))
-      // an older helper there still says Manual: read as regular
-      expect(src.snapshot().places.find((p) => p.id === 'p:far:~')?.mode).toBe('regular')
       expect(src.snapshot().machines.find((m) => m.id === 'm:far')?.status).toBe('idle')
       expect((await src.folders('far', '~/dev')).path).toBe('~/dev')
       expect(got.some((g) => g.path === `/api/folders?machine=far&path=${encodeURIComponent('~/dev')}`)).toBe(true)
@@ -484,26 +352,7 @@ describe('adding a space from the sidebar', () => {
 
 afterAll(stopSource)
 
-describe("coordinator timer is the owner's switch alone", () => {
-  test("an agent's shell cannot turn it on; the record of the owner's switch holds who and when", async () => {
-    const place = placeId.home(HOST)
-    const refused = await src.cli(['mode', 'home', 'autopilot'], { chat: 'LIN-1/Agent' })
-    expect(refused.code).toBe(1)
-    expect(refused.out).toContain('only by the owner')
-    expect(src.places.mode(place)).toBe('regular')
-    const at = Date.now()
-    src.places.recordSwitch(place, 'autopilot', { by: 'terminal', who: 'Owner', at })
-    expect(readJson<Record<string, unknown>>('autopilot-switch.json', {})[place]).toEqual({ by: 'terminal', who: 'Owner', at })
-    src.places.recordSwitch(place, 'regular')
-    expect(readJson<Record<string, unknown>>('autopilot-switch.json', {})[place]).toBeUndefined()
-  })
-
-  test("a restart or a setting cannot start coordinator timer again without the owner's switch on record", async () => {
-    const place = placeId.home(HOST)
-    const start = (src as unknown as { switchPilot(p: string, m: 'autopilot'): Promise<void> }).switchPilot.bind(src)
-    await expect(start(place, 'autopilot')).rejects.toThrow('not switched on by the owner')
-  })
-
+describe('naming a space', () => {
   test("a name reaches this machine's space only; another machine's space needs its full id", () => {
     const peers = src.peers!
     const list = peers.list

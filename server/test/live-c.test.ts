@@ -106,27 +106,27 @@ describe("the brief's default way of working", () => {
 })
 
 describe("a coordinator's instructions", () => {
-  test('who it is, its space and whether coordinator timer is on; its rules are in the coordinator skill', () => {
+  test('who it is, its space and its rules are in the coordinator skill', () => {
     const place = { role: 'space' as const, name: 'gtm', path: '/x/gtm', machine: 'vm-str' }
-    for (const mode of ['regular', 'autopilot'] as const) {
-      const p = coordinatorPrompt(place, mode)
+    {
+      const p = coordinatorPrompt(place)
       expect(p).toContain('the coordinator of the space gtm on vm-str (/x/gtm)')
       expect(p).not.toContain('home space')
       expect(p).toContain('skill/lineclear/SKILL.md first')
       expect(p).toContain('skill/lineclear-coordinator/SKILL.md')
       expect(p).not.toContain('lineclear-agent')
-      expect(p).toContain(`Coordinator timer is ${mode === 'autopilot' ? 'on' : 'off'} now.`)
+      expect(p).not.toContain('Coordinator timer')
     }
     // a home space's also looks after its machine; the main machine's also keeps every machine's overview
-    const home = coordinatorPrompt({ role: 'home', name: 'home', path: '/home/x', machine: 'mac' }, 'regular')
+    const home = coordinatorPrompt({ role: 'home', name: 'home', path: '/home/x', machine: 'mac' })
     expect(home).toContain("This is mac's home space: you also look after the machine")
     expect(home).not.toContain('every machine')
-    const main = coordinatorPrompt({ role: 'main', name: 'home', path: '/home/x', machine: 'vm-str' }, 'regular')
+    const main = coordinatorPrompt({ role: 'main', name: 'home', path: '/home/x', machine: 'vm-str' })
     expect(main).toContain('This is the home space of the main machine, vm-str')
     expect(main).toContain('you keep the overview of every machine')
     expect(main).toContain('which alerts reach the phone')
     const rules = readFileSync(join(ROOT, 'skill', 'lineclear-coordinator', 'SKILL.md'), 'utf8')
-    for (const w of ["Only on the human's plain word", 'standing requests', 'Coordinator timer', 'force-push', 'home space']) expect(rules).toContain(w)
+    for (const w of ["Only on the human's plain word", 'standing requests', 'force-push', 'home space']) expect(rules).toContain(w)
   })
 })
 

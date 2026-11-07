@@ -76,7 +76,7 @@ export class EngineHandoff extends EngineLaunch {
   /** a backup agent could take this task over now: one is set, installed, different, and has not had its turn */
   canSwitch(id: string): boolean {
     const t = this.task(id)
-    if (!t || t.pilot || !t.worktree || t.tookOver) return false
+    if (!t?.worktree || t.tookOver) return false
     const from = this.agents.record(this.key(t))?.kind ?? t.agent?.kind ?? ''
     const to = kindOf(this.settings.get('task.fallback', this.nameOf(t)))
     return !!to && to !== from && this.installed(to)
@@ -89,7 +89,7 @@ export class EngineHandoff extends EngineLaunch {
    */
   async cantGoOn(id: string, why: string) {
     const t = this.task(id)
-    if (!t || t.pilot || !this.mayRetry(this.key(t)) || this.handing.has(t.id)) return
+    if (!t || !this.mayRetry(this.key(t)) || this.handing.has(t.id)) return
     const key = this.key(t)
     const from = this.agents.record(key)?.kind ?? t.agent?.kind ?? ''
     const to = kindOf(this.settings.get('task.fallback', this.nameOf(t)))

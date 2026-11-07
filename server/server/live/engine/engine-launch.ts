@@ -333,7 +333,6 @@ export class EngineLaunch extends EngineStalls {
     const how = settingsBlock(id, { ways, reviewer, agent, by })
     const desc = [o.desc ?? (title !== o.title ? o.title : ''), o.later ? LATER : '', how].filter(Boolean).join('\n\n')
     const t: TaskRec = {
-      pilot: this.pilotOwner?.(o.requester),
       id,
       n,
       project: placeId.space(p.name),
@@ -356,7 +355,6 @@ export class EngineLaunch extends EngineStalls {
     // one that starts work now waits for room; one for later only reads its brief, so it starts at once
     const room = after.length || o.later ? {} : this.room()
     this.data.tasks.push(t)
-    if (t.pilot) this.pilotClaim?.(t)
     if (room.why) {
       t.told = 'queued'
       this.hold(t, room.why)
@@ -391,7 +389,6 @@ export class EngineLaunch extends EngineStalls {
   }
 
   private async startTaskHere(t: TaskRec) {
-    this.pilotGate?.(t)
     this.starting.add(t.id)
     t.trouble = t.stuck = undefined
     this.emit('changed')

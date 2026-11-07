@@ -56,4 +56,4 @@ app is closed or in the background.
 
 - [Upgrading and updates](upgrading.md): coming from herdr-projects, going back, and how Lineclear keeps itself up to date.
 - [Other machines](machines.md): run spaces and tasks on more machines from the same app.
-- [Spaces](spaces.md), [Chats](chat.md), [Tasks](tasks.md), [coordinator timer](coordinator-timer.md), [Artifacts](artifacts.md), [Shared browser](browser.md) and [Settings](settings.md): how it all works.
+- [Spaces](spaces.md), [Chats](chat.md), [Tasks](tasks.md), [Artifacts](artifacts.md), [Shared browser](browser.md) and [Settings](settings.md): how it all works.

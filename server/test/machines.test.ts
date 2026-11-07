@@ -157,26 +157,6 @@ describe('a machine run from the main one', () => {
     expect(JSON.parse(r.stdout)).toEqual({ cwd: '/home/user', log: `${home}/mirror/home/user/.claude/projects/-home-user/abc.jsonl` })
   })
 
-  test("its coordinator's heartbeat holds no path of the main machine: the checklist comes in it", () => {
-    const home = mkdtempSync(join(tmpdir(), 'shep-worker-'))
-    const box: BoxInfo = { label: 'vm-demo', target: 'vm-demo', session: 'default', herdr: 'herdr', home: '/home/other', path: '/usr/bin:/bin', os: 'Linux' }
-    const code = `const { Heartbeats } = await import(${JSON.stringify(join(root, 'server/live/heartbeat.ts'))}); const h = new Heartbeats(); const first = h.beat('p:vm-demo:tor', 'space'); h.write('p:vm-demo:tor', '- Check the ROM builds'); console.log(JSON.stringify([first, h.beat('p:vm-demo:tor', 'space'), h.beat('p:vm-demo:~', 'home')]))`
-    const r = spawnSync(process.execPath, ['-e', code], {
-      encoding: 'utf8',
-      env: { ...process.env, ...mirrorHomes(home, box), LINECLEAR_BOX: JSON.stringify(box), LINECLEAR_HOME: home, LINECLEAR_MACHINE: 'vm-demo' },
-    })
-    const [first, edited, machine] = JSON.parse(r.stdout) as string[]
-    for (const text of [first, edited, machine]) {
-      expect(text).not.toContain(home)
-      expect(text).not.toContain('.lineclear')
-      expect(text).not.toMatch(/\/(Users|home|root|tmp|var|private)\//)
-      expect(text).toContain('lineclear heartbeat set')
-    }
-    expect(first).toContain('Tasks stuck or stalled')
-    expect(edited).toContain('Your HEARTBEAT.md:\n- Check the ROM builds')
-    expect(machine).toContain('Disk, memory and load')
-  })
-
   // fails on ebb17d5 too; L20 fixes it
 
   test.skip("an agent's artifact commands there name no path of the main machine: the pictures and pages are copied over", () => {
@@ -308,40 +288,6 @@ describe('a machine run from the main one', () => {
       ])
       expect(away[0]).toBe(1)
       expect(away[1]).toContain("The main machine's Lineclear can't be reached right now")
-    } finally {
-      server.stop(true)
-    }
-  })
-
-  test.if(perl)('the lineclear command there sends a new HEARTBEAT.md on stdin', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'shep-shim-'))
-    mkdirSync(join(dir, 'bin'))
-    writeFileSync(join(dir, 'bin', 'lineclear'), readFileSync(join(root, 'helper', 'lineclear')), { mode: 0o755 })
-    writeFileSync(join(dir, 'route.pl'), readFileSync(join(root, 'helper', 'route.pl')))
-    let got: { args: string[]; stdin?: string } | undefined
-    const server = Bun.listen({
-      unix: join(dir, 'main.sock'),
-      socket: {
-        data(sock, data) {
-          got = JSON.parse(data.toString().split('\r\n\r\n')[1])
-          sock.end('HTTP/1.0 200 OK\r\n\r\n{"out":"Saved.\\n","code":0}')
-        },
-      },
-    })
-    try {
-      const run = (args: string[], input?: string) =>
-        new Promise<string>((done) => {
-          const c = spawn('perl', [join(dir, 'bin', 'lineclear'), ...args], { stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'] })
-          let out = ''
-          c.stdout!.on('data', (d) => (out += d))
-          c.on('close', () => done(out))
-          if (input !== undefined) c.stdin!.end(input)
-        })
-      expect(await run(['heartbeat', 'set'], '- Check the ROM builds\n')).toBe('Saved.\n')
-      expect(got).toMatchObject({ args: ['heartbeat', 'set'], stdin: '- Check the ROM builds\n' })
-      // other words read no stdin
-      await run(['heartbeat'], 'ignored')
-      expect(got!.stdin).toBeUndefined()
     } finally {
       server.stop(true)
     }

@@ -1,11 +1,10 @@
-import { AUTOPILOT_KINDS, hostList } from './autopilot.ts'
 import { CHAT_KINDS } from './readers/index.ts'
 import { cpus } from 'node:os'
 import { NOTIFY, NOTIFY_DEFAULT, NOTIFY_KEY } from '../../shared/alerts.ts'
 import { SEVERITIES } from './prompts.ts'
 import { herdrCliSync } from './herdr.ts'
 import { effortFor, effortsOf, findModel, LEVELS, modelsOf } from './models.ts'
-import { eventRules, OWN_ZONE, timeRule, validZone, type EventRule } from './trigger.ts'
+import { OWN_ZONE, validZone } from './trigger.ts'
 
 /** every agent kind herdr can start (interactive chat requires runtime log discovery and a reader) */
 const FALLBACK_KINDS = [
@@ -85,31 +84,6 @@ const EFFORTS = ['default', ...LEVELS]
 /** the CLIs a brief's Review line may suggest for a task's review */
 export const REVIEWERS = ['Codex', 'Claude Code', 'pi']
 
-/** Coordinator timer's heartbeat (Settings → coordinator timer): its trigger, a time rule as kept ('off': none) and the news that
- *  wakes it at once, and the time zone of every time rule */
-export interface Heartbeat {
-  time: string
-  on: EventRule[]
-  zone: string
-}
-
-/** Coordinator timer's heartbeat by default: every 30 minutes, all day */
-const HEARTBEAT_RULE = timeRule('FREQ=MINUTELY;INTERVAL=30')
-
-/** the heartbeat's few ready-made rules in Settings; anything else, the coordinator writes */
-export const HEARTBEAT_PRESETS = [
-  { label: '15 min', value: timeRule('FREQ=MINUTELY;INTERVAL=15') },
-  { label: '30 min', value: HEARTBEAT_RULE },
-  { label: '1 hour', value: timeRule('FREQ=HOURLY') },
-  { label: 'Workdays', value: timeRule('FREQ=MINUTELY;INTERVAL=30;BYHOUR=8,9,10,11,12,13,14,15,16,17;BYDAY=MO,TU,WE,TH,FR') },
-]
-
-/** the news that wakes a coordinator on coordinator timer at once, ready-made: all of it, or none (it waits for the heartbeat) */
-export const NEWS_PRESETS = [
-  { label: 'All news', value: 'all news' },
-  { label: 'None: it waits', value: 'none' },
-]
-
 /** the agents Settings picks a CLI, model and effort for */
 export type Role = 'task' | 'coordinator' | 'reviewer' | 'backup'
 export const ROLES: Role[] = ['task', 'coordinator', 'reviewer', 'backup']
@@ -174,9 +148,6 @@ const agentRows = (group: string, role: string, cli: string[], model: string, ef
   { group, label: 'Effort', key: `${role}.effort`, value: effort, options: [...EFFORTS] },
 ]
 
-/** the Settings page of coordinator timer's heartbeat */
-export const AUTOPILOT = 'Coordinator timer'
-
 export type Values = Record<string, string>
 
 export const CATALOG: Section[] = [
@@ -231,38 +202,6 @@ export const CATALOG: Section[] = [
     rows: [{ label: 'Archive Done after', key: 'tasks.archiveAfter', value: '7 days', num: { min: 1, max: 3650, unit: 'days', one: 'day', off: true } }],
   },
   {
-    name: AUTOPILOT,
-    about:
-      'One brief, a wake-up schedule and an isolated agent. Turning it on replaces the coordinator and keeps this chat. Access and limits apply to its workers too.',
-    rows: [
-      { group: 'Wake-up', label: 'When', key: 'heartbeat.when', value: HEARTBEAT_RULE },
-      { group: 'Wake-up', label: 'Events', key: 'heartbeat.on', value: 'all news' },
-      { group: 'Agent', label: 'Agent', key: 'autopilot.agent', value: 'inherit', options: ['inherit', ...AUTOPILOT_KINDS.map(nameOf)] },
-      { group: 'Agent', label: 'Model', key: 'autopilot.model', value: 'inherit', text: true },
-      { group: 'Agent', label: 'Effort', key: 'autopilot.effort', value: 'inherit', options: ['inherit', ...EFFORTS] },
-      { group: 'Access and limits', label: 'Permission profile', key: 'autopilot.access', value: 'Isolated workspace', options: ['Isolated workspace'] },
-      {
-        group: 'Access and limits',
-        label: 'Network hosts (HTTPS)',
-        key: 'autopilot.hosts',
-        value: 'api.openai.com, chatgpt.com, api.anthropic.com',
-        text: true,
-      },
-      { group: 'Access and limits', label: 'Available secrets (names)', key: 'autopilot.secrets', value: '', text: true },
-      { group: 'Access and limits', label: 'Human approval required', key: 'autopilot.approvals', value: 'merge', options: ['merge', 'none'] },
-      {
-        group: 'Access and limits',
-        label: 'Shared HTTPS allowance',
-        key: 'autopilot.traffic',
-        value: 'off',
-        num: { min: 1, max: 1000000, off: true, unit: 'MiB' },
-      },
-      { group: 'Access and limits', label: 'Shared reported tokens', key: 'autopilot.tokens', value: 'off', num: { min: 1, max: 1000000000, off: true } },
-      { group: 'Access and limits', label: 'Shared runtime', key: 'autopilot.runtime', value: 'off', num: { min: 1, max: 10080, off: true, unit: 'min' } },
-      { group: 'Access and limits', label: 'Maximum parallel tasks', key: 'autopilot.parallel', value: '3', num: { min: 1, max: 200 } },
-    ],
-  },
-  {
     // each machine's own: when its tasks may start (engine.release holds the rest as Queued) and when its coordinator
     // hears that it struggles (health.ts). Load is the 1-minute load average, in multiples of the machine's cores
     name: 'Machine',
@@ -294,10 +233,10 @@ export const CATALOG: Section[] = [
     rows: [{ label: 'Notify', key: NOTIFY_KEY, value: NOTIFY_DEFAULT, options: [...NOTIFY] }],
   },
   {
-    // the zone every time rule's times are in: Coordinator timer's heartbeats and automations
+    // the zone every time rule's times are in: automations
     name: 'Time zone',
     levels: ['all'],
-    about: 'The time zone of every schedule: heartbeats and automations, on every machine.',
+    about: 'The time zone of every schedule: automations, on every machine.',
     rows: [{ label: 'Time zone', key: 'time.zone', value: OWN_ZONE, text: true }],
   },
   {
@@ -387,42 +326,13 @@ export function numValue(n: Num, value: string): string | undefined {
 
 /** why a value can't be set, or nothing */
 export function refuse(key: string, value: string): string | undefined {
-  if (key === 'autopilot.agent' && value === 'inherit') return undefined
-  if (key === 'autopilot.hosts') {
-    try {
-      hostList(value)
-      return undefined
-    } catch (e) {
-      return (e as Error).message
-    }
-  }
-  if (
-    key === 'autopilot.secrets' &&
-    value
-      .split(/[\s,]+/)
-      .filter(Boolean)
-      .some((n) => !/^[A-Za-z_][A-Za-z0-9_]*$/.test(n))
-  )
-    return 'Use secret names separated by commas.'
   if (key.endsWith('.instructions') && (value.length > 16000 || value.includes('\0')))
     return 'Use at most 16,000 characters, without null characters. Keep secrets in Secrets.'
-  const cli =
-    key === 'task.agent' ||
-    key === 'coordinator.agent' ||
-    (key === 'autopilot.agent' && value !== 'inherit') ||
-    (key === 'task.fallback' && value.trim().toLowerCase() !== 'off')
+  const cli = key === 'task.agent' || key === 'coordinator.agent' || (key === 'task.fallback' && value.trim().toLowerCase() !== 'off')
   if (cli && !kindOf(value)) return `${value} is not an agent herdr can start.`
   if (key === 'reviewer.agent' && !REVIEWERS.includes(CLI_NAME[kindOf(value) ?? ''] ?? '')) return `Pick one of: ${REVIEWERS.join(' · ')}.`
   if (key.endsWith('.model') && !/^[\w.:/@[\] -]+$/.test(value.trim())) return 'Write a model id like vendor/model-top-5-5, or default.'
   const num = numOf(key)
-  if (key === 'heartbeat.when' || key === 'heartbeat.on') {
-    try {
-      if (key === 'heartbeat.when') timeRule(value)
-      else eventRules(value)
-    } catch (e) {
-      return (e as Error).message
-    }
-  }
   if (key === 'time.zone' && !validZone(value.trim())) return `${value} is no time zone: write one like Europe/Stockholm.`
   if (num && numValue(num, value) === undefined)
     return `Write a number from ${num.min} to ${num.max}${num.step ? '' : ' (whole)'}${num.unit ? `, in ${num.unit}` : ''}${num.off ? ', or off' : num.zero ? ' (0 is off)' : ''}.`

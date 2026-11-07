@@ -1,15 +1,6 @@
 /** Status marks: red needs you, green ready, green ring merging, amber working, grey idle, queued, to do or done, dashed unreachable. */
 type Status = 'need' | 'ready' | 'merging' | 'work' | 'idle' | 'queued' | 'todo' | 'done' | 'off'
 
-/** regular, always the fallback: the coordinator does what the human asks; or coordinator timer, a switch on top of it */
-export type Mode = 'regular' | 'autopilot'
-
-/** each mode, its name and what it means in a few words */
-export const MODES: [Mode, string, string][] = [
-  ['regular', 'Regular', 'Does what you ask'],
-  ['autopilot', 'Coordinator timer', 'Works on its own'],
-]
-
 /** the longest name a space can be given, as Slack's channels */
 export const NAME_MAX = 80
 
@@ -62,7 +53,6 @@ export interface Place {
    *  machine's home space, where there are more machines) */
   level: 0 | 1 | 2
   status: Status
-  mode: Mode
   /** chat key of this space's coordinator */
   chat: string
   /** its machine can't be reached: when it went quiet, as shown ("14:02") */
@@ -395,12 +385,10 @@ export interface CardAsk {
 /** One small update card Lineclear posts in a project's coordinator chat. */
 export interface UpdateCard {
   id: string
-  /** the task it is about; none on a mode card */
+  /** the task it is about */
   task?: string
   /** the task's state when posted */
   status?: TaskStatus
-  /** a mode card: the place's coordinator went on this mode (text: "on · works on its own"); an older one may say Manual */
-  mode?: Mode
   /** a few words on one line ("is merged"); a task's summary is in the task, never on its card */
   text: string
   /** the task's pull request, linked from the card */

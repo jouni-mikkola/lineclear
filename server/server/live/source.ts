@@ -13,7 +13,6 @@ export class LiveSource extends LiveSourceUpkeep implements Source {
   constructor() {
     super()
     this.timers.push(setInterval(() => held('rule requested news', () => void this.drainRequestedNews()), 1000))
-    this.configureAutopilot()
     this.agents.secretScope = (chat) => {
       const space = /^[^/]+\/(Agent|Reviewer)$/.test(chat)
         ? this.engine.task(chat.split('/')[0])?.project
@@ -126,8 +125,6 @@ export class LiveSource extends LiveSourceUpkeep implements Source {
       ),
     )
     this.timers.push(setInterval(() => held('rule run schedules', () => this.runSchedules()), 60_000))
-    // heartbeats: looked for twice a minute, so a busy coordinator gets its own soon after its turn ends
-    this.timers.push(setInterval(() => held('rule heartbeat', () => this.heartbeat()), 30_000))
     this.timers.push(setInterval(() => this.emit('snapshot'), 30_000))
     if (process.env.NODE_ENV !== 'test') this.timers.push(setInterval(() => held('rule health tick', () => this.healthTick()), 5000))
     if (process.env.NODE_ENV !== 'test') this.timers.push(setInterval(() => void this.revive().catch(() => undefined), 15_000))

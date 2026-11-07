@@ -1,5 +1,5 @@
 import type { BrowserNote } from './browser.ts'
-import type { Place, Machine, Task, Automation, Artifact, Section, Mode } from './types-core.ts'
+import type { Place, Machine, Task, Automation, Artifact, Section } from './types-core.ts'
 import type { SettingSection, Chat } from './types-chat.ts'
 
 /** one file of a task's worktree */
@@ -120,9 +120,6 @@ export type Action =
   | { type: 'artifact-delete'; place: string; artifact: string }
   /** Mark up's notes from the shared browser, sent together into the task's chat */
   | { type: 'browser-notes'; chat: string; url: string; title?: string; viewport?: { w: number; h: number }; notes: BrowserNote[] }
-  /** `by`: the owner's terminal, which the command sets; the screen sends none */
-  | { type: 'mode'; place: string; mode: Mode; keepWorkers?: boolean; by?: 'terminal' }
-  | { type: 'autopilot-run'; place: string }
   /** a project's automation: pause or go on, run now, remove. Only agents add or change one, through the command. By
       its place, so another machine's goes there */
   | { type: 'automation'; place: string; op: 'pause' | 'resume' | 'run' | 'remove'; name: string }
