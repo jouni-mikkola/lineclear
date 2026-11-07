@@ -2,9 +2,12 @@ import { TITLE_MAX, type Report, type Task, type TaskStatus, type UpdateCard } f
 import { HOST } from '../places.ts'
 import type * as GH from './github.ts'
 import type * as Lane from './lane.ts'
+import type { Phase } from './phase.ts'
 
 export interface TaskRec {
   id: string
+  /** what the engine is doing for it now (phase.ts); none: nothing. Kept, so a restart sees the same status */
+  phase?: Phase
   n: number
   project: string
   /** the machine its worktree and agent are on (its label); left out: the server's own */

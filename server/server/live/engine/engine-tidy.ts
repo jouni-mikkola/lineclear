@@ -4,6 +4,7 @@ import { ROUTING_FAILURE } from '../agents.ts'
 import { splitBrief } from '../prompts.ts'
 import { type TaskRec, ended, labelOf, archiveAfterMs } from './engine-helpers.ts'
 import { EngineMerge } from './engine-merge.ts'
+import { move } from './phase.ts'
 import { retireDue } from './retire.ts'
 import * as Lane from './lane.ts'
 import { killWork, workIn } from './machine.ts'
@@ -72,7 +73,7 @@ export class EngineTidy extends EngineMerge {
       } else this.hold(t, r.why, { text: t.held?.go ? `${t.held.go}\n\n${text}` : text, why: 'its coordinator said go', plain: true })
       return { held: r.why }
     }
-    if (!t.worktree && !this.starting.has(t.id)) {
+    if (!t.worktree && !this.inPhase(t, 'starting')) {
       // above the defaults Lineclear ended the brief with, so it wins over them like the rest of the brief
       const [work, how] = splitBrief(t.desc)
       t.desc = [work, text, how].filter(Boolean).join('\n\n')
@@ -90,7 +91,7 @@ export class EngineTidy extends EngineMerge {
   /** a task held before it ever started: it has no agent yet, so what you write starts it (tell) */
   unstarted(id: string) {
     const t = this.task(id)
-    return !!t && !t.worktree && !this.starting.has(t.id) && !ended(t)
+    return !!t && !t.worktree && !this.inPhase(t, 'starting') && !ended(t)
   }
 
   /**
@@ -100,19 +101,18 @@ export class EngineTidy extends EngineMerge {
   async stopTask(id: string): Promise<string[]> {
     const t = this.req(id)
     t.stopped = true
-    this.briefing.delete(t.id)
+    move(t, 'brief-over')
     this.settle(t)
     const key = this.key(t)
     await this.agents.interrupt(key)
     // closed before anything is looked at, so it changes nothing more
     await this.agents.finish(key)
     const p = this.places.space(t.project) && this.proj(t)
-    if (!p || !t.worktree || ended(t) || this.cleaning.has(t.id)) return []
-    this.cleaning.add(t.id)
+    if (!p || !t.worktree || ended(t) || !move(t, 'clean')) return []
     try {
       return (await this.putAway(t, p.path, p.base)).kept
     } finally {
-      this.cleaning.delete(t.id)
+      move(t, 'over')
     }
   }
 
@@ -124,7 +124,7 @@ export class EngineTidy extends EngineMerge {
    */
   async deleteTask(id: string, opts: { force?: boolean } = {}): Promise<string[]> {
     const t = this.req(id)
-    if (this.starting.has(t.id) || this.cleaning.has(t.id)) throw new Error(`${t.id} is starting or being put away: try again in a moment`)
+    if (this.inPhase(t, 'starting') || this.inPhase(t, 'cleaning')) throw new Error(`${t.id} is starting or being put away: try again in a moment`)
     const p = this.places.space(t.project) && this.proj(t)
     const key = this.key(t)
     // a merge under way in its repo goes first: never its worktree removed under it
@@ -141,7 +141,7 @@ export class EngineTidy extends EngineMerge {
         )
     }
     await holds()
-    this.cleaning.add(t.id)
+    if (!move(t, 'clean')) throw new Error(`${t.id} is busy: try again in a moment`)
     try {
       await this.agents.interrupt(key)
       await this.agents.finish(key)
@@ -165,7 +165,7 @@ export class EngineTidy extends EngineMerge {
       this.recheck()
       return left
     } finally {
-      this.cleaning.delete(t.id)
+      move(t, 'over')
     }
   }
 

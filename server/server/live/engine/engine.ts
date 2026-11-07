@@ -5,6 +5,7 @@ import { placeId, type Places } from '../places.ts'
 import type { Settings } from '../settings.ts'
 import { Worktrees, type HerdrSpaces } from './worktrees.ts'
 import { EngineTidy } from './engine-tidy.ts'
+import { move } from './phase.ts'
 import { type TaskRec, ended, RECHECK_FIRST, SWEEP_FIRST, SWEEP_EVERY, WATCH_FIRST, WATCH_EVERY, STALL_EVERY, LATER } from './engine-helpers.ts'
 export type { TaskRec, Harness } from './engine-helpers.ts'
 export { reportOf, ended, MERGE_DEADLINE, STALL_QUIET, SILENT_NEED, checkTitle } from './engine-helpers.ts'
@@ -37,6 +38,8 @@ export class Engine extends EngineTidy {
       // saved for later with no agent, before every task got one at once: its agent starts now and waits for a go
       let chain = Promise.resolve()
       for (const t of this.tasks.filter((t) => t.told === 'todo' && !t.worktree && !ended(t) && !t.trouble)) {
+        // a start the last run was in the middle of is gone
+        move(t, 'interrupted')
         if (!t.desc.includes(LATER)) t.desc = `${t.desc || t.title}\n\n${LATER}`
         chain = chain.then(() => this.startTask(t)).catch((e) => this.troubled(t, e))
       }

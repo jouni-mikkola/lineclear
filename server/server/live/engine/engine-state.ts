@@ -13,6 +13,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { join } from 'node:path'
 import { HeadWatch } from './lane-watch.ts'
 import type { Worktrees } from './worktrees.ts'
+import { type Phase, move } from './phase.ts'
 import { type TaskRec, ended, type PeerTask, splitRef, MERGE_DEADLINE, type Events } from './engine-helpers.ts'
 
 export abstract class EngineState extends Emitter<Events> {
@@ -31,9 +32,6 @@ export abstract class EngineState extends Emitter<Events> {
   protected store = new TaskStore<TaskRec>()
   protected data = this.briefs.loaded(withCold(this.cold, this.store.load()))
   taskIds!: TaskIds
-  protected starting = new Set<string>()
-  /** started, its brief not yet taken up: To do until its agent works on it */
-  protected briefing = new Set<string>()
   protected wrote = new Map<string, number>()
   /** when its agent last reported its progress (lineclear status) */
   protected heard = new Map<string, number>()
@@ -64,14 +62,10 @@ export abstract class EngineState extends Emitter<Events> {
   protected closing = false
   /** how long GitHub's checks took lately, per repo, and when that was asked */
   protected took = new Map<string, { ms?: number; at: number }>()
-  /** tasks whose place is being put away */
-  protected cleaning = new Set<string>()
   protected sweeps: ReturnType<typeof setTimeout>[] = []
   protected wt!: Worktrees
   /** other machines' tasks, for a task queued after one (the main copy only: it is the one that sees them) */
   peerTask?: PeerTask
-  /** its backup agent is taking over */
-  protected handing = new Set<string>()
   /** a CLI is installed here (a test says) */
   installed = (kind: string) => !!Bun.which(kind)
   /** how loaded this machine is now: over a start limit (health.ts busy), and whether herdr answers; none until first
@@ -159,6 +153,16 @@ export abstract class EngineState extends Emitter<Events> {
     const at = p.machines?.[t.machine] ?? p.path
     const home = this.machines.get(t.machine)?.home
     return { ...p, path: home && at.startsWith('~/') ? join(home, at.slice(2)) : at }
+  }
+
+  protected inPhase(t: TaskRec, phase: Phase) {
+    return (t.phase ?? 'idle') === phase
+  }
+
+  /** once the engine is up: a start, a handoff or a clean-up it was in the middle of is gone, so its phase is too.
+   *  A brief phase stays: its agent may still take the brief up, and resumeQueue arms its timer again */
+  protected endPhases() {
+    for (const t of this.tasks) if (!this.inPhase(t, 'briefing')) move(t, 'interrupted')
   }
 
   protected key(t: TaskRec) {

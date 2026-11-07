@@ -23,6 +23,7 @@ import {
 } from './engine-helpers.ts'
 import { existsSync } from 'node:fs'
 import { age, ago, clockWithDay } from '../../../shared/time.ts'
+import { move } from './phase.ts'
 import { EngineStalls } from './stalls.ts'
 
 const ORPHAN_AFTER = 2 * 60 * 60_000
@@ -107,7 +108,7 @@ export class EngineLaunch extends EngineStalls {
       pinned: t.pinned,
       orphaned: this.orphaned(t, status) || undefined,
       // waiting out the provider, or a backup taking over: that line shows, not what its agent last reported
-      report: this.handing.has(t.id) ? undefined : reportOf(t.report, status),
+      report: this.inPhase(t, 'handing') ? undefined : reportOf(t.report, status),
     }
   }
 
@@ -144,6 +145,8 @@ export class EngineLaunch extends EngineStalls {
    * After a start: a go that never reached its agent (a restart cut it off) is sent again; then the queue is checked.
    */
   resumeQueue() {
+    this.endPhases()
+    for (const t of this.tasks) if (this.inPhase(t, 'briefing')) this.waitForBrief(t)
     for (const t of this.tasks.filter((t) => t.going && !ended(t) && !t.stopped && this.agents.status(this.key(t)) !== 'working'))
       this.agents.send(this.key(t), hidden(t.going!, 'go'), { ensure: () => this.launch(t) }).catch(() => undefined)
     this.recheck()
@@ -157,7 +160,7 @@ export class EngineLaunch extends EngineStalls {
     t.held = undefined
     t.todo = undefined
     t.reported = false
-    this.briefing.delete(t.id)
+    move(t, 'brief-over')
     // a coordinator's own words go in as they are, and are not sent again after a restart
     t.going = plain ? undefined : text
     this.wrote.set(t.id, Date.now())
@@ -393,7 +396,7 @@ export class EngineLaunch extends EngineStalls {
   }
 
   private async startTaskHere(t: TaskRec) {
-    this.starting.add(t.id)
+    if (!move(t, 'start')) throw new Error(`${t.id} is busy: try again in a moment`)
     t.trouble = t.stuck = undefined
     this.emit('changed')
     try {
@@ -430,33 +433,38 @@ export class EngineLaunch extends EngineStalls {
       const install = made.installMs ?? 0
       t.startMs = { worktree: madeAt - began - install, install, session: Date.now() - madeAt }
       this.save()
-      this.briefing.add(t.id)
-      clearTimeout(this.later.get(`${t.id}:brief`))
-      const x = setTimeout(() => {
-        this.later.delete(`${t.id}:brief`)
-        if (this.briefing.delete(t.id)) {
-          this.briefLate(t)
-          this.settle(t)
-        }
-      }, BRIEF_WAIT)
-      x.unref?.()
-      this.later.set(`${t.id}:brief`, x)
+      move(t, 'launched')
+      this.waitForBrief(t)
     } catch (e) {
       // went wrong before its worktree was there: it shows so
       t.trouble = troubleOf(e)
       throw e
     } finally {
-      this.starting.delete(t.id)
+      move(t, 'over')
       this.begun(t)
       this.settle(t)
     }
   }
 
+  /** a brief not taken up in BRIEF_WAIT is sent again (briefLate) and the task is no longer To do */
+  protected waitForBrief(t: TaskRec) {
+    clearTimeout(this.later.get(`${t.id}:brief`))
+    const x = setTimeout(() => {
+      this.later.delete(`${t.id}:brief`)
+      if (move(t, 'brief-over')) {
+        this.briefLate(t)
+        this.settle(t)
+      }
+    }, BRIEF_WAIT)
+    x.unref?.()
+    this.later.set(`${t.id}:brief`, x)
+  }
+
   /** its agent works and its brief has gone in: it is at work on it, no longer To do */
   protected begun(t: TaskRec) {
     const key = this.key(t)
-    if (!this.briefing.has(t.id) || this.agents.status(key) !== 'working' || this.agents.waiting(key).length) return
-    this.briefing.delete(t.id)
+    if (!this.inPhase(t, 'briefing') || this.agents.status(key) !== 'working' || this.agents.waiting(key).length) return
+    move(t, 'brief-over')
     clearTimeout(this.later.get(`${t.id}:brief`))
     this.later.delete(`${t.id}:brief`)
   }
