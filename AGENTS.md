@@ -5,7 +5,7 @@ What Lineclear is and why: [docs/idea.md](docs/idea.md). The order of work: [doc
 ## Commands
 
 - Checks are light and run on GitHub (`check.yml`, 5 minutes a job at most), never on an owner's machine: no browser suite, no coverage run, no local full check in a release or promotion (next goes out when the merged commit's GitHub `check` is green). `test/light-checks.test.ts` fails when that changes.
-- `bun run check`: what the branch's change reaches (types, tests, doc checks, gates, the server's check when `server/` changed), in 180 s at most on an idle machine, each test case under 2 s (a file with a slower one needs a baseline; `docs/numbers.md`). It must pass before a merge. `bun scripts/check.ts --full` runs everything (a test file that passed with the same files is skipped unless `--no-cache` or `--full`): the release loop does, on the newest main.
+- `bun run check`: on a machine of yours only the types (tsc); no test runs there. GitHub runs the tests, sharded to finish in about a minute: `lineclear pr` pushes the branch, `lineclear checks` waits for the result, and it must be green before a merge. On a runner (`GITHUB_ACTIONS`) the same script runs the change's tests, or `--full` runs everything in shards; a test case is under 2 s (a file with a slower one needs a baseline; `docs/numbers.md`).
 - `bun run types` (tsc), `bun run test` (bun test).
 - `bun run gates`: Biome (lint and format), knip (dead code) and the module borders of `docs/architecture.md`. Any fault fails.
 - `bun run release <version>`: refuses on a dirty tree or a red full check; otherwise sets the version, commits and tags `v<version>` here, installs from the tag into a fresh HOME and runs its doctor. It never pushes.
