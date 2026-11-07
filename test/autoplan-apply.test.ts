@@ -96,7 +96,9 @@ test("merging a 40 commit plan spawns 3 git processes or fewer", () => {
     stderr: "pipe",
   });
   expect(run.stderr.toString()).toBe("");
-  const runs = readFileSync(trace, "utf8").split("\n").filter((l) => l.includes("built-in: git"));
+  const runs = readFileSync(trace, "utf8")
+    .split("\n")
+    .filter((l) => l.includes("built-in: git"));
   expect(runs.length).toBeLessThanOrEqual(3);
 });
 
