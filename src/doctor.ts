@@ -293,12 +293,13 @@ function checkoutFree(p: Probe, env: Record<string, string | undefined>): Check 
   return { name: "installed paths", problem: found.join("; "), fix: INSTALL_AGAIN };
 }
 
-/** The service and the command are the release build, or the problem and the install that fixes it. */
+/** The model a start takes when no default model is set: pi's first listed one. */
 function newTaskModel(): Check {
   const model = firstModel("pi");
   return { name: "model", problem: "", fix: "", info: model ? `a new task with no model set starts on ${model}` : "pi lists no model yet" };
 }
 
+/** The service and the command are the release build, or the problem and the install that fixes it. */
 function stableBuild(p: Probe): Check {
   const problem = p.runFrom ? buildProblem(p.runFrom, p.dataDir ?? dataDir()) : "";
   const { current, previous } = buildNames(p.dataDir ?? dataDir());

@@ -453,7 +453,7 @@ export abstract class EngineState extends Emitter<Events> {
 
   /** a first start with no model set takes the CLI's first listed one, and says so in the task's facts */
   private defaultModel(t: TaskRec, h: Harness) {
-    if (!chooseModel(h.kind, h.model)) return undefined
+    if ((h.model && h.model !== 'default') || !chooseModel(h.kind, h.model)) return undefined
     const model = firstModel(h.kind)
     if (!model) return undefined
     t.facts = [t.facts, `No model was set for ${h.kind}: started on ${model}`].filter(Boolean).join(' · ')
