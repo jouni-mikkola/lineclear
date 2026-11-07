@@ -1,10 +1,13 @@
 name: check
 
 # Checks are light and run here, never on an owner's machine (test/light-checks.test.ts keeps it so).
-# A pull request runs the tests of what it changed (scripts/check.ts --changed). The merge queue and main run the full
-# check in 8 jobs that each take an equal-time share of the test files and steps (--shard). Require the job "check" in the branch rules.
+# A pull request runs the tests of what it changed (scripts/check.ts --changed), or the full check when it has the label
+# "lane". The merge queue and main run the full check, except a push to main whose tree a green lane run checked: that
+# runs one short job. The full check is 8 jobs that each take an equal-time share of the test files and steps (--shard).
+# Require the job "check" in the branch rules.
 on:
   pull_request:
+    types: [opened, reopened, synchronize, labeled]
   merge_group:
   push:
     branches: [main]
@@ -25,7 +28,7 @@ concurrency:
 jobs:
   changed:
     name: changed tests
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'lane')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -49,9 +52,43 @@ jobs:
       # --untimed: a shared runner's speed decides a test's time, not the code
       - run: bun scripts/check.ts --changed --untimed
 
+  reuse:
+    name: reuse lane result
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    outputs:
+      reused: ${{ steps.find.outputs.reused }}
+    steps:
+      # A green lane run of a pull request whose head has this commit's tree already ran every shard on that tree.
+      - id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          reused=false
+          tree=$(gh api "repos/$REPO/commits/$SHA" --jq .commit.tree.sha)
+          for head in $(gh api "repos/$REPO/commits/$SHA/pulls" --jq '.[] | select(any(.labels[]; .name == "lane")) | .head.sha'); do
+            [ "$(gh api "repos/$REPO/commits/$head" --jq .commit.tree.sha)" = "$tree" ] || continue
+            for run in $(gh api "repos/$REPO/actions/workflows/check.yml/runs?head_sha=$head&event=pull_request&status=success" --jq '.workflow_runs[].id'); do
+              n=$(gh api "repos/$REPO/actions/runs/$run/jobs" --jq '[.jobs[] | select(.conclusion == "success" and (.name | startswith("full check")))] | length')
+              [ "$n" = 8 ] && reused=true
+            done
+          done
+          echo "reused=$reused" >> "$GITHUB_OUTPUT"
+
   full:
     name: full check (${{ matrix.shard }}/8)
-    if: github.event_name != 'pull_request'
+    needs: [reuse]
+    if: >-
+      always() && (
+        (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'lane'))
+        || (github.event_name != 'pull_request' && needs.reuse.outputs.reused != 'true'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     strategy:
@@ -74,7 +111,7 @@ jobs:
   check:
     name: check
     if: always()
-    needs: [changed, full]
+    needs: [changed, reuse, full]
     runs-on: ubuntu-latest
     steps:
       - run: test "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = false
