@@ -70,7 +70,7 @@ export class MachinesLinks extends LinkPoll {
       state: 'Connecting…',
       lacks: [],
       connecting: true,
-      health: new LinkBackoff(),
+      backoff: new LinkBackoff(),
     }
     this.links.set(m.label, l)
     setTimeout(() => {
