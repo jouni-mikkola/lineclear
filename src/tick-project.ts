@@ -293,18 +293,15 @@ function stepTask(s: Starting, { step, host, worker, reviewer }: Planned): NewTa
 }
 
 /**
- * Why the tick's own read shows the step taken already, or undefined. Main and every machine's tasks were read once, as
- * the tick began; the claim on the repo stops a start that another loop made since. A machine that cannot be reached
- * still holds what it last ran.
+ * What holds a ready step that its state does not show, or undefined. The state marks a task here only through the
+ * rules' record of its start: a task just added may not be listed yet, and one titled for the step may have no record.
+ * Main and every machine's tasks were read once, as the tick began; the claim on the repo stops a start another loop made since.
  */
-function whyTaken(s: Starting, step: Step): string | undefined {
+function whyHeldUnrecorded(s: Starting, step: Step): string | undefined {
   const { state } = s.t;
-  if (!step.reopened && doneIds(s.commits, new Set([step.id])).has(step.id)) return "it is merged on origin/main already";
-  if (!step.reopened && state.closedSteps?.[step.id] !== undefined) return `${state.closedSteps[step.id]} closed it with nothing to merge: it landed already`;
-  // A task just added may not show in the list yet: the rules' own record of the start holds the step until it does.
   if (Object.values(state.pendingStarts ?? {}).includes(step.id))
     return "a task was just added for this step and is not listed yet, so it does not start twice";
-  const open = s.tasks.find((x) => x.status !== "done" && (x.title.startsWith(`${step.id} `) || (x.id !== undefined && state.taskSteps?.[x.id] === step.id)));
+  const open = s.tasks.find((x) => x.status !== "done" && x.title.startsWith(`${step.id} `));
   if (open) return `${open.id ?? open.title} for this step is not done (${open.status}), so it does not start twice`;
   return undefined;
 }
@@ -317,8 +314,8 @@ function whyTaken(s: Starting, step: Step): string | undefined {
 function planStep(s: Starting, step: Step): Planned | undefined {
   const { t, cap, limit } = s;
   const { settings, world, note, env } = t;
-  const taken = whyTaken(s, step);
-  if (taken) return (note("skip", taken, step.id), undefined);
+  const held = whyHeldUnrecorded(s, step);
+  if (held) return (note("skip", held, step.id), undefined);
   // A routine step (docs, tests, baselines) starts on the cheapest worker model that has room; the stall ladder moves it back after two failed checks.
   const cheap = routineWorker(step, s.picked().workers, env, (m) => availability(m, env, world.now()) === "ok");
   const worker = cheap ?? (s.picked().worker as string);
@@ -389,12 +386,16 @@ function startPlanned(s: Starting, planned: Planned[]) {
     claimed.map((p) => stepTask(s, p)),
     name,
   );
-  claimed.forEach((p, i) => {
+  const failed = claimed.filter((p, i) => {
     const err = errors[i];
-    if (err === undefined) return recordStarted(s, p);
-    world.releaseStep?.(settings.repo, p.step.id);
-    note("skip", `task add failed: ${err}`, p.step.id, p.host ?? THIS_MACHINE);
+    if (err === undefined) recordStarted(s, p);
+    else note("skip", `task add failed: ${err}`, p.step.id, p.host ?? THIS_MACHINE);
+    return err !== undefined;
   });
+  world.releaseSteps?.(
+    settings.repo,
+    failed.map((p) => p.step.id),
+  );
 }
 
 /**
@@ -490,7 +491,10 @@ export function tickProject(
   }
   if (!dryRun) {
     const claimed = world.claimedSteps?.(settings.repo) ?? [];
-    for (const st of status) if (st.state === "done" && claimed.includes(st.id)) world.releaseStep?.(settings.repo, st.id);
+    world.releaseSteps?.(
+      settings.repo,
+      status.filter((st) => st.state === "done" && claimed.includes(st.id)).map((st) => st.id),
+    );
   }
   if (settings.starts === false) {
     note("skip", "this machine does not start steps for the repo (starts: false), it only runs what it is given");

@@ -55,16 +55,16 @@ test("a repo with no origin on GitHub has nobody to race: no claim is asked for"
     const c = claims(origin);
     expect(c.world.claimSteps?.("/r", ["A"])).toEqual([undefined]);
     expect(c.world.claimedSteps?.("/r")).toEqual([]);
-    c.world.releaseStep?.("/r", "A");
+    c.world.releaseSteps?.("/r", ["A"]);
     expect([...c.single, ...c.batches]).toEqual([]);
   }
 });
 
-test("claimed steps are read and released through the REST API", () => {
+test("claimed steps are read, and released all at once, through the REST API", () => {
   const c = claims("https://github.com/owner/repo.git", (argv) => ok(argv.includes("--jq") ? "refs/lineclear/claims/A\nrefs/lineclear/claims/B\n" : ""));
   expect(c.world.claimedSteps?.("/r")).toEqual(["A", "B"]);
-  c.world.releaseStep?.("/r", "A");
-  expect(c.single.at(-1)).toEqual(["gh", "api", "--method", "DELETE", "repos/owner/repo/git/refs/lineclear/claims/A", "--silent"]);
+  c.world.releaseSteps?.("/r", ["A", "B"]);
+  expect(c.batches).toEqual([["A", "B"].map((s) => ["gh", "api", "--method", "DELETE", `repos/owner/repo/git/refs/lineclear/claims/${s}`, "--silent"])]);
 });
 
 /** Two loops of one repo: a step claimed by one is held for the other. */
@@ -101,7 +101,7 @@ test("a claim is deleted once its step is done on main", () => {
   const taken = new Set(["A"]);
   const done = loop("done", taken, {}, [{ subject: "LIN-1: A Alpha", body: "" }]);
   done.f.world.claimedSteps = () => [...taken];
-  done.f.world.releaseStep = (_repo, s) => void taken.delete(s);
+  done.f.world.releaseSteps = (_repo, steps) => steps.forEach((s) => taken.delete(s));
   done.tick();
   expect(taken.size).toBe(0);
 });

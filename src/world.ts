@@ -53,8 +53,8 @@ export interface World {
   claimSteps?(repo: string, steps: string[]): (string | undefined)[];
   /** The steps claimed on the repo. */
   claimedSteps?(repo: string): string[];
-  /** Deletes a step's claim. */
-  releaseStep?(repo: string, step: string): void;
+  /** Deletes the steps' claims, all at once. */
+  releaseSteps?(repo: string, steps: string[]): void;
   /** What another machine of the project says about its room and its tasks, or why it cannot be reached. */
   room?(host: string, space: string): Room | string;
   /** The machine's one-minute load average. */

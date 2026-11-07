@@ -22,7 +22,7 @@ function githubRepo(run: Run, repo: string): string | undefined {
 }
 
 /** The claim operations of the world, on top of ways to run one command and many at once. */
-export function claimWorld(run: Run, runAll: RunAll, originMain: (repo: string) => string): Pick<World, "claimSteps" | "claimedSteps" | "releaseStep"> {
+export function claimWorld(run: Run, runAll: RunAll, originMain: (repo: string) => string): Pick<World, "claimSteps" | "claimedSteps" | "releaseSteps"> {
   return {
     claimSteps(repo, steps) {
       const gh = githubRepo(run, repo);
@@ -48,10 +48,12 @@ export function claimWorld(run: Run, runAll: RunAll, originMain: (repo: string) 
         .filter((ref) => ref.startsWith(CLAIM_PREFIX))
         .map((ref) => ref.slice(CLAIM_PREFIX.length));
     },
-    releaseStep(repo, step) {
+    releaseSteps(repo, steps) {
       const gh = githubRepo(run, repo);
-      if (gh === undefined) return;
-      run(["gh", "api", "--method", "DELETE", `repos/${gh}/git/${CLAIM_PREFIX}${step}`, "--silent"]);
+      if (gh === undefined || steps.length === 0) return;
+      runAll(
+        steps.map((step) => ({ argv: ["gh", "api", "--method", "DELETE", `repos/${gh}/git/${CLAIM_PREFIX}${step}`, "--silent"], timeoutMs: API_TIMEOUT_MS })),
+      );
     },
   };
 }

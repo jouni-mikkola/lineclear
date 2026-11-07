@@ -1,17 +1,17 @@
 import { expect, test } from "bun:test";
 import { runAll } from "../src/run-all.ts";
 
-test("commands run at once: three of 0.4 s end in well under their sum, each result in order", () => {
+test("commands run at once: three of 0.5 s end in well under their sum, each result in order", () => {
   const at = Date.now();
   const r = runAll(
     [
-      { argv: ["sh", "-c", "sleep 0.4; cat"], stdin: "one", timeoutMs: 5000 },
-      { argv: ["sh", "-c", "sleep 0.4; echo two >&2; exit 3"], timeoutMs: 5000 },
-      { argv: ["sh", "-c", "sleep 0.4; echo three"], timeoutMs: 5000 },
+      { argv: ["sh", "-c", "sleep 0.5; cat"], stdin: "one", timeoutMs: 5000 },
+      { argv: ["sh", "-c", "sleep 0.5; echo two >&2; exit 3"], timeoutMs: 5000 },
+      { argv: ["sh", "-c", "sleep 0.5; echo three"], timeoutMs: 5000 },
     ],
     process.env,
   );
-  expect(Date.now() - at).toBeLessThan(1100);
+  expect(Date.now() - at).toBeLessThan(1400);
   expect(r).toEqual([
     { code: 0, out: "one", err: "" },
     { code: 3, out: "", err: "two\n" },

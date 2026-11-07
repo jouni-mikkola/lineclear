@@ -73,7 +73,7 @@ test("a task that cannot be added gives its claim back at once, and the other st
   const added = f.world.addTasks;
   f.world.addTasks = (s, jobs, p) => added(s, jobs, p).map((err, i) => (jobs[i]?.title.startsWith("S2 ") ? "server said no" : err));
   const released: string[] = [];
-  f.world.releaseStep = (_repo, s) => void released.push(s);
+  f.world.releaseSteps = (_repo, steps) => void released.push(...steps);
   const d = tick(f.world, false, env);
   expect(released).toEqual(["S2"]);
   expect(d.find((x) => x.step === "S2")?.reason).toContain("task add failed: server said no");
