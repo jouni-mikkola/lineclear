@@ -39,7 +39,7 @@ Threshold on disk: `reserveTokens: 850000` on a 1M window, so pi compacts near 1
 
 - `server/helper/*.pl` (health, hook, mirror, relay, route; ~690 lines) and perl one-liners in `mfs.ts`, `folders.ts`, `browser-sessions.ts`: stat/readdir on a remote box with no Lineclear installed. Exists only for remote machines; goes with them (section 1).
 - `server/.../retry.ts` (316): re-prompts an agent after a provider error at 1, 2, 4, 8 minutes. pi has its own retry; keep only if its own does not cover overload errors (check).
-- `src/self-fix.ts` (340), `unstick.ts` (105), `heal.ts` (24), `stalls.ts` (339), `scripts/flaky.ts` (129): the board files tasks about itself and repairs stuck tasks. They hide faults. Tasks 6 and 7 already cover them.
+- `src/self-fix.ts` (340), `heal.ts` (24), `stalls.ts` (339), `scripts/flaky.ts` (129): the board files tasks about itself and repairs stuck tasks. They hide faults. Tasks 6 and 7 already cover them.
 - `scripts/canary.ts` (266), `smoke.ts` (212), `release-tag.ts`: release safety nets; task 12.
 - `loop-lag.ts` (122), `terminal-clock.ts` (50): polling and lag logging for a herdr gap and a slow server; keep the clock, delete lag logging.
 - Timers/systemd in `uninstall.ts`, `doctor.ts`, `release.ts`, `promote-step.ts`: installer scaffolding.

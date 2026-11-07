@@ -220,7 +220,7 @@ function readRouted(project: string, env = process.env): string[] {
 export type CardCloser = (space: string, id: string, answer: string) => string | undefined;
 
 /** The task's brief keeps its merge for the owner: its Settings say "ask me first". */
-export const keepsMerge = (desc: unknown) => /^- Merge: ask me first/m.test(String(desc ?? ""));
+const keepsMerge = (desc: unknown) => /^- Merge: ask me first/m.test(String(desc ?? ""));
 
 /** The card asks for a go to merge ("Merge T-3?", "Approve T-3's merge?"), not why a merge has not happened. */
 const asksToMerge = (question: string) => /\bmerge\b/i.test(question) && !/\b(why|how come|what|not|never|stuck|fail(ed|s)?|refus\w*|n't)\b/i.test(question);
