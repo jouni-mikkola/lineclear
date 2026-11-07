@@ -24,7 +24,7 @@ describe('chat lines', () => {
     expect(matches(long, q)).toBe(true)
     expect(matches('Something else entirely', q)).toBe(false)
   })
-  test('answers, attachments, artifact sends, words and notes read back', () => {
+  test('answers and attachments read back', () => {
     const answer = line.answer('Elias', 'Rerun CI on main?', 'Rerun it')
     expect(answer).toBe('<answer from="Elias" question="Rerun CI on main?">Rerun it</answer>')
     expect(parseUserLine(answer)).toEqual({ kind: 'answer', title: 'Rerun CI on main?', answer: 'Rerun it' })
@@ -32,28 +32,7 @@ describe('chat lines', () => {
     expect(attach).toBe('<attachment from="Elias" name="screenshot.png" path="~/inbox/screenshot.png"/>')
     expect(parseUserLine(attach)).toEqual({ kind: 'attach', name: 'screenshot.png', path: '~/inbox/screenshot.png' })
     // double quotes in a value turn curly, so the tag stays whole
-    const art = line.artifact('Weekly "board"', 'wk3n', 2)
-    expect(line.artifactSend('Elias', art, 'Pinned colour: Accent')).toBe(
-      '<artifact-sent from="Elias" title="Weekly “board”" artifact="wk3n" version="2">Pinned colour: Accent</artifact-sent>',
-    )
-    expect(parseUserLine(line.artifactSend('Elias', art, 'Pinned colour: Accent'))).toEqual({
-      kind: 'artifact-send',
-      title: 'Weekly “board”',
-      text: 'Pinned colour: Accent',
-    })
-    expect(parseUserLine(line.artifactSay('Elias', line.artifact('Board', 'ab12', 1), 'Bars in <b>blue</b>'))).toEqual({
-      kind: 'artifact-say',
-      title: 'Board',
-      text: 'Bars in <b>blue</b>',
-    })
-    const note = line.note('Elias', line.artifact('Board', 'ab12', 3), '"Send" (button.primary)', 'Bigger')
-    expect(note).toBe('<artifact-note from="Elias" title="Board" artifact="ab12" version="3" on="“Send” (button.primary)">Bigger</artifact-note>')
-    expect(parseUserLine(note)).toEqual({ kind: 'note', target: '“Send” (button.primary) in "Board"', note: 'Bigger' })
-    expect(parseUserLine(line.note('Elias', line.artifact('Board', 'ab12', 3), undefined, 'Bigger'))).toEqual({
-      kind: 'note',
-      target: '"Board"',
-      note: 'Bigger',
-    })
+    expect(line.answer('Elias', 'Say "go"', 'Go')).toBe('<answer from="Elias" question="Say “go”">Go</answer>')
     expect(parseUserLine('Just a message')).toBeNull()
     expect(parseUserLine('<b>bold</b>')).toBeNull()
   })
@@ -66,18 +45,6 @@ describe('chat lines', () => {
       name: 'screenshot.png',
       path: '~/inbox/screenshot.png',
     })
-    expect(parseUserLine('[Elias sent from "Board" (artifact wk3n v2): Pinned colour: Accent]')).toEqual({
-      kind: 'artifact-send',
-      title: 'Board',
-      text: 'Pinned colour: Accent',
-    })
-    expect(parseUserLine('[Elias sent from "Board": Pinned colour: Accent]')).toEqual({ kind: 'artifact-send', title: 'Board', text: 'Pinned colour: Accent' })
-    expect(parseUserLine('[Elias wrote about "Board" (artifact ab12 v1): Bars in blue]')).toEqual({
-      kind: 'artifact-say',
-      title: 'Board',
-      text: 'Bars in blue',
-    })
-    expect(parseUserLine('[Elias noted on "Send" (button.primary): Bigger]')?.kind).toBe('note')
     expect(parseReply('[Elias replied to "Go": Yes\n[Elias attached a.png: /inbox/a.png]')).toBeNull()
     expect(parseReply('[Elias replied to "Go": Yes]\n[Elias attached a.png: /inbox/a.png]')).toMatchObject({
       to: 'Go',
@@ -121,14 +88,14 @@ describe('chat lines', () => {
     expect(parseReply('<reply to="Go"/>')).toBeNull()
   })
   test('words of a tag that run over several lines stay whole', () => {
-    const say = line.artifactSay('Elias', line.artifact('Board', 'ab12', 1), 'Bars in blue.\nAnd wider.')
+    const say = line.answer('Elias', 'Colour?', 'Blue.\nAnd wider.')
     expect(userLines(`${say}\n${line.attach('Elias', 'a.png', '/a.png')}`)).toEqual([say, line.attach('Elias', 'a.png', '/a.png')])
-    expect(parseUserLine(userLines(say)[0])).toEqual({ kind: 'artifact-say', title: 'Board', text: 'Bars in blue.\nAnd wider.' })
+    expect(parseUserLine(userLines(say)[0])).toEqual({ kind: 'answer', title: 'Colour?', answer: 'Blue.\nAnd wider.' })
     expect(userLines('<answer from="Elias" question="x">never closed\nhi')).toEqual(['<answer from="Elias" question="x">never closed', 'hi'])
     // words with a closing tag of their own on a line stay inside
-    const own = line.artifactSay('Elias', line.artifact('Board', 'ab12', 1), 'Start\n<artifact-comment>Blue</artifact-comment>\nEnd')
+    const own = line.answer('Elias', 'Colour?', 'Start\n<answer>Blue</answer>\nEnd')
     expect(userLines(`${own}\n${line.attach('Elias', 'a.png', '/a.png')}`)).toEqual([own, line.attach('Elias', 'a.png', '/a.png')])
-    expect(parseUserLine(userLines(own)[0])).toMatchObject({ text: 'Start\n<artifact-comment>Blue</artifact-comment>\nEnd' })
+    expect(parseUserLine(userLines(own)[0])).toMatchObject({ answer: 'Start\n<answer>Blue</answer>\nEnd' })
   })
   test("the agent's reply line comes out of its reply, the first one counts", () => {
     const r = agentLines('<reply to="What needs me today?"/>\n<react emoji="👀" to="Hi"/>\nThree things.')

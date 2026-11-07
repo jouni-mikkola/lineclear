@@ -17,8 +17,8 @@
   changed. The task's chat shows the block at the end of its first message, the changed lines picked out. The rest is the agent's judgment, by its
   skills: whether to plan first, how to build and check it, what to fix after a review and what proof to show. Ask for another CLI, model or effort for one task and the coordinator adds
   `--agent`, `--model` or `--effort` to `task add`; for another reviewer, `--reviewer`, `--reviewer-model` or
-  `--reviewer-effort`. Tap the task and you are in its agent's chat, where it asks, shows
-  artifacts and tells you when it is done; the task's brief shows exactly what its agent got.
+  `--reviewer-effort`. Tap the task and you are in its agent's chat, where it asks and
+  tells you when it is done; the task's brief shows exactly what its agent got.
 - Want something noted but not started? Ask for it "for later": the coordinator adds it with `--later`, and its agent
   starts all the same, with "don't start yet, wait for a go" in its brief. It says in one line that it has it and the task shows To do (`lineclear todo`).
   Tap it and you are in its chat, like any other: say go when you are ready, or say what to change. The agent decides
@@ -87,7 +87,7 @@
   brief's Settings block asks for (Settings → How tasks work → Review, Reviewer, Must fix and Review rounds: only words
   in the brief; the agent runs it however it sees fit, a subagent or a
   headless CLI), what the change broke, left undone or added beyond the brief; only the choices no experiment can
-  settle as cards for you, and your yes before anything irreversible; the proof in one small artifact; ready with a facts line; then merge or ask. How to
+  settle as cards for you, and your yes before anything irreversible; the proof in your chat; ready with a facts line; then merge or ask. How to
   build and check the work is the agent's own judgment: Lineclear only gives it the brief, your defaults and the house
   rules.
 - A task with nothing to merge (an answer, research, or work no longer wanted) is closed: `lineclear task close <id>
@@ -111,9 +111,8 @@
   (merged or closed) archive themselves after a week: Settings → Tasks → Archive Done after (`tasks.archiveAfter`: a
   number of days, or off; each machine keeps its own). `lineclear task list` leaves archived tasks out; `--archived`
   lists them.
-- The field at the top of the Tasks and the Artifacts lists filters them as you type (F gets to it on a keyboard):
-  tasks by id, title, status line or summary, Done and archived ones too; artifacts by title or the task that made
-  them. Esc clears it.
+- The field at the top of the Tasks list filters it as you type (F gets to it on a keyboard): tasks by id, title,
+  status line or summary, Done and archived ones too. Esc clears it.
 - Leftovers of merged or closed tasks are swept up when Lineclear starts and every hour after (a merge updates main,
   and the restart that follows can cut a clean-up short). Only tasks Lineclear made and finished are looked at, never
   one whose agent is at work or that you talk to again, never your own worktrees or branches, and nothing while herdr

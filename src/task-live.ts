@@ -1,6 +1,5 @@
-// What a task's view reads besides its chat: the agent's live terminal, which you read and type into, and the
-// artifacts its agent made. Both come from Lineclear's server: the terminal over its WebSocket and its actions, the
-// artifacts from its snapshot, with each page passed on sealed as Lineclear sends it.
+// What a task's view reads besides its chat: the agent's live terminal, which you read and type into. It comes from
+// Lineclear's server over its WebSocket and its actions.
 import { keepLinks, postAction, readSnapshot, lineclearServer, taskChatKey, watchSocket } from "./lineclear-client.ts";
 
 type Env = Record<string, string | undefined>;
@@ -13,19 +12,6 @@ export interface TerminalView {
   cols?: number;
   rows?: number;
   reason?: string;
-}
-
-export interface TaskArtifact {
-  id: string;
-  title: string;
-  /** The newest version. */
-  v: number;
-  when: string;
-  by: string;
-  /** Lineclear's check made a picture of it. */
-  checked: boolean;
-  /** Newest first. */
-  versions: { n: number; when: string; by: string; note?: string }[];
 }
 
 const OFFLINE = "The board server is not running on this machine, so the terminal cannot be reached.";
@@ -153,123 +139,14 @@ function terminalEvents(term: ReturnType<typeof taskTerminal>, signal: AbortSign
   return new Response(stream, { headers: { "content-type": "text/event-stream", "cache-control": "no-store", connection: "keep-alive" } });
 }
 
-interface SnapArtifact {
-  id?: string;
-  title?: string;
-  v?: number;
-  at?: number;
-  when?: string;
-  by?: string;
-  thumb?: boolean;
-  chats?: string[];
-  versions?: { n?: number; when?: string; by?: string; note?: string }[];
-}
-
-/** Whether an artifact of Lineclear's snapshot is the task's: made in its agent's chat. */
-const isTasks = (a: SnapArtifact, key: string) => Array.isArray(a.chats) && a.chats.includes(key);
-
-/** The artifacts of a task, newest first, or the reason Lineclear cannot be read. */
-const OWNED_MS = 2000;
-const owned = new Map<string, { at: number; list: Promise<TaskArtifact[] | { error: string }> }>();
-
-/** The artifacts of a task, read from Lineclear's snapshot at most every two seconds, so each picture of a long list does not read it again. */
-function taskArtifacts(id: string, env: Env = process.env) {
-  const k = `${lineclearServer(env)}|${id}`;
-  const kept = owned.get(k);
-  if (kept && Date.now() - kept.at < OWNED_MS) return kept.list;
-  const list = readArtifacts(id, env);
-  owned.set(k, { at: Date.now(), list });
-  if (owned.size > 64) owned.delete(owned.keys().next().value as string);
-  return list;
-}
-
-async function readArtifacts(id: string, env: Env): Promise<TaskArtifact[] | { error: string }> {
-  const base = lineclearServer(env);
-  const snap = base ? ((await readSnapshot(base)) as (Parameters<typeof taskChatKey>[0] & { artifacts?: SnapArtifact[] }) | undefined) : undefined;
-  if (!snap) return { error: OFFLINE };
-  const key = taskChatKey(snap, id) ?? "";
-  return (Array.isArray(snap.artifacts) ? snap.artifacts : [])
-    .filter((a) => typeof a?.id === "string" && isTasks(a, key))
-    .sort((a, b) => Number(b.at) - Number(a.at))
-    .map((a) => ({
-      id: String(a.id),
-      title: String(a.title ?? a.id),
-      v: Number(a.v) || 1,
-      when: String(a.when ?? ""),
-      by: String(a.by ?? ""),
-      checked: !!a.thumb,
-      versions: (Array.isArray(a.versions) ? a.versions : []).map((v) => ({
-        n: Number(v.n),
-        when: String(v.when ?? ""),
-        by: String(v.by ?? ""),
-        ...(v.note ? { note: v.note } : {}),
-      })),
-    }));
-}
-
-const FRAME_POLICY = "sandbox allow-scripts allow-forms; frame-ancestors 'self'";
-const PASSED = ["content-type", "content-security-policy", "x-content-type-options", "cache-control"];
-
-/** One page or picture of a task's artifact, passed on as Lineclear sends it, under a sandbox policy of Lineclear's own. */
-async function artifactPart(id: string, artifact: string, part: "frame" | "thumb", query: URLSearchParams, env: Env = process.env): Promise<Response> {
-  const list = await taskArtifacts(id, env);
-  if ("error" in list) return Response.json({ error: list.error }, { status: 503 });
-  if (!list.some((a) => a.id === artifact)) return Response.json({ error: "This task has no such artifact." }, { status: 404 });
-  const base = lineclearServer(env);
-  const q = new URLSearchParams();
-  const v = Number(query.get("v"));
-  if (Number.isInteger(v) && v > 0) q.set("v", String(v));
-  if (part === "frame") {
-    q.set("theme", "dark");
-    if (query.has("full")) q.set("full", "1");
-  } else q.set("dark", "1");
-  try {
-    const r = await fetch(`${base}/api/artifacts/${encodeURIComponent(artifact)}${part === "thumb" ? "/thumb" : ""}?${q}`, {
-      signal: AbortSignal.timeout(10_000),
-    });
-    const headers = new Headers();
-    for (const h of PASSED) {
-      const value = r.headers.get(h);
-      if (value !== null) headers.set(h, value);
-    }
-    // Lineclear's own seal comes with Lineclear's (both hold), so a reply without Lineclear's still cannot run with this address's rights
-    headers.set("x-content-type-options", "nosniff");
-    if (part === "frame") headers.append("content-security-policy", FRAME_POLICY);
-    else if (!(headers.get("content-type") ?? "").startsWith("image/")) return Response.json({ error: "Lineclear sent no picture." }, { status: 502 });
-    return new Response(r.body, { status: r.status, headers });
-  } catch {
-    return Response.json({ error: OFFLINE }, { status: 503 });
-  }
-}
-
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { "cache-control": "no-store" } });
 
 /**
- * A task's terminal (`/terminal`, its `/events`, and `POST /terminal/input` with `{text, enter}` or `{keys}`) and its
- * artifacts (`/artifacts`, and each page or picture at `/artifacts/<id>/frame|thumb`). `own` is whether the request
- * came from Lineclear's own page, which only input needs.
+ * A task's terminal (`/terminal`, its `/events`, and `POST /terminal/input` with `{text, enter}` or `{keys}`). `own` is
+ * whether the request came from Lineclear's own page, which only input needs.
  */
-export async function taskLiveApi(
-  req: Request,
-  url: URL,
-  id: string,
-  rest: string,
-  links: ReturnType<typeof taskTerminalLinks>,
-  own: boolean,
-  env: Env,
-): Promise<Response> {
-  const [, what, tail = ""] = /^\/(terminal|artifacts)(\/.*)?$/.exec(rest) ?? [];
-  if (what === "artifacts") {
-    if (req.method !== "GET") return json({ error: "Not found" }, 404);
-    if (!tail) {
-      const list = await taskArtifacts(id, env);
-      return "error" in list ? json(list, 503) : json(list);
-    }
-    const part = /^\/([a-z0-9]{1,16})\/(frame|thumb)$/.exec(tail);
-    // a page of another site may not even learn whether an artifact is there
-    if (!part || req.headers.get("sec-fetch-site") === "cross-site") return json({ error: "Not found" }, 404);
-    return artifactPart(id, part[1] ?? "", part[2] as "frame" | "thumb", url.searchParams, env);
-  }
+export async function taskLiveApi(req: Request, id: string, rest: string, links: ReturnType<typeof taskTerminalLinks>, own: boolean): Promise<Response> {
+  const [, what, tail = ""] = /^\/(terminal)(\/.*)?$/.exec(rest) ?? [];
   const term = links(id);
   if (req.method === "GET" && !tail) return json(term.view());
   if (req.method === "GET" && tail === "/events") return terminalEvents(term, req.signal);

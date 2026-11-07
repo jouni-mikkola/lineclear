@@ -1,6 +1,6 @@
 ---
 name: lineclear-agent
-description: How a Lineclear task's agent takes its task from brief to merged - waiting for a go or a queue, working in its worktree, status reports, asking the human, the review its brief's Settings block asks for, proof in one artifact, the ready summary and facts, the merge, refused merges and GitHub news on its pull request. Use when you are the agent of a Lineclear task, from its first message (the brief) until it is Done. Not for coordinators making, queuing or closing tasks (lineclear-coordinator), and not for chat lines, cards or artifacts in general (lineclear).
+description: How a Lineclear task's agent takes its task from brief to merged - waiting for a go or a queue, working in its worktree, status reports, asking the human, the review its brief's Settings block asks for, proof in your chat, the ready summary and facts, the merge, refused merges and GitHub news on its pull request. Use when you are the agent of a Lineclear task, from its first message (the brief) until it is Done. Not for coordinators making, queuing or closing tasks (lineclear-coordinator), and not for chat lines or cards in general (lineclear).
 ---
 
 # Lineclear agent
@@ -56,10 +56,9 @@ build, check and review the work is your own judgment.
    or above Must fix, then review again; stop once a round has none at or above it, or after Review rounds. Never agree
    with a finding just to end the loop: one you judge wrong goes in the facts with why. Findings below the bar go in
    the facts, unfixed; an open choice no experiment can settle goes to the human as a card.
-4. **Proof.** One artifact, `lineclear artifact new <file> --title "<id>: Proof"`: what changed in one to three plain
-   lines, each proof with a one-line caption, and a "Not proven" list. Every proof is real and from this branch now;
-   never staged, and a mocked test is no proof of what users see. A bug fix first reproduces the bug: the same repro
-   failing before and passing after. A change too small to show gets a line in your chat instead. Its files stay out
+4. **Proof.** In your chat: what changed in one to three plain lines, each proof with a one-line caption, and a "Not
+   proven" list. Every proof is real and from this branch now; never staged, and a mocked test is no proof of what
+   users see. A bug fix first reproduces the bug: the same repro failing before and passing after. Its files stay out
    of the commit.
 5. **Rebase** on the base. On GitHub, `lineclear pr <id>` pushes and opens a draft pull request; run it again after
    each new commit. Once GitHub's checks passed on it, rebase again only for a conflict: each push runs them again.
@@ -83,7 +82,7 @@ build, check and review the work is your own judgment.
 
 ## Outputs
 
-The change committed on the branch, one proof artifact (or a line in your chat), the ready summary and facts, then
+The change committed on the branch, the proof in your chat, the ready summary and facts, then
 Done or the merge question.
 
 ## Exceptions
@@ -112,4 +111,4 @@ report that operational follow-up instead of using an unauthenticated fallback.
 
 ## References
 
-[lineclear](../lineclear/SKILL.md): chat lines, cards, artifacts.
+[lineclear](../lineclear/SKILL.md): chat lines, cards.

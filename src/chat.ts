@@ -196,7 +196,6 @@ function messageView(m: Raw, sizes: ReadonlyMap<string, number>): ChatMessage | 
     return { ...base, file: fileView({ name: String(m.file.name ?? basename(m.file.path)), path: m.file.path }, sizes) };
   if (typeof m.text === "string" && m.text.trim()) return { ...base, text: m.text };
   if (m.question && typeof m.question.title === "string") return { ...base, text: m.question.title, question: questionView(m.question) };
-  if (m.artifact && typeof m.artifact.title === "string") return { ...base, text: `Made **${m.artifact.title}**. It opens in the chat.` };
   return undefined;
 }
 

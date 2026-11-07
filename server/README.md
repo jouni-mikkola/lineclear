@@ -36,11 +36,11 @@ Keep your attention on decisions. Lineclear starts, follows and puts away the ta
 
 ### 📈 See every task at a glance
 
-Each space's chat is in the middle and its tasks on the right, by what they need: `Needs you`, `Ready`, `Merging`, `Working`, `Queued`, `To do` and `Done`. A working task's dot fills like a pie with its % done and its minutes left, and its second line says what it is doing (`Fixing the two failing tests`). The sidebar groups your [spaces](docs/spaces.md) by machine, with Pinned and sections of your own, and marks the ones that wait on you. On a desktop, [split view](docs/chat.md) puts up to three chats, task lists or artifacts side by side.
+Each space's chat is in the middle and its tasks on the right, by what they need: `Needs you`, `Ready`, `Merging`, `Working`, `Queued`, `To do` and `Done`. A working task's dot fills like a pie with its % done and its minutes left, and its second line says what it is doing (`Fixing the two failing tests`). The sidebar groups your [spaces](docs/spaces.md) by machine, with Pinned and sections of your own, and marks the ones that wait on you. On a desktop, [split view](docs/chat.md) puts up to three chats or task lists side by side.
 
 ### 🧩 Make it yours: everything is a plugin
 
-Places, chats, tasks, artifacts, the terminal, the browser, voice, alerts: every part of Lineclear is a plugin, and yours sit beside them in `~/.lineclear/plugins/<name>/`. Write one yourself or ask an agent to build it. Change or replace any built-in plugin's server part by giving yours its name (copy it there and edit it), and switch any plugin off in Settings → Plugins. Updates never touch that folder, so you keep every new release without a fork: save a file and Lineclear rebuilds and restarts in seconds, and a plugin that breaks is set aside with its error while the rest runs. [Plugins](docs/plugins.md) has a hello world.
+Places, chats, tasks, the terminal, the browser, voice, alerts: every part of Lineclear is a plugin, and yours sit beside them in `~/.lineclear/plugins/<name>/`. Write one yourself or ask an agent to build it. Change or replace any built-in plugin's server part by giving yours its name (copy it there and edit it), and switch any plugin off in Settings → Plugins. Updates never touch that folder, so you keep every new release without a fork: save a file and Lineclear rebuilds and restarts in seconds, and a plugin that breaks is set aside with its error while the rest runs. [Plugins](docs/plugins.md) has a hello world.
 
 ### ⚡ Stop briefing every agent yourself
 
@@ -48,7 +48,7 @@ Write what needs doing to a space's coordinator: it makes it a task or several, 
 
 ### 💬 Know when a task needs an answer
 
-An agent that asks you something, wants a permission or a plan approved shows under `Needs you`, and its question comes as a card you answer with a tap, from the chat or straight from an [alert](docs/get-started.md#install-it-as-an-app-with-alerts) on your lock screen. Each task's chat also shows its live terminal, files, diff and pull request. Reports and draft screens come as [artifacts](docs/artifacts.md) you mark up beside the chat, and you can call a coordinator by [voice](docs/get-started.md#voice).
+An agent that asks you something, wants a permission or a plan approved shows under `Needs you`, and its question comes as a card you answer with a tap, from the chat or straight from an [alert](docs/get-started.md#install-it-as-an-app-with-alerts) on your lock screen. Each task's chat also shows its live terminal, files, diff and pull request. You can call a coordinator by [voice](docs/get-started.md#voice).
 
 ## Open Lineclear in three steps
 
@@ -64,7 +64,7 @@ An agent that asks you something, wants a permission or a plan approved shows un
 
 <table align="center">
 <tr>
-<td align="center" valign="top"><sub>For developers who run coding agents in herdr on macOS or Linux</sub><br /><h2>Free</h2><div align="left">&nbsp;&nbsp;&nbsp;✓&nbsp; A coordinator for every space that turns what you write into tasks<br />&nbsp;&nbsp;&nbsp;✓&nbsp; Every task on its own worktree and branch, with its own agent<br />&nbsp;&nbsp;&nbsp;✓&nbsp; A review by fresh eyes before it merges, through a pull request on GitHub<br />&nbsp;&nbsp;&nbsp;✓&nbsp; Cards, alerts and voice calls on your phone, tablet or desktop<br />&nbsp;&nbsp;&nbsp;✓&nbsp; Every machine you saved in herdr, from one app<br />&nbsp;&nbsp;&nbsp;✓&nbsp; Your own plugins and themes, kept through every update<br />&nbsp;&nbsp;&nbsp;✓&nbsp; coordinator timer, artifacts and split view</div></td>
+<td align="center" valign="top"><sub>For developers who run coding agents in herdr on macOS or Linux</sub><br /><h2>Free</h2><div align="left">&nbsp;&nbsp;&nbsp;✓&nbsp; A coordinator for every space that turns what you write into tasks<br />&nbsp;&nbsp;&nbsp;✓&nbsp; Every task on its own worktree and branch, with its own agent<br />&nbsp;&nbsp;&nbsp;✓&nbsp; A review by fresh eyes before it merges, through a pull request on GitHub<br />&nbsp;&nbsp;&nbsp;✓&nbsp; Cards, alerts and voice calls on your phone, tablet or desktop<br />&nbsp;&nbsp;&nbsp;✓&nbsp; Every machine you saved in herdr, from one app<br />&nbsp;&nbsp;&nbsp;✓&nbsp; Your own plugins and themes, kept through every update<br />&nbsp;&nbsp;&nbsp;✓&nbsp; coordinator timer and split view</div></td>
 </tr>
 <tr>
 <td align="center"><a href="https://github.com/eliasstravik/herdr-projects/blob/main/docs/get-started.md"><img src="assets/buttons/install-lineclear.svg" alt="Install Lineclear" /></a></td>
@@ -109,7 +109,7 @@ Only the ones it made. Every task works in its own worktree, on its own branch `
 
 ### Where do my tasks live?
 
-In `~/.lineclear/` on the main machine (`LINECLEAR_HOME` to move it): your spaces, tasks, chats, artifacts, settings and your own plugins. Other machines get only a small helper folder. [Develop](docs/develop.md) and [Plugins](docs/plugins.md) cover the code and how to change Lineclear's plugins for yourself.
+In `~/.lineclear/` on the main machine (`LINECLEAR_HOME` to move it): your spaces, tasks, chats, settings and your own plugins. Other machines get only a small helper folder. [Develop](docs/develop.md) and [Plugins](docs/plugins.md) cover the code and how to change Lineclear's plugins for yourself.
 
 ### Can I use several machines?
 

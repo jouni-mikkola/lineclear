@@ -40,7 +40,6 @@ export const commands: Record<string, string> = {
   ready: 'A task\'s agent says its change is ready: ready <id> --summary "..."',
   merge: "Merge a task's change: merge <id>",
   review: "Review a task's change in one model call on its diff, and store the findings as JSON: review <id> (run in the task's folder)",
-  artifact: "Make, update or list a task's artifacts (a report, a dashboard)",
   pr: "Push a task's branch and open its pull request: pr <id>",
   checks: "Wait for GitHub's checks on a task's pull request: checks <id>",
   alert: 'Send an alert to your devices: alert "<title>" --body "<why now>"',

@@ -334,10 +334,9 @@ The owner froze every open step that is not tier 1 (platform stability) or tier 
 
 ### L69 Lineclear's own names inside
 Result: Variables, classes and file names inside the code say Lineclear, not Lineclear.
-- why: environment variables, CSS classes, the artifact API (`window.lineclear`, `lineclear-dark`,
-  `lineclear-size`) and file and function names in `server/`, `src/`, `pi/`, `scripts/` and `install.sh` still say
-  Lineclear, and a user sees them in artifacts and errors.
-- done when: Every environment variable, CSS class, event, meta tag, path (the sandbox's `/run/lineclear` too) and name in the code is named Lineclear (`LINECLEAR_*`, `lineclear-*`, `window.lineclear`).
+- why: environment variables, CSS classes (`lineclear-dark`) and file and function names in `server/`, `src/`, `pi/`, `scripts/` and `install.sh` still say
+  Lineclear, and a user sees them in errors.
+- done when: Every environment variable, CSS class, event, meta tag, path (the sandbox's `/run/lineclear` too) and name in the code is named Lineclear (`LINECLEAR_*`, `lineclear-*`).
 - parts: server, ui, core, install, pi
 - after: none
 - locks: server, ui, core, install, pi

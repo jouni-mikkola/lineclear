@@ -1,17 +1,13 @@
 import { createHash } from 'node:crypto'
-import type { ArtifactPost, Message, Question, SecretAsk, UpdateCard } from '../../shared/types.ts'
+import type { Message, Question, SecretAsk, UpdateCard } from '../../shared/types.ts'
 import { stripHidden } from './agents.ts'
 import { agentLines, markerSoFar, parseUserLine, type Parsed } from './chatlines.ts'
 import type { LogEvent } from './readers/types.ts'
 
-/** a chat line of yours that shows as words: an answer, a page's Send and words about an artifact under what they
- *  answer, a note with what it is on */
+/** a chat line of yours that shows as words: an answer, a secret you gave */
 export function shownAs(p: Parsed): { title?: string; text: string } | undefined {
   if (p.kind === 'answer') return { title: `Answered “${p.title}”`, text: p.answer }
   if (p.kind === 'secret') return { title: 'Gave a secret', text: `${p.name}${p.where ? `, for ${p.where}` : ''}` }
-  if (p.kind === 'artifact-send') return { title: `Sent from "${p.title}"`, text: p.text }
-  if (p.kind === 'artifact-say') return { title: `About "${p.title}"`, text: p.text }
-  if (p.kind === 'note') return { text: `[note on ${p.target}] ${p.note}` }
   return undefined
 }
 
@@ -65,7 +61,6 @@ export interface Posted {
   at: number
   card?: UpdateCard
   question?: Question
-  artifact?: ArtifactPost
   /** a secret the agent asked for: its masked box */
   secret?: SecretAsk
   /** text shown with it, when it stands alone */
@@ -328,11 +323,11 @@ export function rememberReply(line: string, id: string) {
 }
 
 /** the agent's reply of the same turn, written at or after `at`, before you wrote again */
-export function hostFor(msgs: Message[], at: number, p: { question?: unknown; artifact?: unknown }, hosting: Set<Message>): Message | undefined {
+export function hostFor(msgs: Message[], at: number, p: { question?: unknown }): Message | undefined {
   for (const m of msgs) {
     if ((m.at ?? 0) < at - 1000) continue
     if (m.who === 'you') return undefined
-    if (m.text && !m.card && !(p.question && m.question) && !(p.artifact && hosting.has(m))) return m
+    if (m.text && !m.card && !(p.question && m.question)) return m
   }
   return undefined
 }

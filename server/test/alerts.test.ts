@@ -198,7 +198,7 @@ describe('every link opens the Lineclear UI', () => {
     const go = [{ place: 'p:m:x', task: 'T-1', focus: 'ask:1' }, { place: 'p:m:x', focus: 'card:T-1:done' }, { place: 'all' }]
     const urls = go.map((g) => pushPayload({ id: 'u', from: 'Lineclear', title: 't', body: 'b', go: g }, { count: 0, tags: [] }).url)
     expect(urls).toEqual(['/task/T-1', '/inbox', '/'])
-    const links = [...urls, taskLink('T-1'), taskLink('T-1', 'terminal'), taskLink('T-1', 'artifacts'), BROWSERS_LINK]
+    const links = [...urls, taskLink('T-1'), taskLink('T-1', 'terminal'), taskLink('T-1', 'changes'), BROWSERS_LINK]
     for (const l of links) expect(l).not.toMatch(/:7421\b|\?place=|[?&]focus=|^\.\/|#\//)
     expect(taskLink('T-1', 'terminal')).toBe('/task/T-1?tab=terminal')
     expect(BROWSERS_LINK).toBe('/browsers')

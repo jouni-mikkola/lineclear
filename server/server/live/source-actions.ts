@@ -65,28 +65,6 @@ export class LiveSourceActions extends LiveSourceRestarts {
         this.emit('chat', a.chat)
         return { ok: true }
       }
-      case 'artifact-send':
-      case 'artifact-note':
-      case 'artifact-say': {
-        const x = this.artifacts.get(a.artifact)
-        if (!x) return { ok: false, error: 'That artifact is gone.' }
-        const to = this.keeperOf(x)
-        const art = line.artifact(x.title, x.id, a.v)
-        if (a.type === 'artifact-send') this.artifacts.sent(x, a.v, a.text)
-        const text =
-          a.type === 'artifact-send'
-            ? line.artifactSend(this.user, art, a.text)
-            : a.type === 'artifact-say'
-              ? line.artifactSay(this.user, art, a.text)
-              : line.note(this.user, art, a.target, a.note)
-        await this.send(to, text, [], true)
-        return { to: this.chatName(to) }
-      }
-      case 'artifact-delete': {
-        if (!this.artifacts.remove(a.artifact)) return { ok: false, error: 'That artifact is gone.' }
-        this.emit('snapshot')
-        return {}
-      }
       case 'model':
       case 'effort':
         return { ok: false, error: 'Use the + menu agent controls and Restart to apply model or effort changes. Chat and work are preserved.' }

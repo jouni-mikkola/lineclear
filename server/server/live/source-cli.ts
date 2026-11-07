@@ -185,8 +185,6 @@ export class LiveSourceCli extends LiveSourceSubcommands {
         this.emit('snapshot')
         return 'Asked. End your turn now; the answer arrives as an [… answered …] line.'
       }
-      case 'artifact':
-        return this.artifactCommand(a1, rest, p, ctx)
       case 'alert': {
         if (!a1) throw new Error('lineclear alert "<title>" --body "<why>"')
         const t = one(p, 'task') ? this.engine.task(one(p, 'task')!) : undefined

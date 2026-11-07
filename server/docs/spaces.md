@@ -11,12 +11,12 @@ it, and back where it was when taken out or its section is deleted. Pinned is on
 headings: no chat, never selected; a tap anywhere on one folds it with its chevron, remembered on the device. Folded,
 it hides all its spaces, with a quiet dot where one is unread (grey) or waits on you (red); going to a space opens the
 heading it sits under. Spaces keep Slack's # icon. Each space's coordinator chat is in the middle and its
-tasks on the right. Under their filter box, chips say what Tasks and Artifacts show: a space (`# gtm · vm-str`) or a
+tasks on the right. Under their filter box, chips say what Tasks show: a space (`# gtm · vm-str`) or a
 whole machine, any of them (none: everything), and the filter's words narrow within them. They follow the space you
 pick; × takes one off and **+ Filter** adds a space or a machine from the sidebar's tree. The pin in their header keeps
 the chips while the middle changes (a task from them opens in the middle); unpinned, they follow again. Chips and pin
 are remembered on the device; a phone's scroll sideways. Every agent, coordinator or
-task agent, gets the same chat: replies, reactions, files, search, talk-to-type and artifacts. A task's chat
+task agent, gets the same chat: replies, reactions, files, search, and talk-to-type. A task's chat
 also has a side panel: its live herdr terminal, its files, its diff against main and its pull request.
 
 - Every machine has at least one space: its **home space**, at its home folder (~), named `home`. It can be renamed

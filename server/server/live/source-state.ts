@@ -7,13 +7,10 @@ import { slugify, type Alert, type Machine, type Place, type Section } from '../
 import { Emitter, type SourceEvents } from '../source.ts'
 import { HOME, readJson, writeJson } from '../store.ts'
 import { ROOT } from '../root.ts'
-import { wrapPage } from '../frame.ts'
 import { Agents, hidden, type Spec } from './agents.ts'
 import { Chats } from './chats.ts'
 import { ended, Engine } from './engine/engine.ts'
-import { sh } from './engine/git.ts'
 import { userName } from './user-name.ts'
-import { Artifacts, browserChecker, type Checker } from './artifacts.ts'
 import { Machines } from './machines.ts'
 import { agentEnv, BOX } from './box.ts'
 import { HOST, NAME, placeId, Places } from './places.ts'
@@ -39,15 +36,8 @@ export class LiveSourceState extends Emitter<SourceEvents> {
     () => this.user,
   )
   engine = new Engine(this.agents, this.chats, this.places, this.settings)
-  artifacts = new Artifacts()
   /** agents' secrets: one file on the main machine, which a worker for another machine reads there */
   vault = new Vault(process.env.LINECLEAR_MAIN_HOME || HOME)
-  /** opens an artifact at phone width before anyone sees it (a test puts its own here) */
-  checker: Checker = browserChecker(
-    // on this machine, whichever machine the artifact came from
-    (args) => sh(['agent-browser', ...args], HOME, { timeoutMs: 45_000, here: true }),
-    (html, data) => wrapPage(html, { check: true, phone: true, data }),
-  )
   /** this machine's load, memory, disks and herdr, sampled every 30 seconds; its coordinator hears when one is past
    *  its limit (Settings → the machine). Tests never measure the machine they run on: they tick it themselves */
   health = new Monitor(

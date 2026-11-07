@@ -24,34 +24,6 @@ export class LiveSourceSpaces extends LiveSourceViews {
     return space && key.endsWith('/Agent') && this.engine.task(key.slice(0, -'/Agent'.length))?.project === space ? space : undefined
   }
 
-  /** the machine an artifact lives on, when it is not this one */
-  protected artifactPeer(id: string) {
-    if (this.artifacts.get(id)) return undefined
-    return this.peers?.list().find((l) => l.snap?.artifacts?.some((x) => x.id === id))
-  }
-
-  async artifact(id: string, v?: number): Promise<{ html: string; data?: unknown; sent?: string } | undefined> {
-    const peer = this.artifactPeer(id)
-    if (peer) {
-      const r = await this.peers!.fetch(peer, `/api/artifacts/${encodeURIComponent(id)}/raw${v ? `?v=${v}` : ''}`).catch(() => null)
-      return r?.ok ? ((await r.json()) as { html: string; data?: unknown; sent?: string }) : undefined
-    }
-    const a = this.artifacts.get(id)
-    const html = a && this.artifacts.html(a, v)
-    return html ? { html, data: this.artifacts.data(a, v), sent: this.artifacts.sentFor(a, v) } : undefined
-  }
-
-  async artifactThumb(id: string, dark: boolean): Promise<Blob | null> {
-    const peer = this.artifactPeer(id)
-    if (peer) {
-      const r = await this.peers!.fetch(peer, `/api/artifacts/${encodeURIComponent(id)}/thumb${dark ? '?dark=1' : ''}`).catch(() => null)
-      return r?.ok ? r.blob() : null
-    }
-    const a = this.artifacts.get(id)
-    const f = a?.thumb ? Bun.file(this.artifacts.thumbFile(a.id, dark)) : null
-    return f && (await f.exists()) ? f : null
-  }
-
   watch(chats: string[], terms: string[]) {
     this.peers?.watch(chats, terms[0] ?? null)
     if (this.peers) {
@@ -281,17 +253,13 @@ export class LiveSourceSpaces extends LiveSourceViews {
     if (!has('reactions')) return { ok: false }
     const chat = this.chats.chat(key)
     const m = chat.messages.find((x) => x.id === messageId)
-    // an artifact's card by its title, id and the version posted
-    const art = !m?.text && !m?.file && m?.artifact && this.artifacts.get(m.artifact.id)
-    if (!m || !(m.text || m.file || art)) return { ok: false }
+    if (!m || !(m.text || m.file)) return { ok: false }
     const mine = m.reactions?.find((r) => r.emoji === emoji && (r.by === 'me' || r.by === 'both'))
     // a file is named with its path: two files may share a name
     const f = m.text ? undefined : m.file
-    const text = art
-      ? (mine ? line.unreactArtifact : line.reactArtifact)(this.user, emoji, line.artifact(art.title, art.id, m.artifact!.v))
-      : f
-        ? (mine ? line.unreactFile : line.reactFile)(this.user, emoji, f.name, f.path)
-        : (mine ? line.unreact : line.react)(this.user, emoji, m.text!)
+    const text = f
+      ? (mine ? line.unreactFile : line.reactFile)(this.user, emoji, f.name, f.path)
+      : (mine ? line.unreact : line.react)(this.user, emoji, m.text!)
     await this.agents.send(key, text, {
       reaction: { message: messageId, emoji },
       ensure: key.includes('/') ? () => this.resumeTaskAgent(key) : () => this.coordinator(key),

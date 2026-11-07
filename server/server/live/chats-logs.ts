@@ -177,8 +177,8 @@ export class ChatsLogs {
     return undefined
   }
 
-  /** the newest thing in the chat from its agent (a reply you will see, its question) or Lineclear (a card, an
-   *  artifact): when it came, its words, and whether it is a card about a task (whose own alert tells of it) */
+  /** the newest thing in the chat from its agent (a reply you will see, its question) or Lineclear (a card):
+   *  when it came, its words, and whether it is a card about a task (whose own alert tells of it) */
   newest(key: string): { at: number; text?: string; card?: boolean } | undefined {
     this.pull(key)
     const ev = this.events.get(key) ?? []

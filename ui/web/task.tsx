@@ -3,16 +3,15 @@ import { useFadeIn } from "../kit/hooks.ts";
 import { Chat } from "./chat-view.tsx";
 import { chatState, useChat } from "./chat.tsx";
 import { ChangesTab } from "./task-changes.tsx";
-import { ArtifactsTab, TerminalTab } from "./task-live.tsx";
+import { TerminalTab } from "./task-live.tsx";
 
 // The task view at `/task/<id>`: the chat with one task's agent, the page the Inbox and Home link to, and beside it
-// the agent's live terminal, the artifacts it made and its changes. The tab is `?tab=` (keys 1 to 4 pick one), so a reload
+// the agent's live terminal and its changes. The tab is `?tab=` (keys 1 to 3 pick one), so a reload
 // or a shared link lands on it.
 
 const TABS = [
   ["chat", "Chat"],
   ["terminal", "Terminal"],
-  ["artifacts", "Artifacts"],
   ["changes", "Changes"],
 ] as const;
 type Tab = (typeof TABS)[number][0];
@@ -32,7 +31,7 @@ export function TaskView({ id }: { id: string }) {
     history.replaceState(history.state, "", `${location.pathname}${q.size ? `?${q}` : ""}`);
     setTab(t);
   };
-  // 1 to 4 pick a tab, unless a field has the keys
+  // 1 to 3 pick a tab, unless a field has the keys
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
@@ -68,7 +67,7 @@ function LiveTab({ tab, id }: { tab: Exclude<Tab, "chat">; id: string }) {
   const box = useFadeIn<HTMLDivElement>();
   return (
     <div ref={box} className="mx-auto max-w-3xl px-4 py-4" data-task-live={tab}>
-      {tab === "terminal" ? <TerminalTab id={id} /> : tab === "changes" ? <ChangesTab id={id} /> : <ArtifactsTab id={id} />}
+      {tab === "terminal" ? <TerminalTab id={id} /> : <ChangesTab id={id} />}
     </div>
   );
 }

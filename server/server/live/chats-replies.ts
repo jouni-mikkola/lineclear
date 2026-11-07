@@ -1,4 +1,4 @@
-import { apart, cardMessage, type Chat, type Job, type Message, type Reaction } from '../../shared/types.ts'
+import { cardMessage, type Chat, type Job, type Message, type Reaction } from '../../shared/types.ts'
 import { stripHidden } from './agents.ts'
 import { agentLines, excerpt, findQuoted, parseReply, parseUserLine, userLines } from './chatlines.ts'
 import { findModel } from '../../../src/models.ts'
@@ -25,25 +25,8 @@ export class ChatsReplies extends ChatsLogs {
     const answered = new Set(ev.filter((e) => e.kind === 'answered').map((e) => e.id))
     // a file is named by its path (two may share a name); one quoted by its name alone is the latest of that name
     const byText = (quoted: string, path?: string) => findQuoted(msgs, quoted, path)
-    /** an artifact's card, by the version posted (the latest post of it when that version's is gone) */
-    const artifactPost = (id: string, v?: number) =>
-      msgs.findLast((m) => m.artifact?.id === id && !m.text && (v === undefined || m.artifact.v === v)) ??
-      msgs.findLast((m) => m.artifact?.id === id && !m.text)
-    // artifacts join the chat after what the log says: what quotes one waits for them
-    const later: (() => void)[] = []
-    let joined = false
     /** a reply's quote of the message it answers: that message when it is still in the chat, else the quote alone */
-    const replyTo = (quoted: string, path?: string, line?: string, artifact?: string): Message['reply'] => {
-      if (artifact) {
-        const q: NonNullable<Message['reply']> = { text: quoted.replace(/”/g, '"'), artifact: true }
-        const find = () => {
-          const m = artifactPost(artifact, Number(quoted.match(/ · v(\d+)$/)?.[1]) || undefined)
-          if (m) Object.assign(q, { id: m.id, who: m.who })
-        }
-        if (joined) find()
-        else later.push(find)
-        return q
-      }
+    const replyTo = (quoted: string, path?: string, line?: string): Message['reply'] => {
       const id = line && replied.get(words(line))
       const m = (id && msgs.find((x) => x.id === id)) || byText(quoted, path)
       if (!m) return { text: quoted.replace(/”/g, '"') }
@@ -82,7 +65,7 @@ export class ChatsReplies extends ChatsLogs {
         if (!text) continue
         // a reply: its words, then its files
         const r = parseReply(text)
-        const reply = r ? replyTo(r.to, undefined, r.line, r.artifact) : undefined
+        const reply = r ? replyTo(r.to, undefined, r.line) : undefined
         const lines = r ? [...userLines(r.text), ...r.rest] : userLines(text)
         const files: { name: string; path: string }[] = []
         const rest: string[] = []
@@ -96,9 +79,7 @@ export class ChatsReplies extends ChatsLogs {
           }
           if (p.kind === 'attach') files.push({ name: p.name, path: p.path })
           else if (p.kind === 'react' || p.kind === 'unreact') {
-            const { artifact: a, emoji, kind } = p
-            if (a) later.push(() => addRx(artifactPost(a.id, a.v), emoji, 'me', kind === 'react'))
-            else addRx(byText(p.to, p.path), p.emoji, 'me', p.kind === 'react')
+            addRx(byText(p.to, p.path), p.emoji, 'me', p.kind === 'react')
             consumed = true
           } else {
             const s = shownAs(p)!
@@ -165,10 +146,8 @@ export class ChatsReplies extends ChatsLogs {
     }
     msgs.push(...cards)
     msgs.sort((a, b) => (a.at ?? 0) - (b.at ?? 0))
-    // what else Lineclear posted: a question or artifact joins the agent's reply of that turn
+    // what else Lineclear posted: a question joins the agent's reply of that turn
     const echoed = new Set<Message>()
-    /** the replies an artifact came with: one each */
-    const hosting = new Set<Message>()
     for (const p of l.posted) {
       if (p.card) continue
       if (p.who === 'you') {
@@ -194,24 +173,11 @@ export class ChatsReplies extends ChatsLogs {
         continue
       }
       const q = p.question ? withAnswer(p.question, l, this.answeredIn) : undefined
-      const host = hostFor(msgs, p.at, p, hosting)
+      const host = hostFor(msgs, p.at, p)
       if (host && !p.text) {
         if (q) host.question = q
-        // an artifact is a message of its own, just after the words it came with
-        if (p.artifact) {
-          hosting.add(host)
-          msgs.push({ id: p.id, who: 'agent', at: (host.at ?? p.at) + 0.1, artifact: p.artifact })
-        }
-      } else msgs.push(...apart([{ id: p.id, who: 'agent', at: p.at, text: p.text, question: q, artifact: p.artifact }]))
+      } else msgs.push({ id: p.id, who: 'agent', at: p.at, text: p.text, question: q })
     }
-    // a question that came with them goes after the artifact, as the last thing the chat waits on
-    for (const h of hosting) {
-      if (!h.question) continue
-      msgs.push({ id: `${h.id}:q`, who: 'agent', at: (h.at ?? 0) + 0.2, question: h.question })
-      delete h.question
-    }
-    joined = true
-    for (const f of later) f()
     // each turn's steps fold into one line just before its last reply; a turn nobody sees (news it answered with
     // nothing) shows none
     const act = activityOf(ev)
@@ -232,7 +198,7 @@ export class ChatsReplies extends ChatsLogs {
       } else {
         const files: { name: string; path: string }[] = []
         const r = parseReply(o.text)
-        const reply = r ? replyTo(r.to, undefined, r.line, r.artifact) : undefined
+        const reply = r ? replyTo(r.to, undefined, r.line) : undefined
         let answered: string | undefined
         const text = stripHidden(
           (r ? [...userLines(r.text), ...r.rest] : userLines(o.text))

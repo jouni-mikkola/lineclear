@@ -6,14 +6,11 @@ import { basename, dirname, join } from 'node:path'
 import { notifies, waiting } from '../shared/alerts.ts'
 import { fileType } from '../shared/files.ts'
 import type { Action, AddSpace, ServerEvent, UpdateStatus, WorktreeAsk } from '../shared/types.ts'
-import { frameResponse, wrapPage } from './frame.ts'
 import type { Source } from './source.ts'
 import type { Push } from './push.ts'
 
 /** visible: the screen is on; push: its push subscription, which gets no alerts while the screen is on */
 type Sock = { chats: string[]; term: string | null; visible: boolean; push: string | null; link?: boolean }
-
-const FONT = join(import.meta.dir, '..', 'node_modules', 'inter-ui', 'variable', 'InterVariable.woff2')
 
 export interface AppOptions {
   source: Source
@@ -104,7 +101,7 @@ export function startApp({ source, push, port, host = '127.0.0.1', updates }: Ap
       const path = at >= 0 ? url.pathname.slice(at) : url.pathname
       const q = url.searchParams
       // only this app's own pages may act: another website in your browser can't (no cross-site requests)
-      if (path.startsWith('/api/') && path !== '/api/font/InterVariable.woff2' && !sameSite(req, path)) return new Response('forbidden', { status: 403 })
+      if (path.startsWith('/api/') && !sameSite(req, path)) return new Response('forbidden', { status: 403 })
 
       if (path === '/api/ws')
         return srv.upgrade(req, { data: { chats: [], term: null, visible: false, push: null } }) ? undefined : new Response('upgrade failed', { status: 400 })
@@ -151,36 +148,6 @@ export function startApp({ source, push, port, host = '127.0.0.1', updates }: Ap
           const a = (await req.json()) as Action
           return json((await source.act(a)) ?? {})
         }
-        // an artifact: its page wrapped for a sealed frame, its data alone (pushed into open frames when only that
-        // changed), the check's picture of it, and all of it raw for the main machine to pass on
-        if (path.startsWith('/api/artifacts/')) {
-          const [id, part] = decodeURIComponent(path.slice('/api/artifacts/'.length)).split('/')
-          const v = Number(q.get('v')) || undefined
-          if (part === 'thumb') {
-            const b = await source.artifactThumb(id, q.has('dark'))
-            return b
-              ? new Response(b, { headers: { 'content-type': b.type || 'image/png', 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff' } })
-              : new Response('no picture', { status: 404 })
-          }
-          const a = await source.artifact(id, v)
-          if (part === 'raw') return a ? json(a) : json({ error: 'No such artifact' }, 404)
-          if (part === 'data') return a ? json({ data: a.data ?? null }) : json({ error: 'No such artifact' }, 404)
-          if (!a) return new Response('no such artifact', { status: 404 })
-          return frameResponse(
-            wrapPage(a.html, {
-              sent: a.sent,
-              data: a.data,
-              big: q.has('full'),
-              phone: q.get('device') === 'phone',
-              theme: q.get('theme') === 'dark' ? 'dark' : q.get('theme') === 'light' ? 'light' : undefined,
-            }),
-          )
-        }
-        // the app's font, for artifacts in sealed frames (their origin is opaque, so it is fetched cross-origin)
-        if (path === '/api/font/InterVariable.woff2')
-          return new Response(Bun.file(FONT), {
-            headers: { 'content-type': 'font/woff2', 'access-control-allow-origin': '*', 'cache-control': 'public, max-age=86400' },
-          })
         if (path === '/api/upload' && req.method === 'POST') {
           const form = await req.formData()
           const file = form.get('file') as File | null

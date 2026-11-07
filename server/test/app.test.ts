@@ -11,7 +11,7 @@ import { Emitter, type Source, type SourceEvents } from '../server/source.ts'
 const acted: unknown[] = []
 class Stub extends Emitter<SourceEvents> {
   snapshot() {
-    return { name: 'x', host: 'h', places: [], tasks: [], artifacts: [], asks: {}, settings: [], user: 'u' }
+    return { name: 'x', host: 'h', places: [], tasks: [], asks: {}, settings: [], user: 'u' }
   }
   chat() {
     return undefined
@@ -19,12 +19,6 @@ class Stub extends Emitter<SourceEvents> {
   async act(a: unknown) {
     acted.push(a)
     return { ok: true }
-  }
-  async artifact(id: string, v?: number) {
-    return id === 'ab12' ? { html: `<h1>v${v ?? 2}</h1>`, data: { n: '</script><script>alert(1)</script>' }, sent: undefined } : undefined
-  }
-  async artifactThumb(id: string) {
-    return id === 'ab12' ? new Blob(['png'], { type: 'image/png' }) : null
   }
   watch() {}
   async upload() {
@@ -246,30 +240,5 @@ describe("a task's worktree", () => {
     expect((await fetch(`${base}/api/worktree?task=GTM-1&what=rm`)).status).toBe(400)
     const bad = await fetch(`${base}/api/worktree?task=GTM-1&what=file&path=../x`)
     expect(((await bad.json()) as { error: string }).error).toBe('No such file.')
-  })
-})
-
-describe('artifacts', () => {
-  test('a page is served sealed: its own origin never, nothing loaded from anywhere, its data inert inside', async () => {
-    const r = await fetch(`${base}/api/artifacts/ab12?v=1&full=1&device=phone`)
-    expect(r.status).toBe(200)
-    const csp = r.headers.get('content-security-policy')!
-    expect(csp).toStartWith('sandbox allow-scripts allow-forms;')
-    expect(csp).toContain("default-src 'none'")
-    expect(csp).toContain("connect-src 'none'")
-    expect(csp).not.toContain('https:')
-    const html = await r.text()
-    expect(html).toContain('<h1>v1</h1>')
-    expect(html).toContain('class="full phone"')
-    // the data can't close the script it sits in
-    expect(html).not.toContain('</script><script>alert(1)')
-    expect(html).toContain('\\u003c/script>')
-  })
-  test('its data alone, its picture, and nothing for an artifact that is not there', async () => {
-    expect(await (await fetch(`${base}/api/artifacts/ab12/data?v=2`)).json()).toEqual({ data: { n: '</script><script>alert(1)</script>' } })
-    const t = await fetch(`${base}/api/artifacts/ab12/thumb`)
-    expect(t.headers.get('content-type')).toBe('image/png')
-    expect((await fetch(`${base}/api/artifacts/zz99`)).status).toBe(404)
-    expect((await fetch(`${base}/api/artifacts/zz99/thumb`)).status).toBe(404)
   })
 })

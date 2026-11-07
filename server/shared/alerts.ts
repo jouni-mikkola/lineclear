@@ -152,7 +152,7 @@ export function notifies(snap: Pick<Snapshot, 'settings'>, a: Pick<Alert, 'go' |
 }
 
 /** a task of the Lineclear UI, on one of its tabs (the chat when none) */
-export const taskLink = (id: string, tab?: 'terminal' | 'artifacts' | 'changes') => `/task/${encodeURIComponent(id)}${tab ? `?tab=${tab}` : ''}`
+export const taskLink = (id: string, tab?: 'terminal' | 'changes') => `/task/${encodeURIComponent(id)}${tab ? `?tab=${tab}` : ''}`
 
 /** the agents' browsers in the Lineclear UI */
 export const BROWSERS_LINK = '/browsers'

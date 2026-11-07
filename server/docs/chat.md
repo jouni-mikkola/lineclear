@@ -34,7 +34,7 @@ Every agent, coordinator or task agent, gets the same chat.
   and for how long, and each opens to its own steps or its recent output. Nothing streams by default and nothing
   flashes; a turn it answered with nothing (news it had nothing to say about) shows no rows.
 - On a phone or tablet it behaves like an app: every screen it opens (a space, a task, the sidebar drawer, settings,
-  search, a task's Files or Diff, an artifact) is a step back, so iOS's swipe back and Android's back go one step at a
+  search, a task's Files or Diff) is a step back, so iOS's swipe back and Android's back go one step at a
   time (task, then space, then the sidebar) and an alert's link opens with its space behind it. Swipe from the
   left edge for the sidebar (left again to put them away), right across a task's chat or settings to go back, and down
   on a sheet's grabber to close it; each follows your finger, and a quick flick is enough. A message slid right still
@@ -46,9 +46,9 @@ Every agent, coordinator or task agent, gets the same chat.
 - On a wide screen, drag a sidebar's inner edge to resize it (double-click resets). Hide the sidebar for more chat room
   with the button at its top or `⌘B`. Each device remembers its own.
 - Split view, as Slack's: on a desktop the middle holds up to three panes side by side (as many as the window has room
-  for), each a space's chat, a task's chat, an artifact or a space's tasks, with its own header and message box. Open
-  one with **Open in split view** in a space's or task's ⋯, an artifact card or full screen, or a task's header ⋯, or
-  `⌘`-click (Ctrl-click off a Mac) a space, a task or an artifact's title. The focused pane has a thin line along its
+  for), each a space's chat, a task's chat or a space's tasks, with its own header and message box. Open
+  one with **Open in split view** in a space's or task's ⋯, or a task's header ⋯, or
+  `⌘`-click (Ctrl-click off a Mac) a space or a task. The focused pane has a thin line along its
   top: the sidebar's selection, the lists on the right and the keys follow it, and a space picked opens in it. Drag
   the line between two panes to resize them (double-click shares the room evenly); each pane's header has **Make it
   the only one** and **Close pane**. Each device remembers its own; a phone or tablet shows one at a time, as always.
@@ -65,7 +65,7 @@ Every agent, coordinator or task agent, gets the same chat.
   there and it really lies inside it (no `..`, no links out, nothing ignored, never `.git`). Coordinator chats have no
   panel; their terminal flips the chat, from the ⋯ menu or `Ctrl+`` `.
 
-Every agent learns the chat lines, cards, artifacts and the `lineclear` command from
+Every agent learns the chat lines, cards and the `lineclear` command from
 [skill/lineclear](../skill/lineclear/SKILL.md); coordinators their tasks, news, merges and coordinator timer from
 [skill/lineclear-coordinator](../skill/lineclear-coordinator/SKILL.md); task agents the way from brief to merged from
 [skill/lineclear-agent](../skill/lineclear-agent/SKILL.md). Their prompts (`server/live/prompts.ts`) say only who they are,
