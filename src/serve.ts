@@ -80,7 +80,13 @@ export async function serveMain(args: string[], out: (line: string) => void): Pr
   if (herdr) return (out(`lineclear serve: ${herdr}`), 1);
   const env = { ...process.env, LINECLEAR_MOUNT: join(import.meta.dir, "serve.ts"), ...(port === undefined ? {} : { LINECLEAR_PORT: port }) };
   // the full path in the command line, so `pgrep -f server/main.ts` finds the one server
-  const child = Bun.spawn(["bun", join(server, "server", "main.ts")], { cwd: join(server, "server"), env, stdin: "ignore", stdout: "inherit", stderr: "inherit" });
+  const child = Bun.spawn(["bun", join(server, "server", "main.ts")], {
+    cwd: join(server, "server"),
+    env,
+    stdin: "ignore",
+    stdout: "inherit",
+    stderr: "inherit",
+  });
   for (const sig of ["SIGINT", "SIGTERM"] as const) process.on(sig, () => child.kill(sig));
   return child.exited;
 }
