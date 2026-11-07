@@ -103,17 +103,6 @@ export class EngineMerge extends EngineLand {
 
   protected redMain = new RedMainWatch()
 
-  /**
-   * While main is red on GitHub only its fix merges: a burst of merges on a red main is one failure, not ten. The red
-   * is looked at again first, so a main that turned green frees the merge at once.
-   */
-  protected override async heldByRedMain(t: TaskRec, p: Space): Promise<string | undefined> {
-    if (!this.data.red?.[p.path] || t.by === 'main-green') return
-    await this.watchMain(p).catch(() => undefined)
-    const sha = this.data.red?.[p.path]
-    if (sha) return `Held: ${p.base} is red on GitHub at ${sha.slice(0, 7)}. Nothing was merged: merge ${t.id} again once ${p.base} is green.`
-  }
-
   /** A revert commit of the sha pushed to the base, made in a scratch worktree so no checkout is touched. */
   private async revertOnBase(p: Space, sha: string): Promise<boolean> {
     const dir = mkdtempSync(join(tmpdir(), 'red-main-'))
@@ -125,25 +114,6 @@ export class EngineMerge extends EngineLand {
     } finally {
       await G.git(p.path, 'worktree', 'remove', '--force', dir)
     }
-  }
-
-  /**
-   * One red stops the merges: while main is red on GitHub, the first merge goes (it may be the fix) and every later
-   * one waits for a green run, so a burst of failures stays one failure.
-   */
-  protected override async holdForRedMain(t: TaskRec, p: Space): Promise<string | undefined> {
-    await this.watchMain(p).catch(() => undefined)
-    if (!this.data.red?.[p.path]) return undefined
-    const first = ((this.data.redLet ??= {})[p.path] ??= t.id)
-    this.save()
-    if (first === t.id) return undefined
-    for (const t0 = Date.now(); this.data.red?.[p.path] && Date.now() - t0 < this.holdMax; ) {
-      await Bun.sleep(this.holdEvery)
-      await this.watchMain(p).catch(() => undefined)
-    }
-    return this.data.red?.[p.path]
-      ? `${p.base} is red on GitHub and ${first} merged since: ${t.id} is held until a run on ${p.base} is green. Run lineclear merge ${t.id} again later. Nothing was merged.`
-      : undefined
   }
 
   protected async watchMain(p: Space) {
@@ -159,7 +129,6 @@ export class EngineMerge extends EngineLand {
     if (now.state === 'pass') {
       if (red) {
         delete this.data.red![p.path]
-        delete this.data.redLet?.[p.path]
         this.save()
       }
       return

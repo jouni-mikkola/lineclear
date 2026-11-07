@@ -142,33 +142,8 @@ export class EngineLand extends EngineHandoff {
     return true
   }
 
-  protected async mergeNow(t: TaskRec, self: boolean): Promise<{ ok: boolean; error?: string; note?: string }> {
-    const held = this.heldByRedClaim(t)
-    if (held) return { ok: false, error: held }
-    const r = await this.onMachineOf(t, () => this.mergeOnMachine(t, self))
-    // a merge that failed lets the next one try: only a landed merge counts
-    if (!r.ok) this.redClaims.forEach((id, key) => id === t.id && this.redClaims.delete(key))
-    return r
-  }
-
-  /** the task allowed to merge on a red main, by the red commit: one may (it can be the fix), the rest wait */
-  private redClaims = new Map<string, string>()
-
-  /**
-   * One red on main stops the merges: the first task to merge while main is red goes through (it may be the fix, as a
-   * fix task always does), the rest wait for a green run, so a burst of failures is one failure.
-   */
-  private heldByRedClaim(t: TaskRec): string | undefined {
-    const p = this.proj(t)
-    const red = this.data.red?.[p.path]
-    if (!red || t.by === 'main-green') return
-    const key = `${p.path}@${red}`
-    const claimed = this.redClaims.get(key)
-    if (!claimed || claimed === t.id) {
-      this.redClaims.set(key, t.id)
-      return
-    }
-    return `${p.base} is red at ${red.slice(0, 7)}: ${t.id} waits for a green run on it, then merge again.`
+  protected mergeNow(t: TaskRec, self: boolean): Promise<{ ok: boolean; error?: string; note?: string }> {
+    return this.onMachineOf(t, () => this.mergeOnMachine(t, self))
   }
 
   private async mergeOnMachine(t: TaskRec, self: boolean): Promise<{ ok: boolean; error?: string; note?: string }> {
@@ -248,11 +223,6 @@ export class EngineLand extends EngineHandoff {
     return this.markMerged(t, note)
   }
 
-  /** why a merge waits while main is red on GitHub (EngineMerge knows main's runs); undefined when it may go on */
-  protected async heldByRedMain(_t: TaskRec, _p: Space): Promise<string | undefined> {
-    return undefined
-  }
-
   /** an error for the caller; anyone but the task's own agent also sends it to the agent */
   protected async sendBackOrTell(t: TaskRec, self: boolean, error: string) {
     if (self && !this.callerLeft.has(t.id)) return { ok: false as const, error }
@@ -307,8 +277,6 @@ export class EngineLand extends EngineHandoff {
         ok: false,
         error: `${t.base} here has ${ahead} commit${ahead === 1 ? '' : 's'} GitHub lacks: push ${t.base} (git push origin ${t.base}) or move them off it, then merge ${t.id} again. Nothing was merged.`,
       }
-    const held = await this.heldByRedMain(t, p)
-    if (held) return { ok: false, error: held }
     const pr = await this.prOf(t, g, wt)
     if (pr && pr.baseRefName !== t.base)
       return {
@@ -380,8 +348,6 @@ export class EngineLand extends EngineHandoff {
       await this.sendBack(t, `${why} ${this.fixIt(t)}`)
       return { ok: false, error: `${why} Sent back to ${t.id}'s agent to fix.` }
     }
-    const holding = await this.holdForRedMain(t, p)
-    if (holding) return { ok: false, error: holding }
     const m = await GH.mergePr(g, wt, n, head, `${t.id}: ${t.title} (#${n})`, t.said ?? '')
     let state = (await GH.viewPr(g, wt, n))?.state
     // a repo with a merge queue only queues the pull request: GitHub's full check runs there and merges it when green
@@ -404,11 +370,6 @@ export class EngineLand extends EngineHandoff {
     }
     await G.git(p.path, 'push', '--quiet', 'origin', '--delete', t.branch!)
     return this.mergedOnGitHub(t, p, `merged PR #${n} on GitHub${wait ? '' : ', not waiting for its checks'}`)
-  }
-
-  /** a merge waits here while its base is red on GitHub; the text says why it did not merge, none when it may go */
-  protected async holdForRedMain(_t: TaskRec, _p: Space): Promise<string | undefined> {
-    return undefined
   }
 
   /** main here comes up to GitHub's, so the merge is here too (and Lineclear's own update sees it), then it is marked */
