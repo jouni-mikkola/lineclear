@@ -13,8 +13,7 @@ export interface Quarantined {
   task: string;
 }
 
-export const readQuarantine = (path = QUARANTINE_FILE): Quarantined[] =>
-  existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")) as Quarantined[]) : [];
+export const readQuarantine = (path = QUARANTINE_FILE): Quarantined[] => (existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")) as Quarantined[]) : []);
 
 export const writeQuarantine = (list: Quarantined[], path = QUARANTINE_FILE): void => writeFileSync(path, `${JSON.stringify(list, null, 2)}\n`);
 
@@ -28,12 +27,7 @@ export interface Verdict {
 }
 
 /** `passesAlone` runs one test by itself. A failure that passes alone is tolerated and quarantined; one that fails alone blocks. */
-export async function judge(
-  failures: Failure[],
-  quarantine: Quarantined[],
-  task: string,
-  passesAlone: (f: Failure) => Promise<boolean>,
-): Promise<Verdict> {
+export async function judge(failures: Failure[], quarantine: Quarantined[], task: string, passesAlone: (f: Failure) => Promise<boolean>): Promise<Verdict> {
   const next = [...quarantine];
   const blocking: Failure[] = [];
   const tolerated: Failure[] = [];
