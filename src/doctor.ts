@@ -9,6 +9,7 @@ import { copiesProblem, runByNote } from "./store-copies.ts";
 import { cacheEnvFile, dataDir, extensionFile, INSTALL_URL, type Paths, SERVICE } from "./paths.ts";
 import { diskTrouble, freeBytes } from "./health.ts";
 import { firstModel, readModelFile } from "./models.ts";
+import { setupChosen } from "./tables.ts";
 import { readSetup, type Setup, setupRoles } from "./project.ts";
 import { checkoutPointers } from "./install-paths.ts";
 import { buildNames, buildProblem, buildsDir, installReleaseCommand, type RunFrom, unitCommand } from "./builds.ts";
@@ -308,8 +309,7 @@ function newTaskModel(): Check {
 /** The chosen models, or the problem when the store cannot be read. A machine with no model chosen yet checks none (a fresh install has nothing to lose). */
 function storedSettings(env: Record<string, string | undefined>): Pick<Probe, "setup" | "settings"> {
   try {
-    const setup = readSetup(env);
-    return Object.keys(setup).length ? { setup } : {};
+    return setupChosen(env) ? { setup: readSetup(env) } : {};
   } catch (e) {
     return { settings: { problem: (e as Error).message } };
   }

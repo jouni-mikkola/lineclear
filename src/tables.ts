@@ -12,6 +12,7 @@ create table if not exists inbox (n integer primary key autoincrement, open inte
 create table if not exists waits (task text primary key, wait text not null);
 create table if not exists requests (task text primary key, since text not null, request text not null);
 create table if not exists setup (role text primary key, model text not null);
+create table if not exists setup_files (name text primary key);
 `;
 
 const stores = new Map<string, Database>();
@@ -31,7 +32,6 @@ export function tables(env: Record<string, string | undefined> = process.env): D
     stores.set(file, store);
   }
   importFolders(store, config);
-  importSetupFiles(store, config);
   return store;
 }
 
@@ -52,11 +52,19 @@ function importFolders(store: Database, config: string): void {
   }
 }
 
-/** The role models of the files from before the table: `settings.json` (`setup` in it) and `setup.json`. The first of them to name a role wins. */
-function importSetupFiles(store: Database, config: string): void {
+const setupChecked = new WeakSet<Database>();
+
+/**
+ * The store with the role models in it. The files from before the table, `settings.json` (`setup` in it) and `setup.json`,
+ * are read once per store and stay where they are, so an update that rolls back still finds them. A role the table has wins.
+ */
+export function setupTable(env: Record<string, string | undefined> = process.env): Database {
+  const store = tables(env);
+  if (setupChecked.has(store)) return store;
+  const config = configDir(env);
   for (const name of ["settings.json", "setup.json"]) {
     const file = join(config, name);
-    if (!existsSync(file)) continue;
+    if (!existsSync(file) || store.query("select 1 from setup_files where name = ?").get(name)) continue;
     let value: unknown;
     try {
       value = JSON.parse(readFileSync(file, "utf8"));
@@ -70,14 +78,18 @@ function importSetupFiles(store: Database, config: string): void {
       .transaction(() => {
         const put = store.query("insert or ignore into setup (role, model) values (?, ?)");
         for (const [role, model] of Object.entries(roles as Record<string, unknown>)) if (typeof model === "string") put.run(role, model);
+        store.query("insert or ignore into setup_files (name) values (?)").run(name);
       })
       .immediate();
-    try {
-      renameSync(file, `${file}.imported-${Date.now()}-${process.pid}`);
-    } catch {
-      // another process renamed it first
-    }
   }
+  setupChecked.add(store);
+  return store;
+}
+
+/** Whether any role model was ever chosen here, or an older file named some: a fresh install has none to lose. */
+export function setupChosen(env: Record<string, string | undefined> = process.env): boolean {
+  const store = setupTable(env);
+  return store.query("select 1 from setup union select 1 from setup_files").get() !== null;
 }
 
 /** The parsed JSON files of a folder, a file that does not parse reported and skipped. */

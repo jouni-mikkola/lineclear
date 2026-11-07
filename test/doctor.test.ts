@@ -283,12 +283,12 @@ test("doctor names each role whose model a settings migration lost, and none whe
   const env = { LINECLEAR_CONFIG: dir };
   const roleProblems = () => doctorChecks(probe({ setup: realSetup(env) })).filter((c) => c.name.endsWith(" model") && c.problem);
   try {
-    // one role kept, the others lost in a migration
-    writeFileSync(join(dir, "setup.json"), JSON.stringify({ worker: "p/worker" }));
+    // the old store held no models, so the migration carries none over
+    writeFileSync(join(dir, "setup.json"), JSON.stringify({}));
     const lines: string[] = [];
     const code = doctor(probe({ setup: realSetup(env), which: (c) => `/usr/bin/${c}` }), (l) => lines.push(l));
     const lost = lines.filter((l) => l.startsWith("FAILED") && l.includes(" model:"));
-    expect(lost).toHaveLength(setupRoles.length - 1);
+    expect(lost).toHaveLength(setupRoles.length);
     expect(lost.join("\n")).toContain("step checker");
     expect(code).toBe(1);
 

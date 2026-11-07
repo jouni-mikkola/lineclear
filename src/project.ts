@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import { configDir } from "../pi/config.ts";
 import { ENDLESS, scriptRunner } from "./project-detect.ts";
-import { tables } from "./tables.ts";
+import { setupTable } from "./tables.ts";
 
 export const roles = ["worker", "reviewer"] as const;
 export type Role = (typeof roles)[number];
@@ -86,7 +86,7 @@ export const settingsPath = (name: string, env = process.env) => join(projectsDi
 
 /** Writes the role models into the table, in one transaction. */
 export function writeSetup(next: Setup, env = process.env): void {
-  const store = tables(env);
+  const store = setupTable(env);
   store
     .transaction(() => {
       store.exec("delete from setup");
@@ -98,7 +98,7 @@ export function writeSetup(next: Setup, env = process.env): void {
 
 /** The model chosen for each role: the machine's defaults, which a project's own `models` override. */
 export function readSetup(env = process.env): Setup {
-  const rows = tables(env).query("select role, model from setup").all() as { role: SetupRole; model: string }[];
+  const rows = setupTable(env).query("select role, model from setup").all() as { role: SetupRole; model: string }[];
   return Object.fromEntries(rows.map((r) => [r.role, r.model]));
 }
 

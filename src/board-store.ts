@@ -15,8 +15,9 @@ export function boardSpaces(env: NodeJS.ProcessEnv): { name: string; path: strin
     store = new Database(file, { readonly: true });
     const rows = store.query("select data from spaces order by position").all() as { data: string }[];
     return rows.map((r) => JSON.parse(r.data) as { name: string; path: string });
-  } catch {
-    return []; // the board has no spaces table yet
+  } catch (e) {
+    if (/no such table/.test(String(e))) return []; // the board has no spaces yet
+    throw e;
   } finally {
     store?.close();
   }

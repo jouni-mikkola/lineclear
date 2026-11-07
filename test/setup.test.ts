@@ -77,11 +77,10 @@ test("the web view lists harnesses and accounts, and saves through the same chec
   expect(setupView(registry(), env).chosen).toEqual({ worker: "anthropic/opus-x" });
 });
 
-test("a role model set in Settings is the next task's model, and setup.json is imported once and set aside", () => {
+test("a role model set in Settings is the next task's model, and setup.json is imported once", () => {
   const env = { ...process.env, LINECLEAR_CONFIG: mkdtempSync(join(tmpdir(), "lc-store-")) };
   writeFileSync(join(env.LINECLEAR_CONFIG, "setup.json"), JSON.stringify({ worker: "a/old", reviewer: "b/r", stepChecker: "b/r" }));
   expect(readSetup(env).worker).toBe("a/old");
-  expect(existsSync(join(env.LINECLEAR_CONFIG, "setup.json"))).toBe(false);
   mkdirSync(join(projectsDir(env), "p"), { recursive: true });
   writeFileSync(join(projectsDir(env), "p", "settings.json"), JSON.stringify({ repo: "/r", space: "p", check: "true", models: { worker: [], reviewer: [] } }));
   expect((readSettings("p", env) as Settings).models.worker).toEqual(["a/old"]);
@@ -104,12 +103,13 @@ describe("the machine settings file", () => {
     expect(setupGate(env)).toContain(file(env));
   });
 
-  test("a settings.json of any version is imported into the table once and set aside", () => {
+  test("a settings.json of any version is imported into the table once and left in place", () => {
     const env = configEnv();
     mkdirSync(configDir(env), { recursive: true });
     writeFileSync(file(env), JSON.stringify({ setup: { worker: "a/x", reviewer: "b/y", stepChecker: "b/s" } }));
     expect(readSetup(env)).toEqual({ worker: "a/x", reviewer: "b/y", stepChecker: "b/s" });
-    expect(existsSync(file(env))).toBe(false);
+    expect(existsSync(file(env))).toBe(true);
+    writeFileSync(file(env), JSON.stringify({ setup: { worker: "a/changed" } }));
     expect(readSetup(env).worker).toBe("a/x");
   });
 });
