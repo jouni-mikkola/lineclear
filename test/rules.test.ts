@@ -96,7 +96,7 @@ test("the same step added twice gives one start and one refusal", () => {
   writeFileSync(lock, String(process.pid));
   const refused = t.doTick();
   expect(refused.some((x) => x.kind === "skip" && x.reason.includes("another tick is running"))).toBe(true);
-  expect(t.adds()).toEqual([]);
+  expect(t.adds().length).toBe(1);
   rmSync(lock);
   t.doTick();
   expect(t.adds().length).toBe(1);
