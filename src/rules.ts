@@ -4,6 +4,7 @@ import { writeAtomic } from "../pi/atomic.ts";
 import { addDecisions, decisionsSince, pruneDecisions } from "./decisions-store.ts";
 import { routeAsks } from "./asks.ts";
 import { copyStoreQuietly } from "./store-copies.ts";
+import type { DecisionCode } from "./decision-code.ts";
 import { freshDecisions } from "./decision-dedupe.ts";
 import { answerCard, closeItem, isOpen, type Item, readItems } from "./inbox.ts";
 import { listProjectNames, projectsDir, readSettings, type Settings } from "./project.ts";
@@ -30,6 +31,8 @@ export interface Decision {
   project: string;
   step?: string;
   kind: "start" | "skip" | "stop" | "wake" | "stall" | "close" | "run";
+  /** Why, for the loop and the dedupe to compare; older lines have none. */
+  code?: DecisionCode;
   reason: string;
   /** The stall class of a stop (src/stall-class.ts). */
   class?: string;
@@ -153,12 +156,18 @@ export function tick(world: World, dryRun: boolean, env = process.env): Decision
   for (const name of listProjectNames(env)) {
     const settings = readSettings(name, env);
     if (typeof settings === "string") {
-      all.push({ time: world.now().toISOString(), project: name, kind: "skip", reason: settings });
+      all.push({ time: world.now().toISOString(), project: name, kind: "skip", code: "broken", reason: settings });
       continue;
     }
     const release = dryRun ? () => {} : holdProjectTick(join(projectsDir(env), name, "tick.lock"));
     if (!release) {
-      all.push({ time: world.now().toISOString(), project: name, kind: "skip", reason: "another tick is running for this project, so no step starts twice" });
+      all.push({
+        time: world.now().toISOString(),
+        project: name,
+        kind: "skip",
+        code: "blocked",
+        reason: "another tick is running for this project, so no step starts twice",
+      });
       continue;
     }
     try {

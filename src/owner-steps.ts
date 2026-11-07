@@ -1,7 +1,7 @@
 import { doneItems } from "./doneproof.ts";
 import { addItem, readItems } from "./inbox.ts";
 import type { Step } from "./roadmap.ts";
-import type { Decision, State, World } from "./rules.ts";
+import type { State, World } from "./rules.ts";
 
 /** What the owner's steps need of a tick. */
 interface Ask {
@@ -10,7 +10,7 @@ interface Ask {
   state: State;
   dryRun: boolean;
   env: NodeJS.ProcessEnv;
-  note: (kind: Decision["kind"], reason: string, step?: string) => void;
+  note: (code: "owner", reason: string, step?: string) => void;
 }
 
 /** Owner-only steps whose Inbox item the owner answered Done: they count as merged, so the steps after them start. */
@@ -23,11 +23,11 @@ export function ownerStepsDone(env: NodeJS.ProcessEnv, state: Pick<State, "owner
 export function ownerStepItem(a: Ask, step: Step): true {
   const told = a.state.ownerItems?.[step.id];
   if (told !== undefined) {
-    a.note("skip", "owner-only step: it waits for your answer in the Inbox", step.id);
+    a.note("owner", "owner-only step: it waits for your answer in the Inbox", step.id);
     return true;
   }
   if (a.dryRun) {
-    a.note("skip", `would put owner-only step ${step.id} in the Inbox`, step.id);
+    a.note("owner", `would put owner-only step ${step.id} in the Inbox`, step.id);
     return true;
   }
   const doneWhen = doneItems(step)
@@ -46,6 +46,6 @@ export function ownerStepItem(a: Ask, step: Step): true {
     a.env,
   );
   a.state.ownerItems = { ...a.state.ownerItems, [step.id]: item.n };
-  a.note("skip", `owner-only step: Inbox item ${item.n} waits for your answer, no task started`, step.id);
+  a.note("owner", `owner-only step: Inbox item ${item.n} waits for your answer, no task started`, step.id);
   return true;
 }

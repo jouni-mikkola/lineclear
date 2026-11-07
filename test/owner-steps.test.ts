@@ -39,7 +39,7 @@ test("a ready owner-only step starts no task and makes one Inbox item; Done rele
   const run = demoEnv(dir);
   const f = fakeWorld(run, [], roadmap, []);
   const seen = [0, 1, 2].flatMap(() => tick(f.world, false, run));
-  expect(seen.filter((d) => d.step === "A").map(classify)).toEqual(["owner", "owner"]);
+  expect(seen.filter((d) => d.step === "A").map(classify)).toEqual(["owner"]);
   expect(f.adds).toHaveLength(0);
   const items = readItems(run).filter((i) => i.ownerStep === "A");
   expect(items).toHaveLength(1);

@@ -12,7 +12,7 @@ import { closeSync, existsSync, openSync, readSync, statSync } from "node:fs";
 import { writeAtomic } from "../pi/atomic.ts";
 import { agentName } from "./starts.ts";
 import { namesUsageLimit } from "./harness-pi.ts";
-import type { Decision, State, World } from "./rules.ts";
+import type { State, World } from "./rules.ts";
 import { DAY } from "./time.ts";
 export interface StallCard {
   id: string;
@@ -231,7 +231,7 @@ interface Args {
   tasks: Task[];
   steps: Step[];
   offered: () => Set<string> | undefined;
-  note: (kind: Decision["kind"], reason: string, step?: string) => void;
+  note: (code: "stall", reason: string, step?: string) => void;
   env: NodeJS.ProcessEnv;
 }
 
