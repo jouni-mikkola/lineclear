@@ -8,7 +8,7 @@
 //   snapshot <url> [n=7]  wall time and size of GET <url>/api/snapshot, n runs
 //   chat-tokens [n=20]  tokens per session of the coordinator and the Dispatcher, from their last n session files
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -23,7 +23,7 @@ type Task = {
   mergeStopped?: unknown;
 };
 type Usage = { input: number; output: number; cacheRead: number; cacheWrite: number };
-type Session = { role: "agent" | "reviewer"; firstToolCallAt?: number; usage: Usage };
+type Session = { role: "agent" | "reviewer"; firstToolCallAt?: number; briefAt?: number; usage: Usage };
 
 const SESSIONS = join(homedir(), ".pi/agent/sessions");
 const BOARD = join(homedir(), ".lineclear");
@@ -59,6 +59,7 @@ function sessionsOf(task: Task): Session[] {
       const usage: Usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
       let role: Session["role"] = "reviewer";
       let firstToolCallAt: number | undefined;
+      let briefAt: number | undefined;
       let seenUser = false;
       for (const raw of readFileSync(join(dir, f), "utf8").split("\n")) {
         if (!raw) continue;
@@ -67,6 +68,7 @@ function sessionsOf(task: Task): Session[] {
         if (e.type !== "message" || !m) continue;
         if (m.role === "user" && !seenUser) {
           seenUser = true;
+          briefAt = Date.parse(e.timestamp ?? "");
           if (JSON.stringify(m.content).includes("Settings: (from lineclear show")) role = "agent";
         }
         if (m.role !== "assistant") continue;
@@ -74,16 +76,26 @@ function sessionsOf(task: Task): Session[] {
           firstToolCallAt = Date.parse(e.timestamp ?? "");
         for (const k of Object.keys(usage) as (keyof Usage)[]) usage[k] += m.usage?.[k] ?? 0;
       }
-      return { role, firstToolCallAt, usage };
+      return { role, firstToolCallAt, briefAt, usage };
     });
 }
+
+/** ctime of a worktree entry, in ms; a worktree already removed has none */
+const madeAt = (task: Task, name: string): number | undefined => {
+  try {
+    return lstatSync(join(task.worktree, name)).ctimeMs;
+  } catch {
+    return undefined;
+  }
+};
 
 function start(n: number): void {
   const secs: number[] = [];
   const phases: Record<string, number[]> = { worktree: [], install: [], session: [], "first call": [] };
   let resent = 0;
   for (const t of doneTasks(n)) {
-    const first = sessionsOf(t).find((s) => s.role === "agent")?.firstToolCallAt;
+    const agent = sessionsOf(t).find((s) => s.role === "agent");
+    const first = agent?.firstToolCallAt;
     if (first) secs.push((first - t.created) / 1000);
     if (first && t.startMs) {
       const { worktree, install, session } = t.startMs;
@@ -93,6 +105,11 @@ function start(n: number): void {
       phases["first call"]?.push((first - t.created - worktree - install - session) / 1000);
     }
     if (t.briefResent) resent++;
+    // worktree: add to the checkout; install: checkout to linked packages; session: packages to the brief in the
+    // agent's session; first call: brief in to the first tool call
+    const marks = [t.created, madeAt(t, ".git"), madeAt(t, "node_modules"), agent?.briefAt, first];
+    if (marks.some((m) => m === undefined || Number.isNaN(m))) continue;
+    Object.keys(phases).forEach((name, i) => phases[name]?.push(((marks[i + 1] as number) - (marks[i] as number)) / 1000));
   }
   line("task add to first tool call", secs, "s");
   for (const [name, xs] of Object.entries(phases)) if (xs.length) line(`  phase ${name}`, xs, "s");
