@@ -33,7 +33,6 @@ export interface StoreCopy {
 
 const COPY_EXT = ".sqlite";
 const STORE_DB = "store.sqlite";
-const IDS_DB = "task-ids.sqlite";
 /** Tables a copy adds to the vacuumed store: the other files of the data folder (gzipped) and a few facts. */
 const FILES = "copy_files";
 const META = "copy_meta";
@@ -77,7 +76,7 @@ export function listCopies(env: Env = process.env): StoreCopy[] {
 function copiedPaths(from: string): string[] {
   const top = readdirSync(from, { withFileTypes: true })
     .filter((e) => e.isFile() && !e.name.endsWith(".tmp") && !e.name.endsWith(".sock") && !SECRET_FILES.has(e.name))
-    .filter((e) => !e.name.startsWith(STORE_DB) && !e.name.startsWith(IDS_DB) && e.name !== ERROR_FILE)
+    .filter((e) => !e.name.startsWith(STORE_DB) && e.name !== ERROR_FILE)
     .map((e) => e.name);
   if (!existsSync(join(from, BRIEFS))) return top;
   const briefs = readdirSync(join(from, BRIEFS), { recursive: true, withFileTypes: true })
@@ -105,15 +104,6 @@ function writeCopy(from: string, file: string): void {
     db.transaction(() => {
       const put = db.prepare(`INSERT INTO ${FILES} (path, body) VALUES (?, ?)`);
       for (const p of copiedPaths(from)) put.run(p, Bun.gzipSync(readFileSync(join(from, p))));
-      if (existsSync(join(from, IDS_DB))) {
-        // the id series is a database in write-ahead mode: its bytes are taken through the database, not the file
-        const ids = new Database(join(from, IDS_DB), { readonly: true });
-        try {
-          put.run(IDS_DB, Bun.gzipSync(new Uint8Array(ids.serialize())));
-        } finally {
-          ids.close();
-        }
-      }
       const fact = db.prepare(`INSERT INTO ${META} (key, value) VALUES (?, ?)`);
       fact.run("source", from);
       fact.run("tasks", String(taskCount(from)));
@@ -178,7 +168,6 @@ export function restoreCopy(name: string, env: Env = process.env): number {
     for (const row of db.query(`SELECT path, body FROM ${FILES}`).all() as { path: string; body: Uint8Array<ArrayBuffer> }[]) {
       const dest = join(to, row.path);
       mkdirSync(dirname(dest), { recursive: true });
-      if (row.path === IDS_DB) for (const side of ["-wal", "-shm"]) rmSync(`${dest}${side}`, { force: true });
       writeBytes(`${dest}.tmp`, Bun.gunzipSync(row.body));
       renameSync(`${dest}.tmp`, dest);
     }
