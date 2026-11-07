@@ -97,7 +97,7 @@ describe('news for coordinators, continued', () => {
       expect(news('ready')).toEqual([project])
       expect(news('added')).toEqual([])
       // the home space's own news goes to it once
-      expect(news('ready', home)).toEqual([])
+      expect(news('ready', home)).toEqual([home])
     } finally {
       src.agents.send = send
     }
