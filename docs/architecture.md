@@ -13,7 +13,7 @@ imports count for the borders but not for cycles, since they are gone when the c
 | Module | Folder | Owns | May import |
 | --- | --- | --- | --- |
 | `brand` | `ui/brand/` | the mark, the wordmark and the colour tokens | none |
-| `pi` | `pi/` | the pi extension and the token pack's parts | none |
+| `pi` | `pi/` | the pi extension | none |
 | `cli` | `src/` | the CLI and its commands, the rules loop, config and data paths, the web API | `pi`, `check-line`, `registry` |
 | `bin` | `bin/` | the `lineclear` command | `cli` |
 | `kit` | `ui/kit/` | the design system's parts and motion | `brand`, `cli` |

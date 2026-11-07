@@ -10,7 +10,6 @@
   ],
   "decisions": [
     "pi-web-access 0.45.0 to 0.46.0: kept. The code diff was read before install: new search and fetch providers (Tabstack, SearchApi, Cloudflare) that run only when a key is set and named, and an optional `fetchContent.curl` that starts the command the user configures. No new dependency, no data leaves unless configured.",
-    "cut-output re-reads: the log now tells a read of the saved file (the cut working as told) from a command run again (the waste). The first log, 16 of 38 cuts read again, did not tell them apart. The share to keep under 15 % is the rerun share; it is read with `cutStats`.",
     "pi-lens, pi-subagents with a scout model, pi-usage: no trial yet, so no result. Each needs real tasks run with the pack switch, and none was installed."
   ]
 }

@@ -101,9 +101,8 @@ From [pi](https://pi.dev) (its docs ship with it, under `docs/`):
 
 - Extensions with events: Lineclear's extension in `pi/` hooks `session_start`, `before_agent_start`, `turn_start`,
   `turn_end`, `tool_call`, `tool_result`, `after_provider_response` and `session_before_compact`. They add the agent
-  rules, guard the tools an agent calls, and run the token pack.
+  rules, and guard the tools an agent calls.
 - Skills: `resources_discover` hands pi the kit's skills in `kit/`, so an agent needs no personal skill folder.
-- Compaction: the token pack sets when a session compacts and writes its notes first.
 - Models: `pi --list-models` tells Home which models you are logged in to.
 - Not used yet: pi packages (`pi install`), which could ship the kit and the extension as one package, and pi's RPC
   mode, which could run a headless reviewer without a terminal.

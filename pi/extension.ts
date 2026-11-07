@@ -1,5 +1,5 @@
 // Lineclear's pi extension. It keeps an agent inside its task: no push, and no secret or login file that is not its own.
-// It also loads the token pack (pi/pack.ts), notes how full each account's limits are, for Home's Usage card, and gives
+// It also notes how full each account's limits are, for Home's Usage card, and gives
 // Lineclear's agents the kit (kit/): its rules in the system prompt and its skills, so no agent needs personal files.
 import { homedir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
@@ -8,7 +8,6 @@ import { fileURLToPath } from "node:url";
 import { existsSync, mkdirSync, readFileSync, realpathSync } from "node:fs";
 import { writeAtomic } from "./atomic.ts";
 import { configDir, readJson } from "./config.ts";
-import pack from "./pack.ts";
 import { quietNudge } from "./nudge.ts";
 
 type Env = Record<string, string | undefined>;
@@ -265,5 +264,4 @@ export default async function lineclearExtension(pi: Pi): Promise<void> {
       // a copy without kit/ still runs; the brief carries the task's own rules
     }
   });
-  await pack(pi);
 }

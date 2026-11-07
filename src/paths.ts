@@ -52,7 +52,7 @@ export const cacheEnvFile = (env: Record<string, string | undefined> = process.e
 
 /**
  * What install writes as pi's `lineclear.ts`: an import of the extension by its full path. Not a link: pi resolves an
- * extension's own imports from the link's folder, so `./pack.ts` would not be found. `install.sh` writes the same text.
+ * extension's own imports from the link's folder, so `./config.ts` would not be found. `install.sh` writes the same text.
  */
 export const extensionFile = (app: string) =>
   `// Lineclear's pi extension, written by install.sh. It imports the real one, so its own imports resolve.\nexport { default } from "${app}/pi/extension.ts";\n`;
