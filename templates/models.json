@@ -2,7 +2,7 @@
   "providers": {},
   "families": {
     "claude|fable|opus|sonnet|haiku": { "company": "anthropic" },
-    "gpt|codex|^o\\d": { "company": "openai" },
+    "gpt|^o\\d": { "company": "openai" },
     "gemini|gemma": { "company": "google" },
     "grok": { "company": "xai" },
     "glm|zhipu": { "company": "zhipu" },

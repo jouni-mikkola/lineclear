@@ -13,13 +13,6 @@ const OLD = {
 const NO_REPLY = /^(`?)(<no-reply>(?:(?!<\/no-reply>)[\s\S])*<\/no-reply>|<no-reply\s*\/>)\1$/i
 const OLD_MARKER = /^(\[\[[^[\]\n]+\]\]|\[noted\])$/
 
-/** a reply that is or may become a hidden line as it streams in: one in brackets, or a tag an agent's reply may start
- *  with (none of them for the chat as words) or the start of one */
-export const markerSoFar = (words: string) => {
-  const w = words.replace(/^`/, '').toLowerCase()
-  return w.startsWith('[') || ['<no-reply', '<reply'].some((t) => w.startsWith(t) || t.startsWith(w))
-}
-
 /** an agent's <reply …/> line; its tag may also open its words (<reply to="…">words</reply>) */
 const AGENT_REPLY = /^<reply((?:\s+[\w-]+="[^\n]*?")+)\s*(\/?)>(.*)$/u
 

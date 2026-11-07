@@ -312,7 +312,7 @@ export interface UpdateCard {
   health?: { level: HealthLevel; machine: string }
   /** the project's base branch went red on GitHub ("main"); text says which checks failed */
   red?: string
-  /** its agent started again (text: "Restarted on Codex (Model Code 6, high)") */
+  /** its agent started again (text: "Restarted on pi (Model Code 6, high)") */
   restart?: boolean
   /** a task that needs you: a copy of what it asks, answered here as in its own chat */
   ask?: CardAsk

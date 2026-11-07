@@ -40,7 +40,7 @@ Each space's chat is in the middle and its tasks on the right, by what they need
 
 ### ⚡ Stop briefing every agent yourself
 
-Write what needs doing to a space's coordinator: it makes it a task or several, each with a brief and a Settings block that says how it is reviewed and merged. Each agent starts on Claude Code, Codex, pi or another CLI herdr can start, in a worktree of its own, at once or as soon as the machine has room. Want more control? Ask for it "for later", "after SHE-12", or "ask me before merging".
+Write what needs doing to a space's coordinator: it makes it a task or several, each with a brief and a Settings block that says how it is reviewed and merged. Each agent starts on pi, in a worktree of its own, at once or as soon as the machine has room. Want more control? Ask for it "for later", "after SHE-12", or "ask me before merging".
 
 ### 💬 Know when a task needs an answer
 
@@ -75,7 +75,7 @@ Run the install line again. An update that does not work puts the previous versi
 
 ### Do I need to know how to code?
 
-You need to be comfortable in a terminal for the install. After that everything happens in the app: you write to coordinators and answer cards, and Settings holds the few defaults. You'll need macOS or Linux, herdr 0.9 or newer, Git, Tailscale to reach it from your other devices, and an agent CLI herdr can start: Claude Code, Codex, pi or another. Bun comes by itself. `gh` (pull requests), an ElevenLabs key for voice are optional. [Get started](docs/get-started.md) covers the prerequisites.
+You need to be comfortable in a terminal for the install. After that everything happens in the app: you write to coordinators and answer cards, and Settings holds the few defaults. You'll need macOS or Linux, herdr 0.9 or newer, Git, Tailscale to reach it from your other devices, and pi, the agent CLI. Bun comes by itself. `gh` (pull requests), an ElevenLabs key for voice are optional. [Get started](docs/get-started.md) covers the prerequisites.
 
 ### How do I check that Lineclear is running?
 
@@ -89,7 +89,7 @@ It checks every machine saved in herdr, puts Lineclear's helper there again, sta
 
 ### What permissions do the agents get?
 
-**Codex starts with full access** (`--dangerously-bypass-approvals-and-sandbox`), so a task never waits on a prompt nobody sees. Claude Code and pi start with your own permission settings; Lineclear adds only its hooks, from a settings file of its own, and yours are never touched. A permission prompt shows the task under `Needs you` (`Asks permission`), and startup trust and MCP prompts come as cards. The brief's rules and the review are guidance, not a sandbox. [Tasks](docs/tasks.md) has the details.
+**pi starts with your own permission settings**; Lineclear adds only its hooks, from a settings file of its own, and yours are never touched. A permission prompt shows the task under `Needs you` (`Asks permission`), and startup trust and MCP prompts come as cards. The brief's rules and the review are guidance, not a sandbox. [Tasks](docs/tasks.md) has the details.
 
 ### Does Lineclear send my work to a hosted service?
 
@@ -113,7 +113,7 @@ Mostly. The app has no new-task button: you ask a space's coordinator in your ow
 
 ### What if the safety settings aren't enough?
 
-They are soft. A task's review, merge and rules are lines in its brief, and its agent follows them. Codex runs with full access and every agent has a shell: one can do anything you can, a review is another agent's judgement and not a proof. Set Merge to "ask me first" for a yes before anything lands,.
+They are soft. A task's review, merge and rules are lines in its brief, and its agent follows them. Every agent has a shell: one can do anything you can, a review is another agent's judgement and not a proof. Set Merge to "ask me first" for a yes before anything lands,.
 
 ### What does it cost?
 

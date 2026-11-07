@@ -270,10 +270,10 @@ describe.if(perl)('session-owned command routing', () => {
       const parentCode = `
         const b = Bun.spawnSync(['perl', ${JSON.stringify(join(root, 'helper', 'route.pl'))}, '--bind', String(process.pid), JSON.stringify({cwd:${JSON.stringify(join(other, 'parent'))}, chat:'original-owner', url:${JSON.stringify(`http://127.0.0.1:${server.port}`)}})]);
         if (b.exitCode) throw new Error(b.stderr.toString());
-        const p = Bun.spawnSync(['/bin/bash', '-c', 'exec -a codex "$@"', 'daemon', process.execPath, '-e', ${JSON.stringify(code)}, 'app-server']);
+        const p = Bun.spawnSync(['/bin/bash', '-c', 'exec -a pi "$@"', 'daemon', process.execPath, '-e', ${JSON.stringify(code)}, 'app-server']);
         process.stdout.write(p.stdout); process.stderr.write(p.stderr); process.exit(p.exitCode);
       `
-      const r = await run(['/bin/bash', '-c', 'exec -a codex "$@"', 'original-cli', process.execPath, '-e', parentCode], {
+      const r = await run(['/bin/bash', '-c', 'exec -a pi "$@"', 'original-cli', process.execPath, '-e', parentCode], {
         HOME: home,
         LINECLEAR_CHAT: 'ST-1/Reviewer',
         LINECLEAR_URL: 'http://127.0.0.1:7787',

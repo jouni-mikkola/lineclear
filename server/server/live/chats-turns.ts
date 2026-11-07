@@ -27,18 +27,8 @@ const landed = (ev: LogEvent[]) => {
 }
 
 /** Do the typing dots show: is a message you will see on its way? In a turn you started, at once (an agent never
- *  answers you with a hidden <no-reply>). In one it started itself, only once its reply shows: on its screen as it
- *  streams (`shown`) or landed in its log; until then it may be thinking, running tools, or about to say <no-reply>. */
-export function replying(turn: ReturnType<typeof turnOf>, shown: boolean, ev: LogEvent[]): boolean {
+ *  answers you with a hidden <no-reply>). In one it started itself, only once its reply landed in its log; until then it may be thinking, running tools, or about to say <no-reply>. */
+export function replying(turn: ReturnType<typeof turnOf>, ev: LogEvent[]): boolean {
   if (turn.kind === 'yours' || turn.kind === 'unknown') return true
-  return turn.kind === 'own' && (shown || landed(ev))
-}
-
-/** what the screen showed of the reply in a turn the agent started itself */
-export interface Shown {
-  turn: string
-  /** the reply's text at the last read; it must grow once before it counts, so a still line (a job's "completed") never does */
-  last?: string
-  on: boolean
-  at: number
+  return turn.kind === 'own' && landed(ev)
 }

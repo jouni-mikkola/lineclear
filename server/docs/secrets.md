@@ -12,8 +12,7 @@ machine. A child reviewer can use its parent's credential for the same space; a 
 its own credential. Remote workers have separate authorities and their own machine chains, even though the vault
 is stored on the main machine.
 
-`agentEnv` passes only an opaque `LINECLEAR_SECRET_FILE` reference to the launch environment (including Codex's shell
-policy). The capability is written via stdin over the existing private SSH connection, never in launch arguments,
+`agentEnv` passes only an opaque `LINECLEAR_SECRET_FILE` reference to the launch environment. The capability is written via stdin over the existing private SSH connection, never in launch arguments,
 agent records, prompt text or CLI output. `helper/route.pl --bind PID` reads JSON on stdin, creates owner-only files
 in owner-only `~/.lineclear/helper/routes` and `credentials` directories, and binds them to the process start stamp.
 The CLI obtains proof from a live ancestor's binding or that explicit credential reference. Folder/chat routing may

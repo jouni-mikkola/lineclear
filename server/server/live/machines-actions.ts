@@ -30,9 +30,7 @@ export class MachinesActions extends MachinesLinks {
       }
       await this.start(l, true)
       const p = l.probe
-      const missing = p
-        ? [!p.tools.gh && 'gh (pull requests of GitHub repos)', !p.tools.claude && 'Claude Code', !p.tools.codex && 'Codex'].filter(Boolean)
-        : []
+      const missing = p ? [!p.tools.gh && 'gh (pull requests of GitHub repos)', !p.tools.pi && 'pi'].filter(Boolean) : []
       out.push(
         `${l.rec.machine} (${l.saved.target}): ${l.lacks.length ? `needs ${l.lacks.join(', ')}` : l.state.startsWith("Can't") || l.state.startsWith('herdr') ? l.state : 'helper put there again, worker started again'}${missing.length ? `; not there: ${missing.join(', ')}` : ''}`,
       )

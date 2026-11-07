@@ -38,7 +38,7 @@
   the same. Once started, only the agent puts a task in To do; one that stops for any other reason needs you, except
   while work it started in the background (a reviewer subagent, a shell, a monitor) still runs and will wake it: that
   is still Working (shells alone for up to 10 minutes, since a server it started for you never wakes it; a shell
-  running a headless reviewer of another CLI, `codex exec` or `claude -p`, counts as a subagent), unless its last
+  running a headless reviewer of another CLI, `pi -p` or `claude -p`, counts as a subagent), unless its last
   words ask you something. A task that needs you says why in at most 40
   characters, never by pasting the agent's message and never in a model's words: a standard reason (Plan to approve,
   Asks permission, Signed out, Question for you, Waits for your reply), or the agent's own question cut to fit
@@ -48,8 +48,7 @@
   file of its own (`--settings`, in `~/.lineclear/hooks/`; your own settings are never touched) whose hooks record
   each event: a turn starts or ends, what still runs in the background as it ends, a permission prompt (a subagent's
   too), its question tool, a plan. A turn cut short (Esc, a prompt turned down) runs no hook; its transcript says it
-  ended. herdr's reading of the screen counts only where the agent reports nothing: Codex (its hooks each need
-  trusting in a dialog first, and it writes OSC 7501 itself, which herdr will pass on), pi (it tells only a turn's
+  ended. herdr's reading of the screen counts only where the agent reports nothing: pi (it tells only a turn's
   end), an agent started before this, or a menu up between turns that no hook tells of. One function (`statusFrom` in
   `server/live/agents.ts`) decides, so taking herdr's OSC 7501 program status once it passes that on is one change.
 - On a repo with a GitHub remote that `gh` is logged in to, each task gets a pull request. The lineclear-agent skill runs

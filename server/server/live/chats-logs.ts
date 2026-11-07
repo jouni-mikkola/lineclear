@@ -6,12 +6,12 @@ import { stripHidden, type Agents, type OutItem } from './agents.ts'
 import { agentLines } from './agentlines.ts'
 import { herdr } from './herdr.ts'
 import { logKind } from './readers/find.ts'
-import { LogTail, readerFor } from './readers/index.ts'
+import { readerFor } from './readers/index.ts'
+import { LogTail } from './log-tail.ts'
 import type { LogEvent } from './readers/types.ts'
-import { replyOnScreen } from './streaming.ts'
-import { type Posted, type ChatLog, safe, sawReply, PIECE } from './chats-helpers.ts'
+import { type Posted, type ChatLog, safe, PIECE } from './chats-helpers.ts'
 import { parseMenu, type ScreenMenu } from './chats-menu.ts'
-import { yours, turnOf, replying, type Shown } from './chats-turns.ts'
+import { yours, turnOf, replying } from './chats-turns.ts'
 
 export class ChatsLogs {
   constructor(
@@ -31,7 +31,6 @@ export class ChatsLogs {
   protected logs = new Map<string, ChatLog>()
   protected menus = new Map<string, ScreenMenu>()
   protected menuAt = new Map<string, number>()
-  protected shown = new Map<string, Shown>()
 
   /* ---------- Lineclear's own log per chat ---------- */
 
@@ -50,7 +49,7 @@ export class ChatsLogs {
 
   /** a deleted task's chat: its log goes, and all that was read of it */
   forget(key: string) {
-    for (const m of [this.tails, this.events, this.where, this.reading, this.logs, this.menus, this.menuAt, this.shown]) m.delete(key)
+    for (const m of [this.tails, this.events, this.where, this.reading, this.logs, this.menus, this.menuAt]) m.delete(key)
     rmSync(join(HOME, 'chatlog', `${safe(key)}.json`), { force: true })
   }
 
@@ -189,28 +188,6 @@ export class ChatsLogs {
     return !reply || (posted && posted.at > reply.at) ? posted : reply
   }
 
-  /** in a turn the agent started itself, has its reply begun on its screen, not as a hidden <no-reply> (or older [[...]])? Read about
-   *  once a second, until it has; true when that changes what the chat shows */
-  async readReply(key: string): Promise<boolean> {
-    const r = this.agents.record(key)
-    const turn = turnOf(this.events.get(key) ?? [], this.agents.sentLately(key))
-    if (!r || this.agents.status(key) !== 'working' || turn.kind !== 'own') {
-      const had = this.shown.get(key)?.on ?? false
-      this.shown.delete(key)
-      return had
-    }
-    const was = this.shown.get(key)
-    const s: Shown = was && was.turn === turn.id ? was : { turn: turn.id!, on: false, at: 0 }
-    this.shown.set(key, s)
-    // a little under the poll's second, so a late tick never skips a read
-    if (s.on || Date.now() - s.at < 900) return false
-    s.at = Date.now()
-    const info = this.agents.info(key)
-    if (!info) return false
-    Object.assign(s, sawReply(s, replyOnScreen(r.kind, await herdr.visible(info.pane_id).catch(() => ''))))
-    return s.on
-  }
-
   /** a blocked agent's terminal menu, read from its screen (refreshed at most every 2s) */
   async readMenu(key: string, force = false): Promise<boolean> {
     const st = this.agents.status(key)
@@ -308,11 +285,10 @@ export class ChatsLogs {
 
   protected replying(key: string, ev: LogEvent[]) {
     const turn = turnOf(ev, this.agents.sentLately(key))
-    const s = this.shown.get(key)
-    return replying(turn, !!s?.on && s.turn === turn.id, ev)
+    return replying(turn, ev)
   }
 
-  /** Codex and pi change model and effort only through their own pickers: their menu only adds files */
+  /** pi changes model and effort only through its own pickers: its menu only adds files */
   protected controls(): ChatControls {
     return { models: [], model: 0, efforts: [], effort: 0 }
   }
