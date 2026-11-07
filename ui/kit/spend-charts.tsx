@@ -3,7 +3,7 @@ import { Progress } from "@base-ui/react/progress";
 import { useLayoutEffect, useRef, useState } from "react";
 import { ago, dollars, exact, MONTHS, plural } from "./format.ts";
 import { useGrowingBars } from "./hooks.ts";
-import { AccountHead } from "./line-parts.tsx";
+import { AccountHead } from "./project-words.tsx";
 import { grow } from "./motion.ts";
 import { Count } from "./parts.tsx";
 
