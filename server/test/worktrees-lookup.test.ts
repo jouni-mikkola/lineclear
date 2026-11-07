@@ -1,57 +1,35 @@
-// Putting a task away asks herdr for its spaces once, and a herdr that times out is told apart from a space that is gone.
+// A task's worktree is made and removed by git alone: nothing here has a herdr to ask, and a done task's folder goes.
 import { describe, expect, test } from 'bun:test'
-import { HerdrError } from '../server/live/herdr.ts'
-import { Worktrees, type HerdrSpaces } from '../server/live/engine/worktrees.ts'
+import { existsSync, writeFileSync } from 'node:fs'
+import { execSync } from 'node:child_process'
+import { join } from 'node:path'
+import { repo } from './engine-world.ts'
+import { Worktrees } from '../server/live/engine/worktrees.ts'
 
-function stub(over: Partial<Record<keyof HerdrSpaces, unknown>> = {}) {
-  const calls: string[] = []
-  const spaces = Array.from({ length: 45 }, (_, i) => ({ workspace_id: `w${i}`, label: `task-${i}`, tab_count: 1 }))
-  const note = (name: string, value: unknown) => async () => {
-    calls.push(name)
-    return value
-  }
-  const h = {
-    workspaces: note('workspaces', spaces),
-    agents: note('agents', []),
-    panes: note('panes', []),
-    tabs: note('tabs', []),
-    paneIdle: note('paneIdle', true),
-    closeWorkspace: note('closeWorkspace', undefined),
-    ...over,
-  } as unknown as HerdrSpaces
-  return { h, calls }
-}
+const git = (cwd: string, cmd: string) => execSync(`git ${cmd}`, { cwd, encoding: 'utf8' }).trim()
 
-const away = (w: InstanceType<typeof Worktrees>) => w.putAway({ repo: '/nonexistent-repo', base: 'main', label: 'task-7', closeAgent: async () => undefined })
-
-describe('putAway and herdr', () => {
-  test('lists the spaces once', async () => {
-    const { h, calls } = stub()
-    const r = await away(new Worktrees(h))
-    expect(r.busy).toBeUndefined()
-    expect(calls.filter((c) => c === 'workspaces')).toHaveLength(1)
-    expect(calls).toContain('closeWorkspace')
-  })
-
-  test('a space already gone counts as done', async () => {
-    const { h } = stub({
-      closeWorkspace: async () => {
-        throw new HerdrError('workspace_not_found', 'no such workspace')
-      },
-    })
-    const r = await away(new Worktrees(h))
-    expect(r.busy).toBeUndefined()
+describe('worktrees without herdr', () => {
+  test('a worktree is made by git, and put away with its branch once its work is in base', async () => {
+    const dir = repo()
+    const wt = new Worktrees()
+    const at = join(dir, '..', `wt-${Date.now()}`)
+    const made = await wt.create({ repo: dir, install: 'true' }, 'work/9-x', 'main', at)
+    expect(existsSync(made.path)).toBe(true)
+    let closed = false
+    const r = await wt.putAway({ repo: dir, wt: made.path, branch: 'work/9-x', base: 'main', closeAgent: async () => void (closed = true) })
     expect(r.kept).toEqual([])
+    expect(closed).toBe(true)
+    expect(existsSync(made.path)).toBe(false)
+    expect(git(dir, 'branch --list work/9-x')).toBe('')
   })
 
-  test('a timeout leaves it to try again, with the error told', async () => {
-    const { h } = stub({
-      closeWorkspace: async () => {
-        throw new HerdrError('timeout', 'herdr workspace.close timed out')
-      },
-    })
-    const r = await away(new Worktrees(h))
-    expect(r.busy).toBe(true)
-    expect(r.kept[0]).toContain('timed out')
+  test('uncommitted work is kept, and said', async () => {
+    const dir = repo()
+    const wt = new Worktrees()
+    const made = await wt.create({ repo: dir, install: 'true' }, 'work/10-x', 'main', join(dir, '..', `wt-${Date.now()}-b`))
+    writeFileSync(join(made.path, 'new.txt'), 'x\n')
+    const r = await wt.putAway({ repo: dir, wt: made.path, branch: 'work/10-x', base: 'main', closeAgent: async () => undefined })
+    expect(r.kept[0]).toContain('uncommitted changes')
+    expect(existsSync(made.path)).toBe(true)
   })
 })

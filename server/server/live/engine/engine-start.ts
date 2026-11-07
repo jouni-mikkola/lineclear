@@ -161,9 +161,9 @@ export abstract class EngineStart extends EngineState {
     const key = this.key(t)
     const rec = this.agents.record(key)
     const p = this.proj(t)
-    const home = { repo: p.path, name: p.name, install: p.install }
+    const home = { repo: p.path, install: p.install }
     if (!made && (!ended(t) || !!t.kept?.some((k) => k.startsWith('branch '))) && !(await exists(t.worktree!)) && t.branch) {
-      made = await this.wtOf(t).create(home, t.branch!, t.base!, labelOf(t), t.worktree)
+      made = await this.wtOf(t).create(home, t.branch!, t.base!, t.worktree)
       t.worktree = made.path
       this.save()
     }
@@ -190,7 +190,6 @@ export abstract class EngineStart extends EngineState {
       env,
       first,
       rpc: true,
-      pane: () => this.wtOf(t).agentPane({ home, wt: t.worktree!, label: labelOf(t), tab: 'Agent', env, made }),
     }
     // a start, not a message to a running agent that launch only heals
     if (!rec || restart || this.agents.status(key) === 'gone') recordWork(t.id, 'agent', undefined, t.machine ?? machineOf())

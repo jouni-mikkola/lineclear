@@ -3,7 +3,7 @@ import type { Agents } from '../agents.ts'
 import type { Chats } from '../chats.ts'
 import { placeId, type Places } from '../places.ts'
 import type { Settings } from '../settings.ts'
-import { Worktrees, type HerdrSpaces } from './worktrees.ts'
+import { Worktrees } from './worktrees.ts'
 import { EngineTidy } from './engine-tidy.ts'
 import { move } from './phase.ts'
 import { Clock, every } from './clock.ts'
@@ -15,11 +15,11 @@ export class Engine extends EngineTidy {
   /** the one timer: first runs, hourly tidy, PR watch, head watch and the stall deadlines */
   readonly clock: Clock
 
-  constructor(agents: Agents, chats: Chats, places: Places, settings: Settings, h?: HerdrSpaces) {
+  constructor(agents: Agents, chats: Chats, places: Places, settings: Settings) {
     super(agents, chats, places, settings)
     this.taskIds = new TaskIds(this.places.spaces, this.data, (name) => placeId.space(name))
     this.places.takenTaskKeys = () => this.taskIds.keys()
-    this.wt = new Worktrees(h)
+    this.wt = new Worktrees()
     let snapped = false
     // tasks from before statuses came from the agent: a finished one is merged, and was cleaned up then
     for (const t of this.data.tasks as (Omit<TaskRec, 'after'> & { stage?: string; after?: string | string[] })[]) {

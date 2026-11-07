@@ -18,6 +18,8 @@ for (const n of readdirSync(tmpdir()))
     } catch {}
 const home = mkdtempSync(join(tmpdir(), 'shep-test-home-'))
 process.env.LINECLEAR_HOME = home
+// task worktrees are made inside it, not in the real ~/.herdr/worktrees
+process.env.LINECLEAR_WORKTREES = join(home, 'worktrees')
 process.on('exit', () => rmSync(home, { recursive: true, force: true }))
 for (const k of ['LINECLEAR_URL', 'LINECLEAR_CHAT']) delete process.env[k]
 // the coordinator's timer is off in Lineclear; its tests still test the code the fork keeps

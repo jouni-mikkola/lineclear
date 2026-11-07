@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 process.env.LINECLEAR_HOME = mkdtempSync(join(tmpdir(), 'shep-engine-'))
-export const { Engine } = await import('../server/live/engine/engine.ts')
+const { Engine } = await import('../server/live/engine/engine.ts')
 const { Places } = await import('../server/live/places.ts')
 export const { placeId } = await import('../server/live/places.ts')
 export const { Settings } = await import('../server/live/settings.ts')
@@ -60,11 +60,10 @@ export function world(herdr = fakeHerdr(), o: { boot?: string } = {}) {
   const agents = {
     routed: (key: string) => routed[key] ?? false,
     ensure: async (s: { key: string; first?: string; cwd: string; kind: string; pane?: () => Promise<string> }) => {
-      const pane = await s.pane?.()
-      if (pane) {
-        panes[s.key] = pane
-        herdr.agentPanes.add(pane)
-      }
+      // herdr gives an agent a pane of its own; the engine does not ask for one
+      const pane = `${s.key}:pane`
+      panes[s.key] = pane
+      herdr.agentPanes.add(pane)
       started.push({ ...s, pane })
       records[s.key] = { kind: s.kind, started: Date.now() }
       status[s.key] = o.boot ?? 'working'
@@ -131,7 +130,7 @@ export function world(herdr = fakeHerdr(), o: { boot?: string } = {}) {
   const settings = new Settings()
   // the default is the machine's cores minus 2: a 4-core runner would queue the third task of a test
   settings.set('machine.maxTasks', '50')
-  const engine = new Engine(agents as never, chats as never, places, settings, herdr.h as never)
+  const engine = new Engine(agents as never, chats as never, places, settings)
   engines.push(engine)
   const news: string[] = []
   /** the place each news is for: a project's place id, as its coordinator's chat has it */

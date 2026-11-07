@@ -5,7 +5,7 @@ import { goLine, settingsBlock, queuedLine, taskFirst } from '../prompts.ts'
 import { CLI_NAME } from '../settings.ts'
 import * as GH from './github.ts'
 import type { Made } from './worktrees.ts'
-import { type TaskRec, type Harness, reportOf, ended, STATE, splitRef, START_GAP, branchFor, labelOf, troubleOf, short, LATER } from './engine-helpers.ts'
+import { type TaskRec, type Harness, reportOf, ended, STATE, splitRef, START_GAP, branchFor, troubleOf, short, LATER } from './engine-helpers.ts'
 import { existsSync } from 'node:fs'
 import { age, ago, clockWithDay } from '../../../shared/time.ts'
 import { move } from './phase.ts'
@@ -207,7 +207,6 @@ export class EngineLaunch extends EngineStalls {
     }
     t.after = after
     t.stopped = undefined
-    clearTimeout(this.later.get(t.id))
     const key = this.key(t)
     const cid = `queued:${t.id}:${Date.now()}`
     this.chats.post(key, { id: cid, card: { id: cid, task: t.id, status: 'queued', text: `queued after ${open.join(', ')}` } })
@@ -359,7 +358,6 @@ export class EngineLaunch extends EngineStalls {
     t.todo = true
     // waiting for a go of its own: no longer just paused
     t.paused = undefined
-    clearTimeout(this.later.get(t.id))
     this.settle(t)
     return t
   }
@@ -382,7 +380,7 @@ export class EngineLaunch extends EngineStalls {
       let made: Made
       const began = Date.now()
       try {
-        made = await this.wtOf(t).create({ repo: p.path, name: p.name, install: p.install }, branch, t.base, labelOf(t))
+        made = await this.wtOf(t).create({ repo: p.path, install: p.install }, branch, t.base)
       } catch (e) {
         const msg = (e as Error).message
         if (!/^Install failed/.test(msg)) throw new Error(`Could not make a worktree: ${msg}`)

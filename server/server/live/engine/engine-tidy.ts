@@ -2,7 +2,7 @@ import { exists } from '../mfs.ts'
 import type { TaskStatus } from '../../../shared/types.ts'
 import { ROUTING_FAILURE } from '../agents.ts'
 import { splitBrief } from '../prompts.ts'
-import { type TaskRec, ended, labelOf, archiveAfterMs } from './engine-helpers.ts'
+import { type TaskRec, ended, archiveAfterMs } from './engine-helpers.ts'
 import { EngineMerge } from './engine-merge.ts'
 import { move } from './phase.ts'
 import { retireDue } from './retire.ts'
@@ -139,10 +139,9 @@ export class EngineTidy extends EngineMerge {
         this.save()
         throw e
       })
-      const left = p ? await this.onMachineOf(t, () => this.wtOf(t).remove({ repo: p.path, wt: t.worktree!, branch: t.branch, label: labelOf(t) })) : []
+      const left = p ? await this.onMachineOf(t, () => this.wtOf(t).remove({ repo: p.path, wt: t.worktree!, branch: t.branch })) : []
       if (!p && t.worktree && (await exists(t.worktree))) left.push(`${t.worktree} (its project is gone)`)
-      clearTimeout(this.later.get(t.id))
-      for (const m of [this.later, this.wrote]) m.delete(t.id)
+      this.wrote.delete(t.id)
       this.answering.delete(t.id)
       // a Done task stays done for the ones queued after it
       if (ended(t)) this.passOn(t)
@@ -169,7 +168,6 @@ export class EngineTidy extends EngineMerge {
     if (t.archived) return { kept: [], stopped: false }
     t.archived = Date.now()
     t.pinned = undefined
-    clearTimeout(this.later.get(t.id))
     this.quiet(t)
     const stopped = this.agents.status(this.key(t)) !== 'gone' && !ended(t)
     const kept = stopped ? await this.stopTask(t.id) : []

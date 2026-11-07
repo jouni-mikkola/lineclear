@@ -8,7 +8,7 @@ import * as G from './git.ts'
 import { unmerged } from './branch-work.ts'
 import * as Lane from './lane.ts'
 import { fitStatus } from './status-line.ts'
-import { type TaskRec, type Harness, ended, labelOf, ghNow } from './engine-helpers.ts'
+import { type TaskRec, type Harness, ended, ghNow } from './engine-helpers.ts'
 import { EnginePr } from './engine-pr.ts'
 import { move } from './phase.ts'
 
@@ -170,7 +170,6 @@ export class EngineHandoff extends EnginePr {
       stopped: undefined,
       todo: undefined,
     })
-    clearTimeout(this.later.get(t.id))
     this.settle(t)
     this.dropEndedOutbox()
   }
@@ -236,7 +235,6 @@ export class EngineHandoff extends EnginePr {
     // To do first: the turn the interrupt ends is no question for you
     t.todo = true
     t.paused = this.agents.status(this.key(t)) === 'working' ? 'sent' : 'idle'
-    clearTimeout(this.later.get(t.id))
     await this.agents.interrupt(this.key(t))
     this.settle(t)
     return t
@@ -252,7 +250,6 @@ export class EngineHandoff extends EnginePr {
     if (!p || !move(t, 'clean')) return
     try {
       const r = await this.putAway(t, p.path, p.base)
-      if (r.busy) return r
       const news = r.kept.length && JSON.stringify(r.kept) !== JSON.stringify(t.kept)
       t.kept = r.kept.length ? r.kept : undefined
       t.cleaned = true
@@ -280,8 +277,6 @@ export class EngineHandoff extends EnginePr {
         branch: t.branch,
         base: on,
         squashes: await this.squashes(t, repo, on),
-        label: labelOf(t),
-        agentPane: this.agents.info(key)?.pane_id,
         closeAgent: () => this.agents.finish(key),
       }),
     )

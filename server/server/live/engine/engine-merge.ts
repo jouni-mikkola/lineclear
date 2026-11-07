@@ -7,7 +7,7 @@ import { placeId, type Space } from '../places.ts'
 import { prNewsLine } from '../prompts.ts'
 import * as G from './git.ts'
 import * as GH from './github.ts'
-import { type TaskRec, ended, labelOf, CHECKS_WAIT, MAIN_WATCH, failKey, quote, COMMENT, ghNow } from './engine-helpers.ts'
+import { type TaskRec, ended, CHECKS_WAIT, MAIN_WATCH, failKey, quote, COMMENT, ghNow } from './engine-helpers.ts'
 import { EngineLand } from './merge.ts'
 import { RedMainWatch } from './lane-watch.ts'
 
@@ -249,24 +249,14 @@ export class EngineMerge extends EngineLand {
   /**
    * Leftovers of finished tasks, put away: at startup and every hour, so none pile up. Only tasks Lineclear made and
    * merged or closed, never one whose agent is at work (or that you talk to again after its clean-up), and never what holds
-   * unsaved or unmerged work. Nothing is touched while herdr does not answer.
+   * unsaved or unmerged work. Git alone does it: herdr being down changes nothing.
    */
   async sweep() {
-    let spaces: Awaited<ReturnType<typeof this.wt.workspaces>>
-    try {
-      spaces = await this.wt.workspaces()
-    } catch {
-      return
-    }
     for (const t of this.tasks.filter(ended)) {
       const p = this.places.space(t.project)
       const st = this.agents.status(this.key(t))
       if (!p || t.machine || st === 'working' || (t.cleaned && st !== 'gone')) continue
-      const left =
-        !t.cleaned ||
-        (!!t.worktree && (await exists(t.worktree))) ||
-        (!!t.branch && (await G.branchExists(p.path, t.branch))) ||
-        !!(await this.wt.spaceOf(t.worktree, labelOf(t), spaces))
+      const left = !t.cleaned || (!!t.worktree && (await exists(t.worktree))) || (!!t.branch && (await G.branchExists(p.path, t.branch)))
       if (left) {
         try {
           await this.cleanup(t, true)
@@ -275,7 +265,6 @@ export class EngineMerge extends EngineLand {
         }
       }
     }
-    await this.wt.closeRepoSpaces()
   }
 
   /** finished tasks that kept a worktree or branch, and why: for lineclear status */
