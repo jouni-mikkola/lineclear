@@ -4,7 +4,7 @@ import type { dispatcherChat } from "./chat.ts";
 import { readMoves, setPrice, setRetired } from "./full.ts";
 import { readPrefs, setShowPaused, shownProjects } from "./prefs.ts";
 import { type HomeData, type HomeProject, looseTasks, withProject } from "./home-data.ts";
-import { undoApplied } from "./autoplan.ts";
+import { undoApplied } from "./plan-apply.ts";
 import { inboxMain } from "./inbox-answer.ts";
 import { projectDecisions, readItems } from "./inbox.ts";
 import { lineclearDir, worktreeCost } from "./measure.ts";

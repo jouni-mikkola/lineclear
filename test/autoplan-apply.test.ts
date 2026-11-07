@@ -2,7 +2,8 @@ import { afterAll, expect, test } from "bun:test";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { applyPlan, plansAreAuto, settlePlans, undoApplied } from "../src/autoplan.ts";
+import { plansAreAuto } from "../src/autoplan.ts";
+import { applyPlan, settlePlans, undoApplied } from "../src/plan-apply.ts";
 import { addItem, readItems } from "../src/inbox.ts";
 
 // An applied change on a temp git repo: merged by a fake server, then undone with a revert.

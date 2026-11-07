@@ -20,6 +20,11 @@ test("a change that keeps the rules has no problem", () => {
   expect(planProblems(base, doc(step("A1", "none"), step("B1", "A1"), step("U43", "A1")))).toEqual([]);
 });
 
+test("the chain is counted to the last step of any roadmap", () => {
+  const was = doc(step("P1", "none"), step("P2", "P1"));
+  expect(planProblems(was, doc(step("P1", "none"), step("X1", "P1"), step("P2", "X1"))).join("\n")).toContain("longest chain to P2 grew from 2 to 3");
+});
+
 test("each rule refuses what breaks it", () => {
   const bad = (after: string) => planProblems(base, after).join("\n");
   expect(bad("# Roadmap\nnothing")).toContain("form:");
