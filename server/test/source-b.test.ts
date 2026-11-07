@@ -119,13 +119,6 @@ describe("a task's CLI, model and effort", () => {
 })
 
 describe("a task's CLI, model and effort, continued", () => {
-  test('lineclear models lists what each CLI and model take', async () => {
-    const out = (await src.cli(['models'], {})).out
-    expect(out).toContain('Claude Code (--agent claude), effort levels low, medium, high, xhigh, max:\n  claude-fable-5-1')
-    expect(out).toContain('claude-haiku-5-5             Haiku 5.5: low, medium, high, xhigh, max')
-    expect(out).toContain('pi (--agent pi), effort levels off, minimal, low, medium, high, xhigh, max:\n  any model id it knows')
-    expect((await src.cli(['models', 'gemini'], {})).out).toContain('Lineclear passes it no model or effort')
-  })
   test('lineclear show prints the settings and the lines every brief ends with', async () => {
     const out = (await src.cli(['show'], {})).out
     expect(out).toContain('brief.review           on')

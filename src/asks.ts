@@ -2,13 +2,13 @@ import { zonedInstant } from "./zone.ts";
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { writeAtomic } from "../pi/atomic.ts";
 import { join } from "node:path";
-import { addItem, type InboxKind, type Item, readItems, stepRule } from "./inbox.ts";
+import { addItem, type InboxKind, stepRule } from "./inbox.ts";
 import { chatFiles, findSpace, lineclearDir, spaceTasks } from "./measure.ts";
 import { projectsDir } from "./project.ts";
 import { loadableTotps, secretNames, storedLogin, totpAdvice, totpAnswers } from "./secrets.ts";
 import { writeWait } from "./waits.ts";
 import { IDLE_NUDGE, PROMISE_NUDGE, promisesNext } from "../pi/nudge.ts";
-import { type AskKind, askKind, askKinds, type Card, IDLE_TEXT, isIdle, lineOf, questionIn, replyText } from "./cards.ts";
+import { type AskKind, askKind, type Card, IDLE_TEXT, isIdle, lineOf, questionIn, replyText } from "./cards.ts";
 import { HOUR_MS } from "./time.ts";
 
 const title = (c: Card) => c.ask?.questions?.[0]?.title ?? "";
@@ -132,12 +132,6 @@ export function closedReports(files: any[]): Posted[] {
     }
   }
   return allNeedCards(files).filter((n) => askKind(n.card) === "report" && n.card.task !== undefined && (doneAt.get(n.card.task) ?? -Infinity) >= n.at);
-}
-
-export function countKinds(cards: Posted[]): Record<AskKind, number> {
-  const counts = Object.fromEntries(askKinds.map((k) => [k, 0])) as Record<AskKind, number>;
-  for (const c of cards) counts[askKind(c.card)]++;
-  return counts;
 }
 
 /**
@@ -439,71 +433,4 @@ export function routeAsks(
     writeAtomic(routedPath(project, env), `${JSON.stringify([...done], null, 2)}\n`);
   }
   return out;
-}
-
-/** One ask: a need card of a chat, or an Inbox item that no card stands for. */
-interface AskLine {
-  at: number;
-  task: string;
-  kind: string;
-  question: string;
-  /** What should have answered it: a rule, or the Inbox kind it is. */
-  answer: string;
-}
-
-const RULE_ANSWER = "a rule answers it";
-/** The number of the rule that answers a kind. */
-const ruleNumber: Partial<Record<AskKind, number>> = { allowance: 1, "merge-chat": 2, plan: 6, question: 5 };
-const answerOf = (kind: AskKind) => (askRoute[kind] === "rule" ? `rule ${ruleNumber[kind]}` : `Inbox: ${askRoute[kind]}`);
-
-/** Every ask since `since`: the need cards of the chat files (reports are not asks), and each Inbox item that is not also one of those cards. */
-function askLines(files: any[], items: Item[], since: number): AskLine[] {
-  const cards = allNeedCards(files).filter((n) => n.at >= since && askKind(n.card) !== "report");
-  const same = new Set(allNeedCards(files).map((n) => `${n.card.task}\0${title(n.card)}`));
-  const fromCards = cards.map(({ at, card }) => {
-    const kind = askKind(card);
-    return { at, task: card.task ?? "", kind, question: title(card), answer: answerOf(kind) };
-  });
-  const fromInbox = items
-    .filter((i) => !same.has(`${i.task}\0${i.question}`) && Date.parse(i.since) >= since)
-    .map((i) => ({ at: Date.parse(i.since), task: i.task, kind: `inbox ${i.kind}`, question: i.question, answer: `Inbox: ${i.kind}` }));
-  return [...fromCards, ...fromInbox].sort((a, b) => a.at - b.at);
-}
-
-/** The chat files of every board, live and archived. */
-function allChatFiles(env: NodeJS.ProcessEnv): any[] {
-  const dir = lineclearDir(env);
-  return [join(dir, "chatlog"), join(dir, "archive", "chatlog")]
-    .filter((log) => existsSync(log))
-    .flatMap((log) =>
-      readdirSync(log)
-        .filter((f) => f.endsWith(".json"))
-        .map((f) => {
-          try {
-            return JSON.parse(readFileSync(join(log, f), "utf8"));
-          } catch {
-            return {};
-          }
-        }),
-    );
-}
-
-/** `lineclear asks [--days N]`: counts the asks of the last days by kind, then lists each with the kind and what should have answered it. */
-export function asksMain(args: string[], out: (l: string) => void, env = process.env, now = new Date()): number {
-  let days = 7;
-  if (args.length === 2 && args[0] === "--days" && /^[1-9]\d*$/.test(args[1]!)) days = Number(args[1]);
-  else if (args.length > 0) return (out("usage: lineclear asks [--days N]"), 2);
-  const files = allChatFiles(env);
-  const since = now.getTime() - days * 86_400_000;
-  const cards = allNeedCards(files).filter((n) => n.at >= since);
-  const counts = countKinds(cards);
-  const asks = askLines(files, readItems(env), since);
-  out(`Asks in the last ${days} days: ${asks.length}`);
-  for (const k of askKinds.filter((k) => k !== "report"))
-    out(`${String(counts[k]).padStart(4)}  ${k.padEnd(11)}${askRoute[k] === "rule" ? RULE_ANSWER : `Inbox: ${askRoute[k]}`}`);
-  const inboxOnly = asks.filter((a) => a.kind.startsWith("inbox ")).length;
-  if (inboxOnly > 0) out(`${String(inboxOnly).padStart(4)}  ${"inbox".padEnd(11)}items with no card`);
-  out(`Reports, not asks: ${counts.report} (${closedReports(files).filter((n) => n.at >= since).length} closed, their task is done)`);
-  for (const a of asks) out(`${new Date(a.at).toISOString().slice(0, 16).replace("T", " ")}  ${a.task}  ${a.kind}  ${a.answer}  ${a.question}`);
-  return 0;
 }

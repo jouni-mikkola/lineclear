@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { decisionsPath, tick, type Decision, type State } from "../src/rules.ts";
-import { CLASS_INFO, classify, summarize, watchStalls, type Observation } from "../src/stall-class.ts";
+import { CLASS_INFO, classify, watchStalls, type Observation } from "../src/stall-class.ts";
 import { stepStatuses, type Step, type Task } from "../src/roadmap.ts";
 import { recordTaskSteps } from "./helpers.ts";
 import { fakeWorld, scratch } from "./fake-world.ts";
@@ -135,22 +135,6 @@ test("a stall seen by a task's own state counts from when it began", () => {
   const rung: Decision = { time: "", project: "p", step: "LIN-5", kind: "stall", reason: "rung 1: told LIN-5 it may be stuck" };
   watchStalls("p", state, [rung], [o], new Date(Date.UTC(2026, 5, 1, 10, 5)));
   expect(rung).toMatchObject({ class: "no-sign-of-life", event: "remedy", minutes: 25 });
-});
-
-test("the summary sums stalls and minutes by class, open ones until now, and the median minutes to a remedy", () => {
-  const d = (time: string, cls: string, event: string, step: string, extra: object = {}) =>
-    ({ time, project: "p", step, kind: "stall", class: cls, event, reason: "r", ...extra }) as Decision;
-  const ds = [
-    d("2026-06-01T10:00:00Z", "no-room", "stall", "L1", { since: "2026-06-01T08:00:00Z" }),
-    d("2026-06-01T10:10:00Z", "no-room", "remedy", "L1", { minutes: 130 }),
-    d("2026-06-01T11:00:00Z", "no-room", "end", "L1", { minutes: 180 }),
-    d("2026-06-01T11:00:00Z", "signed-out", "stall", "LIN-2"),
-  ];
-  const s = summarize(ds, new Date("2026-06-01T09:00:00Z"), new Date("2026-06-01T12:00:00Z"));
-  // no-room counts from the window's start: 09:00 to 11:00
-  expect(s.classes["no-room"]).toEqual({ stalls: 1, minutes: 120, toRemedy: 130 });
-  expect(s.classes["signed-out"]).toEqual({ stalls: 1, minutes: 60, toRemedy: null });
-  expect([s.stalls, s.minutes]).toEqual([2, 180]);
 });
 
 test("a Paused project starts none of its steps, and that is no stall; Running again, the step starts", () => {

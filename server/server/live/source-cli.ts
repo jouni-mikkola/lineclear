@@ -1,16 +1,14 @@
 import { randomUUID } from 'node:crypto'
 import { age } from '../../shared/time.ts'
-import { modelsOf } from './models.ts'
 import { HELP, one, parseArgs, summaryOpts, type Parsed } from './args.ts'
 import type { Automation } from './automations.ts'
 import { eventRules, eventsText, nextWords, timeRule, triggerWords } from './trigger.ts'
 import { checkTitle, ended, type TaskRec } from './engine/engine.ts'
-import { answerCard } from './answer.ts'
 import { room } from './herdr-forward.ts'
 import { BOX, boxHome, forwardTask, machineRef } from './box.ts'
 import { HOST, NAME, placeId } from './places.ts'
 import { settingsBlock } from './prompts.ts'
-import { CATALOG, CLI_NAME, CLIS, kindOf, type Level } from './settings.ts'
+import { CATALOG, type Level } from './settings.ts'
 import { summary } from './health.ts'
 import { harnessOf, mainCli } from './source-helpers.ts'
 import { LiveSourceSubcommands } from './source-subcommands.ts'
@@ -148,8 +146,6 @@ export class LiveSourceCli extends LiveSourceSubcommands {
         this.engine.todo(t.id)
         return `Noted: ${t.id} shows as To do until it gets a go. Reply in one line that you have the brief, then end your turn.`
       }
-      case 'answer':
-        return answerCard((x) => this.act(x), ctx.chat, one(p, 'space'), a1, rest.join(' '))
       case 'merge':
         return this.mergeCommand(a1, ctx)
       case 'pr':
@@ -240,20 +236,6 @@ export class LiveSourceCli extends LiveSourceSubcommands {
         })
         const repo = pr ? this.places.byName(pr) : undefined
         return `${head}${repo ? `\nBase branch: ${repo.base} (new tasks; per-task override: --base <branch>)` : ''}\n${this.settings.lines(pr, NAME)}${now}\n\nEvery new task's brief${pr ? ` in ${pr}` : ''} ends with:\n${block}\n\nFor one task, set any of these with task add: --set review.rounds=1 --set merge="ask me first" (--set agent=codex, model, effort, reviewer, reviewer.model, reviewer.effort too), or say so in its brief, which wins.`
-      }
-      case 'models': {
-        const kinds = a1 ? [kindOf(a1)] : ['claude', 'codex', 'pi']
-        if (!kinds[0]) throw new Error(`No CLI called ${a1}; herdr starts ${CLIS.join(', ')}`)
-        return kinds
-          .map((k) => {
-            const c = modelsOf(k!)
-            if (!c) return `${CLI_NAME[k!]}: Lineclear passes it no model or effort; it picks its own.`
-            const rows = c.models.map(
-              (m) => `  ${m.id.padEnd(28)} ${m.label === m.id ? '' : `${m.label}: `}${m.efforts.length ? m.efforts.join(', ') : 'no effort levels'}`,
-            )
-            return `${CLI_NAME[k!]} (--agent ${k}), effort levels ${c.efforts.join(', ')}:\n${rows.length ? rows.join('\n') : '  any model id it knows'}${c.others?.length ? `\n  it also takes older ones by id: ${c.others.map((m) => m.id).join(', ')}` : ''}`
-          })
-          .join('\n\n')
       }
       case 'set':
       case 'unset': {

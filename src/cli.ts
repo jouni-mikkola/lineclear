@@ -1,7 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
-import { asksMain } from "./asks.ts";
 import { storeMain } from "./store-copies.ts";
 import { dispatcherMain, moveMain } from "./dispatcher.ts";
 import { doctor, herdrVersions, realProbe, testedHerdr } from "./doctor.ts";
@@ -19,10 +18,9 @@ import { setupMain } from "./setup.ts";
 import { project } from "./project-cli.ts";
 import { roadmapMain } from "./roadmap-cli.ts";
 import { demoMain } from "./demo.ts";
-import { decisionsPath, runMain } from "./rules.ts";
+import { runMain } from "./rules.ts";
 import { startWeb } from "./web.ts";
 import { secrets, totp } from "./secrets.ts";
-import { stallsMain } from "./stall-class.ts";
 import { boardMain, isBoardJob, serveMain } from "./serve.ts";
 import { waitsMain } from "./waits.ts";
 import { realRemover, uninstall } from "./uninstall.ts";
@@ -45,11 +43,9 @@ export const commands: Record<string, string> = {
   merge: "Merge a task's change: merge <id>",
   artifact: "Make, update or list a task's artifacts (a report, a dashboard)",
   pr: "Push a task's branch and open its pull request: pr <id>",
-  models: "List each agent program's models and effort levels: models [<program>]",
   checks: "Wait for GitHub's checks on a task's pull request: checks <id>",
   alert: 'Send an alert to your devices: alert "<title>" --body "<why now>"',
   automation: "Timed tasks: automation add, edit, list, pause, resume, run, remove",
-  restart: "Restart a space's coordinator or a task's agent: restart <space|id>",
   set: "Change a setting of the board: set <key> <value> [--machine | --space <name>]",
   unset: "Go back to a setting's default: unset <key>",
   todo: "Show a task that waits for a go as To do: todo <id>",
@@ -61,23 +57,18 @@ export const commands: Record<string, string> = {
   progress: 'A space\'s coordinator saves or reads its progress: progress ["<text>"]',
   checkpoint: "A space's coordinator commits its owned task's work: checkpoint \"<message>\"",
   complete: 'A space\'s coordinator proves its stopping goal and ends its run: complete "<evidence>"',
-  stalls: "Print the stalls of the last day by class with the minutes lost (--hours N, --json)",
   release:
     "Show the stable and next builds, the last promotion and why next is held (release status); release run tests main and promotes it when green, as the rule loop does every 2 minutes",
   store: "The local copies of the task store (store list, store copy, store restore <name>); the rule loop takes one an hour",
   totp: "Print the current code of a stored login: totp NAME reads NAME_TOTP from this folder's secrets",
   status:
     'Show what stops each project and what each task waits for; --plan [<task>] shows the steps of a plan; a task\'s agent reports progress: status <id> "<line>" --done <0-100> [--left 5m]',
-  event:
-    'Put an event no log holds, such as a review round, in the stream the live map shows: event <part> <start|end|switch|skip|fail> "<text>" [--task <id>]',
   wait: "Declare a wait: owner --kind login|money|outward, login, checks, browser, task <id>, or until <time>",
   plan: 'Start a planning task: plan <project> "<goal>"; plan submit sends its roadmap change to the Inbox; a task\'s agent lists its steps: plan <id> --step "..."',
   move: "Send a plan change to the Inbox: move <project> <step> --after <ids>",
   dispatcher: "Make the Dispatcher chat: dispatcher setup; dispatcher projects lists what it picks a project from",
   ask: "Put a question with choices in the Inbox, and wait for the answer (--kind login|outward); a card in a chat is card",
   card: 'Ask the chat a question with choices: card "<question>" --choice "<label>" ... (the board\'s old ask)',
-  answer: 'Answer a choice card of a space\'s coordinator chat in words: answer <card id> "<answer>" --space <name>',
-  asks: "Count the last week's needs-you cards by kind and say which a rule answers",
   inbox: "List open items of every machine (--all adds closed ones of this one), or answer one: inbox answer <n> <choice>",
   resume: "End this task's declared wait",
   check: "Run the project's check (or the command given) in its turn: one full check at a time per machine; --changed runs only what the branch changed",
@@ -177,7 +168,6 @@ function inboxCommand(rest: string[], out: Out): number | Promise<number> {
 
 /** The commands that are one call: each gets the words after its name. */
 const COMMANDS: Record<string, (rest: string[], out: Out) => number | Promise<number>> = {
-  stalls: (rest, out) => stallsMain(rest, out, decisionsPath()),
   roadmap: roadmapMain,
   run: (rest, out) => (rest[0] === "--demo" ? demoMain(rest.slice(1), out) : runMain(rest, out, undefined, { web: startWeb })),
   serve: serveMain,
@@ -190,7 +180,6 @@ const COMMANDS: Record<string, (rest: string[], out: Out) => number | Promise<nu
   move: moveMain,
   dispatcher: dispatcherMain,
   ask: askMain,
-  asks: (rest, out) => asksMain(rest, out),
   inbox: inboxCommand,
 };
 

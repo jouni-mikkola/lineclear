@@ -2,7 +2,7 @@ import { afterAll, afterEach, expect, mock, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { promisesNext } from "../pi/nudge.ts";
-import { saysDone, allowanceReset, asksMain, closedReports, countKinds, openNeedCards, routeAsks, ruleFor } from "../src/asks.ts";
+import { saysDone, allowanceReset, closedReports, openNeedCards, routeAsks, ruleFor } from "../src/asks.ts";
 import { askKind, type Card, isIdle } from "../src/cards.ts";
 import { inboxMain } from "../src/inbox-answer.ts";
 import { addItem, closeItem, isOpen, readItems } from "../src/inbox.ts";
@@ -52,7 +52,6 @@ test("each card falls in one kind", () => {
     "question",
     "report",
   ]);
-  expect(countKinds([limit, allowance, report].map((card) => ({ at: 0, card })))).toMatchObject({ allowance: 2, report: 1, plan: 0 });
 });
 
 test("a card with a question is not an allowance notice", () => {
@@ -181,18 +180,7 @@ test("a dry run changes nothing, and a failed tell is tried again", () => {
   expect(routeAsks("demo", "Demo", w.tell, new Date(), false, w.env)).toHaveLength(1);
 });
 
-test("lineclear asks counts the kinds and names where each goes", () => {
-  const w = world([limit, report, plan]);
-  const lines: string[] = [];
-  expect(asksMain([], (l) => lines.push(l), w.env, new Date(1000 + 86_400_000))).toBe(0);
-  expect(lines[0]).toBe("Asks in the last 7 days: 2");
-  expect(lines.join("\n")).toMatch(/1\s+allowance\s+a rule answers it/);
-  expect(lines.join("\n")).toMatch(/1\s+plan\s+a rule answers it/);
-  expect(asksMain(["--days", "x"], () => {}, w.env)).toBe(2);
-  expect(readFileSync(join(w.config, "projects", "demo", "settings.json"), "utf8")).toContain("Demo");
-});
-
-test("a report of a done task closes by a rule and a question is answered by a rule, and reports are counted apart", () => {
+test("a report of a done task closes by a rule and a question is answered by a rule", () => {
   const w = world([report, question]);
   const done: Card = { id: "d8", task: "T-8", status: "done", text: "done" };
   writeFileSync(join(w.env.LINECLEAR_HOME!, "chatlog", "T-8_Done.json"), JSON.stringify({ posted: [{ at: 5000, id: "d8", card: done }] }));
@@ -213,10 +201,6 @@ test("a report of a done task closes by a rule and a question is answered by a r
   ]);
   expect(w.told[0]).toContain("The owner is not asked a step question.");
   expect(routeAsks("demo", "Demo", w.tell, new Date(), false, w.env)).toEqual([]);
-  const lines: string[] = [];
-  asksMain([], (l) => lines.push(l), w.env, new Date(1000 + 86_400_000));
-  expect(lines[0]).toBe("Asks in the last 7 days: 1");
-  expect(lines).toContain("Reports, not asks: 1 (1 closed, their task is done)");
 });
 
 const idleCard = (task: string, id: string, reply: string): Card => ({
@@ -424,23 +408,4 @@ test("a push to approve is not the owner's when any login has a stored TOTP", ()
   expect(mixed.told[0]).toContain("lineclear totp GITHUB");
   const none = world([push]);
   expect(routeAsks("demo", "Demo", none.tell, new Date(), false, none.env)).toEqual([]);
-});
-
-test("lineclear asks lists five cards of the Inbox and the chat files with the hand-counted kinds", () => {
-  const w = world([allowance, plan, question]);
-  const base = { project: "demo", choices: ["Ok"], since: new Date(1500).toISOString() };
-  addItem({ ...base, kind: "login", task: "T-4", question: "Log in to GitHub, done?" }, w.env);
-  addItem({ ...base, kind: "outward", task: "T-9", question: "Release 1.0?" }, w.env);
-  // an Inbox item that is also a card (same task and question) is one ask
-  addItem({ ...base, kind: "step", task: "T-7", question: "Which logo?" }, w.env);
-  const lines: string[] = [];
-  asksMain(["--days", "1"], (l) => lines.push(l), w.env, new Date(1000 + 86_400_000));
-  expect(lines[0]).toBe("Asks in the last 1 days: 5");
-  expect(lines.filter((l) => /^\d{4}-/.test(l)).map((l) => l.split(/\s{2,}/).slice(1, 4))).toEqual([
-    ["T-2", "allowance", "rule 1"],
-    ["T-5", "plan", "rule 6"],
-    ["T-7", "question", "rule 5"],
-    ["T-4", "inbox login", "Inbox: login"],
-    ["T-9", "inbox outward", "Inbox: outward"],
-  ]);
 });
