@@ -24,8 +24,6 @@ export type Settings = {
   models: Record<Role, string[]>;
   /** Review rounds a worker may use before the step asks the owner. 2 if unset. */
   reviewRounds?: number;
-  /** Wall time in minutes a task may run before it is stopped with a report. 120 if unset. */
-  taskLimitMin?: number;
   /** `spend` (default) holds no step for pace, only for a full account; `even` holds off-critical steps when every account is ahead of its weekly pace. */
   pace?: "spend" | "even";
   /** Other machines (SSH hosts) that may run this project's steps when this one has no room. */
@@ -38,8 +36,6 @@ export type Settings = {
   paused?: boolean;
   /** False turns the step check's model call off; the form rule stays. Missing means on. */
   stepCheck?: boolean;
-  /** Lineclear's own project: the one its fix steps go to. Found by its package name when no project says so. */
-  self?: boolean;
   /** Which checks run when: missing means what `proposeTiers` reads from the repo. */
   tiers?: Partial<Record<Tier, Partial<TierSpec>>>;
 };
