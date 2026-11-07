@@ -309,7 +309,17 @@ export function climbStalls(a: Args): void {
       const err = world.stopTask(id) ?? world.tellTask(id, RESTART, "resume");
       note("stall", err ? `rung 2: could not restart ${id}: ${err}` : `rung 2: restarted ${id}: ${what}`, id);
     } else if (rung === 3) {
-      addItem({ kind: "stuck", task: id, project: a.project, question: `${id} is stuck (${what}) after a nudge and a restart.`, choices: ["Ok"], since: world.now().toISOString() }, env);
+      addItem(
+        {
+          kind: "stuck",
+          task: id,
+          project: a.project,
+          question: `${id} is stuck (${what}) after a nudge and a restart.`,
+          choices: ["Ok"],
+          since: world.now().toISOString(),
+        },
+        env,
+      );
       note("stall", `rung 3: asked you about ${id} in the Inbox: ${what}`, id);
     }
   }
