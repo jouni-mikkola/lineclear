@@ -11,6 +11,8 @@ use Socket ();
 use JSON::PP;
 
 my $dir = File::Basename::dirname(Cwd::abs_path($0));
+# An installed helper is a folder per version (<root>/v/<version>) behind one symlink, and the tunnel's socket sits in <root>
+my $root = $dir =~ m{^(.*)/v/[^/]+/bin$} ? $1 : "$dir/..";
 my $home = $ENV{LINECLEAR_HOME} || "$ENV{HOME}/.lineclear";
 # route.pl, when it started this (a repo checkout), has set the chat and the capability already
 my ($routing) = grep { -e } "$dir/../route.pl", "$dir/route.pl";
@@ -30,8 +32,8 @@ if (!$server_port && open(my $sj, '<', "$home/server.json")) {
   my $c = eval { JSON::PP->new->decode(do { local $/; <$sj> }) };
   $server_port = $c->{port} if ref $c eq 'HASH';
 }
-if (-S "$dir/../main.sock" || -e "$dir/../route.pl") {
-  $sock = "$dir/../main.sock";   # the installed helper: its own tunnel, whatever URL the caller inherited
+if (-S "$root/main.sock" || -e "$dir/../route.pl") {
+  $sock = "$root/main.sock";   # the installed helper: its own tunnel, whatever URL the caller inherited
 } elsif (length($ENV{LINECLEAR_URL} // '')) {
   ($host, $port) = $ENV{LINECLEAR_URL} =~ m{^https?://([^/:]+)(?::(\d+))?} ? ($1, $2 // 80) : ('127.0.0.1', 7421);
 } elsif ($server_port) {

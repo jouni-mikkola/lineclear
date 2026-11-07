@@ -5,7 +5,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { helperFiles, helperVersion } from '../server/live/install.ts'
+import { helperFiles, helperVersion, installScript, PROBE } from '../server/live/install.ts'
 import type { BoxInfo } from '../server/live/box.ts'
 import { until } from './until.ts'
 
@@ -28,6 +28,52 @@ describe('the helper', () => {
     const r = spawnSync('perl', [join(dir, 'bin', 'lineclear'), 'status'], { encoding: 'utf8' })
     expect(r.status).toBe(2)
     expect(r.stderr).toContain("can't be reached from this machine")
+  })
+})
+
+describe('the helper goes in atomically', () => {
+  const tarOfHelper = (version: string) => {
+    const src = mkdtempSync(join(tmpdir(), 'shep-src-'))
+    for (const [to, from] of helperFiles()) {
+      mkdirSync(join(src, to, '..'), { recursive: true })
+      writeFileSync(join(src, to), readFileSync(from), { mode: 0o755 })
+    }
+    writeFileSync(join(src, 'version'), `${version}\n`)
+    return spawnSync('tar', ['cf', '-', '-C', src, '.'], { maxBuffer: 1 << 26 }).stdout
+  }
+  const install = (dir: string, version: string) => spawnSync('sh', ['-c', installScript(dir, version)], { input: tarOfHelper(version) })
+
+  test.if(perl)('50 lineclear calls while the helper updates all find a whole helper', async () => {
+    const dir = join(mkdtempSync(join(tmpdir(), 'shep-atomic-')), 'helper')
+    expect(install(dir, 'v1').status).toBe(0)
+    let updating = true
+    const updater = (async () => {
+      for (let i = 2; updating; i++) {
+        expect(install(dir, `v${i}`).status).toBe(0)
+        await Bun.sleep(40)
+      }
+    })()
+    const calls = Array.from({ length: 50 }, () => Bun.spawn(['perl', join(dir, 'bin', 'lineclear'), 'status'], { stdout: 'pipe', stderr: 'pipe' }))
+    const failures = (
+      await Promise.all(
+        calls.map(async (p) => {
+          const err = await new Response(p.stderr).text()
+          if ((await p.exited) === 2 && err.includes("can't be reached")) return 0
+          return 1
+        }),
+      )
+    ).reduce<number>((a, b) => a + b, 0)
+    updating = false
+    await updater
+    expect(failures).toBe(0)
+    expect(readFileSync(join(dir, 'version'), 'utf8').trim()).toMatch(/^v\d+$/)
+  })
+
+  test('the probe prints one JSON object', () => {
+    const r = spawnSync('sh', ['-c', PROBE], { encoding: 'utf8' })
+    const found = JSON.parse(r.stdout) as { home: string; os: string; tools: Record<string, string> }
+    expect(found.home).toBe(process.env.HOME ?? '')
+    expect(found.tools.tar).toBeTruthy()
   })
 })
 
