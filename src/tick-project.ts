@@ -302,7 +302,8 @@ function whyStale(s: Starting, step: Step): string | undefined {
   }
   if (state.closedSteps?.[step.id] !== undefined) return "it was closed with nothing to merge, its step is done already";
   // A task started a moment ago may not show in the board's list yet.
-  if (Object.values(state.pendingStarts ?? {}).includes(step.id)) return "a task started for this step has not shown on the board yet, so it does not start twice";
+  if (Object.values(state.pendingStarts ?? {}).includes(step.id))
+    return "a task started for this step has not shown on the board yet, so it does not start twice";
   const open = [...here, ...remote].find(
     (x) => x.status !== "done" && (x.title.startsWith(`${step.id} `) || (x.id !== undefined && state.taskSteps?.[x.id] === step.id)),
   );
