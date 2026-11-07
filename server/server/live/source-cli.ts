@@ -1,5 +1,5 @@
 import { HELP, parseArgs, type Parsed } from './args.ts'
-import { type Ctx } from './source-helpers.ts'
+import type { Ctx } from './source-helpers.ts'
 import { LiveSourceSubcommands } from './source-subcommands.ts'
 
 export class LiveSourceCli extends LiveSourceSubcommands {

@@ -263,7 +263,12 @@ export class LiveSourceActions extends LiveSourceRestarts {
     const opts = fit(p, '', on, keep ? info.info.want.model : undefined)
     const model = 'model' in opts ? opts.model || undefined : keep ? info.info.want.model : undefined
     const effort = 'effort' in opts ? opts.effort || undefined : keep ? info.info.want.effort : undefined
-    const r = (await this.act({ type: 'restart', chat: key, kind: on, model, effort, save: p.flags.has('save') })) as { ok: boolean; error?: string; waiting?: boolean; on?: string }
+    const r = (await this.act({ type: 'restart', chat: key, kind: on, model, effort, save: p.flags.has('save') })) as {
+      ok: boolean
+      error?: string
+      waiting?: boolean
+      on?: string
+    }
     if (r.waiting) return `${target}'s machine is out of reach: it restarts once it is back.`
     if (!r.ok) throw new Error(r.error ?? 'It could not be restarted.')
     return `Restarted ${t?.id ?? peer?.id ?? place!.name} on ${r.on}${p.flags.has('save') ? `, now its space's Settings too` : ''}. A card in its chat says so.`

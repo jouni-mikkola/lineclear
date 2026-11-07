@@ -12,7 +12,11 @@ export class LiveSourceSecrets extends LiveSourceActions {
    *  this machine, Everywhere */
   protected secretChain(ctx: Ctx) {
     const folder = ctx.cwd ? this.places.forPath(ctx.cwd) : undefined
-    const space = ctx.chat?.includes('/') ? this.engine.task(ctx.chat.split('/')[0])?.project : ctx.chat?.startsWith('p:') ? ctx.chat : folder && placeId.space(folder.name)
+    const space = ctx.chat?.includes('/')
+      ? this.engine.task(ctx.chat.split('/')[0])?.project
+      : ctx.chat?.startsWith('p:')
+        ? ctx.chat
+        : folder && placeId.space(folder.name)
     return [...(space ? [space] : []), placeId.machine(), 'all']
   }
 
@@ -42,7 +46,8 @@ export class LiveSourceSecrets extends LiveSourceActions {
       return `${all.map((x) => `${x.name}  (${levelName(x.level)}, saved ${age(x.at)} ago)`).join('\n')}\nUse one by name: lineclear secret run NAME -- <command>, or lineclear secret env NAME --file .env.`
     }
     if (sub === 'ask') {
-      if (!ctx.chat) throw new Error('lineclear secret ask works from an agent Lineclear started; add one yourself in Settings → Secrets, or with lineclear secret set')
+      if (!ctx.chat)
+        throw new Error('lineclear secret ask works from an agent Lineclear started; add one yourself in Settings → Secrets, or with lineclear secret set')
       needName('lineclear secret ask NAME --why "<what it is for>" (NAME: letters, digits and _, like GITHUB_TOKEN)')
       const had = this.vault.visible(chain).find((x) => x.name === name)
       if (had && !p.flags.has('force'))

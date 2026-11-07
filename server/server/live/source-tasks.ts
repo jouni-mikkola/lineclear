@@ -11,7 +11,23 @@ import { CLI_NAME, setForTask } from './settings.ts'
 import { agentTask, harnessOf, reviewerOf, statusLine, taskAddArgs, type Ctx } from './source-helpers.ts'
 import { LiveSourceSecrets } from './source-secrets.ts'
 
-const ADD_FLAGS = ['brief', 'desc', 'result', 'space', 'base', 'after', 'later', 'agent', 'model', 'effort', 'reviewer', 'reviewer-model', 'reviewer-effort', 'set', 'on']
+const ADD_FLAGS = [
+  'brief',
+  'desc',
+  'result',
+  'space',
+  'base',
+  'after',
+  'later',
+  'agent',
+  'model',
+  'effort',
+  'reviewer',
+  'reviewer-model',
+  'reviewer-effort',
+  'set',
+  'on',
+]
 type Cli = { out: string; code: number }
 
 export class LiveSourceTasks extends LiveSourceSecrets {
@@ -38,7 +54,9 @@ export class LiveSourceTasks extends LiveSourceSecrets {
       })
       return answer((await r.json()) as Cli)
     }
-    const targets = (this.peers?.list() ?? []).flatMap((l) => (l.snap?.places ?? []).filter((x) => !x.home && (x.id === named || x.name === named)).map((x) => ({ l, x })))
+    const targets = (this.peers?.list() ?? []).flatMap((l) =>
+      (l.snap?.places ?? []).filter((x) => !x.home && (x.id === named || x.name === named)).map((x) => ({ l, x })),
+    )
     if (targets.length > 1) throw new Error('Several spaces have that name; use its full p:machine:space identity.')
     if (!targets.length) return undefined
     const { l, x } = targets[0]
@@ -133,7 +151,10 @@ export class LiveSourceTasks extends LiveSourceSecrets {
         null,
         2,
       )
-    const rows = all.map((t) => `${t.id.padEnd(8)} ${t.status.padEnd(5)} ${t.name}${t.pinned ? '  (pinned)' : ''}${statusLine(t) ? `  · ${statusLine(t)}` : ''}  (on ${machine(t)})`)
+    const rows = all.map(
+      (t) =>
+        `${t.id.padEnd(8)} ${t.status.padEnd(5)} ${t.name}${t.pinned ? '  (pinned)' : ''}${statusLine(t) ? `  · ${statusLine(t)}` : ''}  (on ${machine(t)})`,
+    )
     const archived = archivedOnly ? 0 : this.engine.tasks.filter((t) => t.archived && (!pr || t.project === placeId.space(pr.name))).length
     return (rows.join('\n') || (archivedOnly ? 'No archived tasks.' : noTasks())) + (archived ? `\n(${archived} archived: lineclear task list --archived)` : '')
   }

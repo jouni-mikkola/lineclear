@@ -60,7 +60,9 @@ export class LiveSourceSubcommands extends LiveSourceTasks {
     if (sub === 'list' || !sub)
       return this.places
         .shown()
-        .map((x) => (x.space ? `${x.name}  ${x.space.key}  ${x.space.path}${x.space.github ? `  github:${x.space.github}` : ''}` : `${x.name}  (home space)  ${boxHome()}`))
+        .map((x) =>
+          x.space ? `${x.name}  ${x.space.key}  ${x.space.path}${x.space.github ? `  github:${x.space.github}` : ''}` : `${x.name}  (home space)  ${boxHome()}`,
+        )
         .join('\n')
     if (sub === 'rename') {
       const x = rest[0] ? this.places.find(rest[0]) : undefined
@@ -144,7 +146,8 @@ export class LiveSourceSubcommands extends LiveSourceTasks {
   protected askCommand(title: string | undefined, p: Parsed, ctx: Ctx) {
     if (!ctx.chat) throw new Error('lineclear card works from an agent Lineclear started')
     const labels = p.opts.choice ?? []
-    if (!title || labels.length < 2) throw new Error(`lineclear card "<question>" --choice "<label>" --choice "<label>" …. ${readSection('lineclear', 'Asking')}`)
+    if (!title || labels.length < 2)
+      throw new Error(`lineclear card "<question>" --choice "<label>" --choice "<label>" …. ${readSection('lineclear', 'Asking')}`)
     const desc = Object.fromEntries((p.opts.desc ?? []).map((d) => d.split('=').map((s) => s.trim()) as [string, string]))
     const id = `ask:${randomUUID().slice(0, 8)}`
     const question = {
@@ -234,7 +237,9 @@ export class LiveSourceSubcommands extends LiveSourceTasks {
       if (key === 'space.base') await this.places.setBase(pr.name, value!)
       else this.places.setInstall(pr.name, value)
       this.emit('snapshot')
-      return key === 'space.base' ? `${pr.name}: base branch ${pr.base}. Existing tasks keep their target.` : `${pr.name}: install step ${pr.install ?? 'is the default'}.`
+      return key === 'space.base'
+        ? `${pr.name}: base branch ${pr.base}. Existing tasks keep their target.`
+        : `${pr.name}: install step ${pr.install ?? 'is the default'}.`
     }
     if (!CATALOG.some((s) => s.rows.some((r) => r.key === key))) throw new Error(`No setting ${key}; lineclear show lists them`)
     // Everywhere unless it says --machine (this machine's own) or --space NAME (that space's own)
