@@ -74,7 +74,11 @@ export function world(herdr = fakeHerdr(), o: { boot?: string } = {}) {
       sent.push({ key, text })
       return { waiting: false, item: {} }
     },
-    on: () => () => undefined,
+    on: (event: string, f: (k: string) => void) => {
+      const set = (listeners[event] ??= new Set())
+      set.add(f)
+      return () => void set.delete(f)
+    },
     status: (key: string) => status[key] ?? 'gone',
     aborted: (key: string) => abortedKeys.has(key),
     record: (key: string) => records[key],
@@ -83,6 +87,7 @@ export function world(herdr = fakeHerdr(), o: { boot?: string } = {}) {
     waiting: (key: string) => outbox.filter((k) => k === key),
     finish: async (key: string) => {
       if (records[key]) records[key].finished = true
+      finishedKeys.push(key)
       status[key] = 'gone'
       if (panes[key]) await herdr.h.closePane(panes[key])
     },
@@ -101,7 +106,10 @@ export function world(herdr = fakeHerdr(), o: { boot?: string } = {}) {
       forgot.push(key)
     },
   }
+  const listeners: Record<string, Set<(k: string) => void>> = {}
   const forgot: string[] = []
+  /** every agent finish() was called for, kept after forget drops its record */
+  const finishedKeys: string[] = []
   const abortedKeys = new Set<string>()
   /** agents whose turn was interrupted before a restart */
   const stopped: string[] = []
@@ -144,6 +152,7 @@ export function world(herdr = fakeHerdr(), o: { boot?: string } = {}) {
     if (aborted) abortedKeys.add(key)
     else abortedKeys.delete(key)
     engine.agentStatus(key)
+    for (const f of listeners.status ?? []) f(key)
   }
   /** what waits to go in to it goes in */
   const brief = (key: string) => {
@@ -169,6 +178,7 @@ export function world(herdr = fakeHerdr(), o: { boot?: string } = {}) {
     herdr,
     chat,
     forgot,
+    finishedKeys,
     stopped,
   }
 }
