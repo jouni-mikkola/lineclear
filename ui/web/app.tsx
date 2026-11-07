@@ -167,7 +167,7 @@ type PageProps = {
   session: string | undefined;
 };
 
-/** The view the address names. Home is the page for usage, the chat and the browsers too. */
+/** The view the address names. Home is the page for usage and the chat too. */
 function Page(p: PageProps) {
   const { view, state } = p;
   if (p.shown === "home") {

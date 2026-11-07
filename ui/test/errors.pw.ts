@@ -148,7 +148,7 @@ for (const [i, body] of BAD.entries()) {
 test.describe("a missing page says so", () => {
   const frame = async (page: Page) => {
     await expect(page.locator("[data-frame]")).toBeVisible();
-    await expect(page.locator('[data-view] a[href="/"]').first()).toBeVisible();
+    await expect(page.locator('[data-view] a[data-back], [data-view] a[href="/"], [data-view] a[href="/browsers"]').first()).toBeVisible();
   };
 
   test("a roadmap of an unknown project names it", async ({ page }) => {
@@ -166,11 +166,17 @@ test.describe("a missing page says so", () => {
     await frame(page);
   });
 
-  test("/browsers is its own view, and a session that is not open says so", async ({ page }) => {
+  test("/browsers with no session names the empty state in its own view", async ({ page }) => {
+    await page.route("**/api/browsers**", (r) => r.fulfill({ json: [] }));
     await open(page, "/browsers");
     await expect(page.locator('[data-view="browsers"]')).toBeVisible();
+    await expect(page.locator("[data-part-state=empty]")).toContainText("No browser is open.");
     await expect(page.locator('nav[aria-label="Views"]:visible [aria-current="page"]')).toHaveText(/^Browsers/);
-    await page.goto("/browsers/nope");
+  });
+
+  test("a browser session that is not open says so", async ({ page }) => {
+    await open(page, "/browsers/nope");
+    await frame(page);
     await expect(page.locator("[data-part-state=empty]")).toContainText("The browser nope is not open.");
     await expect(page.getByRole("link", { name: "All browsers" })).toBeVisible();
   });

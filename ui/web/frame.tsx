@@ -145,7 +145,7 @@ export function Frame({
     if (showPanel && !wasOpen.current && aside.current) play("chat-open", aside.current, [{ transform: "translateX(100%)" }, { transform: "none" }]);
     wasOpen.current = showPanel;
   }, [showPanel]);
-  // the address names the view you are on: Browsers and Usage are drawn on Home, but their link is the one marked
+  // the address names the view you are on: Usage and the chat are drawn on Home, but their link is the one marked. A task is no view, so it marks none
   const at = viewOf(location.pathname);
   const current = view === "roadmap" ? `project:${project}` : at === "task" ? "" : at === "usage" || at === "chat" ? "home" : at;
   const shown = view === "inbox" ? <InboxView sample={sample} ask={placeOf(location.pathname).ask} /> : children;
