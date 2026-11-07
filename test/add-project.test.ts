@@ -1,5 +1,4 @@
 import { afterAll, expect, spyOn, test } from "bun:test";
-import { Database } from "bun:sqlite";
 import { chmodSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { detectProject, FIRST_ROADMAP, findRepos, pickModels, saveProject } from "../src/add-project.ts";
@@ -7,7 +6,7 @@ import { companyOfModel, type ModelFile, modelFile } from "../src/models.ts";
 import { detectCheck } from "../src/project-detect.ts";
 import { addProject } from "../src/project-write.ts";
 import { pickReviewer } from "../src/stalls.ts";
-import { tmp } from "./helpers.ts";
+import { seedSpace, tmp } from "./helpers.ts";
 
 const root = tmp("add-project");
 afterAll(() => rmSync(root, { recursive: true, force: true }));
@@ -39,15 +38,6 @@ esac
   );
   chmodSync(bin, 0o755);
   return bin;
-}
-
-/** The board's store with one space, as the board writes it. */
-function seedSpace(home: string, name: string, path: string): void {
-  mkdirSync(home, { recursive: true });
-  const store = new Database(join(home, "store.sqlite"), { create: true });
-  store.exec("create table if not exists spaces (position integer primary key, data text not null)");
-  store.query("insert into spaces (position, data) values (0, ?)").run(JSON.stringify({ name, path }));
-  store.close();
 }
 
 test("project add finds the space in the store and starts no child process", async () => {
