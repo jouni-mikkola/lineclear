@@ -1,4 +1,3 @@
-import type { LinkBackoff } from './recovery.ts'
 import { join } from 'node:path'
 import type { Action, Alert, Chat, Snapshot, TermScreen } from '../../shared/types.ts'
 import type { Overview } from '../source.ts'
@@ -42,7 +41,6 @@ export interface Link {
   busy?: boolean
   /** not reached yet since this server started: shown as connecting, not as out of reach, for a while */
   connecting: boolean
-  backoff: LinkBackoff
   retryTimer?: ReturnType<typeof setTimeout>
   polling?: boolean
 }

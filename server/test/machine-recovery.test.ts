@@ -137,18 +137,22 @@ describe('machine link recovery', () => {
         message() {},
       },
     })
+    const intervals: unknown[] = []
+    const realInterval = globalThis.setInterval
+    globalThis.setInterval = ((...a: Parameters<typeof setInterval>) => (intervals.push(a), realInterval(...a))) as typeof setInterval
     const m = new Machines(null, async () => ({}))
     const l = m.adopt('fake-socket', `http://127.0.0.1:${s.port}`)
-    l.backoff.fail = () => 50
+    ;(m as unknown as { retryAfter: number }).retryAfter = 50
     try {
       await until(() => opened === 1 && l.reachable)
       await Bun.sleep(1200)
       expect(fetches).toBe(1)
+      expect(intervals).toHaveLength(0)
       open[0].close()
       await until(() => opened === 2 && l.reachable)
       expect(fetches).toBe(2)
-      expect(l.worker).toBeUndefined()
     } finally {
+      globalThis.setInterval = realInterval
       m.stop()
       s.stop(true)
     }

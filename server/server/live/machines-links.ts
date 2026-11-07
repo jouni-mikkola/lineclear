@@ -1,4 +1,3 @@
-import { LinkBackoff } from './recovery.ts'
 import { mkdirSync, openSync, rmSync, watch } from 'node:fs'
 import { join } from 'node:path'
 import type { Chat } from '../../shared/types.ts'
@@ -70,7 +69,6 @@ export class MachinesLinks extends LinkPoll {
       state: 'Connecting…',
       lacks: [],
       connecting: true,
-      backoff: new LinkBackoff(),
     }
     this.links.set(m.label, l)
     setTimeout(() => {
@@ -257,7 +255,8 @@ export class MachinesLinks extends LinkPoll {
     })
     this.own(l, w)
     // its address, once it serves: server.json appears in its folder
-    const watcher = watch(home, () => {
+    const watcher = watch(home, (_, file) => {
+      if (file && file !== 'server.json') return
       const port = workerRecord(l.saved.label).port
       if (!port || l.worker !== w) return
       watcher.close()

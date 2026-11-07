@@ -37,6 +37,8 @@ export abstract class LinkPoll extends Emitter<Events> {
       l.rec.url = ''
       l.state = 'Its worker stopped; starting it again'
       this.emit('snapshot')
+      // a worker started out of our hands may already serve elsewhere (moved)
+      this.retry(l)
     })
   }
 
@@ -68,13 +70,10 @@ export abstract class LinkPoll extends Emitter<Events> {
       l.rec.lastSeen = Date.now()
       l.connecting = false
       this.keep(l)
-      if (!this.seen(l, snap)) {
-        this.emit('snapshot')
-        return this.retry(l)
-      }
+      // the socket is made even with herdr off: it says when herdr is back
+      const herdrUp = this.seen(l, snap)
       this.connect(l)
-      l.backoff.success()
-      await this.flush(l)
+      if (herdrUp) await this.flush(l)
       this.emit('snapshot')
     } catch {
       if (!this.active(l)) return
@@ -109,12 +108,14 @@ export abstract class LinkPoll extends Emitter<Events> {
     for (const a of l.waiting.splice(0)) await this.forward(l, a).catch(() => l.waiting.push(a))
   }
 
+  /** a look again soon, so a lost link is back within seconds; one timer per link, never beside an open socket */
+  protected retryAfter = 3000
   protected retry(l: Link) {
     if (!this.active(l) || l.retryTimer) return
     l.retryTimer = setTimeout(() => {
       l.retryTimer = undefined
       void this.poll(l)
-    }, l.backoff.fail())
+    }, this.retryAfter)
   }
 
   /** Its worker was started again out of this server's hands (lineclear doctor while another server ran, by hand)
