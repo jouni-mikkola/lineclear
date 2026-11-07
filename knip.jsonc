@@ -3,22 +3,18 @@
   "workspaces": {
     ".": {
       // pi loads its parts and the dispatcher eval runs fake-cli.ts by path, so nothing imports them
-      "entry": ["bin/lineclear", "src/cli.ts", "src/heal.ts", "src/projects-worker.ts", "test/fixtures/*-projects-worker.ts", "pi/extension.ts", "pi/parts/*.ts", "scripts/*.ts", "scripts/gates/run.ts", "test/**/*.test.{ts,tsx}", "test/dispatcher-eval/fake-cli.ts", "ui/test/*.pw.ts", "ui/test/fake-lineclear-server.ts"],
-      "project": ["bin/lineclear", "src/**/*.{ts,tsx}", "pi/**/*.ts", "scripts/**/*.ts", "test/**/*.{ts,tsx}", "ui/**/*.{ts,tsx}"],
-      // the gates run Biome from node_modules/.bin by path; CSS imports tailwindcss; the UI bar reads axe-core's
-      // file by path
-      "ignoreDependencies": ["@biomejs/biome", "axe-core", "tailwindcss"],
+      "entry": ["bin/lineclear", "src/cli.ts", "src/heal.ts", "src/projects-worker.ts", "test/fixtures/*-projects-worker.ts", "pi/extension.ts", "scripts/*.ts", "test/**/*.test.{ts,tsx}", "test/dispatcher-eval/fake-cli.ts", "ui/test/*.pw.ts", "ui/test/fake-lineclear-server.ts"],
+      "project": ["bin/lineclear", "src/**/*.{ts,tsx}", "pi/**/*.ts", "scripts/**/*.ts", "test/**/*.{ts,tsx}", "ui/**/*.{ts,tsx,css}"],
+      // the gates run Biome from node_modules/.bin by path; the UI bar reads axe-core's file by path
+      "ignoreDependencies": ["@biomejs/biome", "axe-core"],
       // ui:test runs the CLI by path
       "ignoreUnresolved": ["bin/lineclear"]
     },
     "server": {
-      // server/bin/lineclear runs server/cli.ts by path
-      "entry": ["server/cli.ts", "scripts/*.ts", "test/**/*.test.{ts,tsx}"],
-      "project": ["server/**/*.{ts,tsx}", "src/**/*.{ts,tsx}", "shared/**/*.{ts,tsx}", "helper/**/*.ts", "scripts/**/*.ts", "test/**/*.{ts,tsx}"],
-      // CSS imports tailwindcss
-      "ignoreDependencies": ["tailwindcss"]
+      "entry": ["scripts/*.ts", "test/**/*.test.{ts,tsx}"],
+      "project": ["server/**/*.{ts,tsx}", "shared/**/*.{ts,tsx}", "scripts/**/*.ts", "test/**/*.{ts,tsx}"]
     }
   },
-  // tools of the machine, not of npm
-  "ignoreBinaries": ["tailscale", "perl", "herdr"]
+  // a tool of the machine, not of npm
+  "ignoreBinaries": ["perl"]
 }
