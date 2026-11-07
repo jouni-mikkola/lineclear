@@ -8,7 +8,7 @@
 //   snapshot <url> [n=7]  wall time and size of GET <url>/api/snapshot, n runs
 //   chat-tokens [n=20]  tokens per session of the coordinator and the Dispatcher, from their last n session files
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -23,7 +23,7 @@ type Task = {
   mergeStopped?: unknown;
 };
 type Usage = { input: number; output: number; cacheRead: number; cacheWrite: number };
-type Session = { role: "agent" | "reviewer"; firstToolCallAt?: number; usage: Usage };
+type Session = { role: "agent" | "reviewer"; startedAt?: number; firstToolCallAt?: number; usage: Usage };
 
 const SESSIONS = join(homedir(), ".pi/agent/sessions");
 const BOARD = join(homedir(), ".lineclear");
@@ -59,10 +59,12 @@ function sessionsOf(task: Task): Session[] {
       const usage: Usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
       let role: Session["role"] = "reviewer";
       let firstToolCallAt: number | undefined;
+      let startedAt: number | undefined;
       let seenUser = false;
       for (const raw of readFileSync(join(dir, f), "utf8").split("\n")) {
         if (!raw) continue;
         const e = JSON.parse(raw) as { type: string; timestamp?: string; message?: { role: string; content: unknown; usage?: Usage } };
+        if (e.type === "session") startedAt = Date.parse(e.timestamp ?? "");
         const m = e.message;
         if (e.type !== "message" || !m) continue;
         if (m.role === "user" && !seenUser) {
@@ -74,8 +76,17 @@ function sessionsOf(task: Task): Session[] {
           firstToolCallAt = Date.parse(e.timestamp ?? "");
         for (const k of Object.keys(usage) as (keyof Usage)[]) usage[k] += m.usage?.[k] ?? 0;
       }
-      return { role, firstToolCallAt, usage };
+      return { role, startedAt, firstToolCallAt, usage };
     });
+}
+
+/** A worktree folder and its linked node_modules are born in order, so their birth times bound the worktree and install phases. */
+function birth(path: string): number | undefined {
+  try {
+    return statSync(path).birthtimeMs;
+  } catch {
+    return undefined;
+  }
 }
 
 function start(n: number): void {
@@ -83,7 +94,8 @@ function start(n: number): void {
   const phases: Record<string, number[]> = { worktree: [], install: [], session: [], "first call": [] };
   let resent = 0;
   for (const t of doneTasks(n)) {
-    const first = sessionsOf(t).find((s) => s.role === "agent")?.firstToolCallAt;
+    const s = sessionsOf(t).find((x) => x.role === "agent");
+    const first = s?.firstToolCallAt;
     if (first) secs.push((first - t.created) / 1000);
     if (first && t.startMs) {
       const { worktree, install, session } = t.startMs;
@@ -93,6 +105,14 @@ function start(n: number): void {
       phases["first call"]?.push((first - t.created - worktree - install - session) / 1000);
     }
     if (t.briefResent) resent++;
+    const wt = birth(t.worktree);
+    const modules = birth(join(t.worktree, "node_modules"));
+    if (!first || !s?.startedAt || !wt) continue;
+    const installed = Math.max(wt, modules ?? wt);
+    phases.worktree?.push((wt - t.created) / 1000);
+    phases.install?.push((installed - wt) / 1000);
+    phases.session?.push(Math.max(0, s.startedAt - installed) / 1000);
+    phases["first call"]?.push((first - s.startedAt) / 1000);
   }
   line("task add to first tool call", secs, "s");
   for (const [name, xs] of Object.entries(phases)) if (xs.length) line(`  phase ${name}`, xs, "s");
