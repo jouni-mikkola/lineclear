@@ -5,6 +5,7 @@ import { HOME, readJson, writeJson } from '../store.ts'
 import { stripHidden, type Agents, type OutItem } from './agents.ts'
 import { agentLines } from './agentlines.ts'
 import { herdr } from './herdr.ts'
+import { isRpcPane } from './agent-rpc.ts'
 import { logKind } from './readers/find.ts'
 import { readerFor } from './readers/index.ts'
 import { LogTail } from './log-tail.ts'
@@ -199,7 +200,7 @@ export class ChatsLogs {
     if (!force && Date.now() - last < 2000) return false
     this.menuAt.set(key, Date.now())
     const info = this.agents.info(key)
-    if (!info) return false
+    if (!info || isRpcPane(info.pane_id)) return false
     const text = await herdr.visible(info.pane_id)
     // Some herdr versions call startup checkbox menus idle. Require a live menu footer before parsing those.
     const waiting = /(?:enter.*(?:confirm|select|continue)|space to select.*esc to reject|\[y\/n\]|\(y\/n\))/i.test(

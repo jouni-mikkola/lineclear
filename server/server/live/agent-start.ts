@@ -17,7 +17,7 @@ export function agentName(s: string) {
 }
 
 /** a launch's spec onto its record: what it leaves unsaid stays as the record had it */
-export function applySpec(r: AgentRecord, spec: Omit<Spec, 'first' | 'pane' | 'was' | 'fresh'>) {
+export function applySpec(r: AgentRecord, spec: Omit<Spec, 'first' | 'pane' | 'was' | 'fresh' | 'rpc'>) {
   Object.assign(r, {
     name: spec.name,
     kind: spec.kind,

@@ -11,6 +11,7 @@ import { type AgentRecord, type Spec, holdFrom, hidden, sleep } from './agents-h
 import { addLog } from './log-list.ts'
 import { AgentsState, isNews } from './agents-state.ts'
 import { listAfter } from './agent-events.ts'
+import { RpcAgent } from './agent-rpc.ts'
 
 /** how soon a hand-over to an agent that is still starting is tried again */
 const STARTING_RETRY_MS = 300
@@ -84,6 +85,7 @@ export class AgentsDelivery extends AgentsState {
     this.listed = list
     this.heardAt = Date.now()
     this.live = new Map(list.filter((a) => a.name).map((a) => [a.name!, a]))
+    for (const [key, a] of this.rpcs) this.live.set(this.records[key].name, this.rpcInfo(this.records[key], a))
     this.settle()
     void this.routes.repair()
     this.sub.set(paneEvents(list.map((x) => x.pane_id)))
@@ -180,6 +182,7 @@ export class AgentsDelivery extends AgentsState {
     if (problem) return Promise.reject(new Error(problem))
     if (this.stopping.has(spec.key)) return this.starting.get(spec.key) ?? Promise.reject(new Error('Coordinator transition in progress.'))
     const running = this.live.get(spec.name)
+    if (running && this.rpcs.has(spec.key)) return Promise.resolve(running)
     if (running) return this.routes.bind({ ...this.records[spec.key], ...spec } as AgentRecord, running.pane_id).then(() => running)
     return this.starting.get(spec.key) ?? this.starts(spec.key, () => this.launch(spec))
   }
@@ -202,9 +205,10 @@ export class AgentsDelivery extends AgentsState {
     if (chosen) r.model = chosen
     const unset = chooseModel(r.kind, r.model)
     if (unset) throw new Error(unset)
+    const args = this.args(r)
+    if (input.rpc && r.kind === 'pi' && !BOX) return this.launchRpc(r, args, chosen, first)
     const pane = place ? await place() : await paneFor(r, was)
     this.startedIn.set(r.key, pane)
-    const args = this.args(r)
     this.save()
     await startIn(r, pane, args).catch((e) => {
       this.save()
@@ -224,6 +228,55 @@ export class AgentsDelivery extends AgentsState {
     setTimeout(() => this.deliver(r.key), 250)
     for (const ms of [3000, 15000]) setTimeout(() => this.discoverLog(r.key), ms)
     return this.live.get(r.name) ?? null
+  }
+
+  /** the agent as a child of this server: its first record is read within moments, and the brief goes in with a prompt */
+  private async launchRpc(r: AgentRecord, args: string[], chosen: string | undefined, first: string | undefined) {
+    this.save()
+    const rpc = new RpcAgent(
+      args,
+      { cwd: r.cwd, env: { ...process.env, ...r.env } },
+      { change: () => this.rpcChanged(r.key), exit: (a) => this.rpcEnded(r.key, a) },
+    )
+    this.rpcs.set(r.key, rpc)
+    try {
+      await rpc.firstEvent
+    } catch (e) {
+      this.rpcs.delete(r.key)
+      rpc.stop()
+      r.finished = true
+      this.save()
+      throw e
+    }
+    await this.routes.bindPid(r, rpc.pid)
+    this.queue(
+      r.key,
+      [chosen ? hidden(`No model was set, so the machine's first available model was chosen: ${chosen}. Note it in your facts.`) : '', first ?? ''].filter(
+        Boolean,
+      ),
+      true,
+      true,
+    )
+    this.rpcChanged(r.key)
+    void this.deliver(r.key)
+    return this.live.get(r.name) ?? null
+  }
+
+  /** the agent's own status and session, as its events say them */
+  private rpcChanged(key: string) {
+    const rpc = this.rpcs.get(key)
+    const r = this.records[key]
+    if (!rpc || !r) return
+    this.live.set(r.name, this.rpcInfo(r, rpc))
+    this.settle()
+  }
+
+  private rpcEnded(key: string, rpc: RpcAgent) {
+    if (this.rpcs.get(key) !== rpc) return
+    this.rpcs.delete(key)
+    const r = this.records[key]
+    if (r) this.live.delete(r.name)
+    this.settle()
   }
 
   args = launchArgs
@@ -259,6 +312,7 @@ export class AgentsDelivery extends AgentsState {
         this.went(next)
         drop()
         this.emit('sent', next)
+        if (this.rpcs.has(key)) continue
         await sleep(1500) // the CLI takes it before the next item
         await this.refresh()
       }
@@ -308,6 +362,11 @@ export class AgentsDelivery extends AgentsState {
     if (this.records[key]) this.records[key].finished = true
     this.save()
     if (!a) return
+    const rpc = this.rpcs.get(key)
+    if (rpc) {
+      this.rpcEnded(key, rpc)
+      return rpc.stop()
+    }
     const close = herdr.closePane(a.pane_id)
     await (strict ? close : close.catch(() => undefined))
     await this.refresh() // gone from what herdr runs at once, so starting it again starts a new one

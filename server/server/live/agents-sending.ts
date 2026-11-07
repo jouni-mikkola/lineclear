@@ -5,6 +5,7 @@ import { paneWrong, type Wrong } from './revive.ts'
 import { holdFrom, sleep, type OutItem, type Hold, type SendOpts, type Sent } from './agents-helpers.ts'
 import { LATELY, isNews } from './agents-state.ts'
 import { putInto } from './agent-input.ts'
+import { isRpcPane } from './agent-rpc.ts'
 import { AgentsDelivery } from './agents-delivery.ts'
 
 export class AgentsSending extends AgentsDelivery {
@@ -21,7 +22,7 @@ export class AgentsSending extends AgentsDelivery {
     super.take(list)
     for (const key of this.byName.values()) {
       const pane = this.info(key)?.pane_id
-      if (!pane) {
+      if (!pane || isRpcPane(pane)) {
         this.compared.delete(key)
         this.verdict.delete(key)
         this.due.delete(key)
@@ -55,7 +56,7 @@ export class AgentsSending extends AgentsDelivery {
    *  turn is never cut for this) */
   async wrong(key: string): Promise<Wrong | undefined | null> {
     const r = this.records[key]
-    if (!r?.kind) return undefined
+    if (!r?.kind || this.rpcs.has(key)) return undefined
     const a = this.info(key)
     if (!a) return 'gone'
     if (this.due.has(key)) {
@@ -84,7 +85,8 @@ export class AgentsSending extends AgentsDelivery {
     this.stopping.add(key)
     try {
       const a = close ? this.info(key) : undefined
-      if (a) {
+      if (a && this.rpcs.has(key)) await this.finish(key)
+      else if (a) {
         await herdr.closePane(a.pane_id).catch(() => undefined)
         await this.refresh()
       }
@@ -197,12 +199,12 @@ export class AgentsSending extends AgentsDelivery {
 
   async keys(key: string, keys: string[]) {
     const a = this.info(key)
-    if (a) await herdr.paneKeys(a.pane_id, keys)
+    if (a && !this.rpcs.has(key)) await herdr.paneKeys(a.pane_id, keys)
   }
 
   async text(key: string, text: string) {
     const a = this.info(key)
-    if (a) await herdr.paneText(a.pane_id, text)
+    if (a && !this.rpcs.has(key)) await herdr.paneText(a.pane_id, text)
   }
 
   watchTerminals(keys: string[]) {
@@ -229,12 +231,14 @@ export class AgentsSending extends AgentsDelivery {
     for (const end = Date.now() + ms; this.status(key) === 'working'; ) {
       if (Date.now() > end) throw new Error('It is still working after an interrupt: try again in a moment.')
       await sleep(500)
-      await this.refresh()
+      if (!this.rpcs.has(key)) await this.refresh()
     }
     await sleep(500) // what it wrote last reaches its log
   }
 
   async interrupt(key: string) {
-    if (this.info(key)) await herdr.sendKeys(this.records[key].name, ['esc']).catch(() => undefined)
+    const rpc = this.rpcs.get(key)
+    if (rpc) await rpc.abort()
+    else if (this.info(key)) await herdr.sendKeys(this.records[key].name, ['esc']).catch(() => undefined)
   }
 }
