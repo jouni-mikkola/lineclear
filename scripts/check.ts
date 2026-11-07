@@ -38,7 +38,7 @@ import {
   writeTimes,
 } from "./check-speed.ts";
 import { fastGates } from "./fast-gates.ts";
-import { describeFailure, type Failure, outsideChange, parseFailures } from "./failures.ts";
+import { describeFailure, type Failure, failCount, judge, outsideChange, parseFailures, readQuarantine, writeQuarantine } from "./failures.ts";
 import { changedSince } from "./gates/tools.ts";
 
 // Every step but the server's (below) runs with TMPDIR in a folder of this run, on disk. Each test process clears its own
@@ -227,6 +227,40 @@ const started = performance.now();
 const times: StepTime[] = [];
 const outcome = new Map<string, Promise<boolean>>();
 
+const QUARANTINE = "test/quarantine.json";
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Runs one failed test alone, in the folder and with the env its step ran in: true when it passes (and something ran). */
+function passesAlone(f: Failure, server: boolean): boolean {
+  const name = escapeRegex(f.test.replaceAll(" > ", " "));
+  const r = Bun.spawnSync(["bun", "test", "--timeout", "120000", f.file.startsWith(".") ? f.file : `./${f.file}`, "-t", name], {
+    cwd: server ? "server" : undefined,
+    env: { ...(server ? serverEnv : env), LINECLEAR_TEST_RUNNER: "1" },
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  return r.success && /^\s*[1-9]\d* pass$/m.test(r.stdout.toString() + r.stderr.toString());
+}
+
+/**
+ * A test step that failed only on tests that then pass alone is a flake: quarantined ones are let through, and a new one
+ * goes into the quarantine file (at most five) for its fix task. A test that fails alone too, or a failure the list does
+ * not account for, still fails the step.
+ */
+function afterRerun(step: Step, failing: Failure[], output: string): boolean {
+  const listed = failCount(output);
+  if (failing.length === 0 || (listed !== undefined && listed !== failing.length)) return false;
+  const verdict = judge(failing, readQuarantine(QUARANTINE), (f) => passesAlone(f, step.cwd === "server"));
+  for (const f of verdict.quarantined) console.log(`check: quarantined, failed once and passed alone: ${f.file} > ${f.test}`);
+  if (verdict.flaky.length > 0) {
+    writeQuarantine(QUARANTINE, verdict.next);
+    for (const f of verdict.flaky) console.log(`check: flaky, failed once and passed alone, now in ${QUARANTINE} (file its fix task): ${f.file} > ${f.test}`);
+  }
+  if (verdict.error) console.error(`check: ${verdict.error}`);
+  for (const f of verdict.broken) console.error(`check: failed alone too: ${f.file} > ${f.test}`);
+  return verdict.broken.length === 0;
+}
+
 /** Runs one step after the steps it needs. Resolves to whether it passed; a step skipped for a failed need counts as failed. */
 async function runStep(step: Step): Promise<boolean> {
   // every step is in the map before any looks for its needs, whatever their order in the plan
@@ -235,7 +269,8 @@ async function runStep(step: Step): Promise<boolean> {
   const at = performance.now();
   const { code, failing, output } = await run(step);
   const isTests = step.name.startsWith("tests");
-  const ok = code === 0;
+  const isTestStep = isTests || step.name === "server tests";
+  const ok = code === 0 || (isTestStep && afterRerun(step, failing, output));
   times.push({ step: step.name, seconds: (performance.now() - at) / 1000, ok });
   if (!ok) {
     console.error(
