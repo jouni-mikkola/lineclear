@@ -24,7 +24,6 @@ function world() {
   put(join(paths.app, "store-copies", "task.json"));
   put(paths.unit);
   put(join(dirname(paths.unit), "lineclear-herdr.service"));
-  put(join(dirname(paths.unit), "lineclear-track.timer"));
   put(join(paths.config, "settings.json"));
   put(paths.cacheEnv, cacheEnvFile({ HOME: home }));
   mkdirSync(dirname(paths.binLink), { recursive: true });
@@ -36,7 +35,7 @@ function world() {
   return { paths, ran, lines, remover, out: (l: string) => void lines.push(l) };
 }
 
-test("uninstall removes the units, the track timer, the link and the extension, and keeps the settings and the store copies", () => {
+test("uninstall removes the units, the link and the extension, and keeps the settings and the store copies", () => {
   const w = world();
   expect(uninstall(w.remover, false, w.out)).toBe(0);
   expect(existsSync(w.paths.unit)).toBe(false);
@@ -44,8 +43,6 @@ test("uninstall removes the units, the track timer, the link and the extension, 
   expect(existsSync(join(w.paths.app, "marker"))).toBe(false);
   expect(existsSync(join(w.paths.app, "store-copies", "task.json"))).toBe(true);
   expect(existsSync(join(w.paths.config, "settings.json"))).toBe(true);
-  expect(w.ran).toContain("systemctl --user disable --now lineclear-track.timer");
-  expect(w.lines.some((l) => l.startsWith("Removed the test track's timer"))).toBe(true);
   expect(w.lines.some((l) => l.startsWith("Kept the project settings"))).toBe(true);
 });
 

@@ -38,8 +38,6 @@ export type Settings = {
   paused?: boolean;
   /** False turns the step check's model call off; the form rule stays. Missing means on. */
   stepCheck?: boolean;
-  /** `release.promote`: `ask` waits for the owner's tap before a checked build becomes stable; missing means it promotes by itself. */
-  release?: { promote?: "auto" | "ask" };
   /** Lineclear's own project: the one its fix steps go to. Found by its package name when no project says so. */
   self?: boolean;
   /** Which checks run when: missing means what `proposeTiers` reads from the repo. */
@@ -551,20 +549,4 @@ export function removeProject(name: string, out: (l: string) => void, env = proc
 export function fail(out: (l: string) => void, message: string): number {
   out(`lineclear project: ${message}`);
   return 1;
-}
-
-/** Lineclear's own project: the one whose settings say `self`, else the one whose repo is the lineclear package. */
-export function selfProject(env = process.env): { name: string; settings: Settings } | undefined {
-  const all = listProjectNames(env)
-    .map((name) => ({ name, settings: readSettings(name, env) }))
-    .filter((p): p is { name: string; settings: Settings } => typeof p.settings !== "string");
-  const marked = all.find((p) => p.settings.self === true);
-  if (marked) return marked;
-  return all.find((p) => {
-    try {
-      return JSON.parse(readFileSync(join(p.settings.repo, "package.json"), "utf8")).name === "lineclear";
-    } catch {
-      return false;
-    }
-  });
 }

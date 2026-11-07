@@ -31,10 +31,6 @@ case "$cmd" in
   *"--version")
     echo "lineclear 0.1.0 build$(wc -l < "$log.$host.installs" 2>/dev/null || echo 0)"
     ;;
-  *"release rollback")
-    echo "$host rollback" >> "$log"
-    echo "current is now previous"
-    ;;
   *"lineclear\" 'export'")
     # FAKE_SSH_EXPORT is what `lineclear export` prints there; unset, the Lineclear there has no export
     [ -n "$FAKE_SSH_EXPORT" ] && { echo "$FAKE_SSH_EXPORT"; exit 0; }

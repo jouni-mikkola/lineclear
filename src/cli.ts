@@ -17,9 +17,7 @@ import { planMain } from "./plan.ts";
 import { planStatus } from "./requests.ts";
 import { resolveProject } from "./resolve.ts";
 import { codeCommit, pathsFor } from "./paths.ts";
-import { candidateMain } from "./candidate-check.ts";
-import { promoteMain } from "./promote-cmd.ts";
-import { readRelease, releaseMain, releaseTry } from "./release.ts";
+import { readRelease, releaseMain } from "./release.ts";
 import { fillSetup } from "./fill-setup.ts";
 import { type Ask, setupGate } from "./project.ts";
 import { setupMain } from "./setup.ts";
@@ -30,7 +28,6 @@ import { decisionsPath, runMain } from "./rules.ts";
 import { startWeb } from "./web.ts";
 import { secrets, totp } from "./secrets.ts";
 import { stallsMain } from "./stall-class.ts";
-import { trackMain } from "./track.ts";
 import { boardMain, isBoardJob, serveMain } from "./serve.ts";
 import { waitsMain } from "./waits.ts";
 import { realRemover, uninstall } from "./uninstall.ts";
@@ -74,9 +71,8 @@ export const commands: Record<string, string> = {
   checkpoint: "A space's coordinator commits its owned task's work: checkpoint \"<message>\"",
   complete: 'A space\'s coordinator proves its stopping goal and ends its run: complete "<evidence>"',
   stalls: "Print the stalls of the last day by class with the minutes lost (--hours N, --json)",
-  track: "Run the test track: a fixture project through the whole chain; pass, or the stall class that broke it (--after-update rolls back a broken update)",
   release:
-    "Show the stable and next builds, the last promotion and why next is held (release status); release run tests main and promotes it when green, as the rule loop does every 2 minutes; release check <version> checks a candidate on its own (check, smoke, canary, store both ways); release promote <version> makes a checked candidate stable and leaves the Inbox item to read; release try [version] starts a test instance on a copy of the data, release try --stop ends it",
+    "Show the stable and next builds, the last promotion and why next is held (release status); release run tests main and promotes it when green, as the rule loop does every 2 minutes",
   store: "The local copies of the task store (store list, store copy, store restore <name>); the rule loop takes one an hour",
   totp: "Print the current code of a stored login: totp NAME reads NAME_TOTP from this folder's secrets",
   status:
@@ -196,7 +192,6 @@ function inboxCommand(rest: string[], out: Out): number | Promise<number> {
 /** The commands that are one call: each gets the words after its name. */
 const COMMANDS: Record<string, (rest: string[], out: Out) => number | Promise<number>> = {
   stalls: (rest, out) => stallsMain(rest, out, decisionsPath()),
-  track: trackMain,
   machine: (rest, out) => machineMain(rest, out),
   roadmap: roadmapMain,
   run: (rest, out) => (rest[0] === "--demo" ? demoMain(rest.slice(1), out) : runMain(rest, out, undefined, { web: startWeb })),
@@ -205,14 +200,7 @@ const COMMANDS: Record<string, (rest: string[], out: Out) => number | Promise<nu
   secrets,
   totp,
   store: storeMain,
-  release: (rest, out) =>
-    rest[0] === "try"
-      ? releaseTry(rest.slice(1), out)
-      : rest[0] === "check"
-        ? candidateMain(rest.slice(1), out)
-        : rest[0] === "promote"
-          ? promoteMain(rest.slice(1), out)
-          : releaseMain(rest, out),
+  release: releaseMain,
   status: statusCommand,
   plan: planMain,
   move: moveMain,

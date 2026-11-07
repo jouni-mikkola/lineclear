@@ -1,19 +1,17 @@
 // Stable and next: the service runs stable, the last build that proved itself. Next is main. The rule
-// loop runs `lineclear release run` every few minutes: it builds next in a folder of its own, runs its smoke check and
-// canary on spare ports, reads next's files with stable's code, and installs next as stable when all pass (install.sh,
+// loop runs `lineclear release run` every few minutes: it builds next in a folder of its own, waits for its GitHub check,
+// checks that it reads this machine's store, and installs next as stable when all pass (install.sh,
 // which restarts, checks and rolls back, then updates the other machines). Else stable stays and one fix task is filed.
 import { KEPT_ENV } from "./herdr.ts";
-import { rollbackMain } from "./rollback.ts";
 import { spawnSync } from "node:child_process";
-import { closeSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, statSync } from "node:fs";
+import { closeSync, mkdirSync, openSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { writeAtomic } from "../pi/atomic.ts";
 import { configDir, readJson } from "../pi/config.ts";
 import { dataDir, lockFile, pathsFor, serverBin } from "./paths.ts";
 import { forgetTaskReads, readTasks } from "./task-read.ts";
 import { listProjectNames, readSettings } from "./project.ts";
-import { cacheDir, diskTmpRoot } from "./tmpdirs.ts";
-import { tryLines, tryMain } from "./try-instance.ts";
+import { cacheDir } from "./tmpdirs.ts";
 
 type Env = Record<string, string | undefined>;
 
@@ -36,10 +34,6 @@ export interface ReleaseState {
   filed?: string;
   /** When main was last looked at. */
   checked?: string;
-  /** The last candidate checked on its own (`lineclear release check <version>`). */
-  candidate?: CandidateResult;
-  /** The candidate version the rule loop started a promotion of, so it starts one once. */
-  promoteTried?: string;
 }
 
 /** The state file as the release run writes it: the last test runs of main, newest last, beside the state. */
@@ -52,23 +46,6 @@ interface Run {
   minutes: number;
   verdict: "green" | "held";
   why?: string;
-}
-
-export interface CandidateCheck {
-  name: string;
-  outcome: "passed" | "failed" | "skipped";
-  why?: string;
-}
-
-/** A candidate release and how each of its checks went; ready only when all passed. */
-export interface CandidateResult {
-  version: string;
-  commit: string;
-  at: string;
-  result: "checking" | "ready" | "failed";
-  checks: CandidateCheck[];
-  /** The commit a fix task was filed for, so it is filed once. */
-  filed?: string;
 }
 
 /** What a run needs from the world; the tests give their own. */
@@ -90,7 +67,7 @@ export interface ReleaseDeps {
 
 export const PROMOTE_EVERY_MS = 30 * 60_000;
 const CHECK_EVERY_MS = 2 * 60_000;
-// longer than the longest run: five builds, the canary, the format checks and install.sh, each under its own timeout
+// longer than the longest run: five builds, the format check and install.sh, each under its own timeout
 const STALE_LOCK_MS = 4 * 60 * 60_000;
 const MAX_BACKOFF_MS = 15 * 60_000;
 
@@ -211,7 +188,7 @@ function red(s: ReleaseState, deps: ReleaseDeps, head: string, stable: string, w
     "",
     why.slice(0, 5000),
     "",
-    "Fix main so it passes: `bun scripts/canary.ts` (smoke and canary on next) and `bun scripts/formats.ts` run by stable.",
+    "Fix main so it passes GitHub's check and `bun scripts/formats.ts`.",
     "`lineclear release` shows the state. Once main is fixed, the next run promotes it.",
   ].join("\n");
   const err = deps.fileTask(`Fix next ${short(head)}`, brief);
@@ -219,7 +196,7 @@ function red(s: ReleaseState, deps: ReleaseDeps, head: string, stable: string, w
   else s.filed = head;
 }
 
-export function run(cmd: string[], cwd: string, env: Env, timeoutMs = 20 * 60_000): { ok: boolean; out: string } {
+function run(cmd: string[], cwd: string, env: Env, timeoutMs = 20 * 60_000): { ok: boolean; out: string } {
   const r = spawnSync(cmd[0] as string, cmd.slice(1), {
     cwd,
     env: env as NodeJS.ProcessEnv,
@@ -231,14 +208,14 @@ export function run(cmd: string[], cwd: string, env: Env, timeoutMs = 20 * 60_00
 }
 
 /** Checks `commit` out in `dir` and installs its packages. */
-export const checkoutSteps = (dir: string, commit: string): [string, string[], string][] => [
+const checkoutSteps = (dir: string, commit: string): [string, string[], string][] => [
   ["checkout", ["git", "checkout", "-q", "-f", "--detach", commit], dir],
   ["install", ["bun", "install", "--frozen-lockfile", "--silent"], dir],
   ["server install", ["bun", "install", "--frozen-lockfile", "--silent"], join(dir, "server")],
 ];
 
 /** Runs the named commands in order; returns the first that failed with its output, or "". */
-export function runSteps(steps: [string, string[], string][], env: Env): string {
+function runSteps(steps: [string, string[], string][], env: Env): string {
   for (const [name, cmd, cwd] of steps) {
     const r = run(cmd, cwd, env);
     if (!r.ok) return `${name}: ${tail(r.out)}`;
@@ -246,7 +223,7 @@ export function runSteps(steps: [string, string[], string][], env: Env): string 
   return "";
 }
 
-export const tail = (out: string) => out.split("\n").slice(-6).join("; ").slice(-600);
+const tail = (out: string) => out.split("\n").slice(-6).join("; ").slice(-600);
 
 /** Sets the clone's origin to the app's when they differ (and says so on stderr), so a renamed repository is not fetched under its old name. */
 export function pointOriginAt(dir: string, url: string, env: Env): void {
@@ -270,7 +247,7 @@ function realDeps(env: Env = process.env): ReleaseDeps {
       if (!f.ok) throw new Error(tail(f.out));
       return run(["git", "rev-parse", "FETCH_HEAD"], dir, env).out;
     },
-    test: (commit) => testNext(app, dir, commit, env),
+    test: (commit) => testNext(dir, commit, env),
     promote(commit) {
       const r = run(["sh", join(dir, "install.sh")], dir, { ...env, LINECLEAR_REF: commit, LINECLEAR_REPO: origin() }, 30 * 60_000);
       const now = run(["git", "-C", app, "rev-parse", "HEAD"], app, env).out;
@@ -281,7 +258,7 @@ function realDeps(env: Env = process.env): ReleaseDeps {
 }
 
 /** Files, finds and tells the "Fix ..." tasks of the project whose repository is Lineclear's own. */
-export function fixTaskTools(origin: () => string, dir: string, prefix: string, env: Env): Pick<ReleaseDeps, "openFix" | "tell" | "fileTask"> {
+function fixTaskTools(origin: () => string, dir: string, prefix: string, env: Env): Pick<ReleaseDeps, "openFix" | "tell" | "fileTask"> {
   return {
     openFix() {
       const space = ownSpace(origin(), env);
@@ -334,7 +311,7 @@ export function fullCheckWhy(out: string): string {
 const CHECK_PENDING = "GitHub check: not finished";
 
 /** What GitHub's "check" says of `commit` (`gh api`, from the clone's origin): "" when it passed, else why not. */
-export function githubCheck(commit: string, dir: string, env: Env): string {
+function githubCheck(commit: string, dir: string, env: Env): string {
   const r = run(
     [
       "gh",
@@ -371,8 +348,8 @@ function failedLog(commit: string, dir: string, env: Env): string {
   return log.ok ? log.out : "";
 }
 
-/** Builds next at `commit` and runs its smoke check and canary, then stable's format check on what next wrote. */
-function testNext(app: string, dir: string, commit: string, env: Env): string {
+/** Builds next at `commit` and waits for its GitHub check, then checks that next reads this machine's store. */
+function testNext(dir: string, commit: string, env: Env): string {
   const steps: [string, string[], string][] = [
     ...checkoutSteps(dir, commit),
     ["web build", ["bun", "run", "web:build"], dir],
@@ -387,40 +364,13 @@ function testNext(app: string, dir: string, commit: string, env: Env): string {
   // Checks are light and run on GitHub, never here: next goes out when the merged commit's GitHub check is green.
   const github = githubCheck(commit, dir, env);
   if (github) return github;
-  const store = mkdtempSync(join(diskTmpRoot(env), "release-store-"));
-  try {
-    const canary = run(["bun", join(dir, "scripts", "canary.ts"), "--keep", store], dir, env);
-    if (!canary.ok) return canary.out.split("\n").find((l) => l.startsWith("fail ")) ?? `canary: ${tail(canary.out)}`;
-    return formatsOf(app, dir, store, env) || nextReadsStable(dir, env);
-  } finally {
-    rmSync(store, { recursive: true, force: true });
-  }
+  return nextReadsStable(dir, env);
 }
 
 /** Next reads the store stable wrote on this machine, the one it takes over (its format check reads a copy). */
-export function nextReadsStable(nextTree: string, env: Env): string {
+function nextReadsStable(nextTree: string, env: Env): string {
   const r = run(["bun", join(nextTree, "scripts", "formats.ts"), nextTree, dataDir(env), "--older"], nextTree, env, 120_000);
   return r.ok ? "" : `next cannot read this machine's store: ${tail(r.out)}`;
-}
-
-/** Stable reads next's roadmap and store files: with its own format check, or before it had one, its roadmap check. */
-export function formatsOf(stableApp: string, nextTree: string, store: string, env: Env): string {
-  const own = join(stableApp, "scripts", "formats.ts");
-  if (existsSync(own)) {
-    const r = run(["bun", own, nextTree, store], stableApp, env, 120_000);
-    return r.ok ? "" : `stable cannot read next's files: ${tail(r.out)}`;
-  }
-  const road = join(nextTree, "docs", "ROADMAP.md");
-  if (!existsSync(road)) return "";
-  const copy = mkdtempSync(join(diskTmpRoot(env), "release-roadmap-"));
-  try {
-    mkdirSync(join(copy, "docs"));
-    copyFileSync(road, join(copy, "docs", "ROADMAP.md"));
-    const r = run(["bun", join(stableApp, "bin", "lineclear"), "roadmap", "check", copy], copy, env, 120_000);
-    return r.ok ? "" : `stable cannot read next's roadmap: ${tail(r.out)}`;
-  } finally {
-    rmSync(copy, { recursive: true, force: true });
-  }
 }
 
 const sameRepo = (a: string, b: string) =>
@@ -459,12 +409,12 @@ export function releaseStartDue(env: Env, now: number): { due: boolean; tries: n
 
 /**
  * From the rule loop: starts `lineclear release run` when main was not looked at for a while and no run is going. Only
- * the installed app does, never a checkout someone runs, a test or a canary. It runs as a unit of its own, so the
+ * the installed app does, never a checkout someone runs or a test. It runs as a unit of its own, so the
  * restart of a promotion does not stop it.
  */
 export function startReleaseIfDue(env: Env = process.env, now = new Date()): void {
   const app = pathsFor(env).app;
-  if (env.LINECLEAR_CANARY || env.LINECLEAR_RELEASE === "off" || follows(env) || resolve(import.meta.dir, "..") !== app) return;
+  if (env.LINECLEAR_RELEASE === "off" || follows(env) || resolve(import.meta.dir, "..") !== app) return;
   try {
     if (now.getTime() - statSync(lockFile(env, "release")).mtimeMs > STALE_LOCK_MS) rmSync(lockFile(env, "release"), { force: true });
     else return;
@@ -491,12 +441,6 @@ export function startReleaseIfDue(env: Env = process.env, now = new Date()): voi
   if (r.status !== 0) Bun.spawn(cmd, { env: env as Record<string, string>, stdio: ["ignore", "ignore", "ignore"], detached: true }).unref();
 }
 
-/** `lineclear release try`: the test instance of a version, or of a candidate from main's newest green commit. */
-export function releaseTry(args: string[], out: (l: string) => void, env: Env = process.env): Promise<number> {
-  const next = readRelease(env).next;
-  return tryMain(args, out, env, next?.result === "green" ? next.commit : undefined);
-}
-
 /** The lines of `lineclear release` and of doctor and Home. */
 export function releaseLines(s: Stored): string[] {
   const next = s.next ? `${short(s.next.commit)} ${s.next.result}${s.next.commit === s.stable?.commit ? " (same as stable)" : ""}` : "not looked at yet";
@@ -509,14 +453,7 @@ export function releaseLines(s: Stored): string[] {
       (r) =>
         `run  ${short(r.commit) || "main"} at ${r.at.slice(0, 16).replace("T", " ")} UTC, ${r.minutes} min, ${r.verdict}${r.why ? `: ${r.why.slice(0, 200)}` : ""}`,
     ),
-    ...candidateLines(s.candidate),
   ];
-}
-
-function candidateLines(c?: CandidateResult): string[] {
-  if (!c) return [];
-  const checks = c.checks.map((k) => `${k.name} ${k.outcome}${k.why ? ` (${k.why.slice(0, 120)})` : ""}`).join(", ");
-  return [`candidate  ${c.version} (${short(c.commit)}) ${c.result}${checks ? `: ${checks}` : ""}`];
 }
 
 export function releaseMain(args: string[], out: (l: string) => void, env: Env = process.env): number {
@@ -524,16 +461,15 @@ export function releaseMain(args: string[], out: (l: string) => void, env: Env =
   const leader = follows(env);
   if (verb === "status") {
     if (leader) out(`follows ${leader}: this machine gets the stable build ${leader} promotes`);
-    else for (const l of [...releaseLines(readRelease(env)), ...tryLines(env)]) out(l);
+    else for (const l of releaseLines(readRelease(env))) out(l);
     return 0;
   }
   if (verb === "run" && leader) {
     out(`lineclear release: this machine follows ${leader}, which promotes for it`);
     return 0;
   }
-  if (verb === "rollback") return rollbackMain(out, env, args[1] === "--from" ? args[2] : undefined);
   if (verb !== "run" || args.slice(1).some((a) => a !== "--again")) {
-    out("usage: lineclear release [status|run [--again]|check|promote|rollback|try]");
+    out("usage: lineclear release [status|run [--again]]");
     return 2;
   }
   mkdirSync(configDir(env), { recursive: true });

@@ -59,8 +59,6 @@ export interface Item {
   undone?: string;
   /** For a plan that waits from before its project let plans apply by themselves: the commit the rules refused. */
   tried?: string;
-  /** For a release item: the version and the one tap it offers, to roll the build back or to promote it. */
-  release?: { version: string; action: "rollback" | "promote" };
   /** For an owner-only step: its id. The owner answers Done with the result as the note. */
   ownerStep?: string;
   /** For a plan: the go answers of the fresh model that read each new or changed step. */

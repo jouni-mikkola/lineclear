@@ -1,6 +1,5 @@
-import { existsSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join, sep } from "node:path";
-import { writeAtomic } from "../pi/atomic.ts";
 import { INSTALL_URL } from "./paths.ts";
 
 /** Where install.sh puts each release: `<data>/builds/<version>`, with `current` and `previous` beside them. */
@@ -59,56 +58,8 @@ const versionOf = (link: string): string | null => {
   return where ? (where.split(sep).pop() ?? null) : null;
 };
 
-const newer = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true }) > 0;
-const rejectedFile = (data: string) => join(buildsDir(data), "rejected");
-
-/** The versions a rollback put aside: install.sh does not offer them again until a newer version passes. */
-function rejectedBuilds(data: string): string[] {
-  try {
-    return readFileSync(rejectedFile(data), "utf8").split("\n").filter(Boolean);
-  } catch {
-    return [];
-  }
-}
-
-/** The build that runs, the one before it, and the newest finished build above current that was not rolled back. */
-export function buildNames(data: string): { current: string | null; previous: string | null; candidate: string | null } {
+/** The build that runs and the one before it. */
+export function buildNames(data: string): { current: string | null; previous: string | null } {
   const builds = buildsDir(data);
-  const current = versionOf(join(builds, "current"));
-  let candidate: string | null = null;
-  try {
-    for (const v of readdirSync(builds)) {
-      if (!/^\d+\.\d+\.\d+$/.test(v) || !existsSync(join(builds, v, ".release")) || rejectedBuilds(data).includes(v)) continue;
-      if (current && newer(v, current) && (!candidate || newer(v, candidate))) candidate = v;
-    }
-  } catch {}
-  return { current, previous: versionOf(join(builds, "previous")), candidate };
-}
-
-/** Points the link `name` beside the builds at `version`, whole or not at all. */
-export function pointBuild(data: string, name: "current" | "previous", version: string): void {
-  const builds = buildsDir(data);
-  const tmp = join(builds, `.${name}.tmp`);
-  rmSync(tmp, { force: true });
-  symlinkSync(join(builds, version), tmp);
-  renameSync(tmp, join(builds, name));
-}
-
-/** Whether a rollback put `version` aside, so no promotion may take it. */
-export const isRejected = (data: string, version: string): boolean => rejectedBuilds(data).includes(version);
-
-/** A promotion of `version` ends the hold on every version it is newer than. */
-export function liftHold(data: string, version: string): void {
-  const kept = rejectedBuilds(data).filter((bad) => !newer(version, bad));
-  writeAtomic(rejectedFile(data), kept.length ? `${kept.join("\n")}\n` : "");
-}
-
-/** Points `current` at `previous` and records the version it left as rejected. Returns what changed, or why it cannot. */
-export function swapToPrevious(data: string): { from: string; to: string } | string {
-  const { current, previous } = buildNames(data);
-  if (current === previous) return "current is already the previous build, so there is nothing older to go back to";
-  if (!current || !previous) return "there is no previous build to go back to";
-  pointBuild(data, "current", previous);
-  writeAtomic(rejectedFile(data), `${[...rejectedBuilds(data), current].join("\n")}\n`);
-  return { from: current, to: previous };
+  return { current: versionOf(join(builds, "current")), previous: versionOf(join(builds, "previous")) };
 }

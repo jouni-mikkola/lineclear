@@ -20,7 +20,7 @@ imports count for the borders but not for cycles, since they are gone when the c
 | `web` | `ui/web/` | the pages `lineclear run` serves | `kit`, `brand`, `cli` |
 | `ui-test` | `ui/test/`, `ui/shots/`, `ui/budget/`, `playwright.config.ts`, `playwright.shots.config.ts`, `playwright.budget.config.ts` | the UI bar's browser tests and their fixture | `web`, `kit`, `brand`, `cli`, `pi` |
 | `gates` | `scripts/gates/` | the check's gates | none |
-| `scripts` | `scripts/` | repo tools: the check, the smoke check and canary, measurements | `cli`, `brand`, `gates`, `check-line` |
+| `scripts` | `scripts/` | repo tools: the check, the smoke check, measurements | `cli`, `brand`, `gates`, `check-line` |
 | `tests` | `test/` | the bun tests, one file per command | `cli`, `pi`, `kit`, `web`, `brand`, `scripts`, `gates`, `ui-test`, `check-line`, `registry` |
 | `shared` | `server/shared/` | types and pure helpers the server shares | none |
 | `server` | `server/server/` | the server: the live source, agents, chats, the engine and the merge lane | `shared`, `generated`, `check-line`, `registry`, `timer-rule` |

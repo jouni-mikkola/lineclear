@@ -1,5 +1,3 @@
-import { spawnSync } from "node:child_process";
-import { join } from "node:path";
 import { writeAtomic } from "../pi/atomic.ts";
 import { undoApplied } from "./autoplan.ts";
 import { applyMove } from "./dispatcher.ts";
@@ -59,7 +57,6 @@ function answerItem(item: Item, text: string, note: string | undefined, out: (l:
   if (note !== undefined && item.kind !== "plan" && item.ownerStep === undefined)
     return (out("lineclear inbox: --note is only for a plan or an owner step"), 2);
   if (item.ownerStep !== undefined && note === undefined) return (out("lineclear inbox: say the result: answer <n> Done --note <text>"), 2);
-  if (item.release) return answerRelease(item, item.release, choice, out, env);
   if (item.move) return answerMove(item, item.move, choice, note, out, env);
   const resend = item.kind === "plan" && choice === "Reject" && (item.round ?? 1) < 2;
   if (resend && note === undefined) return (out("lineclear inbox: say why you reject the plan: answer <n> Reject --note <text>"), 2);
@@ -72,15 +69,6 @@ function answerItem(item: Item, text: string, note: string | undefined, out: (l:
   if (waitReason(item.task, env) === `asked: ${item.question}`) clearWait(item.task, env);
   out(answeredLine(item, choice, resend));
   return 0;
-}
-
-/** The one tap of a release item: runs the release command it offers, in a process of its own, and leaves the item for what that did. */
-function answerRelease(item: Item, release: NonNullable<Item["release"]>, choice: string, out: (l: string) => void, env: NodeJS.ProcessEnv): number {
-  const args = release.action === "rollback" ? ["rollback", "--from", release.version] : ["promote", release.version];
-  const ran = spawnSync(process.execPath, [join(import.meta.dir, "..", "bin", "lineclear"), "release", ...args], { env, encoding: "utf8" });
-  out(`${ran.stdout}${ran.stderr}`.trim().split("\n").at(-1) || "done");
-  if (ran.status === 0) writeAtomic(itemPath(item.n, env), `${JSON.stringify({ ...item, answer: choice, answeredAt: new Date().toISOString() }, null, 2)}\n`);
-  return ran.status ?? 1;
 }
 
 /** Carries the answer out: the merge, the close or the word to the task. Returns the line to say when it fails. */

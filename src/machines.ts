@@ -132,26 +132,14 @@ export async function installMachine(host: string, env: Env = process.env, say: 
   return done;
 }
 
-/** The build a machine runs, as its `lineclear --version` says; empty when it does not answer. */
-async function buildOn(host: string, env: Env): Promise<string> {
-  const r = await run(sshArgs(env, host, `${LINECLEAR} --version`), undefined, 30_000, env);
-  return r.code === 0 ? (r.lines.at(-1) ?? "") : "";
-}
-
-async function rollBack(host: string, env: Env, out: (l: string) => void): Promise<void> {
-  const back = await run(sshArgs(env, host, `${LINECLEAR} release rollback`), undefined, 120_000, env);
-  out(back.code === 0 ? `${host} is back on its previous build.` : `${host} could not go back: ${back.lines.at(-1) ?? `exit ${back.code}`}`);
-}
-
 /**
  * Updates the machines one by one, each to the build this one runs, with the install's own smoke check there. The
  * machine's own list is not followed (LINECLEAR_NO_FANOUT), so no machine updates the others in a loop. A machine that
- * does not end ready goes back to its previous build, and the machines after it stay on theirs.
+ * does not end ready stops the run, and the machines after it stay on theirs.
  * Returns how many did not end ready.
  */
 async function updateMachines(hosts: string[], env: Env, out: (l: string) => void): Promise<number> {
   for (const [i, host] of hosts.entries()) {
-    const before = await buildOn(host, env);
     const m = await installMachine(host, { ...env, LINECLEAR_NO_FANOUT: "1" }, out);
     if (m.state === "ready") {
       out(`${host} is up to date.`);
@@ -160,11 +148,6 @@ async function updateMachines(hosts: string[], env: Env, out: (l: string) => voi
     // the doctor lists passing checks too: the reason is the first failed line
     const why = m.doctor?.find((l) => l.startsWith("FAILED")) ?? m.doctor?.[0] ?? "doctor failed";
     out(`${host} is not ready: ${why}`);
-    // a machine whose build did not change has nothing to go back from
-    const after = await buildOn(host, env);
-    // an unknown build is no proof of a change: roll back only when both are known and differ
-    if (!before || !after || after === before) out(`${host} still runs its previous build.`);
-    else await rollBack(host, env, out);
     const rest = hosts.slice(i + 1);
     if (rest.length) out(`Stopped: ${rest.join(", ")} stay on their old build.`);
     return 1;

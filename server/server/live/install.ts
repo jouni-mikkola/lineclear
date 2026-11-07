@@ -33,10 +33,8 @@ async function herdrJson<T>(args: string[], fallback: T): Promise<T> {
   }
 }
 
-/** every machine saved in herdr's Remote that is turned on. None for the release canary (LINECLEAR_CANARY): herdr's
- *  machine list is shared by all its sessions, and a worker of the canary would take over the real server's tunnel */
-export const savedMachines = async () =>
-  process.env.LINECLEAR_CANARY ? [] : (await herdrJson<Saved[]>(['machine', 'list', '--json'], [])).filter((m) => m.enabled !== false && m.label)
+/** every machine saved in herdr's Remote that is turned on */
+export const savedMachines = async () => (await herdrJson<Saved[]>(['machine', 'list', '--json'], [])).filter((m) => m.enabled !== false && m.label)
 
 /** whether herdr reaches each: "reachable", or what is wrong */
 export const machineStatus = async () =>
