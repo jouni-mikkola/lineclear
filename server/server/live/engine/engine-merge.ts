@@ -37,27 +37,66 @@ export class EngineMerge extends EngineLand {
     }
   }
 
+  /** the repo's GitHub when gh reaches it; null (its state in the repo watch says why) when not: down is never "no GitHub" */
+  private async hubOrState(p: Space): Promise<GH.GitHub | null> {
+    try {
+      const g = await this.hub(p)
+      this.repos.mark(p.path, g ? 'ok' : 'unauthenticated')
+      return g
+    } catch (e) {
+      this.repos.mark(p.path, 'down', (e as Error).message)
+      return null
+    }
+  }
+
+  /** one look at the repos' tasks: each repo is read once, whatever number of tasks it holds */
   protected async lookAtPrs() {
     const hubs = new Map<string, GH.GitHub | null>()
+    const opens = new Map<string, Map<number, GH.OpenPr> | null>()
     for (const t of this.tasks.filter((t) => t.reported && t.pr && t.worktree && !ended(t) && !t.archived && !t.stopped)) {
       if (['working', 'blocked'].includes(this.agents.status(this.key(t)))) continue
       const p = this.places.space(t.project)
       if (!p || !existsSync(t.worktree!)) continue
-      if (!hubs.has(p.path)) hubs.set(p.path, await this.hub(p).catch(() => null))
+      if (!hubs.has(p.path)) hubs.set(p.path, await this.hubOrState(p))
       const g = hubs.get(p.path)
-      if (g) await this.watchPr(t, g).catch(() => undefined)
+      if (!g) continue
+      const key = GH.repoKey(g)
+      if (!opens.has(key)) opens.set(key, await this.readOpen(g, p.path))
+      const open = opens.get(key)
+      if (!open) continue
+      try {
+        await this.watchPr(t, g, open.get(t.pr!.number))
+      } catch (e) {
+        this.watchFailed(g, e)
+      }
     }
   }
 
-  protected async watchPr(t: TaskRec, g: GH.GitHub) {
-    const pr = await this.prOf(t, g, t.worktree!)
+  private async readOpen(g: GH.GitHub, cwd: string) {
+    try {
+      return (await this.repos.read(g, cwd, 0)).prs
+    } catch (e) {
+      this.watchFailed(g, e)
+      return null
+    }
+  }
+
+  /** GitHub not answering is the repo's state (down); anything else is a fault in Lineclear, said once per look */
+  private watchFailed(g: GH.GitHub, e: unknown) {
+    if (e instanceof GH.GhDown) this.repos.mark(GH.repoKey(g), 'down', e.message)
+    else console.error(`watching ${GH.repoKey(g)}:`, e)
+  }
+
+  /** `open` is the task's pull request in the repo's read when it is open on GitHub; else it is asked for (merged, closed) */
+  protected async watchPr(t: TaskRec, g: GH.GitHub, open?: GH.OpenPr) {
+    const pr = open?.pr ?? (await this.prOf(t, g, t.worktree!))
     // merged on GitHub by hand: it is Done here too, or the tasks queued after it wait for ever
     if (pr?.state === 'MERGED') return void (await this.mergedOnGitHub(t, this.proj(t), `PR #${pr.number} was merged on GitHub`))
     if (pr?.state !== 'OPEN') return
     const w = (t.watch ??= { since: ghNow() })
     const news: string[] = []
     const what: string[] = []
-    const c = await GH.prChecks(g, t.worktree!, pr.number)
+    const c = open?.checks ?? (await GH.prChecks(g, t.worktree!, pr.number))
     const failed = c.state === 'fail' ? failKey(pr.headRefOid, c) : c.state === 'pass' ? undefined : w.failed
     if (c.state === 'fail' && failed !== w.failed) {
       for (const f of c.failed) {
@@ -66,7 +105,7 @@ export class EngineMerge extends EngineLand {
       }
       what.push(`${c.failed.map((f) => f.name).join(', ')} failed`)
     }
-    const all = await GH.prComments(g, t.worktree!, pr.number)
+    const all = open?.comments ?? (await GH.prComments(g, t.worktree!, pr.number))
     const seen = new Set(w.seen)
     // an approval or a review with no words of its own (it only carries its line comments) is no news
     const fresh = (all ?? []).filter((x) => !seen.has(x.id) && x.at >= w.since && (x.body || x.state === 'CHANGES_REQUESTED'))
@@ -95,7 +134,15 @@ export class EngineMerge extends EngineLand {
     if (this.watchingMain) return
     this.watchingMain = true
     try {
-      for (const p of this.places.spaces) await this.watchMain(p).catch(() => undefined)
+      for (const p of this.places.spaces) {
+        try {
+          await this.watchMain(p)
+        } catch (e) {
+          const g = await GH.github(p.path)
+          if (g) this.watchFailed(g, e)
+          else console.error(`watching ${p.name}:`, e)
+        }
+      }
     } finally {
       this.watchingMain = false
     }
@@ -120,8 +167,8 @@ export class EngineMerge extends EngineLand {
     const red = this.data.red?.[p.path]
     const lately = Date.now() - MAIN_WATCH
     if (!red && !this.tasks.some((t) => t.merged && t.pr && (t.doneAt ?? 0) > lately && this.places.space(t.project) === p)) return
-    const g = await this.hub(p).catch(() => null)
-    const runs = g && (await GH.branchRuns(g, p.path, p.base))
+    const g = await this.hubOrState(p)
+    const runs = g && (await this.repos.branchRuns(g, p.path, p.base, 0))
     // the newest commit on main its runs have a verdict on
     const i = runs ? runs.findIndex((r) => r.state !== 'pending') : -1
     if (!g || !runs || i < 0) return
@@ -183,8 +230,12 @@ export class EngineMerge extends EngineLand {
    * unsaved or unmerged work. Nothing is touched while herdr does not answer.
    */
   async sweep() {
-    const spaces = await this.wt.workspaces().catch(() => null)
-    if (!spaces) return
+    let spaces: Awaited<ReturnType<typeof this.wt.workspaces>>
+    try {
+      spaces = await this.wt.workspaces()
+    } catch {
+      return
+    }
     for (const t of this.tasks.filter(ended)) {
       const p = this.places.space(t.project)
       const st = this.agents.status(this.key(t))
@@ -194,7 +245,13 @@ export class EngineMerge extends EngineLand {
         (!!t.worktree && existsSync(t.worktree)) ||
         (!!t.branch && (await G.branchExists(p.path, t.branch))) ||
         !!(await this.wt.spaceOf(t.worktree, labelOf(t), spaces))
-      if (left) await this.cleanup(t, true).catch(() => undefined)
+      if (left) {
+        try {
+          await this.cleanup(t, true)
+        } catch (e) {
+          console.error(`sweeping ${t.id}:`, e)
+        }
+      }
     }
     await this.wt.closeRepoSpaces()
   }

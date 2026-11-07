@@ -5,9 +5,13 @@ import * as GH from './github.ts'
 import { type TaskRec, ended, CHECKS_EVERY, CHECKS_SHOW, LATER, failKey, ghNow } from './engine-helpers.ts'
 import type * as Lane from './lane.ts'
 import { EngineLaunch } from './engine-launch.ts'
+import { RepoWatch } from './repo-watch.ts'
 
 /** a task's pull request on GitHub: opening it, its words and GitHub's checks */
 export class EnginePr extends EngineLaunch {
+  /** GitHub's word on each repo, read once for all its tasks (watching them, waiting for their checks) */
+  protected repos = new RepoWatch()
+
   /**
    * The project's GitHub repo when gh is logged in to its host, read live: a repo may gain its remote after it was
    * added. Each form of origin is tried (as git rewrites it, as written) for one gh is logged in to. None: the task
@@ -142,14 +146,28 @@ export class EnginePr extends EngineLaunch {
     const head = (await G.git(t.worktree!, 'rev-parse', 'HEAD')).out
     const expect = await GH.hasPrWorkflows(t.worktree!)
     let errors = 0
+    let first = true
     for (;;) {
-      const c = await GH.prChecks(g, t.worktree!, n)
+      // the first look is of GitHub as it is now; waiting after it shares the repo's reads
+      const c = await this.sharedChecks(g, t.worktree!, n, head, first ? 0 : CHECKS_EVERY / 2)
+      first = false
       errors = c.state === 'error' ? errors + 1 : 0
       const early = c.state === 'none' && expect && t.pushed?.sha === head && Date.now() - t.pushed.at < CHECKS_SHOW
       if ((c.state !== 'pending' && c.state !== 'error' && !early) || errors >= 3) return this.withTests(g, t.worktree!, c)
       if (Date.now() - t0 + CHECKS_EVERY > waitMs) return early ? { ...c, state: 'pending' } : this.withTests(g, t.worktree!, c)
       await Bun.sleep(CHECKS_EVERY)
     }
+  }
+
+  /** the checks as the repo's one read has them; asked of gh for this pull request alone when that read can't tell */
+  private async sharedChecks(g: GH.GitHub, cwd: string, n: number, head: string, maxAge: number) {
+    try {
+      const shared = await this.repos.checks(g, cwd, n, head, maxAge)
+      if (shared) return shared
+    } catch (e) {
+      if (!(e instanceof GH.GhDown)) throw e
+    }
+    return GH.prChecks(g, cwd, n)
   }
 
   /** failed checks with the names of the tests their job logs show as failed */
