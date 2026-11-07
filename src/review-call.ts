@@ -22,7 +22,7 @@ export interface Finding {
 }
 
 const RULE_FILES = ["AGENTS.md", "CLAUDE.md", "REVIEW.md"];
-const CONTEXT_LINES = 20;
+const CONTEXT_LINES = 8;
 /** The diff and the rules are cut to this many characters each, so a huge change cannot overflow the model. */
 const PART_MAX = 150_000;
 
@@ -34,7 +34,7 @@ function repoRules(repo: string): string {
     .slice(0, PART_MAX);
 }
 
-/** The change since the branch left its base, with 20 lines of context, committed or not. */
+/** The change since the branch left its base, with 8 lines of context, committed or not. */
 function diffAgainst(repo: string, base: string): string | undefined {
   const ref = [`origin/${base}`, base].find((r) => git(repo, "rev-parse", "--verify", "--quiet", r).ok);
   const from = ref && gitText(repo, "merge-base", ref, "HEAD");
@@ -43,6 +43,12 @@ function diffAgainst(repo: string, base: string): string | undefined {
   const fresh = git(repo, "ls-files", "--others", "--exclude-standard").out.split("\n").filter(Boolean);
   const added = fresh.map((f) => git(repo, "diff", "--no-index", `-U${CONTEXT_LINES}`, "--", "/dev/null", f).out);
   return [git(repo, "diff", `-U${CONTEXT_LINES}`, from).out, ...added].join("");
+}
+
+/** The step itself: the brief up to the owner's direction block, which is long and the same for every task. */
+export function stepOfBrief(brief: string): string {
+  const at = brief.indexOf("## The owner's direction");
+  return (at < 0 ? brief : brief.slice(0, at)).trim();
 }
 
 function reviewQuestion(brief: string, diff: string, rules: string): string {
@@ -54,7 +60,7 @@ function reviewQuestion(brief: string, diff: string, rules: string): string {
     "No finding: answer the single line NONE.",
     "",
     "BRIEF",
-    brief,
+    stepOfBrief(brief),
     "",
     "THE REPO'S RULES",
     rules || "(none)",

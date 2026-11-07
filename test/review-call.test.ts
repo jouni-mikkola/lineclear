@@ -17,7 +17,7 @@ function repoWithChange(): string {
   return repo;
 }
 
-test("a review is one tool-less call with the brief, the diff with 20 lines of context and the rules, and stores the findings", () => {
+test("a review is one tool-less call with the brief, the diff with 8 lines of context and the rules, and stores the findings", () => {
   const repo = repoWithChange();
   const home = mkdtempSync(join(tmpdir(), "review-home-"));
   const pi = join(home, "pi");
@@ -28,16 +28,17 @@ test("a review is one tool-less call with the brief, the diff with 20 lines of c
   chmodSync(pi, 0o755);
   const env = { ...process.env, LINECLEAR_HOME: home, PI_BIN: pi, PI_CODING_AGENT_DIR: join(home, "agent") };
   writeFileSync(join(repo, "new.ts"), "brand new file\n");
-  const r = review({ task: "T-1", repo, base: "main", brief: "BRIEF TEXT", reviewer: "x/y", worker: "z/w" }, env);
+  const r = review({ task: "T-1", repo, base: "main", brief: "BRIEF TEXT\n## The owner's direction\nLONG DIRECTION", reviewer: "x/y", worker: "z/w" }, env);
   expect(r.ok).toBe(true);
   const call = readFileSync(join(home, "call"), "utf8");
   expect(call).toContain("--no-tools");
   expect(call).toContain("BRIEF TEXT");
+  expect(call).not.toContain("LONG DIRECTION");
   expect(call).toContain("RULE: short names");
   expect(call).toContain("+brand new file");
   expect(call).toContain("+changed 30");
-  expect(call).toContain(" line 10\n"); // 20 lines before the change
-  expect(call).not.toContain("\n line 9\n");
+  expect(call).toContain(" line 22\n"); // 8 lines before the change
+  expect(call).not.toContain("\n line 21\n");
   const stored = JSON.parse(readFileSync(reviewPath("T-1", env), "utf8"));
   expect(stored.findings).toEqual([
     { severity: "major", file: "a.ts", line: 30, why: "the line is wrong" },
