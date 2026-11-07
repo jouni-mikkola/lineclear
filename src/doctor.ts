@@ -3,7 +3,7 @@ import { existsSync, lstatSync, readFileSync, readlinkSync } from "node:fs";
 import { herdrArgv, herdrVersionOf } from "./herdr.ts";
 import { userInfo } from "node:os";
 import { delimiter, dirname, join } from "node:path";
-import { readJson } from "../pi/config.ts";
+import { configDir, readJson } from "../pi/config.ts";
 import { failureTail } from "../server/server/live/secrets.ts";
 import { copiesProblem, runByNote } from "./store-copies.ts";
 import { cacheEnvFile, dataDir, extensionFile, INSTALL_URL, type Paths, SERVICE } from "./paths.ts";
@@ -73,7 +73,7 @@ export interface Probe {
 export function realProbe(paths: Paths, env: Record<string, string | undefined> = process.env): Probe {
   const probe: Probe = {
     paths,
-    setup: readSetup(env),
+    setup: storedSetup(env),
     dataDir: dataDir(env),
     running: () => {
       try {
@@ -303,13 +303,21 @@ function newTaskModel(): Check {
   return { name: "model", problem: "", fix: "", info: model ? `a new task with no model set starts on ${model}` : "pi lists no model yet" };
 }
 
+/** The chosen models, or undefined on a machine that has chosen none yet (a fresh install has nothing to lose). */
+function storedSetup(env: Record<string, string | undefined>): Setup | undefined {
+  const setup = readSetup(env);
+  return existsSync(join(configDir(env), "settings.json")) ? setup : undefined;
+}
+
+const ROLE_WORDS: Record<string, string> = { stepChecker: "step checker" };
+
 /** One check per role with no model: a lost setting fails every start of that role. */
 function roleModels(p: Probe): Check[] {
   const { setup } = p;
   if (!setup) return [];
   return setupRoles
     .filter((role) => !setup[role])
-    .map((role) => ({ name: `${role} model`, problem: `no model chosen for the ${role}`, fix: "lineclear setup" }));
+    .map((role) => ({ name: `${role} model`, problem: `no model chosen for the ${ROLE_WORDS[role] ?? role}`, fix: "lineclear setup" }));
 }
 
 /** The service and the command are the release build, or the problem and the install that fixes it. */
