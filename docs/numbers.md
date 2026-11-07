@@ -99,20 +99,20 @@ Measured on the one machine with this repo's history, under light load. The Spee
 
 | Measure | Median | p90 | Runs | Measure again |
 | --- | --- | --- | --- | --- |
-| `lineclear task add` to the agent's first tool call | 23 s | 131 s | last 20 done tasks | `start` |
+| `lineclear task add` to the agent's first tool call | 22 s | 131 s | last 20 done tasks | `start` |
 | `lineclear task list` wall time | 0.23 s | 0.23 s | 7 | `time 7 lineclear task list` |
 | `lineclear show` wall time | 0.09 s | 0.09 s | 7 | `time 7 lineclear show` |
 | `lineclear room` wall time | 0.47 s | 0.68 s | 7 | `time 7 lineclear room` |
 | Board `GET /api/snapshot`, 24.5 MB | 0.19 s | 0.28 s | 7 | `snapshot http://127.0.0.1:<board port>` |
-| `check.yml` on main, whole run | 66 s | 86 s | last 20 runs | `gh` |
-| Agent new input per task | 55 k | 276 k | last 20 done tasks | `tokens` |
-| Agent cache reads per task | 798 k | 10502 k | last 20 done tasks | `tokens` |
+| `check.yml` on main, whole run | 73 s | 92 s | last 20 runs | `gh` |
+| Agent new input per task | 79 k | 280 k | last 20 done tasks | `tokens` |
+| Agent cache reads per task | 1303 k | 11076 k | last 20 done tasks | `tokens` |
 | Coordinator new input per session | 227 k | 12702 k | last 6 sessions | `chat-tokens` |
 | Dispatcher new input per session | 38 k | 2773 k | last 11 sessions | `chat-tokens` |
 | Stall-kind lines per hour in `decisions.jsonl` | 15.5 | | 169 hours | `stalls` |
 
 The reviewer ran in 2 of the last 20 done tasks' session folders, so its tokens have too few runs to set a target.
 
-Runs of `check.yml` on main, the last 50: 20 success, 14 failure, 15 cancelled, 1 still running
-(`gh run list --workflow check.yml --branch main --limit 50`). The workflow's `concurrency` group is the branch ref with
-`cancel-in-progress`, so each push to main cancels the run before it.
+Runs of `check.yml` on main, the last 50: 21 success, 16 failure, 13 cancelled
+(`gh run list --workflow check.yml --branch main --limit 50`). The cancelled runs are from before the workflow's
+`concurrency` group stopped cancelling runs on main. The full check now runs in 8 shards.

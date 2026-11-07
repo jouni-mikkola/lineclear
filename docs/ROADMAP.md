@@ -68,8 +68,8 @@ Result: The board loads from a snapshot of at most 200 KB, so a phone gets the f
 
 ### L451 An agent starts in 10 seconds
 Result: A task's agent makes its first tool call at most 10 s after `lineclear task add`, median, and 30 s at p90.
-- why: from add to first tool call takes 23 s (median) and 131 s (p90) today, and 22 of 194 tasks needed their brief sent again.
-- done when: `bun scripts/core-baseline.ts start 20` prints a median of 10 s or less and a p90 of 30 s or less over 20 new tasks; no task of those 20 needed its brief sent again. Baseline today: median 23 s, p90 131 s.
+- why: from add to first tool call takes 22 s (median) and 131 s (p90) today, and 22 of 194 tasks needed their brief sent again.
+- done when: `bun scripts/core-baseline.ts start 20` prints a median of 10 s or less and a p90 of 30 s or less over 20 new tasks; no task of those 20 needed its brief sent again. Baseline today: median 22 s, p90 131 s.
 - locks: agent-start
 - after: none
 - files: server/server/live/engine/engine-launch.ts, server/server/live/engine/briefs.ts, src/starts.ts
@@ -83,25 +83,25 @@ Result: `lineclear task list`, `lineclear show` and `lineclear room` each finish
 - files: src/cli.ts, src/task-read.ts, src/herdr.ts
 
 ### L453 Main is never red
-Result: No push to main cancels another's `check.yml` run, and a commit that turns main red is reverted within 10 minutes.
-- why: of the last 50 runs on main 14 failed and 15 were cancelled by the next push (its `concurrency` group cancels in progress), so main's state is often unknown.
-- done when: `gh run list --workflow check.yml --branch main --limit 20 --json conclusion` lists 0 `cancelled` over 20 runs after the step's merge; a test plants a red main and sees a revert commit and a fix task within 10 simulated minutes. Baseline today: 14 failed and 15 cancelled of the last 50 runs.
+Result: A commit that turns main red is reverted within 10 minutes and gets a fix task, and no run on main is cancelled.
+- why: of the last 50 runs on main 16 failed and 13 were cancelled (before `check.yml` stopped cancelling runs on main), and no rule yet reverts a red main.
+- done when: `gh run list --workflow check.yml --branch main --limit 20 --json conclusion` lists 0 `cancelled` over 20 runs after the step's merge; a test plants a red main and sees a revert commit and a fix task within 10 simulated minutes. Baseline today: 16 failed and 13 cancelled of the last 50 runs.
 - locks: main-green
 - after: none
 - files: .github/workflows/check.yml, server/server/live/engine/lane.ts, server/server/live/engine/lane-watch.ts
 
 ### L454 Stable follows green main only
-Result: `lineclear promote <commit>` installs a commit as stable only when its GitHub `check` is green on main, and prints the commit.
+Result: `bun scripts/promote.ts <commit>` installs a commit as stable only when its GitHub `check` is green on main, and prints the commit.
 - why: the machines run the stable install, and a promotion of a red or unchecked commit puts every machine on a bug.
-- done when: a test runs `lineclear promote` on a red, a pending and a green commit and sees refuse, refuse, install; `bun scripts/canary.ts` still passes on the installed commit. Baseline today: no command checks the commit's `check` run before an install.
+- done when: a test runs `scripts/promote.ts` on a red, a pending and a green commit and sees refuse, refuse, install; `bun scripts/canary.ts` still passes on the installed commit. Baseline today: no command checks the commit's `check` run before an install.
 - locks: promotion
 - after: none
-- files: src/builds.ts, scripts/canary.ts, install.sh
+- files: scripts/promote.ts, scripts/canary.ts, install.sh
 
 ### L455 GitHub check in 45 seconds
 Result: The whole `check.yml` run on main finishes in 45 s or less, median, and 60 s at p90.
-- why: merge waits for the check, which takes 66 s (median) and 86 s (p90) today; jobs 1/4 and 3/4 take 24 s and 22 s while 2/4 and 4/4 take 46 s and 57 s.
-- done when: `bun scripts/core-baseline.ts gh 20` prints a run median of 45 s or less and a p90 of 60 s or less over 20 runs on main. Baseline today: median 66 s, p90 86 s.
+- why: merge waits for the check, which takes 73 s (median) and 92 s (p90) today, in 8 shards; the slowest shard of the last runs took 203 s.
+- done when: `bun scripts/core-baseline.ts gh 20` prints a run median of 45 s or less and a p90 of 60 s or less over 20 runs on main. Baseline today: median 73 s, p90 92 s.
 - locks: check-ci
 - after: none
 - files: scripts/check-speed.ts, scripts/load-map.ts, test/check-speed.test.ts
@@ -116,7 +116,7 @@ Result: A lock wait raises no stall line, and every other stall line names a cla
 
 ### L457 Agents read less
 Result: A task agent spends at most 40 k new input tokens at the median and 150 k at p90, with its prompt and skills trimmed to match.
-- why: a task agent spends 55 k new input tokens (median) and 276 k (p90), and 798 k cache reads (p90 10.5 M).
+- why: a task agent spends 79 k new input tokens (median) and 280 k (p90), and 1303 k cache reads (p90 11.1 M).
 - done when: `bun scripts/core-baseline.ts tokens 20` over 20 new tasks prints agent new input of 40 k or less (median) and 150 k or less (p90); `wc -c server/server/live/prompts.ts` prints at most 9400 bytes (70 % of 13418 today).
 - locks: agent-prompt
 - after: none
@@ -144,7 +144,7 @@ Result: With 45 ready steps on disjoint locks, 45 agents are working within 5 mi
 - done when: a test with 3 fake machines of 10, 12 and 25 slots and 45 ready steps starts 45 within 5 simulated minutes and never more than a machine's slots; `lineclear roadmap locks . --space <name>` on this file lists every step of this section as startable together.
 - locks: slots
 - after: none
-- files: src/rules.ts, src/tick-project.ts, src/spread.ts
+- files: src/rules.ts, src/tick-project.ts
 
 ## Frozen by the owner 5 Nov 2026
 
