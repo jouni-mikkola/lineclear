@@ -33,16 +33,18 @@ const real = (path: string) => {
   }
 };
 
-/** Removes a worktree folder, then tells its repo to forget it (the repo is named in the folder's `.git` file). */
-function removeWorktree(path: string): void {
+/** Removes a linked worktree folder, then tells its repo to forget it (the repo is named in the folder's `.git` file). A folder that is no linked worktree, such as a clone, holds commits nowhere else and stays. */
+function removeWorktree(path: string): boolean {
   let gitDir = "";
   try {
     gitDir = readFileSync(join(path, ".git"), "utf8").match(/^gitdir: (.+)\/worktrees\/[^/\n]+$/m)?.[1] ?? "";
   } catch {
-    // not a linked worktree
+    // no .git file
   }
+  if (!gitDir) return false;
   removeFolders([path]);
-  if (gitDir) spawnSync("git", [`--git-dir=${gitDir}`, "worktree", "prune"], { stdio: "ignore" });
+  spawnSync("git", [`--git-dir=${gitDir}`, "worktree", "prune"], { stdio: "ignore" });
+  return true;
 }
 
 /** The loop's sweep of disk use: worktrees of ended tasks, work folders no task owns, and the data of deleted features. Returns what to log. */
@@ -64,8 +66,7 @@ export function sweepDiskUse(now: Date, env: Env = process.env): string[] {
     const ended = !!(t.merged || t.closed);
     owned.add(real(wt));
     if (ended && !t.pinned && now.getTime() - doneAt >= RETIRED_AGE_MS && existsSync(wt) && !hasUncommitted(wt)) {
-      removeWorktree(wt);
-      retired++;
+      if (removeWorktree(wt)) retired++;
     }
   }
   if (retired) lines.push(`removed ${retired} worktree${retired === 1 ? "" : "s"} of retired tasks`);
@@ -93,8 +94,7 @@ export function sweepDiskUse(now: Date, env: Env = process.env): string[] {
         continue;
       }
       if (hasUncommitted(path)) continue;
-      removeWorktree(path);
-      orphans++;
+      if (removeWorktree(path)) orphans++;
     }
   }
   if (orphans) lines.push(`removed ${orphans} old work folder${orphans === 1 ? "" : "s"} no task owns`);
