@@ -8,7 +8,7 @@ import { failureTail } from "../server/server/live/secrets.ts";
 import { copiesProblem, runByNote } from "./store-copies.ts";
 import { cacheEnvFile, dataDir, extensionFile, INSTALL_URL, type Paths, SERVICE } from "./paths.ts";
 import { diskTrouble, freeBytes } from "./health.ts";
-import { readModelFile } from "./models.ts";
+import { firstModel, readModelFile } from "./models.ts";
 import { checkoutPointers } from "./install-paths.ts";
 import { buildNames, buildProblem, buildsDir, installReleaseCommand, type RunFrom, unitCommand } from "./builds.ts";
 import { publishedAddress, serveCommand } from "./published.ts";
@@ -65,6 +65,8 @@ export interface Probe {
   ci?: boolean;
   /** The failed starts of the last 24 hours, one entry per machine. */
   starts?: MachineStarts[];
+  /** The model a new task starts on when no default is set (the machine's first available one). */
+  newTaskModel?: () => string | undefined;
 }
 
 export function realProbe(paths: Paths, env: Record<string, string | undefined> = process.env): Probe {
@@ -87,6 +89,7 @@ export function realProbe(paths: Paths, env: Record<string, string | undefined> 
     runFrom: runFrom(paths, env),
     taskIds: () => storedTaskIds(dataDir(env)),
     ci: env.CI === "true",
+    newTaskModel: () => firstModel("pi"),
     user: env.USER ?? userInfo().username,
     free: freeBytes,
     minFreeMb: env.LINECLEAR_MIN_FREE_MB,
@@ -353,6 +356,9 @@ export function doctorChecks(probe: Probe): Check[] {
       skip: !p.runBy,
     },
     taskIdsUnique(p),
+    ...(p.newTaskModel
+      ? [{ name: "new task model", problem: "", fix: "", info: p.newTaskModel() ?? "pi lists no model, so a start waits until it does" }]
+      : []),
     ...(p.starts ?? []).map((m) => ({ name: "failed starts", problem: "", fix: "", info: startsLine(m).replace(/^failed starts /, "") })),
   ];
 }

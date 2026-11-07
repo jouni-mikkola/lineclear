@@ -187,6 +187,27 @@ describe('an agent that was at work when the machine went down', () => {
   })
 })
 
+describe('a start with no model set', () => {
+  test('takes the machine first model and tells the agent to note it in its facts', async () => {
+    const { setRegistry } = await import('../../src/models.ts')
+    setRegistry([{ harness: 'pi', provider: 'fakeco', name: 'zeta-1' }])
+    const a = new Agents()
+    Object.assign(a, { sub: { set: () => undefined, stop: () => undefined } })
+    try {
+      // herdr is not reached, so the start ends later than the model choice
+      const error = await a.ensure({ key: 'T-2/Agent', name: 'shep-t-2', kind: 'pi', cwd: tmpdir(), workspace: 'w', model: '' } as never).catch((e: Error) => e)
+      expect(String((error as Error)?.message)).not.toContain('No model is set')
+      const r = a.record('T-2/Agent')!
+      expect(r.model).toBe('fakeco/zeta-1')
+      expect(r.system).toContain('started you on fakeco/zeta-1')
+      expect(r.system).toContain('facts')
+    } finally {
+      setRegistry([])
+      a.stop()
+    }
+  })
+})
+
 describe('an agent that stopped', () => {
   test('is started again: relaunch lets its start through ensure()', async () => {
     const a = agents()
