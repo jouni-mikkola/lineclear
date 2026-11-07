@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import type { Action, Snapshot } from '../../shared/types.ts'
 import { clock } from '../../shared/time.ts'
@@ -7,6 +8,7 @@ import { boxInfo } from './install.ts'
 import type { BoxInfo } from './box.ts'
 import type { Kept } from './kept.ts'
 import { type Events, type Link, dirOf } from './machines-helpers.ts'
+import { saveWaiting } from './waiting.ts'
 import { running, type Worker } from './worker-process.ts'
 
 /** what a worker says of itself in its server.json */
@@ -80,9 +82,10 @@ export abstract class LinkPoll extends Emitter<Events> {
       this.connect(l)
       if (herdrUp) await this.flush(l)
       this.emit('snapshot')
-    } catch {
+    } catch (e) {
       if (!this.active(l)) return
       if (!this.moved(l) && (l.reachable || l.down === undefined)) {
+        l.state = `Can't reach it: ${(e as Error).message}`
         l.reachable = false
         l.down ??= Date.now()
         this.emit('snapshot')
@@ -108,9 +111,31 @@ export abstract class LinkPoll extends Emitter<Events> {
     return herdrUp
   }
 
-  /** what waited for the machine goes in now */
+  /** What waited for the machine goes in now, in order. An action leaves the kept list only once the machine has
+   *  answered, so a restart or a failure never drops or repeats one; a failure shows in the machine's state. */
   protected async flush(l: Link) {
-    for (const a of l.waiting.splice(0)) await this.forward(l, a).catch(() => l.waiting.push(a))
+    if (l.flushing) return
+    l.flushing = true
+    try {
+      while (l.waiting.length) {
+        try {
+          await this.forward(l, l.waiting[0].action)
+        } catch (e) {
+          l.failed = `Couldn't deliver an action: ${(e as Error).message}`
+          this.emit('snapshot')
+          this.retry(l)
+          return
+        }
+        l.waiting.shift()
+        saveWaiting(l.saved.label, l.waiting)
+      }
+      if (l.failed) {
+        l.failed = undefined
+        this.emit('snapshot')
+      }
+    } finally {
+      l.flushing = false
+    }
   }
 
   protected retryAfter = 3000
@@ -203,7 +228,8 @@ export abstract class LinkPoll extends Emitter<Events> {
 
   async act(l: Link, a: Action): Promise<unknown> {
     if (!l.reachable) {
-      l.waiting.push(a)
+      l.waiting.push({ id: randomUUID(), action: a })
+      saveWaiting(l.saved.label, l.waiting)
       return { waiting: true }
     }
     return this.forward(l, a)

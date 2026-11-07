@@ -7,6 +7,7 @@ import { boxInfo, helperVersion, installHelper, lacks, machineStatus, probe, sav
 import { MERGE_DEADLINE } from './engine/engine.ts'
 import type { Kept } from './kept.ts'
 import { LinkPoll, workerRecord } from './link-poll.ts'
+import { loadWaiting } from './waiting.ts'
 import { CONNECTING_FOR, type Link, dirOf, fits, machineHome, sameBox, workerHome } from './machines-helpers.ts'
 import { codeVersion, readAddress, running, type Worker } from './worker-process.ts'
 
@@ -65,7 +66,7 @@ export class MachinesLinks extends LinkPoll {
       chats: new Map(),
       watching: { chats: [], term: null },
       reachable: false,
-      waiting: [],
+      waiting: loadWaiting(m.label),
       state: 'Connecting…',
       lacks: [],
       connecting: true,

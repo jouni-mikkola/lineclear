@@ -42,8 +42,9 @@ export class MachinesActions extends MachinesLinks {
   rows() {
     return [...this.links.values()].map((l) => ({
       name: l.rec.machine,
-      state:
-        l.reachable && l.state === 'Ready'
+      state: l.failed
+        ? `${l.failed}; ${l.waiting.length} waiting`
+        : l.reachable && l.state === 'Ready'
           ? `Ready · ${l.saved.target}`
           : l.reachable
             ? l.state
@@ -62,8 +63,8 @@ export class MachinesActions extends MachinesLinks {
         .split('\n')
         .slice(-20)
         .join('\n')
-    } catch {
-      return ''
+    } catch (e) {
+      return `Can't read the log: ${(e as Error).message}`
     }
   }
 }

@@ -16,7 +16,7 @@ export interface Kept {
 function moveOldStore(d: string) {
   const from = join(HOME, 'machines', d)
   const to = join(HOME, 'workers', d)
-  const files = readdirSync(from).filter((f) => f !== 'last.json')
+  const files = readdirSync(from).filter((f) => f !== 'last.json' && f !== 'waiting.json')
   if (!files.length) return
   mkdirSync(to, { recursive: true })
   for (const f of files) {
