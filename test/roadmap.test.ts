@@ -9,7 +9,7 @@ import { FORK_PATH } from "../ui/test/chain-path.ts";
 import { roadmapSample } from "../ui/test/samples/roadmap-samples.ts";
 import { stepFiles, stepParts } from "../src/parts.ts";
 import { roadmapMain } from "../src/roadmap-cli.ts";
-import { checkRoadmap, closedSteps, doneIds, fitTitle, formErrors, parseRoadmap, resultFlag, resultOf, type Step, TITLE_MAX } from "../src/roadmap.ts";
+import { checkRoadmap, closedSteps, doneIds, doneItems, fitTitle, formErrors, parseRoadmap, resultFlag, resultOf, type Step, TITLE_MAX } from "../src/roadmap.ts";
 
 const temps: string[] = [];
 const scratch = mkdtempSync(join(tmpdir(), "lc-roadmap-cfg-"));
@@ -250,11 +250,15 @@ test("the line carries no critical path while it gives no finish date", () => {
   expect(roadmapLine(plan, new Map(), {}, 0).path).toBeUndefined();
 });
 
-test("testOf reads the test a done-when names; closedSteps counts remote tasks closed by their agent's done", async () => {
-  const { testOf } = await import("../src/doneproof.ts");
+test("a done-when bullet wrapped over two lines is one item", () => {
+  const text =
+    "# Roadmap\n\n## Phase 0\n\n### R5 Wrap\n- why: because\n- done when:\n  - First part of it\n    and the rest.\n  - Second:\n    - nested.\n- locks: none\n- after: none\n";
+  expect(doneItems(checkRoadmap(text).parsed.steps[0] as Step)).toEqual(["First part of it and the rest.", "Second: - nested."]);
+});
+
+test("closedSteps counts remote tasks closed by their agent's done", async () => {
   const text = "# R\n\n## P\n\n### A T\n- why: w\n- done when:\n  - `bun test test/a.test.ts` passes\n- locks: repo\n- after: none\n";
   const { parsed } = checkRoadmap(text);
-  expect(testOf((parsed?.steps ?? [])[0] as Step)).toBe("bun test test/a.test.ts");
   const remote = [{ id: "L-1@host", title: "A T", status: "done", closed: true, closedBy: "done" as const }];
   expect([...closedSteps(parsed?.steps ?? [], [], {}, remote).keys()]).toEqual(["A"]);
 });

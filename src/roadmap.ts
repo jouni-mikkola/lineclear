@@ -318,3 +318,27 @@ export function fitTitle(title: string): string {
   const cut = t.slice(0, TITLE_MAX + 1).lastIndexOf(" ");
   return (cut > 0 ? t.slice(0, cut) : t.slice(0, TITLE_MAX)).replace(/[\s,:;.-]+$/, "");
 }
+
+/** The `done when` items of a step: its bullets, each with its wrapped lines, else its text as one item. A `Reopened:` item is not one to prove. */
+export function doneItems(step: Step): string[] {
+  const f = step.fields["done when"];
+  if (!f) return [];
+  const items: string[] = [];
+  const lines = [f.value, ...f.more];
+  const indentOf = (l: string) => /^\s*/.exec(l)?.[0].length ?? 0;
+  const bulletIndents = f.more.filter((l) => /^\s*[-*]\s/.test(l)).map(indentOf);
+  const top = bulletIndents.length > 0 ? Math.min(...bulletIndents) : 0;
+  for (const l of lines) {
+    const bullet = /^\s*[-*]\s+(.*)$/.exec(l)?.[1]?.trim();
+    if (bullet !== undefined && (l === f.value || indentOf(l) === top)) items.push(bullet);
+    else if (items.length > 0 && l.trim() !== "") items[items.length - 1] += ` ${l.trim()}`;
+  }
+  if (items.length === 0)
+    items.push(
+      [f.value, ...f.more]
+        .map((l) => l.trim())
+        .join(" ")
+        .trim(),
+    );
+  return items.filter((i) => i !== "" && !/^(Reopened|Owner only):/i.test(i));
+}

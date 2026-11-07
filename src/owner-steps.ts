@@ -1,6 +1,5 @@
-import { doneItems } from "./doneproof.ts";
 import { addItem, readItems } from "./inbox.ts";
-import type { Step } from "./roadmap.ts";
+import { doneItems, type Step } from "./roadmap.ts";
 import type { State, World } from "./rules.ts";
 
 /** What the owner's steps need of a tick. */

@@ -10,7 +10,7 @@ type Env = Record<string, string | undefined>;
 export const machineOf = (env: Env = process.env) =>
   ((env.LINECLEAR_MACHINE ?? "").split(".")[0] || hostname().split(".")[0] || "machine").replace(/[^A-Za-z0-9._-]+/g, "_");
 
-export type Work = "agent" | "review" | "stepcheck" | "doneproof";
+export type Work = "agent" | "review" | "stepcheck";
 
 export interface WorkLine {
   time: string;
