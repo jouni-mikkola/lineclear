@@ -11,6 +11,8 @@ import { type TaskRec, ended, labelOf, CHECKS_WAIT, MAIN_WATCH, failKey, quote, 
 import { EngineLand } from './merge.ts'
 import { RedMainWatch } from './lane-watch.ts'
 
+const REVERTED = 'Lineclear reverted that commit; bring its change back, fixed.'
+
 export class EngineMerge extends EngineLand {
   /** lineclear checks: wait for GitHub's checks on the task's pull request, at the commit this machine has */
   checks(id: string, waitMs = CHECKS_WAIT): Promise<{ ok: boolean; text: string }> {
@@ -153,7 +155,10 @@ export class EngineMerge extends EngineLand {
 
   /** main is green: the fix tasks of older reds have nothing left to merge. One with commits of its own stays: close refuses it. */
   private async closeOldFixes(p: Space) {
-    for (const t of this.tasks.filter((x) => x.by === 'main-green' && !ended(x) && !x.machine && this.places.space(x.project) === p))
+    // a reverted red is what made main green: its task still has the change to bring back
+    for (const t of this.tasks.filter(
+      (x) => x.by === 'main-green' && !ended(x) && !x.machine && !x.desc.includes(REVERTED) && this.places.space(x.project) === p,
+    ))
       await this.close(t.id, `nothing to merge: ${p.base} is green`).catch(() => undefined)
   }
 
@@ -201,7 +206,7 @@ export class EngineMerge extends EngineLand {
     const ids = merged.map((m) => m.match(/^([A-Z][A-Z0-9]*-\d+):/)?.[1]).filter((x): x is string => !!x)
     // one fix task per repo and red: the first loop to claim the red files it, the others only say so
     const claim = await GH.claimRef(g, p.path, `red-${now.sha}`, now.sha)
-    const heldBy = this.tasks.find((x) => x.by === 'main-green' && x.title.startsWith(`Fix ${p.base} red at ${now.sha.slice(0, 7)}`))
+    const heldBy = this.tasks.find((x) => x.by === 'main-green' && !ended(x) && x.title.startsWith(`Fix ${p.base} red at ${now.sha.slice(0, 7)}`))
     if (claim !== 'held')
       await this.redMain.look(
         { sha: now.sha, conclusion: 'failure' },
@@ -215,7 +220,7 @@ export class EngineMerge extends EngineLand {
               base: p.base,
               by: 'main-green',
               title: `Fix ${p.base} red at ${sha.slice(0, 7)}`,
-              desc: `${p.base} went red at ${sha}: ${failing}. ${reverted ? 'Lineclear reverted that commit; bring its change back, fixed.' : 'The revert failed; fix it forward.'} Merged since it was last green: ${merged.join('; ') || 'unknown'}.`,
+              desc: `${p.base} went red at ${sha}: ${failing}. ${reverted ? REVERTED : 'The revert failed; fix it forward.'} Merged since it was last green: ${merged.join('; ') || 'unknown'}.`,
             })
           },
         },

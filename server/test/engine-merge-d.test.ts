@@ -242,7 +242,7 @@ describe('on GitHub: news, checks and the default way in', () => {
     await w.engine.watchMains()
     expect(fixes().length).toBe(0)
     expect(w.news.some((n) => n.includes('red, fixed by'))).toBe(true)
-    // this loop claims a red nobody else has: one task, and a second look adds none
+    // this loop claims a red nobody else has: one task
     g.set({ refs: [] })
     ;(w.engine as unknown as { data: { red?: object } }).data.red = {}
     await w.engine.watchMains()
