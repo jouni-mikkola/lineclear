@@ -150,13 +150,17 @@ export function dispatcherPrompt(): string {
   return `${readFileSync(join(import.meta.dir, "..", "templates", "dispatcher.md"), "utf8").trimEnd()}\n\n${ownerDirection()}\n`;
 }
 
-const agentIsPi = (run: (...a: string[]) => { stdout: Buffer }) =>
+/** The smallest model that keeps `bun run dispatcher:eval` at 95 % or more (haiku-5-5 scored 90 % at best). */
+export const DISPATCHER_MODEL = "claude-bridge/claude-sonnet-5-5";
+
+/** True when the space stores `value` for `key` itself, as `lineclear show` prints it. */
+const isStored = (run: (...a: string[]) => { stdout: Buffer }, key: string, value: string) =>
   run("show", "--space", DISPATCHER_SPACE)
     .stdout.toString()
     .split("\n")
-    .some((l) => /^coordinator\.agent\s+pi\s+\(this space\)/.test(l));
+    .some((l) => l.startsWith(`${key} `) && l.slice(key.length).trim().startsWith(`${value} (this space)`));
 
-/** `lineclear dispatcher setup`: makes the Dispatcher's space, in regular mode, with pi as its coordinator agent. Safe to run again. */
+/** `lineclear dispatcher setup`: makes the Dispatcher's space, in regular mode, with pi and DISPATCHER_MODEL as its coordinator. Safe to run again. */
 export function dispatcherMain(args: string[], out: (l: string) => void, env = process.env): number {
   if (args.length === 1 && args[0] === "projects") return projectsMain(out, env);
   if (args.length !== 1 || args[0] !== "setup") return (USAGE.slice(1).forEach((l) => out(l)), 2);
@@ -181,11 +185,12 @@ export function dispatcherMain(args: string[], out: (l: string) => void, env = p
     ...(exists ? [] : [["space", "add", dir, "--name", DISPATCHER_SPACE]]),
     ["mode", DISPATCHER_SPACE, "regular"],
     ["set", "coordinator.agent", "pi", "--space", DISPATCHER_SPACE],
+    ["set", "coordinator.model", DISPATCHER_MODEL, "--space", DISPATCHER_SPACE],
   ];
   for (const s of steps) {
     const p = run(...s);
     // The set can store the value and still fail on restarting the coordinator where no local runtime runs: the stored value decides.
-    if (p.exitCode !== 0 && !(s[0] === "set" && agentIsPi(run)))
+    if (p.exitCode !== 0 && !(s[0] === "set" && isStored(run, s[1]!, s[2]!)))
       return (out(`lineclear dispatcher: lineclear ${s.slice(0, 2).join(" ")} failed: ${(p.stderr.toString() || p.stdout.toString()).trim()}`), 1);
   }
   out(`the Dispatcher is the chat of the space '${DISPATCHER_SPACE}' (${dir}).`);

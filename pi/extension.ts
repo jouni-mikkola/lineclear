@@ -4,6 +4,7 @@ import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { quietNudge } from "./nudge.ts";
+import freshDispatcher from "./fresh-dispatcher.ts";
 
 type Env = Record<string, string | undefined>;
 
@@ -104,6 +105,7 @@ export function beatDuringCalls(
 export default async function lineclearExtension(pi: Pi): Promise<void> {
   nudgeQuietTurns(pi);
   beatDuringCalls(pi);
+  freshDispatcher(pi);
   pi.on("resources_discover", () => (lineclearAgent(process.env) ? { skillPaths: kitSkills() } : undefined));
   pi.on("before_agent_start", (event) => {
     const sections = event?.systemPromptOptions?.sections;

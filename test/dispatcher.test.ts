@@ -2,7 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { dispatcherDir, dispatcherMain, moveMain } from "../src/dispatcher.ts";
+import { DISPATCHER_MODEL, dispatcherDir, dispatcherMain, moveMain } from "../src/dispatcher.ts";
 import { readItems } from "../src/inbox.ts";
 import { inboxMain } from "../src/inbox-answer.ts";
 import { planMain } from "../src/plan.ts";
@@ -118,6 +118,7 @@ test("setup makes a regular-mode space with pi, and plans go to the project's sp
     ["space", "add", dispatcherDir(t.env), "--name", "dispatcher"],
     ["mode", "dispatcher", "regular"],
     ["set", "coordinator.agent", "pi", "--space", "dispatcher"],
+    ["set", "coordinator.model", DISPATCHER_MODEL, "--space", "dispatcher"],
   ]);
   // A plan started from the Dispatcher puts its task in the project's space.
   expect(planMain(["demo", "Ship it"], () => {}, t.env, dispatcherDir(t.env))).toBe(0);
@@ -193,7 +194,7 @@ test("nothing the rule loop or a project add does names the Dispatcher's space, 
       .slice(0, setupCalls)
       .filter((c) => c.includes("dispatcher"))
       .map((c) => c[0]),
-  ).toEqual(["space", "mode", "set"]);
+  ).toEqual(["space", "mode", "set", "set"]);
 });
 
 test("status names a task that waits for you, from the task list", () => {
