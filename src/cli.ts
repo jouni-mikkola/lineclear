@@ -28,7 +28,6 @@ import { gitText } from "./git.ts";
 import { recordReviewCall } from "./task-work.ts";
 
 export const commands: Record<string, string> = {
-  export: "Print what this machine holds as JSON, for the machine that shows all of them",
   doctor: "Check each part and name the command that fixes a problem (--here checks only this machine)",
   project: "Add, list, change, remove and check projects",
   roadmap: "Check or show the roadmap (roadmap show <id> prints one step)",

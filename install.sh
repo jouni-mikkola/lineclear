@@ -468,15 +468,6 @@ enable_linger() {
   fi
 }
 
-# Every machine added in Settings gets this install too. A machine's own install does not go on to others.
-update_machines() {
-  [ -z "${LINECLEAR_NO_FANOUT:-}" ] || return 0
-  [ -x "$bindir/lineclear" ] || return 0
-  [ -s "${LINECLEAR_CONFIG:-$HOME/.config/lineclear}/machines.json" ] || return 0
-  say "Machines: updating each machine added in Settings"
-  LINECLEAR_REF="$ref" LINECLEAR_REPO="$repo" "$bindir/lineclear" machine update || say "Some machines did not update. Run 'lineclear doctor' to see which."
-}
-
 # The install of a release: see install_release. A failed smoke check puts builds/previous back as current.
 main_release() {
   install_tools
@@ -495,7 +486,6 @@ main_release() {
   if [ "$active" -eq 1 ] && [ "$changed" -eq 1 ]; then smoke; fi
   rm -rf "$projects_before"
   enable_linger
-  update_machines
   say "Done. Run 'lineclear doctor' to check it."
 }
 
@@ -537,7 +527,6 @@ main() {
   armed=0
   rm -rf "$projects_before"
   enable_linger
-  update_machines
 
   case ":$path_before:" in
     *":$bindir:"*) ;;
