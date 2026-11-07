@@ -2,7 +2,7 @@ import { taskIdsSection } from './task-ids.ts'
 import { coordinatorRequestIds } from '../../shared/attention.ts'
 import { randomUUID } from 'node:crypto'
 import { BODY_MAX, clip, lastReply, openCards, TITLE_MAX } from '../../shared/alerts.ts'
-import type { Action, Alert, CardAsk, Chat, Question, Snapshot } from '../../shared/types.ts'
+import type { Action, Alert, CardAsk, Chat, Question, Snapshot, Task } from '../../shared/types.ts'
 import { hidden } from './agents.ts'
 import { excerpt, line } from './chatlines.ts'
 import { rememberReply } from './chats.ts'
@@ -14,6 +14,9 @@ import { room } from './herdr-forward.ts'
 import { repositorySection } from './settings.ts'
 import { secretPages } from './secrets.ts'
 import { LiveSourceState } from './source-state.ts'
+
+/** the briefs and fact lines are the bulk of a board and no list shows them: a task's own page and `task show` read them from its view */
+const lean = (v: Task): Task => ({ ...v, desc: undefined, facts: undefined, said: v.said?.slice(0, 200) })
 
 export class LiveSourceViews extends LiveSourceState {
   pushWarnings: () => string[] = () => []
@@ -150,7 +153,7 @@ export class LiveSourceViews extends LiveSourceState {
       places,
       machines,
       tasks: [
-        ...this.engine.tasks.filter((t) => this.places.space(t.project)).map((t) => this.engine.view(t)),
+        ...this.engine.tasks.filter((t) => this.places.space(t.project)).map((t) => lean(this.engine.view(t))),
         ...peers.flatMap((l) => this.peers!.tasksOf(l)),
       ],
       asks,
