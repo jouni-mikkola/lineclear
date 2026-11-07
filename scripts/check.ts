@@ -4,7 +4,6 @@
 // each step's time recorded (scripts/check-speed.ts) and a file or the whole run over its limit failed by name.
 // `--full` runs everything the light check has, never a browser: checks are light and run on GitHub (docs/numbers.md). `--changed`
 // is the worker's loop.
-// A test that fails and then passes alone is a flake (scripts/flaky.ts): recorded, not failed.
 // The budget is 180 s on a machine that is not busy (docs/numbers.md); a busy one is slower for reasons outside the change.
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -31,7 +30,7 @@ import {
   writeTimes,
 } from "./check-speed.ts";
 import { fastGates } from "./fast-gates.ts";
-import { describeFailure, type Failure, outsideChange, parseFailures, settleFailures } from "./flaky.ts";
+import { describeFailure, type Failure, outsideChange, parseFailures } from "./failures.ts";
 import { changedSince } from "./gates/tools.ts";
 
 // Every step but the server's (below) runs with TMPDIR in a folder of this run, on disk. Each test process clears its own
@@ -209,8 +208,7 @@ async function runStep(step: Step): Promise<boolean> {
   const at = performance.now();
   const { code, failing, output } = await run(step);
   const isTests = step.name.startsWith("tests");
-  // a test that fails and then passes alone is a flake: recorded, and the check goes on
-  const ok = code === 0 || (isTests && settleFailures(failing, env));
+  const ok = code === 0;
   times.push({ step: step.name, seconds: (performance.now() - at) / 1000, ok });
   if (!ok) {
     console.error(

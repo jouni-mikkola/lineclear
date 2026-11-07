@@ -36,8 +36,8 @@ interface FlakyTest {
 /** Files the fix task of a flaky test in a space. True when it is filed. */
 export type FileFlakeFix = (space: string, f: FlakyTest, seen: number) => boolean;
 
-/** The fix task of a flaky test, the same for the repo check (scripts/flaky.ts) and `lineclear check`. */
-export const flakeFixIn =
+/** The fix task of a flaky test, the same for `lineclear check`. */
+const flakeFixIn =
   (world: { addTask(space: string, title: string, brief: string, extra: string[]): string | undefined }): FileFlakeFix =>
   (space, f, seen) => {
     const where = f.file === "" ? "" : ` in ${f.file}`;
