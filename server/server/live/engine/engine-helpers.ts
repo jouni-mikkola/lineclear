@@ -285,7 +285,7 @@ export type Events = {
 export const ANSWER_GRACE = 6000
 
 /** an agent that never gets to work on its brief leaves To do after this long anyway (and then waits on you) */
-export const BRIEF_WAIT = 45_000
+export const BRIEF_WAIT = 120_000
 
 /** what a task for later (task add --later) is told: its agent reads the brief and waits for a go */
 export const LATER = "Don't start yet: wait for a go."
