@@ -61,6 +61,9 @@ jobs:
       # The update's smoke check starts a coordinator chat, and pi will not start an agent without a model set.
       - name: A newer release waits as a candidate
         run: |
+          # the install starts the service and returns; `lineclear set` needs its port open
+          for _ in $(seq 60); do curl -fsS -m 3 -o /dev/null http://127.0.0.1:7421/api/snapshot && break; sleep 1; done
+          curl -fsS -m 3 -o /dev/null http://127.0.0.1:7421/api/snapshot
           lineclear set coordinator.model claude-bridge/claude-sonnet-5-5
           git tag v0.0.2 "$(git rev-parse HEAD)"
           LINECLEAR_REF=v0.0.2 sh < install.sh
