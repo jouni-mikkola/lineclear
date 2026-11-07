@@ -106,10 +106,10 @@ function jsonFiles(dir: string): unknown[] {
   });
 }
 
-/** What the inbox table holds for an item: whether it waits for the owner, and whether it left the list (closed, and not a plan). */
-export const inboxFlags = (i: { answer?: unknown; closed?: unknown; kind: string }) => ({
+/** What the inbox table holds for an item: whether it waits for the owner, and whether it left the list (closed). */
+export const inboxFlags = (i: { answer?: unknown; closed?: unknown }) => ({
   open: i.answer === undefined && i.closed === undefined ? 1 : 0,
-  shelved: i.closed !== undefined && i.kind !== "plan" ? 1 : 0,
+  shelved: i.closed !== undefined ? 1 : 0,
 });
 
 const loaders: Record<string, (store: Database, dir: string) => void> = {

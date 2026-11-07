@@ -30,7 +30,7 @@ function setup(tasks: { id: string; title: string; status: string }[]) {
   const wrote = new Set<string>();
   const world = idleWorld(env, { tasks: () => tasks, maxTasks: () => 0, ownerWrote: (task) => wrote.has(task) });
   const ask = (task: string) => {
-    addItem({ kind: "step", task, project: "demo", question: `Q of ${task}?`, choices: ["Yes", "No"], since: "2026-06-01T09:00:00Z" }, env);
+    addItem({ kind: "choice", task, project: "demo", question: `Q of ${task}?`, choices: ["Yes", "No"], since: "2026-06-01T09:00:00Z" }, env);
     writeWait({ task, project: "demo", kind: "owner", reason: `asked: Q of ${task}?`, since: "2026-06-01T09:00:00Z" }, env);
   };
   return { dir, env, world, wrote, ask, tick: () => tick(world, false, env) };
@@ -57,30 +57,13 @@ test("an item of a done or gone task closes with its reason and its wait goes", 
 
 test("an item asked with no project closes with its done task, and one of another space stays", () => {
   const t = setup([{ id: "LIN-1", title: "A", status: "done" }]);
-  addItem({ kind: "step", task: "LIN-1", question: "Look at the new UI?", choices: ["Got it"], since: "2026-06-01T09:00:00Z" }, t.env);
-  addItem({ kind: "step", task: "OTHER-1", question: "Elsewhere?", choices: ["Yes"], since: "2026-06-01T09:00:00Z" }, t.env);
+  addItem({ kind: "choice", task: "LIN-1", question: "Look at the new UI?", choices: ["Got it"], since: "2026-06-01T09:00:00Z" }, t.env);
+  addItem({ kind: "choice", task: "OTHER-1", question: "Elsewhere?", choices: ["Yes"], since: "2026-06-01T09:00:00Z" }, t.env);
   t.tick();
   expect(readAllItems(t.env).map((i) => [i.task, i.closed])).toEqual([
     ["LIN-1", "its task is done"],
     ["OTHER-1", undefined],
   ]);
-});
-
-test("a stuck item and its wait close with a done task", () => {
-  const t = setup([{ id: "LIN-1", title: "A", status: "done" }]);
-  addItem(
-    {
-      kind: "stuck",
-      task: "LIN-1",
-      project: "demo",
-      question: "LIN-1 is stuck. What now?",
-      choices: ["Keep waiting", "I will look"],
-      since: "2026-06-01T09:00:00Z",
-    },
-    t.env,
-  );
-  t.tick();
-  expect(readAllItems(t.env)[0]!.closed).toBe("its task is done");
 });
 
 test("an item closes when the owner wrote to its task after it was made", () => {

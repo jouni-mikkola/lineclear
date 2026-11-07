@@ -15,7 +15,7 @@ const world = (name: string): E => {
   return { LINECLEAR_CONFIG: config, PATH: process.env.PATH };
 };
 const since = new Date().toISOString();
-const step = (e: E, question: string) => addItem({ kind: "step", task: "LIN-9", project: "demo", question, choices: ["Yes", "No"], since }, e as never);
+const step = (e: E, question: string) => addItem({ kind: "choice", task: "LIN-9", project: "demo", question, choices: ["Yes", "No"], since }, e as never);
 
 /** The fork's own Push, with its delivery to the browser's push service replaced: what it would send is kept. */
 async function fakePush() {
@@ -78,7 +78,7 @@ test("each new Inbox item is one push to each device, and old items are not anno
   const item = step(e, "Which one?");
   expect(await notifyNew(push, e as never)).toBe(1);
   expect(sent.map((s) => s.endpoint).sort()).toEqual(["https://push.example/a", "https://push.example/b"]);
-  expect(sent[0]!.body).toMatchObject({ title: `Inbox ${item.n}: step waits for you`, body: "LIN-9: Which one?", badge: 2 });
+  expect(sent[0]!.body).toMatchObject({ title: `Inbox ${item.n}: choice`, body: "LIN-9: Which one?", badge: 2 });
   expect(await notifyNew(push, e as never)).toBe(0); // the same item is not sent again
   expect(sent).toHaveLength(2);
   const quick = step(e, "Quick?");
@@ -107,21 +107,6 @@ test("with 300 closed items and nothing new, a look reads no item", async () => 
   expect(parsed).toBe(0);
 });
 
-test("main turning red is one push with its own title", async () => {
-  const e = world("red");
-  const { push, sent } = await fakePush();
-  push.subscribe(sub("https://push.example/a"), "phone");
-  await notifyNew(push, e as never);
-  const red = addItem(
-    { kind: "stuck", task: "-", project: "demo", question: "demo: main failed its health command twice.", choices: ["Ok"], alert: "Main is red", since },
-    e as never,
-  );
-  expect(await notifyNew(push, e as never)).toBe(1);
-  expect(sent).toHaveLength(1);
-  expect(sent[0]!.body).toMatchObject({ title: "Main is red", body: "demo: main failed its health command twice." });
-  expect(alertOf(red).tag).toBe(`inbox-${red.n}`);
-});
-
 test("the fork's push code loads and keeps a key for this server", async () => {
   const push = await realPush();
   expect(push.publicKey.length).toBeGreaterThan(40);
@@ -144,9 +129,9 @@ test("every push for an Inbox item opens the Inbox of the Lineclear UI: no old p
   const { push, sent } = await fakePush();
   push.subscribe(sub("https://push.example/1"), "phone");
   const e = world("links");
-  for (const kind of ["outward", "login", "step", "plan"] as const)
+  for (const kind of ["outward", "login", "choice"] as const)
     await push.send(alertOf(addItem({ kind, task: "LIN-9", question: "Go?", choices: ["Go"], since }, e as never)));
   const urls = sent.map((s) => s.body.url);
-  expect(urls).toEqual(["/inbox", "/inbox", "/inbox", "/inbox"]);
+  expect(urls).toEqual(["/inbox", "/inbox", "/inbox"]);
   for (const url of urls) expect(url).not.toMatch(/:7421\b|\?place=|[?&]focus=|^\.\/|#\//);
 });

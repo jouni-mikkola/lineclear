@@ -74,7 +74,7 @@ const api = () => {
       join(dir, "config", "inbox", `${n}.json`),
       JSON.stringify({
         n,
-        kind: "step",
+        kind: "choice",
         task: "WEB-1",
         project: "web-shop",
         question: `Question ${n}?`,
@@ -140,41 +140,7 @@ test("/api/inbox is the open items, newest first, with their details", async () 
   const items = (await (await handle(new Request("http://127.0.0.1:7420/api/inbox"))).json()) as any[];
   expect(items.map((i) => i.id)).toEqual(["2", "1"]);
   expect(items[0]).toMatchObject({ project: "web-shop", question: "Question 2?", choices: ["Yes", "No"] });
-  expect(items[0].details).toContain("Login or code.");
   expect(items[0].details).toContain("playwright-cli -s=WEB-1 show");
-  rmSync(dir, { recursive: true, force: true });
-});
-
-test("a plan's Inbox item carries the go of each step with the model's words, and no no-go", async () => {
-  const { dir, handle } = api();
-  const check = (step: string, go: boolean) => ({
-    step,
-    key: "k",
-    round: 1,
-    model: "m/x",
-    go,
-    said: `${step} said back`,
-    missing: go ? "" : "what",
-    tokensIn: 1,
-    tokensOut: 1,
-  });
-  writeFileSync(
-    join(dir, "config", "inbox", "5.json"),
-    JSON.stringify({
-      n: 5,
-      kind: "plan",
-      task: "PLAN-1",
-      project: "web-shop",
-      question: "Approve?",
-      choices: ["Approve", "Reject"],
-      since: "2026-01-05T09:12:00.000Z",
-      checks: [check("S1", true), check("S2", false)],
-    }),
-  );
-  const items = (await (await handle(new Request("http://127.0.0.1:7420/api/inbox"))).json()) as { id: string; stepChecks?: unknown }[];
-  expect(items.find((i) => i.id === "5")?.stepChecks).toEqual([{ step: "S1", model: "m/x", said: "S1 said back" }]);
-  expect(items.find((i) => i.id === "1")?.stepChecks).toBeUndefined();
-  expect(JSON.stringify(items)).not.toContain("S2");
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -266,18 +232,18 @@ test("answers work behind an HTTPS proxy that ends TLS, and still refuse foreign
   rmSync(dir, { recursive: true, force: true });
 });
 
-test("a plan's rejection needs its reason, and the reason goes with the answer", async () => {
+test("an owner step needs its result, and the result goes with the answer", async () => {
   const { dir, handle } = api();
   writeFileSync(
     join(dir, "config", "inbox", "4.json"),
-    JSON.stringify({ n: 4, kind: "plan", task: "WEB-9", question: "Approve the plan?", choices: ["Approve", "Reject"], since: "2026-01-05T09:12:00.000Z" }),
+    JSON.stringify({ n: 4, kind: "choice", task: "-", ownerStep: "A", question: "A is yours", choices: ["Done"], since: "2026-01-05T09:12:00.000Z" }),
   );
   const items = (await (await handle(new Request("http://127.0.0.1:7420/api/inbox"))).json()) as any[];
-  expect(items.find((i) => i.id === "4").needsNote).toBe("Reject");
+  expect(items.find((i) => i.id === "4").needsNote).toBe("Done");
   expect(items.find((i) => i.id === "1").needsNote).toBeUndefined();
-  expect((await handle(post(4, { choice: "Reject" }))).status).toBe(400);
-  expect((await handle(post(4, { choice: "Reject", note: "Split step 3" }))).status).toBe(200);
-  expect(readAllItems({ LINECLEAR_CONFIG: join(dir, "config") }).find((i) => i.n === 4)).toMatchObject({ answer: "Reject", note: "Split step 3" });
+  expect((await handle(post(4, { choice: "Done" }))).status).toBe(400);
+  expect((await handle(post(4, { choice: "Done", note: "Split step 3" }))).status).toBe(200);
+  expect(readAllItems({ LINECLEAR_CONFIG: join(dir, "config") }).find((i) => i.n === 4)).toMatchObject({ answer: "Done", note: "Split step 3" });
   rmSync(dir, { recursive: true, force: true });
 });
 

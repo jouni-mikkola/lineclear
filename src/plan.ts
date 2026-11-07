@@ -2,9 +2,8 @@ import { serverBin } from "./paths.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DISPATCHER_MODEL, dispatcherDir } from "./dispatcher.ts";
-import { planProblems, plansAreAuto, readiness, stepFormProblems } from "./autoplan.ts";
+import { planProblems, readiness, stepFormProblems } from "./autoplan.ts";
 import { applyPlan } from "./plan-apply.ts";
-import { addItem, isOpen, readItems } from "./inbox.ts";
 import { readSettings } from "./project.ts";
 import { looseNote, resolveProject } from "./resolve.ts";
 import { liveLink, readRequests, recordRequest } from "./requests.ts";
@@ -14,7 +13,7 @@ import { checkRoadmap } from "./roadmap.ts";
 import { checkSteps, NOGO_ROUNDS, type StepCheck, type StepCheckInput, type StepVerdict } from "./stepcheck.ts";
 import { addDecisions } from "./decisions-store.ts";
 import type { Decision } from "./rules.ts";
-import { clearWait, findProject, findTask, writeWait } from "./waits.ts";
+import { clearWait, findProject, findTask } from "./waits.ts";
 import { mainBranch, mainRef } from "./main-branch.ts";
 import { git } from "./git.ts";
 
@@ -29,7 +28,7 @@ function serverIsDown(env: NodeJS.ProcessEnv): boolean {
 }
 
 const lineclear = serverBin;
-/** `lineclear plan <project> "<goal>"` hands the goal to the Dispatcher, which writes the steps. No task starts. `lineclear plan submit` sends its roadmap change to the Inbox. */
+/** `lineclear plan <project> "<goal>"` hands the goal to the Dispatcher, which writes the steps. No task starts. `lineclear plan submit` applies its roadmap change once the checks pass. */
 export function planMain(
   raw: string[],
   out: (l: string) => void,
@@ -98,10 +97,7 @@ function submit(out: (l: string) => void, env: NodeJS.ProcessEnv, cwd: string, n
   if (diff.trim() === "") return fail("docs/ROADMAP.md has no change from main");
   const files = git(root, "diff", "--name-only", `${base}...HEAD`).out.trim().split("\n");
   if (files.some((f) => f !== "docs/ROADMAP.md")) return fail("a plan changes docs/ROADMAP.md only, undo the change to the other files");
-  if (readItems(env).some((i) => i.kind === "plan" && i.task === task && isOpen(i))) return fail("this plan waits for the owner already");
   const head = git(root, "rev-parse", "HEAD").out.trim();
-  const round = readItems(env).filter((i) => i.kind === "plan" && i.task === task).length + 1;
-  if (round > 2) return fail("the plan was already sent back once; this plan ends");
   const settings = project ? readSettings(project, env) : undefined;
   const before = was.ok ? was.out : "";
   const reviewers = typeof settings === "object" ? settings.models.reviewer : [];
@@ -119,14 +115,8 @@ function submit(out: (l: string) => void, env: NodeJS.ProcessEnv, cwd: string, n
   }
   if (read.kind === "ended") return endPlan(task, project, read, out, env, now);
   const checks = read.checks;
-  if (plansAreAuto(project, env)) return autoApply({ task, project: project!, root, base, diff, head, round, text, checks }, out, env, now);
-  const since = now().toISOString();
-  const question = `Approve this roadmap change${project ? ` for ${project}` : ""}?`;
-  const item = addItem({ kind: "plan", task, project, question, choices: ["Approve", "Reject"], diff, head, round, since, checks }, env);
-  clearWait(task, env);
-  writeWait({ task, project, kind: "owner", reason: `asked: ${question}`, since }, env);
-  out(`inbox ${item.n}: ${question} End your turn; the answer comes as a message.`);
-  return 0;
+  if (project === undefined) return fail("cannot tell which project this is");
+  return autoApply({ task, project, root, base, diff, head, text, checks }, out, env, now);
 }
 
 /** The step check's verdict, or a go with no answers when the project turned its model call off. */
@@ -169,12 +159,11 @@ interface Auto {
   base: string;
   diff: string;
   head: string;
-  round: number;
   text: string;
   checks: StepCheck[];
 }
 
-/** A project that does not ask before plans: the rule checks and the readiness check say go, then the plan merges and the owner may undo it. */
+/** The rule checks and the readiness check say go, then the plan merges and the owner may undo it. */
 function autoApply(a: Auto, out: (l: string) => void, env: NodeJS.ProcessEnv, now: () => Date): number {
   const fail = (m: string) => (out(`lineclear plan submit: ${m}`), 1);
   // compare with where the branch left main, so steps main gained since do not look removed
@@ -189,14 +178,12 @@ function autoApply(a: Auto, out: (l: string) => void, env: NodeJS.ProcessEnv, no
   const question = `Roadmap change from ${a.task} applied for ${a.project}`;
   const r = applyPlan(
     {
-      kind: "plan",
+      kind: "choice",
       task: a.task,
       project: a.project,
       question,
       choices: ["Approve", "Reject"],
       diff: a.diff,
-      head: a.head,
-      round: a.round,
       since: now().toISOString(),
       checks: a.checks,
     },

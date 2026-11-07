@@ -39,7 +39,7 @@ function project() {
   writeFileSync(join(root, "cfg", "projects", "proj", "state.json"), JSON.stringify({ taskSteps: { "OF-2": "S2", "OF-5": "S5" } }));
   writeFileSync(
     join(asks, "4.json"),
-    JSON.stringify({ n: 4, kind: "step", task: "OF-5", project: "proj", question: "Pick A or B?", choices: ["A", "B"], since: "2026-01-05T09:12:00.000Z" }),
+    JSON.stringify({ n: 4, kind: "choice", task: "OF-5", project: "proj", question: "Pick A or B?", choices: ["A", "B"], since: "2026-01-05T09:12:00.000Z" }),
   );
   const env = { LINECLEAR_HOME: dir, PI_CODING_AGENT_DIR: join(root, "pi"), LINECLEAR_CONFIG: join(root, "cfg"), LINECLEAR_SERVER_BIN: "true" };
   const live = [

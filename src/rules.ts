@@ -3,10 +3,9 @@ import { join } from "node:path";
 import { writeAtomic } from "../pi/atomic.ts";
 import { addDecisions, decisionsSince, pruneDecisions } from "./decisions-store.ts";
 import { routeAsks } from "./asks.ts";
-import { settlePlans } from "./plan-apply.ts";
 import { copyStoreQuietly } from "./store-copies.ts";
 import { freshDecisions } from "./decision-dedupe.ts";
-import { addItem, answerCard, closeItem, closeSettledUpdates, isOpen, type Item, readItems } from "./inbox.ts";
+import { answerCard, closeItem, isOpen, type Item, readItems } from "./inbox.ts";
 import { listProjectNames, projectsDir, readSettings, type Settings } from "./project.ts";
 import type { Task } from "./roadmap.ts";
 import { classify, type StallEntry } from "./stall-class.ts";
@@ -140,12 +139,11 @@ function closeOver(project: string, settings: Settings, world: World, dryRun: bo
 export function tick(world: World, dryRun: boolean, env = process.env): Decision[] {
   const all: Decision[] = [];
   world.newTick?.();
-  // plans that wait from before their project let plans apply by themselves are settled under the rule
   if (!dryRun) {
     for (const start of [copyStoreQuietly]) start(env, world.now());
     all.push(
       ...logDecisions(
-        [...settlePlans(world.now(), env), ...closeSettledUpdates(world.now(), env), ...sweepOldTemp(world.now(), env), ...sweepDiskUse(world.now(), env)].map(
+        [...sweepOldTemp(world.now(), env), ...sweepDiskUse(world.now(), env)].map(
           (reason): Decision => ({ time: world.now().toISOString(), project: "-", kind: "wake", reason }),
         ),
         env,
@@ -169,7 +167,6 @@ export function tick(world: World, dryRun: boolean, env = process.env): Decision
         loaded = loadState(name, env);
       } catch (e) {
         const reason = e instanceof Error ? e.message : String(e);
-        if (!dryRun) askAboutState(name, reason, world.now(), env);
         all.push({ time: world.now().toISOString(), project: name, kind: "stop", reason: `stopped: ${reason}` });
         continue;
       }
@@ -200,13 +197,6 @@ export function tick(world: World, dryRun: boolean, env = process.env): Decision
   }
   if (!dryRun) pruneDecisions(env, world.now().getTime());
   return all;
-}
-
-/** One open Inbox item per fault, so the owner is told once however many ticks stop on it. */
-function askAboutState(project: string, reason: string, now: Date, env: NodeJS.ProcessEnv): void {
-  const question = `${project}: ${reason}`;
-  if (readItems(env).some((i) => isOpen(i) && i.question === question)) return;
-  addItem({ kind: "step", task: "-", project, question, choices: ["Ok"], since: now.toISOString() }, env);
 }
 
 function logDecisions(ds: Decision[], env: NodeJS.ProcessEnv): Decision[] {

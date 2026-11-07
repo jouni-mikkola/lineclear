@@ -55,15 +55,11 @@ export function addedSteps(diff: string) {
 /** Where one request stands, from its plan's Inbox items. */
 function planView(r: PlanRequest, items: Item[] = readItems(process.env)): PlanView {
   const item = items
-    .filter((i) => i.kind === "plan" && i.task === r.task && !i.move)
+    .filter((i) => i.auto && i.task === r.task && !i.move)
     .sort((a, b) => a.n - b.n)
     .at(-1);
   let state: PlanState = "planning";
-  if (item?.closed !== undefined) state = "closed";
-  else if (item?.answer === "Approve") state = "approved";
-  // a first rejection goes back to the Dispatcher with your note
-  else if (item?.answer !== undefined) state = (item.round ?? 1) < 2 ? "planning" : "rejected";
-  else if (item) state = "approve";
+  if (item) state = "approved";
   return { ...r, state, steps: item?.diff ? addedSteps(item.diff) : [], ...(item ? { item } : {}), live: liveLink(r.project, r.task) };
 }
 

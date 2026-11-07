@@ -50,3 +50,13 @@ export function questionIn(reply: string): string | undefined {
     .trim();
   return line ? (line.length > 90 ? `${line.slice(0, 89).trimEnd()}…` : line) : undefined;
 }
+
+/** The written rule for a step question, or the Dispatcher's way when no rule fits. An agent decides and goes on. */
+export function stepRule(question: string): string {
+  if (/merge (now|or wait)|wait (to|for) merge/i.test(question)) return "Merge now when your check and your review passed. Wait only for a wait you declared.";
+  if (/reviewer/i.test(question))
+    return "The rules pick the reviewer: the first model of another company than yours, from the project's list. Use the one the brief names.";
+  if (/flak|intermittent/i.test(question))
+    return "Run the test once more. If it passes, go on and note it in your facts. If it fails again it is a real failure: fix it.";
+  return "Decide it from your brief and the roadmap, take the safer choice, and list the decision in your facts.";
+}

@@ -383,7 +383,7 @@ test("run ticks in its own process, ends on SIGTERM with a logged reason, and cr
   expect(source).not.toMatch(/uncaughtException|unhandledRejection|SIGHUP/);
 });
 
-test("a state file that is not JSON stops its project with an Inbox item that names it, and is left as it was", () => {
+test("a state file that is not JSON stops its project with a decision that names it, and is left as it was", () => {
   const t = setup({ steps: [step("A", "none")] });
   const file = join(t.config, "projects", "demo", "state.json");
   writeFileSync(file, "{");
@@ -394,8 +394,7 @@ test("a state file that is not JSON stops its project with an Inbox item that na
   }
   expect(readFileSync(file, "utf8")).toBe("{");
   expect(t.adds()).toEqual([]);
-  const items = readItems(t.env).filter((i) => i.question.includes(file));
-  expect(items).toHaveLength(1);
+  expect(readItems(t.env)).toEqual([]);
 });
 
 test("a tick writes state.json only when the state changed", () => {

@@ -25,7 +25,15 @@ function setup() {
   writeFileSync(join(lineclear, "chatlog", "cards.json"), JSON.stringify({ posted: cards }));
   writeFileSync(
     join(dir, "config", "inbox", "1.json"),
-    JSON.stringify({ n: 1, kind: "step", task: "WEB-1", project: "web-shop", question: "Which one?", choices: ["A", "B"], since: "2026-01-05T09:12:00.000Z" }),
+    JSON.stringify({
+      n: 1,
+      kind: "choice",
+      task: "WEB-1",
+      project: "web-shop",
+      question: "Which one?",
+      choices: ["A", "B"],
+      since: "2026-01-05T09:12:00.000Z",
+    }),
   );
   const list = [
     { id: "WEB-1", title: "Task 1", status: "need" },

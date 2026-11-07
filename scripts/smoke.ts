@@ -1,6 +1,6 @@
 // The smoke check install.sh runs after an update restarts the service (see "An update that breaks rolls back" in the
 // README). `bun scripts/smoke.ts check <projects-folder> <api|noapi>` retries each check until LINECLEAR_SMOKE_SECONDS (default 120)
-// are up and prints one line per failure. `bun scripts/smoke.ts post <text>` puts the Inbox item that names it.
+// are up and prints one line per failure.
 // `bun scripts/smoke.ts branch` is the merge lane's: it starts this checkout's service on free ports with a scratch
 // data folder, runs the web and API checks against it, stops it, and prints one line per failure.
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -199,12 +199,8 @@ if (import.meta.main) {
     const failed = await checkBranch(join(import.meta.dir, ".."));
     for (const f of failed) console.log(f);
     process.exit(failed.length ? 1 : 0);
-  } else if (verb === "post" && arg) {
-    const { addItem } = await import("../src/inbox.ts");
-    const item = addItem({ kind: "stuck", task: "-", question: arg, choices: ["Ok"], alert: "An update was rolled back", since: new Date().toISOString() });
-    console.log(`inbox ${item.n}: ${arg}`);
   } else {
-    console.error("usage: smoke.ts check <projects-folder> <api|noapi> | smoke.ts post <text>");
+    console.error("usage: smoke.ts check <projects-folder> <api|noapi>");
     process.exit(2);
   }
 }

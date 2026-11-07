@@ -3,7 +3,8 @@ import { expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { inboxMain } from "../src/inbox-answer.ts";
-import { askMain, readItems } from "../src/inbox.ts";
+import { askMain } from "../src/ask-command.ts";
+import { readItems } from "../src/inbox.ts";
 import { parseUntil } from "../src/waits.ts";
 import { run, setup, status, step, waitsOf } from "./rules-world.ts";
 
@@ -63,10 +64,10 @@ test("ask adds an Inbox item, calls no lineclear alert, and declares a wait; no 
   expect(readItems(t.env)[0]).toMatchObject({ n: 1, kind: "outward", task: "LIN-9", project: "demo" });
   expect(waitsOf(t)[0]).toMatchObject({ kind: "owner", reason: "asked: Which one?" });
   expect(ask(t, ["Only one?", "--choice", "a"]).code).toBe(2);
-  expect(ask(t, ["Q?", "--choice", "a", "--choice", "b", "--kind", "nope"]).code).toBe(2);
+  expect(ask(t, ["Q?", "--choice", "a", "--choice", "b", "--kind", "nope"]).code).toBe(1);
   expect(t.calls()).toHaveLength(0);
   // a step question, a plan or a stuck task is never the owner's: the agent gets the written rule
-  for (const k of ["step", "plan", "stuck"]) {
+  for (const k of ["choice", "step", "plan", "stuck"]) {
     const r = ask(t, ["Merge now or wait?", "--choice", "Merge", "--choice", "Wait", "--kind", k]);
     expect(r.code).toBe(1);
     expect(r.text).toContain("Merge now when your check and your review passed");

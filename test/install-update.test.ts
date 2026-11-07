@@ -60,11 +60,9 @@ test("an update that breaks the chat is rolled back, and the Inbox says so", () 
   expect(running()).toBe(before);
   expect(existsSync(join(current, "BROKEN"))).toBe(false);
   expect(restarts()).toBe(restartedBefore + 2); // on the new version, then back on the old one
-  const items = inbox();
-  expect(items).toHaveLength(1);
-  expect(items[0]!.kind).toBe("stuck");
-  expect(items[0]!.question).toContain("a coordinator chat does not accept a message");
-  expect(items[0]!.question).toContain(`Putting ${basename(before)} back`);
+  expect(r.out).toContain("a coordinator chat does not accept a message");
+  expect(r.out).toContain(`putting ${basename(before)} back`);
+  expect(inbox()).toEqual([]);
 }, 180_000);
 
 test("an update that pauses a Running project is rolled back too", () => {
@@ -72,7 +70,6 @@ test("an update that pauses a Running project is rolled back too", () => {
   expect(r.code).not.toBe(0);
   expect(after.paused).toBeUndefined(); // the project is Running again, not only the code back
   expect(existsSync(join(current, "BROKEN"))).toBe(false);
-  const items = inbox();
-  expect(items).toHaveLength(2);
-  expect(items[1]?.question).toContain("p is Paused, it was Running");
+  expect(r.out).toContain("p is Paused, it was Running");
+  expect(inbox()).toEqual([]);
 }, 180_000);

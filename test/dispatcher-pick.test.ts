@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chatView } from "../src/chat.ts";
 import { dispatcherMain, dispatcherPrompt } from "../src/dispatcher.ts";
-import { addItem, readItems } from "../src/inbox.ts";
+import { addItem } from "../src/inbox.ts";
 import { planMain } from "../src/plan.ts";
 import { about, addedSteps, planStatus, readRequests } from "../src/requests.ts";
 import { webApi } from "../src/web.ts";
@@ -95,18 +95,20 @@ function dispatcher(env: NodeJS.ProcessEnv) {
   };
 }
 
-/** The planner, faked: it sends a plan that adds `ids` to the Inbox, as `lineclear plan submit` does. */
-const planned = (env: NodeJS.ProcessEnv, task: string, project: string, ids: string[], round = 1) =>
+/** The planner, faked: its plan that adds `ids` applied by itself, as `lineclear plan submit` records it. */
+const planned = (env: NodeJS.ProcessEnv, task: string, project: string, ids: string[]) =>
   addItem(
     {
-      kind: "plan",
+      kind: "choice",
       task,
       project,
-      question: `Approve this roadmap change for ${project}?`,
+      question: `Roadmap change from ${task} applied for ${project}`,
       choices: ["Approve", "Reject"],
       diff: ids.map((id) => `+### ${id} Title ${id}\n+- after: A1`).join("\n"),
-      round,
       since: new Date().toISOString(),
+      answer: "Approve",
+      answeredAt: new Date().toISOString(),
+      auto: true,
     },
     env,
   );
@@ -172,7 +174,7 @@ test("the lineclear command itself prints the project list the Dispatcher picks 
   expect(text).toContain("  A recipe box for the family: meals and shopping lists.");
 });
 
-test("a clear pick plans in that project; the plan comes back as one approval in the chat and the Inbox; approving puts its steps in the roadmap", async () => {
+test("a clear pick plans in that project; the plan applies by itself and its steps are in the roadmap", async () => {
   const w = world();
   const c = await chatWith(w);
   try {
@@ -183,24 +185,11 @@ test("a clear pick plans in that project; the plan comes back as one approval in
     expect(readRequests(w.env)).toMatchObject([{ task: "PLAN-1", project: "budget-app", goal: "Add CSV export to the budget app", by: "dispatcher" }]);
     expect((await c.get("/api/plans"))[0]).toMatchObject({ task: "PLAN-1", state: "planning", steps: [], live: "/budget-app/roadmap/track?plan=PLAN-1" });
 
-    // the planner sends its steps: the chat's card is the Inbox's item
-    const item = planned(w.env, "PLAN-1", "budget-app", ["B1", "B2"]);
-    const [plan] = await c.get("/api/plans");
-    expect(plan).toMatchObject({ state: "approve", steps: ["B1", "B2"], item: { id: String(item.n), choices: ["Approve", "Reject"] } });
-    expect((await c.get("/api/inbox")).map((i: any) => i.id)).toEqual([String(item.n)]);
-
-    // approving merges the plan's branch `plan/PLAN-1`; the Dispatcher merged nothing itself
-    const repo = w.repo("budget-app");
-    git(repo, "branch", "plan/PLAN-1");
-    git(repo, "worktree", "add", "-q", join(w.dir, "plan-1"), "plan/PLAN-1");
-    writeFileSync(join(w.dir, "plan-1", "plan-note.txt"), "B1, B2\n");
-    git(join(w.dir, "plan-1"), "add", ".");
-    git(join(w.dir, "plan-1"), "commit", "-q", "-m", "plan B1 and B2");
-    expect(git(repo, "log", "--format=%s", "main").stdout.toString()).not.toContain("PLAN-1: roadmap plan");
-    expect((await c.post(`/api/inbox/${plan.item.id}`, { choice: "Approve" })).status).toBe(200);
-    expect(git(repo, "log", "--format=%s", "main").stdout.toString()).toContain("PLAN-1: roadmap plan");
-    expect((await c.get("/api/plans"))[0]).toMatchObject({ state: "approved", answer: "Approve" });
+    // the planner's steps apply by themselves: no item waits for the owner
+    planned(w.env, "PLAN-1", "budget-app", ["B1", "B2"]);
+    expect((await c.get("/api/plans"))[0]).toMatchObject({ state: "approved", steps: ["B1", "B2"], answer: "Approve" });
     expect(await c.get("/api/inbox")).toEqual([]);
+    expect(readFileSync(w.log, "utf8")).not.toMatch(/^merge /m);
 
     // the merged plan is on main; "where are we?" answers for exactly those steps
     writeFileSync(join(w.repo("budget-app"), "docs", "ROADMAP.md"), roadmap(step("A1"), step("B1", "A1"), step("B2", "B1"), step("C9")));
@@ -249,35 +238,6 @@ test("when no project fits, the Dispatcher says so and starts nothing; a plan fo
     expect(planMain(["gallery", "Fix the login"], (l) => lines.push(l), w.env)).toBe(1);
     expect(lines).toEqual(["lineclear plan: no project 'gallery', nearest: 'recipes' and 'budget-app'"]);
     expect(readRequests(w.env)).toEqual([]);
-  } finally {
-    c.fake.stop();
-  }
-});
-
-test("rejecting a plan sends it back once with your note, and a second rejection ends it; the roadmap stays", async () => {
-  const w = world();
-  const c = await chatWith(w);
-  try {
-    await c.ask("Add CSV export to the budget app", 2);
-    const first = planned(w.env, "PLAN-1", "budget-app", ["B1"]);
-    expect((await c.post(`/api/inbox/${first.n}`, { choice: "Reject" })).status).toBe(400);
-    expect((await c.post(`/api/inbox/${first.n}`, { choice: "Reject", note: "One step is enough" })).status).toBe(200);
-    // the Dispatcher wrote the plan and has no task to tell
-    expect(readFileSync(w.log, "utf8")).not.toContain("task tell");
-    expect((await c.get("/api/plans"))[0]).toMatchObject({ state: "planning", answer: "Reject" });
-
-    const second = planned(w.env, "PLAN-1", "budget-app", ["B1"], 2);
-    expect((await c.get("/api/plans"))[0]).toMatchObject({ state: "approve", item: { id: String(second.n) } });
-    expect((await c.post(`/api/inbox/${second.n}`, { choice: "Reject" })).status).toBe(200);
-    expect(readFileSync(w.log, "utf8")).not.toContain("task close");
-    expect((await c.get("/api/plans"))[0]).toMatchObject({ state: "rejected" });
-    expect(readFileSync(w.log, "utf8")).not.toMatch(/^merge /m);
-    expect(readFileSync(join(w.repo("budget-app"), "docs", "ROADMAP.md"), "utf8")).toBe(roadmap(step("A1")));
-    const lines: string[] = [];
-    expect(planStatus((l) => lines.push(l), w.env, "PLAN-1")).toBe(0);
-    expect(lines[0]).toContain(": rejected.");
-    expect(planStatus(() => {}, w.env, "PLAN-9")).toBe(1);
-    expect(readItems(w.env).filter((i) => i.answer === "Reject")).toHaveLength(2);
   } finally {
     c.fake.stop();
   }
