@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { inboxMain } from "../src/inbox-answer.ts";
 import { addItem, readAllItems } from "../src/inbox.ts";
 import { sessionFolder } from "../src/measure.ts";
-import { decisionsPath } from "../pi/config.ts";
+import { decisionsSince } from "../src/decisions-store.ts";
 import { realWorld, tick } from "../src/rules.ts";
 import { status } from "../src/status.ts";
 import { changeSettings } from "../src/project-change.ts";
@@ -51,7 +51,7 @@ test("an item of a done or gone task closes with its reason and its wait goes", 
     ["LIN-3", "its task is gone"],
   ]);
   expect(readWaits(t.env).map((w) => w.task)).toEqual(["LIN-2"]);
-  const log = readFileSync(decisionsPath(t.env), "utf8");
+  const log = JSON.stringify(decisionsSince(t.env, 0));
   expect(log).toContain("closed inbox item 1: its task is done");
 });
 
@@ -90,7 +90,7 @@ test("an item closes when the owner wrote to its task after it was made", () => 
   t.tick();
   expect(readAllItems(t.env)[0]!.closed).toBe("you wrote to its task after the item was made");
   expect(readWaits(t.env).some((w) => w.task === "LIN-2")).toBe(false);
-  expect(readFileSync(decisionsPath(t.env), "utf8")).toContain("closed inbox item 1");
+  expect(JSON.stringify(decisionsSince(t.env, 0))).toContain("closed inbox item 1");
 });
 
 test("a wait of a done task is removed and no longer in status", () => {
@@ -100,7 +100,7 @@ test("a wait of a done task is removed and no longer in status", () => {
   status((l) => lines.push(l), t.env);
   expect(lines.join("\n")).toContain("LIN-1 paused, waits");
   t.tick();
-  expect(readFileSync(decisionsPath(t.env), "utf8")).toContain("removed its wait: its task is done");
+  expect(JSON.stringify(decisionsSince(t.env, 0))).toContain("removed its wait: its task is done");
   lines.length = 0;
   status((l) => lines.push(l), t.env);
   expect(lines.join("\n")).not.toContain("LIN-1");

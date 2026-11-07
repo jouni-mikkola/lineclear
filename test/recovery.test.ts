@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { addItem, readItems } from "../src/inbox.ts";
 import { readWaits, writeWait } from "../src/waits.ts";
-import { decisionsPath } from "../pi/config.ts";
+import { addDecisions, decisionsSince } from "../src/decisions-store.ts";
 import { chooseModels } from "./helpers.ts";
 
 const temps: string[] = [];
@@ -84,7 +84,7 @@ esac`,
     LINECLEAR_NET_CHECK: "off",
   } as Record<string, string>;
   const adds = () => (existsSync(join(fake, "adds.log")) ? readFileSync(join(fake, "adds.log"), "utf8").trim().split("\n") : []);
-  const decisions = () => (existsSync(decisionsPath(vars)) ? readFileSync(decisionsPath(vars), "utf8").trim().split("\n") : []);
+  const decisions = () => decisionsSince(vars, 0).map((d) => JSON.stringify(d));
   /** What a crash must not lose: the wait, the Inbox item and the decisions. */
   const state = (withDecisions = true) => JSON.stringify({ waits: readWaits(vars), inbox: readItems(vars), decisions: withDecisions ? decisions() : [] });
   return { dir, fake, config, vars, roadmap, step, adds, decisions, state };
@@ -112,7 +112,7 @@ function work(m: Machine) {
   writeWait({ task: "LIN-1", project: "demo", kind: "owner", reason: "asked: Ship it?", since: "2026-11-01T00:00:00Z" }, m.vars);
   addItem({ kind: "step", task: "LIN-1", project: "demo", question: "Ship it?", choices: ["Yes", "No"], since: "2026-11-01T00:00:00Z" }, m.vars);
   mkdirSync(m.config, { recursive: true });
-  writeFileSync(decisionsPath(m.vars), `${JSON.stringify({ time: "t", project: "demo", kind: "start", reason: "earlier" })}\n`);
+  addDecisions(m.vars, [{ time: new Date().toISOString(), project: "demo", kind: "start", reason: "earlier" }]);
 }
 
 for (const kind of ["a killed service", "a reboot"] as const) {

@@ -3,7 +3,6 @@ import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { storeMain } from "./store-copies.ts";
 import { dispatcherMain, moveMain } from "./dispatcher.ts";
-import { decisionsPath } from "../pi/config.ts";
 import { failedStartsIn, THIS_MACHINE } from "./start-failures.ts";
 import { doctor, herdrVersions, realProbe, testedHerdr } from "./doctor.ts";
 import { askMain } from "./inbox.ts";
@@ -192,7 +191,7 @@ async function installCommand(name: "doctor" | "uninstall", rest: string[], out:
     const here = rest.includes("--here");
     if (probe.which("herdr")) probe.herdr = { tested: testedHerdr(), machines: herdrVersions(probe.run, here) };
     const machines = probe.herdr?.machines.map((m) => m.machine) ?? [THIS_MACHINE];
-    probe.starts = failedStartsIn(decisionsPath(), machines, Date.now());
+    probe.starts = failedStartsIn(process.env, machines, Date.now());
     return doctor(probe, out);
   }
   const bad = rest.find((a) => a !== "--all");

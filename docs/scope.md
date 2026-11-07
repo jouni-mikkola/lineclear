@@ -207,7 +207,7 @@ css, shell, perl and the `bin` scripts): server 17,094, `src/` 14,725, `ui/` 11,
 | `src/task-live.ts` | View | 164 | keep | a task's terminal; drop the artifacts tab (D6) |
 | `src/task-read.ts` | Run | 45 | keep | one task list call |
 | `src/task-steps.ts` | Rules | 104 | keep | the loop's record of a project |
-| `src/task-work.ts` | Models | 64 | keep | what a task runs, in decisions.jsonl |
+| `src/task-work.ts` | Models | 64 | keep | what a task runs, in the decisions table |
 | `src/tick-project.ts` | Rules | 459 | keep | one project's tick |
 | `src/time.ts` | Run | 3 | keep | time constants |
 | `src/tmpdirs.ts` | Checks | 163 | keep | temp and cache folders |

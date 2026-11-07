@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { addDecisions } from "../src/decisions-store.ts";
 import { join } from "node:path";
 import { homeData } from "../src/home-data.ts";
 import { stageSince, stepOf, taskStage } from "../src/home-stage.ts";
@@ -110,12 +111,11 @@ describe("why work waits", () => {
     wait(2, { kind: "task", for: "PR-1", reason: "waits for PR-1" });
     wait(3, { kind: "task", for: "PR-1", reason: "waits for PR-1" });
     for (const n of [4, 5, 6]) wait(n, { kind: "until", until: "2026-11-02T10:00:00Z", reason: "merge waits for PR-1 to land" });
-    const decision = (step: string, reason: string) =>
-      `${JSON.stringify({ time: new Date(NOW - 60_000).toISOString(), project: "lc", step, kind: "skip", reason })}\n`;
-    writeFileSync(
-      join(cfg, "decisions.jsonl"),
-      decision("U1", "lock 'ui' is held by U3") + decision("U2", "load average is above the limit of 4, no new task starts"),
-    );
+    const decision = (step: string, reason: string) => ({ time: new Date(NOW - 60_000).toISOString(), project: "lc", step, kind: "skip", reason });
+    addDecisions({ LINECLEAR_CONFIG: cfg }, [
+      decision("U1", "lock 'ui' is held by U3"),
+      decision("U2", "load average is above the limit of 4, no new task starts"),
+    ]);
     const bin = join(root, "task-list.sh");
     writeFileSync(bin, `#!/bin/sh\necho '${JSON.stringify(tasks.map((t) => ({ id: t.id, title: t.title, status: t.id === "PR-1" ? "work" : "queued" })))}'\n`, {
       mode: 0o755,

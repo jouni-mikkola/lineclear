@@ -1,11 +1,8 @@
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
-import { writeAtomic } from "../pi/atomic.ts";
-import { dirname, join } from "node:path";
 import type { Decision, State } from "./rules.ts";
 import { MIN } from "./time.ts";
 
 // Every way a task or a ready step stops moving has a class. A detector in plain code sees it, the stall is recorded
-// in decisions.jsonl once it passes its class's limit, its remedy is recorded with the minutes from the stall, and
+// in the decisions table once it passes its class's limit, its remedy is recorded with the minutes from the stall, and
 // its end with the minutes it cost.
 
 /** Every decision of the rule loop, one JSON line each. */
@@ -215,88 +212,4 @@ function ladderActed(stalls: Record<string, StallEntry>, r: { k: string; reason:
     r.d.minutes = Math.round((at - entry.since) / MIN);
   }
   seen.set(r.k, { key, class: c, evidence: r.reason });
-}
-
-/** Decisions from `since`, read from the end of the file so a long one costs little. When `since` is older than the
- *  file's first line, the months rotateDecisions moved to archive/ are read too. */
-export function readDecisionsSince(file: string, since: number): Decision[] {
-  if (!existsSync(file)) return [];
-  const lines = readFileSync(file, "utf8").split("\n");
-  const out: Decision[] = [];
-  let whole = true;
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const l = lines[i];
-    if (!l) continue;
-    try {
-      const d = JSON.parse(l) as Decision;
-      if (new Date(d.time).getTime() < since) {
-        whole = false;
-        break;
-      }
-      out.push(d);
-    } catch {}
-  }
-  out.reverse();
-  if (!whole) return out;
-  const archive = join(dirname(file), "archive");
-  if (!existsSync(archive)) return out;
-  const from = `decisions-${new Date(since).toISOString().slice(0, 7)}.jsonl`;
-  const old: Decision[] = [];
-  for (const f of readdirSync(archive)
-    .filter((f) => f.startsWith("decisions-") && f >= from)
-    .sort()) {
-    for (const l of readFileSync(join(archive, f), "utf8").split("\n")) {
-      if (!l) continue;
-      try {
-        const d = JSON.parse(l) as Decision;
-        if (new Date(d.time).getTime() >= since) old.push(d);
-      } catch {}
-    }
-  }
-  return [...old, ...out];
-}
-
-const KEEP_DECISIONS_MS = 90 * 86_400_000;
-
-/** Moves the lines of decisions.jsonl older than KEEP_DECISIONS_MS to archive/decisions-<month>.jsonl, so the file the
- *  rule loop reads every tick stays small. Returns how many lines moved. */
-export function rotateDecisions(file: string, now: Date): number {
-  if (!existsSync(file)) return 0;
-  const cut = now.getTime() - KEEP_DECISIONS_MS;
-  const lines = readFileSync(file, "utf8").split("\n").filter(Boolean);
-  const byMonth = new Map<string, string[]>();
-  let i = 0;
-  for (; i < lines.length; i++) {
-    let time: number;
-    try {
-      time = new Date((JSON.parse(lines[i] ?? "") as Decision).time).getTime();
-    } catch {
-      continue;
-    }
-    if (!(time < cut)) break;
-    const m = new Date(time).toISOString().slice(0, 7);
-    byMonth.set(m, [...(byMonth.get(m) ?? []), lines[i] ?? ""]);
-  }
-  if (i === 0) return 0;
-  const archive = join(dirname(file), "archive");
-  mkdirSync(archive, { recursive: true });
-  // the archive is written first: a stop in between keeps a line twice, never loses it
-  for (const [m, ls] of byMonth) appendFileSync(join(archive, `decisions-${m}.jsonl`), `${ls.join("\n")}\n`);
-  const rest = lines.slice(i);
-  writeAtomic(file, rest.length ? `${rest.join("\n")}\n` : "");
-  return i;
-}
-
-/** The day of the last cut, kept beside decisions.jsonl. */
-const cutMarkPath = (file: string) => join(dirname(file), "decisions-cut-day");
-
-/** Once a day, old lines of decisions.jsonl go to the archive. Returns how many moved, 0 when today's cut is done. */
-export function cutDecisionsDaily(file: string, now: Date): number {
-  const mark = cutMarkPath(file);
-  const today = now.toISOString().slice(0, 10);
-  if (existsSync(mark) && readFileSync(mark, "utf8").trim() >= today) return 0;
-  const moved = rotateDecisions(file, now);
-  mkdirSync(dirname(mark), { recursive: true });
-  writeAtomic(mark, `${today}\n`);
-  return moved;
 }

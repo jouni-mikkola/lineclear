@@ -1,10 +1,10 @@
 import { afterAll, expect, test } from "bun:test";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tick } from "../src/rules.ts";
 import { cheapWorker, isRoutine } from "../src/routine.ts";
 import { parseRoadmap } from "../src/roadmap.ts";
-import { decisionsPath } from "../pi/config.ts";
+import { decisionsSince } from "../src/decisions-store.ts";
 import { demoConfig, idleWorld } from "./demo-world.ts";
 import { recordTaskSteps, tmp } from "./helpers.ts";
 
@@ -51,11 +51,7 @@ function setup(files: string, tasks: { id: string; title: string; status: string
     addTasks: (_s, jobs) => jobs.map(({ title, brief, extra }) => (adds.push([title, brief, ...extra]), undefined)),
   });
   recordTaskSteps(config, Object.fromEntries(tasks.map((t) => [t.id, "A"])));
-  const decisions = () =>
-    readFileSync(decisionsPath(vars), "utf8")
-      .trim()
-      .split("\n")
-      .map((l) => JSON.parse(l));
+  const decisions = () => decisionsSince(vars, 0);
   const statePath = join(config, "projects", "demo", "state.json");
   return { dir, vars, world, adds, closed, decisions, statePath, tick: () => tick(world, false, vars) };
 }
@@ -79,7 +75,7 @@ test("a routine step starts on the cheap model and a code step on the worker mod
   const routine = setup("docs/numbers.md, test/a.test.ts");
   routine.tick();
   expect(modelOf(routine.adds[0]!)).toBe(CHEAP);
-  expect(routine.decisions().find((d) => d.kind === "start").reason).toContain("routine step on the cheap worker model");
+  expect(routine.decisions().find((d) => d.kind === "start")?.reason).toContain("routine step on the cheap worker model");
 
   const code = setup("src/a.ts, docs/numbers.md");
   code.tick();

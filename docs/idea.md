@@ -121,7 +121,7 @@ From [herdr](https://herdr.dev):
 **Your plan sets the order. Plain code starts each step when the one before it is done. AI writes, checks and plans
 the code:** worker, reviewer, planner.
 
-1. **No AI where a rule works.** An if-statement decides, and logs its reason in `decisions.jsonl`.
+1. **No AI where a rule works.** An if-statement decides, and logs its reason in the `decisions` table.
 2. **Don't add.** Simple is the default. Each new part must pay for its cost; new ideas wait in the backlog.
 3. **You approve only what leaves.** Agents never push. Plans, roadmap changes and step questions never wait for
    you: rules and the Dispatcher decide them, and you can undo any plan with one tap. The Inbox keeps what a human

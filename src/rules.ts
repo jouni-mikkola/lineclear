@@ -1,7 +1,7 @@
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { writeAtomic } from "../pi/atomic.ts";
-import { configDir, decisionsPath } from "../pi/config.ts";
+import { addDecisions, decisionsSince, pruneDecisions } from "./decisions-store.ts";
 import { routeAsks } from "./asks.ts";
 import { settlePlans } from "./plan-apply.ts";
 import { copyStoreQuietly } from "./store-copies.ts";
@@ -9,7 +9,7 @@ import { freshDecisions } from "./decision-dedupe.ts";
 import { addItem, answerCard, closeItem, closeSettledUpdates, isOpen, type Item, readItems } from "./inbox.ts";
 import { listProjectNames, projectsDir, readSettings, type Settings } from "./project.ts";
 import type { Task } from "./roadmap.ts";
-import { classify, cutDecisionsDaily, readDecisionsSince, type StallEntry } from "./stall-class.ts";
+import { classify, type StallEntry } from "./stall-class.ts";
 import { holdProjectTick, type StartRecord } from "./starts.ts";
 import { tickProject } from "./tick-project.ts";
 import { sweepDiskUse } from "./disk-use.ts";
@@ -21,7 +21,7 @@ import { dataDir } from "./paths.ts";
 import { serviceWaits } from "./wait-service.ts";
 import { clearWait, loadLimit, readWaits } from "./waits.ts";
 import { ownMark, realWorld, type World } from "./world.ts";
-export { decisionsPath, ownMark, realWorld };
+export { ownMark, realWorld };
 export type { World };
 
 export const TICK_MS = 30_000;
@@ -202,7 +202,7 @@ export function tick(world: World, dryRun: boolean, env = process.env): Decision
       release();
     }
   }
-  if (!dryRun) cutDecisionsDaily(decisionsPath(env), world.now());
+  if (!dryRun) pruneDecisions(env, world.now().getTime());
   return all;
 }
 
@@ -214,10 +214,7 @@ function askAboutState(project: string, reason: string, now: Date, env: NodeJS.P
 }
 
 function logDecisions(ds: Decision[], env: NodeJS.ProcessEnv): Decision[] {
-  if (ds.length > 0) {
-    mkdirSync(configDir(env), { recursive: true });
-    appendFileSync(decisionsPath(env), `${ds.map((d) => JSON.stringify(d)).join("\n")}\n`);
-  }
+  addDecisions(env, ds);
   return ds;
 }
 
@@ -334,9 +331,7 @@ export async function nightWatch(
     return typeof s !== "string" && !s.paused;
   });
   const since = Math.max(last.sent, nightStart(now, window));
-  const found = readDecisionsSince(decisionsPath(env as NodeJS.ProcessEnv), since).filter(
-    (d) => Date.parse(d.time) > since && running.includes(d.project) && worthHearing(d),
-  );
+  const found = decisionsSince<Decision>(env, since).filter((d) => Date.parse(d.time) > since && running.includes(d.project) && worthHearing(d));
   if (found.length === 0) return undefined;
   const lines = [...new Set(found.map((d) => `- ${d.project}${d.step ? ` ${d.step}` : ""}: ${d.reason}`))];
   const failed = await send(
