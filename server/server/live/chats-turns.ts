@@ -32,4 +32,3 @@ export function replying(turn: ReturnType<typeof turnOf>, ev: LogEvent[]): boole
   if (turn.kind === 'yours' || turn.kind === 'unknown') return true
   return turn.kind === 'own' && landed(ev)
 }
-

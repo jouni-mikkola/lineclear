@@ -287,7 +287,7 @@ export class ChatsLogs {
     return replying(turn, ev)
   }
 
-  /** Codex and pi change model and effort only through their own pickers: their menu only adds files */
+  /** pi changes model and effort only through its own pickers: its menu only adds files */
   protected controls(): ChatControls {
     return { models: [], model: 0, efforts: [], effort: 0 }
   }
