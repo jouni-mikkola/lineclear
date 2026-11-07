@@ -41,7 +41,9 @@ export class EngineMerge extends EngineLand {
   private async hubOrState(p: Space): Promise<GH.GitHub | null> {
     try {
       const g = await this.hub(p)
+      // one state per repo: its key once gh reaches it, the space's own while it can't tell which repo
       this.repos.mark(p.path, g ? 'ok' : 'unauthenticated')
+      if (g) this.repos.mark(GH.repoKey(g), 'ok')
       return g
     } catch (e) {
       this.repos.mark(p.path, 'down', (e as Error).message)

@@ -48,7 +48,8 @@ const PR_FIELDS = 'number,url,state,isDraft,headRefOid,baseRefName'
 /** the branch's pull request: its open one, else one merged already */
 export async function findPr(g: GitHub, cwd: string, branch: string): Promise<Pr | null> {
   const r = await gh(g, cwd, 'pr', 'list', ...R(g), '--head', branch, '--state', 'all', '--json', PR_FIELDS, '--limit', '10')
-  if (!r.ok) return null
+  // a list gh could not read is not an empty one: no pull request would open a second
+  if (!r.ok) throw new GhDown((r.err || r.out || `gh exited ${r.code}`).split('\n')[0])
   const list = parseJson<Pr[]>(r.out, '[]')
   return list.find((p) => p.state === 'OPEN') ?? list.find((p) => p.state === 'MERGED') ?? null
 }
@@ -312,7 +313,7 @@ export interface OpenPr {
   comments: PrComment[]
 }
 
-const CONTEXTS = `commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 50) { nodes {
+const CONTEXTS = `commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {
   __typename
   ... on CheckRun { name status conclusion detailsUrl }
   ... on StatusContext { context state targetUrl }
@@ -322,9 +323,9 @@ const OPEN_PRS = (checks: boolean) => `query($owner: String!, $name: String!) { 
   pullRequests(states: OPEN, first: 100, orderBy: { field: UPDATED_AT, direction: DESC }) { nodes {
     number url state isDraft headRefOid baseRefName
     ${checks ? CONTEXTS : ''}
-    reviews(first: 50) { nodes { databaseId author { login } body state url submittedAt } }
-    comments(first: 50) { nodes { databaseId author { login } body url createdAt } }
-    reviewThreads(first: 30) { nodes { comments(first: 30) { nodes {
+    reviews(last: 50) { nodes { databaseId author { login } body state url submittedAt } }
+    comments(last: 50) { nodes { databaseId author { login } body url createdAt } }
+    reviewThreads(last: 30) { nodes { comments(last: 30) { nodes {
       databaseId author { login } body url createdAt path line originalLine pullRequestReview { databaseId submittedAt }
     } } } }
   } }

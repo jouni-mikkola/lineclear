@@ -20,8 +20,9 @@ export class RepoWatch {
   }
 
   mark(key: string, state: RepoState['state'], said?: string) {
-    if (this.state(key).state === state && this.states.has(key)) return
-    this.states.set(key, { state, said, since: Date.now() })
+    const was = this.states.get(key)
+    if (was?.state === state && was.said === said) return
+    this.states.set(key, { state, said, since: was?.state === state ? was.since : Date.now() })
   }
 
   /** the repo's open pull requests as GitHub has them, read at most once per `maxAge` ms however many ask; GhDown when unread */
