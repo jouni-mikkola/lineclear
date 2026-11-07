@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { herdrArgv } from "./herdr.ts";
 import { join } from "node:path";
 import { fileClash, stepHeld, stepNeeds } from "./parts.ts";
@@ -91,6 +91,32 @@ export function bindStarts(state: StartRecord, tasks: Task[]) {
     delete pending[t.title];
   }
 }
+
+/** How long a start holds its step against another tick that has not yet seen the new task. */
+export const CLAIM_MS = 2 * 60_000;
+
+/**
+ * Claims a step for one start, by a file only one process can create. Two ticks that both read no task for the step
+ * would each add one; the second finds the claim and starts nothing. Returns why not, or undefined when it holds the claim.
+ */
+export function claimStart(dir: string, step: string, now: Date): string | undefined {
+  mkdirSync(dir, { recursive: true });
+  const file = join(dir, `${step}.claim`);
+  for (let tries = 0; tries < 2; tries++) {
+    try {
+      writeFileSync(file, String(now.getTime()), { flag: "wx" });
+      return undefined;
+    } catch {
+      const at = Number(readFileSync(file, "utf8"));
+      if (now.getTime() - at < CLAIM_MS && now.getTime() >= at) return "another tick started it a moment ago, so it does not start twice";
+      rmSync(file, { force: true });
+    }
+  }
+  return "its start claim cannot be taken";
+}
+
+/** Gives a claim back when the task could not be added. */
+export const releaseStart = (dir: string, step: string) => rmSync(join(dir, `${step}.claim`), { force: true });
 
 /** The steps with a task that still runs for them (an orphaned task holds no locks). */
 export function liveSteps(steps: Step[], tasks: Task[], remote: Task[], taskSteps: Record<string, string> | undefined): Set<string> {

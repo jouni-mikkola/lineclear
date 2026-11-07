@@ -3,7 +3,7 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseRoadmap } from "../src/roadmap.ts";
 import { readState } from "../src/rules.ts";
-import { AGE_TICKS, agentStart, nudgePane, lockWhy, reservedLocks } from "../src/starts.ts";
+import { AGE_TICKS, CLAIM_MS, agentStart, claimStart, releaseStart, nudgePane, lockWhy, reservedLocks } from "../src/starts.ts";
 import { tmp } from "./helpers.ts";
 import { setup, step } from "./rules-world.ts";
 
@@ -114,4 +114,14 @@ test("reservations go to the oldest waiting step, and a step reserves nothing un
   expect(reserved.get("x")).toBe("B");
   expect(lockWhy(byId.get("A")!, new Map(), reserved)).toContain("reserved for B");
   expect(lockWhy(byId.get("B")!, new Map(), reserved)).toBeUndefined();
+});
+
+test("a start claim is refused for two minutes, then taken again, and a released one is free", () => {
+  const dir = tmp("claims");
+  const at = new Date(1_000_000);
+  expect(claimStart(dir, "A", at)).toBeUndefined();
+  expect(claimStart(dir, "A", new Date(at.getTime() + 1000))).toContain("does not start twice");
+  expect(claimStart(dir, "A", new Date(at.getTime() + CLAIM_MS + 1))).toBeUndefined();
+  releaseStart(dir, "A");
+  expect(claimStart(dir, "A", at)).toBeUndefined();
 });
