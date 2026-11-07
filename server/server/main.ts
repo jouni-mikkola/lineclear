@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { startApp } from './app.ts'
 import { holderPort, lockStore } from './lock.ts'
 import { Push } from './push.ts'
-import { DEFAULT_PORT, HOME, writeJson } from './store.ts'
+import { DEFAULT_PORT, db, HOME, StoreError, writeJson } from './store.ts'
 
 interface Mounted {
   fetch: (req: Request) => Promise<Response | undefined>
@@ -20,6 +20,13 @@ if (holder !== undefined) {
   console.error(
     `lineclear: another server (process ${holder}${at ? `, port ${at}` : ''}) already runs on ${HOME}. Stop it first, or use another LINECLEAR_HOME.`,
   )
+  process.exit(1)
+}
+// a store that cannot open stops the board here, with the file's path in the line
+try {
+  db.query('select 1').get()
+} catch (e) {
+  console.error(e instanceof StoreError ? e.message : String(e))
   process.exit(1)
 }
 const { LiveSource } = await import('./live/source.ts')
