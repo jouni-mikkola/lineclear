@@ -215,12 +215,6 @@ unless (caller) {
     }
   }
   $ENV{LINECLEAR_ROUTED} = 1;
-  # in this process, not a second perl: a start costs the modules' load time again
-  $0 = $local;
-  my $path = $local =~ m{^/} ? $local : "./$local";
-  -r $path or die "perl: $path: $!\n";
-  do $path;
-  die $@ if $@;
-  exit 0;
+  exec('perl', $local, @ARGV) or die "perl: $!";
 }
 1;
