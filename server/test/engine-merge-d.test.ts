@@ -219,6 +219,37 @@ describe('on GitHub: news, checks and the default way in', () => {
     expect(reds()).toBe(before + 2)
   })
 
+  test('a red main holds the next merges until a green run', async () => {
+    const w = world()
+    const g = onGitHub()
+    const first = await started(w, g.dir, 'hold1')
+    const second = await started(w, g.dir, 'hold2')
+    const third = await started(w, g.dir, 'hold3')
+    for (const x of w.engine.tasks) x.doneAt = 0
+    for (const [i, { t }] of [first, second, third].entries()) {
+      writeFileSync(join(t.worktree!, `h${i}.txt`), 'x\n')
+      sh('git add -A && git commit -qm x', t.worktree!)
+    }
+    expect((await w.engine.merge(first.t.id, { self: true })).ok).toBe(true)
+    const red = sh('git rev-parse main', g.bare)
+    const run = (headSha: string, conclusion: string, n: number) => ({
+      headSha,
+      status: 'completed',
+      conclusion,
+      url: `https://github.com/acme/app/actions/runs/${n}`,
+      workflowName: 'Check',
+    })
+    g.set({ runs: [run(red, 'failure', 3)], api: { 'repos/acme/app/actions/runs/3/jobs': [9] }, logs: { '9': 'boom' } })
+    await w.engine.watchMains()
+    for (const x of [second, third]) {
+      const r = await w.engine.merge(x.t.id, { self: true })
+      expect(r.ok).toBe(false)
+      expect(r.error).toContain('merges are held until a green run')
+    }
+    g.set({ runs: [run('b'.repeat(40), 'success', 5), run(red, 'failure', 3)] })
+    expect((await w.engine.merge(second.t.id, { self: true })).ok).toBe(true)
+  })
+
   test('GitHub slow on the merge: one lineclear merge waits for its result, and asked again while it runs joins the same merge', async () => {
     const w = world()
     const g = onGitHub()

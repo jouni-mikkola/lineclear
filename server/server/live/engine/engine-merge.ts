@@ -103,6 +103,21 @@ export class EngineMerge extends EngineLand {
 
   protected redMain = new RedMainWatch()
 
+  /** While the base is red no task merges into it but the one fixing it: a second red on top hides the first. */
+  protected override async mergeNow(t: TaskRec, self: boolean) {
+    const p = this.places.space(t.project)
+    if (p && this.data.red?.[p.path] && t.by !== 'main-green' && !t.merged) {
+      await this.watchMains()
+      const sha = this.data.red?.[p.path]
+      if (sha)
+        return {
+          ok: false,
+          error: `${p.base} is red at ${sha.slice(0, 7)}: merges are held until a green run. Run lineclear merge ${t.id} again once the fix task has merged.`,
+        }
+    }
+    return super.mergeNow(t, self)
+  }
+
   /** A revert commit of the sha pushed to the base, made in a scratch worktree so no checkout is touched. */
   private async revertOnBase(p: Space, sha: string): Promise<boolean> {
     const dir = mkdtempSync(join(tmpdir(), 'red-main-'))
