@@ -22,9 +22,11 @@ export interface Finding {
 }
 
 const RULE_FILES = ["AGENTS.md", "CLAUDE.md", "REVIEW.md"];
-const CONTEXT_LINES = 8;
+const CONTEXT_LINES = 3;
+/** Generated files a reviewer cannot judge and that cost the most tokens. */
+const SKIP = [":(exclude)*.lock", ":(exclude)*lock.json", ":(exclude)*lockb", ":(exclude)pnpm-lock.yaml", ":(exclude)*.snap", ":(exclude)*.min.js"];
 /** The diff and the rules are cut to this many characters each, so a huge change cannot overflow the model. */
-const PART_MAX = 60_000;
+const PART_MAX = 40_000;
 
 /** The repo's own rules, each file under its name. */
 function repoRules(repo: string): string {
@@ -34,7 +36,7 @@ function repoRules(repo: string): string {
     .slice(0, PART_MAX);
 }
 
-/** The change since the branch left its base, with 8 lines of context, committed or not. */
+/** The change since the branch left its base, with 3 lines of context, committed or not. */
 function diffAgainst(repo: string, base: string): string | undefined {
   const ref = [`origin/${base}`, base].find((r) => git(repo, "rev-parse", "--verify", "--quiet", r).ok);
   const from = ref && gitText(repo, "merge-base", ref, "HEAD");
@@ -42,7 +44,7 @@ function diffAgainst(repo: string, base: string): string | undefined {
   // new files are not in `git diff`; they are added from git's own listing, leaving the index as it was
   const fresh = git(repo, "ls-files", "--others", "--exclude-standard").out.split("\n").filter(Boolean);
   const added = fresh.map((f) => git(repo, "diff", "--no-index", `-U${CONTEXT_LINES}`, "--", "/dev/null", f).out);
-  return [git(repo, "diff", `-U${CONTEXT_LINES}`, from).out, ...added].join("");
+  return [git(repo, "diff", `-U${CONTEXT_LINES}`, from, "--", ".", ...SKIP).out, ...added].join("");
 }
 
 /** The step and the owner's direction, without the worker's procedure that follows them: a reviewer never runs it. */
