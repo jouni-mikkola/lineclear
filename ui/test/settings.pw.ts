@@ -72,7 +72,7 @@ test("each model says why it is in use or not, and its arrows are 44 px to touch
   // moving the full one down makes the next row the one in use, before the server answers
   await page.locator('[data-down="vendor-a/model-mid"]').click();
   await expect(rows.nth(0).locator("[data-reason]")).toHaveText("in use");
-  const box = await page.locator('[data-models="worker"] [data-up="vendor-c/model-pro"]').boundingBox();
+  const box = await page.locator('[data-models="worker"] [data-up="vendor-a/model-mid"]').boundingBox();
   const narrow = (page.viewportSize()?.width ?? 1440) < 500;
   expect(box?.width ?? 0).toBeGreaterThanOrEqual(narrow ? 44 : 32);
   expect(box?.height ?? 0).toBeGreaterThanOrEqual(narrow ? 44 : 32);

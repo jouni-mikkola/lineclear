@@ -38,7 +38,7 @@ const COPIED_FOLDERS = ["chatlog", "inbox", "tasks"];
 const TASK_LINKS = ["worktree", "branch", "pushed", "pr", "agent", "watch", "waitChecks"];
 /** The variables the instance keeps; every other one (keys, tokens, sockets, the task's own chat) is dropped. */
 const KEPT_ENV = ["PATH", "LANG", "LC_ALL", "TERM", "USER", "LOGNAME", "TMPDIR"];
-const AGENT_CLIS = ["claude", "codex", "pi"];
+const AGENT_CLIS = ["claude", "pi"];
 
 /** `<cache>/try/state.json`: the instance that runs, while one does. */
 export interface TryState {

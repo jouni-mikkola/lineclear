@@ -14,23 +14,20 @@ function fake(body: string): string {
   return path;
 }
 
-const registry = () =>
-  readRegistry(
-    harnesses({ PI_BIN: fake(`printf 'provider model\\nanthropic opus-x\\nopenai-codex gpt-y\\n'`), OPENCODE_BIN: fake(`echo opencode-go/kimi-z`) }),
-  );
+const registry = () => readRegistry(harnesses({ PI_BIN: fake(`printf 'provider model\\nanthropic opus-x\\nopenai-codex gpt-y\\n'`) }));
 const configEnv = () => ({ ...process.env, LINECLEAR_CONFIG: mkdtempSync(join(tmpdir(), "setup-cfg-")) });
-const flags = ["--worker", "anthropic/opus-x", "--reviewer", "openai-codex/gpt-y", "--planner", "anthropic/opus-x", "--step-checker", "opencode-go/kimi-z"];
+const flags = ["--worker", "anthropic/opus-x", "--reviewer", "openai-codex/gpt-y", "--planner", "anthropic/opus-x", "--step-checker", "openai-codex/gpt-y"];
 
-test("two fake harnesses: a choice is saved and read back", async () => {
+test("a fake harness: a choice is saved and read back", async () => {
   const env = configEnv();
   const lines: string[] = [];
   expect(await setupMain(flags, (l) => lines.push(l), null, env, registry())).toBe(0);
-  expect(lines.join("\n")).toContain("opencode: opencode-go (1 models)");
+  expect(lines.join("\n")).toContain("pi: ");
   expect(readSetup(env)).toEqual({
     worker: "anthropic/opus-x",
     reviewer: "openai-codex/gpt-y",
     planner: "anthropic/opus-x",
-    stepChecker: "opencode-go/kimi-z",
+    stepChecker: "openai-codex/gpt-y",
   });
   expect(setupGate(env)).toBeUndefined();
 });
@@ -67,7 +64,7 @@ test("until roles are chosen, run and project add stop with a line pointing to s
 test("the web view lists harnesses and accounts, and saves through the same check", () => {
   const env = configEnv();
   const view = setupView(registry(), env);
-  expect(view.harnesses.map((h) => h.name)).toEqual(["pi", "opencode"]);
+  expect(view.harnesses.map((h) => h.name)).toEqual(["pi"]);
   expect(view.harnesses[0]?.accounts).toEqual([
     { account: "anthropic", models: ["anthropic/opus-x"] },
     { account: "openai-codex", models: ["openai-codex/gpt-y"] },
