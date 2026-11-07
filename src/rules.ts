@@ -12,6 +12,7 @@ import type { Task } from "./roadmap.ts";
 import { cutDecisionsDaily, type StallEntry } from "./stall-class.ts";
 import { holdProjectTick, type StartRecord } from "./starts.ts";
 import { tickProject } from "./tick-project.ts";
+import { sweepDiskUse } from "./disk-use.ts";
 import { sweepOldTemp } from "./tmpdirs.ts";
 import { holdWorld } from "./hold.ts";
 import { nightWatch } from "./night-watch.ts";
@@ -132,7 +133,7 @@ export function tick(world: World, dryRun: boolean, env = process.env): Decision
     for (const start of [copyStoreQuietly]) start(env, world.now());
     all.push(
       ...logDecisions(
-        [...settlePlans(world.now(), env), ...closeSettledUpdates(world.now(), env), ...sweepOldTemp(world.now(), env)].map(
+        [...settlePlans(world.now(), env), ...closeSettledUpdates(world.now(), env), ...sweepOldTemp(world.now(), env), ...sweepDiskUse(world.now(), env)].map(
           (reason): Decision => ({ time: world.now().toISOString(), project: "-", kind: "wake", reason }),
         ),
         env,

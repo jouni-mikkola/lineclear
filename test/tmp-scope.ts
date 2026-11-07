@@ -44,7 +44,9 @@ for (const k of [
   "LINECLEAR_MOUNT",
 ])
   delete process.env[k];
-for (const k of ["LINECLEAR_HOME", "LINECLEAR_MACHINE", "LINECLEAR_SHARED_HOME"]) delete process.env[k];
+for (const k of ["LINECLEAR_MACHINE", "LINECLEAR_SHARED_HOME"]) delete process.env[k];
+// the loop sweeps worktrees by the tasks of the data folder: a test that sets no folder of its own never reaches the owner's
+process.env.LINECLEAR_HOME = join(scope, "lineclear-home");
 // the secrets vault the CLI reads (server/server/live/secrets.ts): never the owner's real one
 process.env.LINECLEAR_MAIN_HOME = join(scope, "main-home");
 // A git a test starts never waits on fsync: a throwaway repo needs no durability, and under disk load every
