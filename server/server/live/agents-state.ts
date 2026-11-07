@@ -1,64 +1,34 @@
-import { LinkBackoff } from './recovery.ts'
 import { Emitter } from '../source.ts'
 import { readJson, writeJson } from '../store.ts'
-import { ColdAgents } from './engine/cold.ts'
-import { addLog } from './log-list.ts'
-import type { AgentHerdr, TermScreen } from '../../shared/types.ts'
-import type { Subscription, AgentInfo, AgentStatus } from './herdr.ts'
+import { AgentRows } from './engine/cold.ts'
+import { addLog, uniqueLogs } from './log-list.ts'
+import type { AgentInfo, AgentStatus } from './herdr.ts'
 import { findPiLog } from './readers/find.ts'
-import { PasteWatch } from './paste-watch.ts'
-import { AgentTerminals } from './agent-terminals.ts'
 import { machineNews } from './quiet.ts'
 import { mirrored } from './mfs.ts'
 import { SecretAccess } from './secret-access.ts'
 import { AgentRoutes } from './agent-routes.ts'
 import { type RpcAgent, rpcPane } from './agent-rpc.ts'
-import type { AgentRecord, OutItem, Hold, Sent, Events } from './agents-helpers.ts'
-
-/** internal news carries a cid of this form and is never a screen's message */
-export const isNews = (cid?: string) => !!cid?.startsWith('requested-news:')
-export const LATELY = 600_000
-const lately = (list: OutItem[], now: number) => list.filter((o) => now - o.at < LATELY)
+import { SendFailures, SentLog, isNews } from './agents-sent.ts'
+import type { AgentRecord, OutItem, Hold, Events } from './agents-helpers.ts'
 
 export class AgentsState extends Emitter<Events> {
-  private cold = new ColdAgents<AgentRecord>()
-  records: Record<string, AgentRecord> = this.cold.read()
+  private rows = new AgentRows<AgentRecord>()
+  records: Record<string, AgentRecord> = this.rows.read()
   // news held in an older version's outbox is dropped too (quiet.ts)
   outbox: OutItem[] = readJson<OutItem[]>('outbox.json', []).filter((o) => !machineNews(o.text))
   live = new Map<string, AgentInfo>()
   /** the agents that run as a child of this server, by chat key: herdr knows nothing of them */
   rpcs = new Map<string, RpcAgent>()
-  protected byName = new Map<string, string>()
-  protected timer: ReturnType<typeof setInterval> | null = null
-  protected sub!: Subscription
+  private byName = new Map<string, string>()
   readonly secretAccess = new SecretAccess()
   secretScope: (chat: string) => string[] | undefined = () => undefined
-  protected refreshing = false
-  protected readAgain = false
-  /** the subscription dropped and has not opened again: a read meanwhile does not make herdr reachable */
-  protected subDown = false
-  protected retryTimer: ReturnType<typeof setTimeout> | null = null
-  /** every agent herdr listed, named or not: events keep it current between reads */
-  protected listed: AgentInfo[] = []
-  protected pasteDue = new Set<string>()
-  protected paste = new PasteWatch()
-  protected heardAt = 0
-  protected stopped = false
-  protected retryAt = 0
-  protected recovery = new LinkBackoff()
-  protected routes = new AgentRoutes(this)
-  protected starting = new Map<string, Promise<AgentInfo | null>>()
+  private routes = new AgentRoutes(this)
+  readonly sent = new SentLog()
+  readonly failures = new SendFailures()
   stopping = new Set<string>()
-  protected delivering = new Set<string>()
-  /** what went in lately with a screen's id: the chat gives the id back once it reads it from the log */
-  protected delivered: OutItem[] = []
-  protected newsReceipts: string[] = readJson('requested-news-receipts.json', [])
-  /** everything that went in lately: what a merge checks the agent has read, so kept across a restart */
-  protected typed: OutItem[] = readJson('typed.json', [])
-  protected failures: { key: string; cid: string; error: string; at: number }[] = []
-  protected inflight = new Map<string, Promise<Sent>>()
   /** since when an agent with screen sends waiting for it is gone (fail after strandAfter) */
-  protected stranded = new Map<string, number>()
+  private stranded = new Map<string, number>()
   /** since when herdr lists an agent that just started but won't take input yet (fail after unreadyFor) */
   unready = new Map<string, number>()
   /** after a failed hand-over: when the next try may be, and how many failed in a row */
@@ -77,20 +47,23 @@ export class AgentsState extends Emitter<Events> {
   startedIn = new Map<string, string>()
   reachable = true
   lastReach = Date.now()
-  protected terminals = new AgentTerminals(
-    (k) => this.info(k),
-    (k, s) => this.emit('output', k, s),
-    (k) => this.screen(k), // by name, so a subclass or a test can replace screen
-  )
-  protected told = new Map<string, AgentStatus | 'gone'>()
   /** whether a menu a slash command opened is up, which herdr doesn't see: typed text could pick an option */
   menuUp?: (key: string) => boolean
   beforeInput?: (key: string) => Promise<void>
   /** why nothing is sent to this key's pane when its task is done or closed (it has none), else nothing */
   taskEnded?: (key: string) => string | undefined
 
+  constructor() {
+    super()
+    // records written before logs were kept once each
+    for (const r of Object.values(this.records)) {
+      r.logs = uniqueLogs(r.logs ?? [])
+      this.byName.set(r.name, r.key)
+    }
+  }
+
   save() {
-    this.cold.write(this.records)
+    this.rows.write(this.records)
     writeJson('outbox.json', this.outbox)
   }
 
@@ -113,6 +86,42 @@ export class AgentsState extends Emitter<Events> {
 
   protected unroute(key: string) {
     this.routes.drop(key)
+  }
+
+  hasRoute(key: string) {
+    return this.routes.has(key)
+  }
+
+  bindRoute(r: AgentRecord, pane: string) {
+    return this.routes.bind(r, pane)
+  }
+
+  bindRoutePid(r: AgentRecord, pid: number | undefined) {
+    return this.routes.bindPid(r, pid)
+  }
+
+  repairRoutes() {
+    return this.routes.repair()
+  }
+
+  trackName(r: AgentRecord) {
+    this.byName.set(r.name, r.key)
+  }
+
+  protected untrack(r: AgentRecord) {
+    if (this.byName.get(r.name) === r.key) this.byName.delete(r.name)
+  }
+
+  protected trackedKeys() {
+    return [...this.byName.values()]
+  }
+
+  protected trackedNames() {
+    return [...this.byName]
+  }
+
+  protected unstrand(key: string) {
+    this.stranded.delete(key)
   }
 
   /** what a screen sent waits only on a menu or a starting agent: one whose agent is gone (or herdr out of reach) for a
@@ -153,30 +162,19 @@ export class AgentsState extends Emitter<Events> {
     }
   }
 
-  /** herdr's word on the agent as the events and reads kept it: nothing is asked of herdr */
-  herdrView(key: string): AgentHerdr | undefined {
-    const a = this.info(key)
-    const s = a?.agent_session
-    return a && { status: a.agent_status, ...(s?.kind === 'path' ? { session: s.value } : {}), pasted: this.paste.has(key), at: this.heardAt }
-  }
-
   status(key: string): AgentStatus | 'gone' {
     return this.info(key)?.agent_status ?? 'gone'
-  }
-
-  protected lookAtPastes() {
-    for (const key of this.byName.values()) {
-      if (this.stopped) return
-      if (this.pasteDue.delete(key) && !this.rpcs.has(key)) void this.paste.look(key, this.records[key]?.started ?? 0, () => this.info(key)?.pane_id)
-    }
   }
 
   /** what a screen sent that waits for this agent fails: the screen says why and offers Retry */
   protected fail(key: string, error: string) {
     const mine = this.outbox.filter((o) => o.key === key && o.cid && !isNews(o.cid))
     if (!this.dropWhere((o) => mine.includes(o))) return
-    const now = Date.now()
-    this.failures = [...this.failures.filter((f) => now - f.at < LATELY), ...mine.map((o) => ({ key, cid: o.cid!, error, at: now }))]
+    this.failures.add(
+      key,
+      mine.map((o) => o.cid!),
+      error,
+    )
     this.emit('failed', key)
   }
 
@@ -214,18 +212,6 @@ export class AgentsState extends Emitter<Events> {
   }
 
   protected went(item: OutItem) {
-    const now = Date.now()
-    const entry = { ...item, at: now }
-    this.typed = [...lately(this.typed, now), entry].slice(-200)
-    writeJson('typed.json', this.typed)
-    if (!item.cid) return
-    if (isNews(item.cid) && !this.newsReceipts.includes(item.cid)) {
-      this.newsReceipts.push(item.cid)
-      writeJson('requested-news-receipts.json', this.newsReceipts)
-    }
-    this.delivered = [...lately(this.delivered, now), entry].slice(-200)
-  }
-  screen(key: string): Promise<TermScreen> {
-    return this.terminals.screen(key)
+    this.sent.record(item)
   }
 }

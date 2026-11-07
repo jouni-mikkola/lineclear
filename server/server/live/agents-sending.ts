@@ -3,24 +3,26 @@ import { herdr, type AgentInfo, type HerdrEvent } from './herdr.ts'
 import { holdBack, machineNews } from './quiet.ts'
 import { paneWrong, type Wrong } from './revive.ts'
 import { holdFrom, sleep, type OutItem, type Hold, type SendOpts, type Sent } from './agents-helpers.ts'
-import { LATELY, isNews } from './agents-state.ts'
+import { isNews } from './agents-sent.ts'
 import { putInto } from './agent-input.ts'
 import { isRpcPane } from './agent-rpc.ts'
 import { AgentsDelivery } from './agents-delivery.ts'
 
 export class AgentsSending extends AgentsDelivery {
+  private inflight = new Map<string, Promise<Sent>>()
+
   /** told when a pane needs its process compared: the news that revives is herdr's, nothing is polled for it */
   onSuspect?: () => void
   /** the pane each agent's process was last compared in: a new pane (a start, or herdr back) is compared once */
-  protected compared = new Map<string, string>()
+  private compared = new Map<string, string>()
   /** agents whose pane is to be compared: new, or its CLI exited */
-  protected due = new Set<string>()
+  private due = new Set<string>()
   /** what the last compare found wrong with each agent's pane */
-  protected verdict = new Map<string, Wrong | undefined>()
+  private verdict = new Map<string, Wrong | undefined>()
 
   protected override take(list: AgentInfo[]) {
     super.take(list)
-    for (const key of this.byName.values()) {
+    for (const key of this.trackedKeys()) {
       const pane = this.info(key)?.pane_id
       if (!pane || isRpcPane(pane)) {
         this.compared.delete(key)
@@ -37,7 +39,7 @@ export class AgentsSending extends AgentsDelivery {
   protected override heard(e: HerdrEvent) {
     if (e.event === 'pane_exited') {
       const id = ((e.data.pane ?? e.data) as Partial<AgentInfo>).pane_id
-      const key = [...this.byName.values()].find((k) => this.info(k)?.pane_id === id)
+      const key = this.trackedKeys().find((k) => this.info(k)?.pane_id === id)
       if (key) {
         this.due.add(key)
         this.onSuspect?.()
@@ -73,10 +75,6 @@ export class AgentsSending extends AgentsDelivery {
 
   wasWorking(key: string) {
     return !!this.records[key]?.working
-  }
-
-  busy(key: string) {
-    return this.starting.has(key) || this.stopping.has(key)
   }
 
   /** started again by `start` (that resumes its session), its pane closed first where it still holds it. Meanwhile what
@@ -133,12 +131,12 @@ export class AgentsSending extends AgentsDelivery {
       holdBack(news, key)
       return { waiting: false, item: base }
     }
-    if (isNews(cid) && this.newsReceipts.includes(cid!)) return { waiting: false, item: { ...base, id: cid! } }
+    if (isNews(cid) && this.sent.received(cid!)) return { waiting: false, item: { ...base, id: cid! } }
     const again = cid && this.outbox.find((o) => o.cid === cid)
     if (again) return { waiting: true, waitsFor: this.whyWaits(key), item: again }
-    const done = cid && this.delivered.find((o) => o.cid === cid)
+    const done = cid && this.sent.withId(cid)
     if (done) return { waiting: false, item: done }
-    if (cid) this.failures = this.failures.filter((f) => f.cid !== cid)
+    if (cid) this.failures.clear(cid)
     const item: OutItem = { ...base, ...(idle ? { idle } : {}), ...(command ? { command } : {}) }
     if (this.unwanted(item)) return { waiting: false, item }
     if (this.status(key) === 'gone' && ensure && cid) {
@@ -183,7 +181,7 @@ export class AgentsSending extends AgentsDelivery {
   }
 
   failedLately(key: string) {
-    return this.failures.filter((f) => f.key === key && Date.now() - f.at < LATELY).map(({ cid, error }) => ({ cid, error }))
+    return this.failures.lately(key)
   }
 
   waiting(key: string) {
@@ -192,11 +190,11 @@ export class AgentsSending extends AgentsDelivery {
 
   /** what went in with a screen's id in the last ten minutes, oldest first */
   sentLately(key: string) {
-    return this.delivered.filter((o) => o.key === key && Date.now() - o.at < LATELY)
+    return this.sent.lately(key)
   }
 
   typedSince(key: string, at: number) {
-    return this.typed.filter((o) => o.key === key && o.at > at)
+    return this.sent.since(key, at)
   }
 
   async keys(key: string, keys: string[]) {
@@ -209,18 +207,14 @@ export class AgentsSending extends AgentsDelivery {
     if (a && !this.rpcs.has(key)) await herdr.paneText(a.pane_id, text)
   }
 
-  watchTerminals(keys: string[]) {
-    this.terminals.watch(keys)
-  }
-
   /** a deleted task's agent, forgotten: its record (so its chat no longer reads its CLI's log) and what waited for it */
   forget(key: string) {
     this.unroute(key)
     const r = this.records[key]
-    if (r && this.byName.get(r.name) === key) this.byName.delete(r.name)
+    if (r) this.untrack(r)
     delete this.records[key]
-    this.failures = this.failures.filter((f) => f.key !== key)
-    this.stranded.delete(key)
+    this.failures.forget(key)
+    this.unstrand(key)
     this.dropWhere((o) => o.key === key)
     this.save()
   }
