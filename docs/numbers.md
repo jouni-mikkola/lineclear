@@ -83,9 +83,36 @@ Tokens per task by role, from the session files of the last 20 done tasks
 
 Stalls and failed starts (`bun scripts/core-baseline.ts stalls`):
 
-- The board's task history on this machine (elitebook) holds 38 tasks over 6.7 hours. It recorded no stall card
-  ("may be stuck"), so 0 stalls per hour. It recorded no failed start. 3 tasks needed their brief sent again.
-- The rule loop's `decisions.jsonl` (`~/.config/lineclear/`) holds 209 `stall` lines from 2026-11-01 to 2026-11-07, about
-  1.7 per hour: 178 flaky test, 31 command-failed. This is the older loop, not the board.
-  Count again: `grep -c '"kind":"stall"' ~/.config/lineclear/decisions.jsonl`.
+- The board's task history on one machine holds 194 tasks over 62 hours. It has no per-machine failed-start record,
+  only 22 tasks that needed their brief sent again (0.11 per task).
+- The rule loop's `decisions.jsonl` (`~/.config/lineclear/`) holds 2614 `stall` lines from 2026-10-31 to 2026-11-07
+  (about 169 hours), 15.5 per hour. 1559 of them are `stall <class>` lines and 1055 are ladder steps (`rung N`,
+  `remedy`). By class: lock-held 552, unknown 545, no-sign-of-life 386, brief-unsent 32, coordinator-gone 16,
+  head-of-line 12, no-room 6, machine-unreachable 4, roadmap-broken 2, idle-after-done 2, command-failed 2.
+  Count again: `bun scripts/core-baseline.ts stalls`.
 - Other machines: the board keeps no history of them here, so there is no number yet.
+
+## Speed and stability baseline
+
+Measured on the one machine with this repo's history, under light load. The Speed and stability steps of
+[ROADMAP.md](ROADMAP.md) compare against these rows, not the older "Core baseline" above (a smaller sample). Medians and p90 come from `bun scripts/core-baseline.ts`.
+
+| Measure | Median | p90 | Runs | Measure again |
+| --- | --- | --- | --- | --- |
+| `lineclear task add` to the agent's first tool call | 22 s | 131 s | last 20 done tasks | `start` |
+| `lineclear task list` wall time | 0.23 s | 0.23 s | 7 | `time 7 lineclear task list` |
+| `lineclear show` wall time | 0.09 s | 0.09 s | 7 | `time 7 lineclear show` |
+| `lineclear room` wall time | 0.47 s | 0.68 s | 7 | `time 7 lineclear room` |
+| Board `GET /api/snapshot`, 24.5 MB | 0.19 s | 0.28 s | 7 | `snapshot http://127.0.0.1:<board port>` |
+| `check.yml` on main, whole run | 73 s | 92 s | last 20 runs | `gh` |
+| Agent new input per task | 79 k | 280 k | last 20 done tasks | `tokens` |
+| Agent cache reads per task | 1303 k | 11076 k | last 20 done tasks | `tokens` |
+| Coordinator new input per session | 227 k | 12702 k | last 6 sessions | `chat-tokens` |
+| Dispatcher new input per session | 38 k | 2773 k | last 11 sessions | `chat-tokens` |
+| Stall-kind lines per hour in `decisions.jsonl` | 15.5 | | 169 hours | `stalls` |
+
+The reviewer ran in 2 of the last 20 done tasks' session folders, so its tokens have too few runs to set a target.
+
+Runs of `check.yml` on main, the last 50: 21 success, 16 failure, 13 cancelled
+(`gh run list --workflow check.yml --branch main --limit 50`). The cancelled runs are from before the workflow's
+`concurrency` group stopped cancelling runs on main. The full check now runs in 8 shards.

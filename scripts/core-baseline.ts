@@ -1,10 +1,12 @@
-// Core speed baseline numbers (docs/numbers.md, "Core baseline"): one mode per measure, each prints median and worst.
-// Usage: bun scripts/core-baseline.ts <start|tokens|stalls|gh|time> [args]
+// Core speed baseline numbers (docs/numbers.md, "Core baseline"): one mode per measure, each prints median, p90 and worst.
+// Usage: bun scripts/core-baseline.ts <start|tokens|stalls|gh|time|snapshot|chat-tokens> [args]
 //   start  [n=20]       task add to the agent's first tool call, from the last n done tasks' session files
 //   tokens [n=20]       tokens per task by role (agent, reviewer), from the last n done tasks' session files
 //   stalls              stalls per hour and failed starts per machine, from the board's task history
 //   gh     [n=20]       GitHub check time on main per job, from the last n runs of check.yml
 //   time <n> <cmd...>   wall time of a command, n runs
+//   snapshot <url> [n=7]  wall time and size of GET <url>/api/snapshot, n runs
+//   chat-tokens [n=20]  tokens per session of the coordinator and the Dispatcher, from their last n session files
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -22,14 +24,17 @@ const median = (xs: number[]): number => {
   const m = s.length >> 1;
   return s.length % 2 ? (s[m] ?? 0) : ((s[m - 1] ?? 0) + (s[m] ?? 0)) / 2;
 };
+const p90 = (xs: number[]): number => [...xs].sort((a, b) => a - b)[Math.ceil(xs.length * 0.9) - 1] ?? 0;
 const worst = (xs: number[]): number => Math.max(...xs);
 const line = (label: string, xs: number[], unit: string, digits = 1): void =>
-  console.log(`${label}: median ${median(xs).toFixed(digits)} ${unit}, worst ${worst(xs).toFixed(digits)} ${unit} (${xs.length} runs)`);
+  console.log(
+    `${label}: median ${median(xs).toFixed(digits)} ${unit}, p90 ${p90(xs).toFixed(digits)} ${unit}, worst ${worst(xs).toFixed(digits)} ${unit} (${xs.length} runs)`,
+  );
 
 function doneTasks(n: number): Task[] {
   const all = (JSON.parse(readFileSync(join(BOARD, "tasks.json"), "utf8")) as { tasks: Task[] }).tasks;
   return all
-    .filter((t) => t.doneAt)
+    .filter((t) => t.doneAt && t.worktree)
     .sort((a, b) => (b.doneAt ?? 0) - (a.doneAt ?? 0))
     .slice(0, n);
 }
@@ -96,7 +101,21 @@ function tokens(n: number): void {
   }
 }
 
+function stallLines(): void {
+  const file = join(homedir(), ".config/lineclear/decisions.jsonl");
+  if (!existsSync(file)) return;
+  const lines = readFileSync(file, "utf8")
+    .split("\n")
+    .filter((l) => l.includes('"kind":"stall"'));
+  const times = lines.map((l) => Date.parse((JSON.parse(l) as { time: string }).time));
+  const hours = (Math.max(...times) - Math.min(...times)) / 3.6e6;
+  const byClass = Object.entries(Object.groupBy(lines, (l) => /"reason":"stall ([a-z-]+)/.exec(l)?.[1] ?? "ladder step"));
+  console.log(`decisions.jsonl: ${lines.length} stall-kind lines over ${hours.toFixed(0)} h (${(lines.length / hours).toFixed(1)} per h)`);
+  for (const [cls, ls] of byClass.sort((x, y) => (y[1]?.length ?? 0) - (x[1]?.length ?? 0))) console.log(`  ${cls}: ${ls?.length}`);
+}
+
 function stalls(): void {
+  stallLines();
   const tasks = (JSON.parse(readFileSync(join(BOARD, "tasks.json"), "utf8")) as { tasks: Task[] }).tasks;
   const chat = readdirSync(join(BOARD, "chatlog"))
     .filter((f) => f.startsWith("p_"))
@@ -147,10 +166,66 @@ function time(n: number, cmd: string[]): void {
   line(cmd.join(" "), secs, "s", 2);
 }
 
+async function snapshot(url: string, n: number): Promise<void> {
+  const secs: number[] = [];
+  let bytes = 0;
+  for (let i = 0; i < n; i++) {
+    const t0 = performance.now();
+    bytes = (await (await fetch(`${url}/api/snapshot`)).arrayBuffer()).byteLength;
+    secs.push((performance.now() - t0) / 1000);
+  }
+  line(`GET /api/snapshot (${(bytes / 1e6).toFixed(1)} MB)`, secs, "s", 2);
+}
+
+function chatTokens(n: number): void {
+  const dirOf = (cwd: string) => join(SESSIONS, `--${cwd.slice(1).replaceAll("/", "-")}--`);
+  const roles: [string, string][] = [
+    ["coordinator", dirOf(join(homedir(), ".herdr-projects/data/coordinator-default-chat"))],
+    ["Dispatcher", dirOf(join(homedir(), ".config/lineclear/dispatcher"))],
+  ];
+  for (const [role, dir] of roles) {
+    if (!existsSync(dir)) continue;
+    const files = readdirSync(dir)
+      .filter((f) => f.endsWith(".jsonl"))
+      .sort()
+      .slice(-n);
+    const per = files.map((f) => {
+      const u: Usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+      for (const raw of readFileSync(join(dir, f), "utf8").split("\n")) {
+        if (!raw) continue;
+        const m = (JSON.parse(raw) as { message?: { role: string; usage?: Usage } }).message;
+        if (m?.role !== "assistant") continue;
+        for (const k of Object.keys(u) as (keyof Usage)[]) u[k] += m.usage?.[k] ?? 0;
+      }
+      return u;
+    });
+    line(
+      `${role} input (new), k tokens per session`,
+      per.map((u) => (u.input + u.cacheWrite) / 1000),
+      "k",
+      0,
+    );
+    line(
+      `${role} input (cache reads), k tokens per session`,
+      per.map((u) => u.cacheRead / 1000),
+      "k",
+      0,
+    );
+    line(
+      `${role} output, k tokens per session`,
+      per.map((u) => u.output / 1000),
+      "k",
+      0,
+    );
+  }
+}
+
 const [mode, a, ...rest] = process.argv.slice(2);
 if (mode === "start") start(Number(a ?? 20));
 else if (mode === "tokens") tokens(Number(a ?? 20));
 else if (mode === "stalls") stalls();
 else if (mode === "gh") gh(Number(a ?? 20));
 else if (mode === "time") time(Number(a), rest);
-else console.log("usage: bun scripts/core-baseline.ts <start|tokens|stalls|gh|time> [args]");
+else if (mode === "snapshot") await snapshot(a ?? "", Number(rest[0] ?? 7));
+else if (mode === "chat-tokens") chatTokens(Number(a ?? 20));
+else console.log("usage: bun scripts/core-baseline.ts <start|tokens|stalls|gh|time|snapshot|chat-tokens> [args]");
