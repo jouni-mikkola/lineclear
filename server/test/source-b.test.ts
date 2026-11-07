@@ -185,7 +185,11 @@ describe("a task's CLI, model and effort, continued", () => {
       const place = placeId.space((await src.places.add(dir, 'first-model-source')).name)
       setRegistry([{ harness: 'pi', provider: 'fakeco', name: 'zeta-1' }])
       src.settings.set('task.agent', 'pi')
-      const out = (await src.cli(['task', 'add', 'No model', '--desc', 'x'], { chat: place })).out
+      // earlier tests' tasks hold the slots of a small machine, and no herdr is there to sample: it starts at once
+      const { machine, room } = src.engine
+      src.engine.machine = () => undefined
+      src.engine.room = () => ({})
+      const out = (await src.cli(['task', 'add', 'No model', '--desc', 'x'], { chat: place }).finally(() => Object.assign(src.engine, { machine, room }))).out
       const t = src.engine.task(out.match(/([A-Z]+-\d+)/)![1])!
       const mine = () => seen.find((x) => x.name === `shep-${t.id.toLowerCase()}`)
       await until(() => !!mine(), 'the start')
