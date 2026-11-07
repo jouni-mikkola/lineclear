@@ -368,11 +368,11 @@ Result: The live server's tests are named by module, not by a letter.
 
 ### L775 The fork's leftovers are gone
 Result: The repo has one set of docs and guidance; the fork's own docs are gone.
-- why: `server/docs/` (9 files, 593 lines), `server/README.md`, `server/AGENTS.md` and `server/CLAUDE.md` describe the fork, not Lineclear.
-- done when: `git ls-files server/docs server/README.md server/AGENTS.md server/CLAUDE.md` lists none; `server/LICENSE` and `server/NOTICE` stay; `git grep -n "server/docs"` lists none.
+- why: The fork's docs folder (9 files, 593 lines), `server/README.md`, `server/AGENTS.md` and `server/CLAUDE.md` describe the fork, not Lineclear.
+- done when: `git ls-files server | grep -E '/(docs/|README.md|AGENTS.md|CLAUDE.md)'` lists none at the server root; `server/LICENSE` and `server/NOTICE` stay; no file names the removed docs folder.
 - locks: none
 - after: none
-- files: server/docs/, server/README.md, server/AGENTS.md, server/CLAUDE.md
+- files: server/README.md, server/AGENTS.md, server/CLAUDE.md
 
 ### L776 One package, one lock file
 Result: The repo has one package, one lock file and one test runner.
