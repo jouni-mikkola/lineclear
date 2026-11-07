@@ -20,6 +20,7 @@ export class LiveSourceActions extends LiveSourceRestarts {
   protected async actLocal(a: Action): Promise<unknown> {
     switch (a.type) {
       case 'send': {
+        if (a.text.trim() === '/new' && !a.reply) return this.newSession(a.chat, a.cid)
         const space = this.spaceOf(a.chat, a.space)
         if (space) return this.replyHere(space, a)
         // your words answer the choice cards still open there: they quote them

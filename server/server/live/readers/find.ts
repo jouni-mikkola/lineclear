@@ -136,6 +136,11 @@ export const LOG_FINDERS: Record<string, (cwd: string, sinceMs?: number) => stri
   pi: findPiLog,
 }
 
+/** the newest log of this CLI for this cwd */
+export function findLog(cli: string, cwd: string, sinceMs?: number): string | undefined {
+  return Object.hasOwn(LOG_FINDERS, cli) ? LOG_FINDERS[cli](cwd, sinceMs) : undefined
+}
+
 /** which CLI wrote this log, by where it lies: an agent a backup took over from has logs of two CLIs */
 export function logKind(file: string): string | undefined {
   const under = (dir: string) => file.startsWith(`${trimSlash(dir)}/`)

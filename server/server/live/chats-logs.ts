@@ -30,7 +30,6 @@ export class ChatsLogs {
   protected menus = new Map<string, ScreenMenu>()
   protected menuAt = new Map<string, number>()
   protected shown = new Map<string, Shown>()
-  protected jobsSeen = new Map<string, string>()
 
   /* ---------- Lineclear's own log per chat ---------- */
 

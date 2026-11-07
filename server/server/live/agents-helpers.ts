@@ -54,6 +54,8 @@ export interface OutItem {
   brief?: boolean
   /** a CLI command (/model, /compact): goes in only between turns */
   idle?: boolean
+  /** /new: Lineclear reads the new session's log */
+  command?: boolean
 }
 
 /** what starts an agent: its record, the first thing it is told, and where its pane comes from when it isn't its
@@ -74,6 +76,8 @@ export interface SendOpts {
   cid?: string
   /** a CLI command: only between turns */
   idle?: boolean
+  /** /new (see OutItem.command) */
+  command?: boolean
 }
 
 export interface Sent {

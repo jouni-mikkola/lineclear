@@ -63,6 +63,7 @@ export class LiveSource extends LiveSourceUpkeep implements Source {
     })
     this.agents.on('logs', (key) => this.watched.includes(key) && this.emit('chat', key))
     this.agents.on('sent', (item) => {
+      if (item.command) this.followNewSession(item.key, item.text, item.cid)
       this.engine.sent(item.key)
       this.emit('chat', item.key)
     })

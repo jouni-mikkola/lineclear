@@ -164,6 +164,24 @@ export class LiveSourceSpaces extends LiveSourceViews {
     return ctx.cwd ? this.places.forPath(ctx.cwd) : undefined
   }
 
+  /** /new, which the Dispatcher's chat sends before each message: into the CLI once its turn is over, then its new
+   *  session's log is read. A task's agent not started yet is started by it as by any message. */
+  protected async newSession(key: string, cid?: string) {
+    const at = Date.now()
+    const ensure = key.includes('/') ? () => this.resumeTaskAgent(key) : () => this.coordinator(key)
+    if (!key.includes('/') && this.agents.status(key) === 'gone') await this.coordinator(key).catch(() => undefined)
+    const r = await this.agents.send(key, '/new', { ensure, cid, idle: true, command: true })
+    this.emit('chat', key)
+    return { waiting: r.waiting, waitsFor: r.waitsFor, at }
+  }
+
+  protected followNewSession(key: string, text: string, cid?: string) {
+    const at = Date.now()
+    this.chats.post(key, { id: `command:${at}`, who: 'you', text, cid })
+    this.emit('chat', key)
+    this.agents.follow(key, at)
+  }
+
   protected async react(key: string, messageId: string, emoji: string) {
     const chat = this.chats.chat(key)
     const m = chat.messages.find((x) => x.id === messageId)
