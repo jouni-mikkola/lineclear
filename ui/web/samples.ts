@@ -4,7 +4,22 @@ import { realInbox, realProjects, realUsage } from "./real-samples.ts";
 // Sample data for each state of a page (`?state=`): the design page and the views draw it, so their pictures stay
 // the same on every machine.
 
-export const STATES = ["filled", "empty", "loading", "error", "long", "many", "idle", "clear", "offline", "thirty", "one", "real"] as const;
+export const STATES = [
+  "filled",
+  "empty",
+  "loading",
+  "error",
+  "long",
+  "many",
+  "idle",
+  "clear",
+  "offline",
+  "thirty",
+  "one",
+  "title",
+  "tasks200",
+  "real",
+] as const;
 export type PageState = (typeof STATES)[number];
 
 /** The Chat view has states more than the others: sending, streaming, offline, none, request (a sentence to a plan to approve) and task. */
@@ -15,6 +30,10 @@ export const QUESTIONS = ["What waits for me?", "How far is web-shop?", "Move Gi
 
 const LONG = "Move the whole settings page onto the new form parts and keep every saved value, including the ones from before the rename";
 const LONG_NAME = "a-project-with-a-very-long-repository-name-that-goes-on-and-on";
+
+/** Exactly 200 characters, to see how a title that long wraps. */
+const TITLE_200 =
+  "Make the checkout total follow every removed line, keep each saved cart across a reload, show the rounding rule in the order mail and tell the shopper which coupon was dropped and why before they pay.";
 
 const MIN = 60_000;
 // a fixed hour, so each picture is the same on every run
@@ -155,14 +174,20 @@ export function projects(state: PageState): Project[] {
       ...rest,
     ];
   }
-  if (state === "many") {
+  if (state === "title") {
+    const [first, ...rest] = base as [Project, ...Project[]];
+    return [{ ...first, tasks: [t("x1", TITLE_200, "work"), ...first.tasks] }, ...rest];
+  }
+  if (state === "many" || state === "tasks200") {
     const words = ["Fix", "Add", "Move", "Check", "Split", "Name", "Test", "Measure", "Drop", "Speed up"];
     const things = ["the login form", "the import", "the merge lane", "the usage chart", "a flaky test", "the inbox card", "the doctor", "the install"];
     const states: TaskState[] = ["queued", "queued", "work", "queued", "need", "queued", "work", "queued"];
-    const ps = base.map((p) => ({ ...p, total: p.total + 80, tasks: [] as Task[] }));
+    // `many` spreads 200 tasks over the projects, `tasks200` puts them all in one
+    const ps = base.map((p, n) => ({ ...p, total: state === "many" || n === 0 ? p.total + 80 : p.total, tasks: [] as Task[] }));
+    const into = (i: number) => ps[state === "many" ? i % ps.length : 0];
     for (let i = 0; i < 200; i++) {
       const stage = i % 11 === 0 ? "review" : i % 13 === 0 ? "ready" : undefined;
-      ps[i % ps.length]?.tasks.push(
+      into(i)?.tasks.push(
         t(`m${i}`, `S${i} ${words[i % words.length]} ${things[(i * 7) % things.length]}`, states[i % states.length] as TaskState, {
           step: `S${i}`,
           ...(stage && states[i % states.length] === "work" ? { stage } : {}),
