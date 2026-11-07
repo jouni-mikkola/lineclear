@@ -131,7 +131,7 @@ export class LiveSourceTaskWords extends LiveSourceSecrets {
         return `Added ${t.id}: ${t.title}, for later. Its agent (${on}) reads the brief now and waits for a go (lineclear task tell ${t.id} "go").`
       if (t.held)
         return `Added ${t.id}: ${t.title}, held: ${t.held.why === 'slots' ? `all ${this.settings.machine().max} slots are taken` : 'the machine is busy'} (${this.workingLine()}). It shows as Queued and its agent (${on}) starts by itself when there's room, oldest first.`
-      return `Added ${t.id}: ${t.title}. Its agent (${on}) starts on the brief now.${after.length ? ' What it would wait for is done already.' : ''}`
+      return `Added ${t.id}: ${t.title}. Its agent (${on}) starts on the brief now.${p.opts.after?.length ? ' What it would wait for is done already.' : ''}`
     }
     if (sub === 'list' || !sub) {
       const pr = one(p, 'space') ? this.projectFor(p, ctx) : null
