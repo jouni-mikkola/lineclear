@@ -36,7 +36,10 @@ export interface HomeData {
 }
 
 /** `offline` is when the server last answered, while a later read fails. */
-export type Load<T> = { status: "loading" } | { status: "error"; error: string; retry: () => void; missing?: boolean } | { status: "ok"; data: T; offline?: number };
+export type Load<T> =
+  | { status: "loading" }
+  | { status: "error"; error: string; retry: () => void; missing?: boolean }
+  | { status: "ok"; data: T; offline?: number };
 
 const emptyRoadmap = (project: string): RoadmapData => ({
   project,
@@ -134,7 +137,8 @@ export function useLoad<T>(
   if (state) return sample(state, () => filled(state), empty);
   // what was read stays on screen while a later read fails
   if (q.data !== undefined) return { status: "ok", data: q.data, ...(q.isError ? { offline: q.dataUpdatedAt } : {}) };
-  if (q.isError) return { status: "error", error: q.error.message, retry: () => void q.refetch(), missing: q.error instanceof ApiError && q.error.status === 404 };
+  if (q.isError)
+    return { status: "error", error: q.error.message, retry: () => void q.refetch(), missing: q.error instanceof ApiError && q.error.status === 404 };
   return { status: "loading" };
 }
 
