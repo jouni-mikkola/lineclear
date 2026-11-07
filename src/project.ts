@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { writeAtomic } from "../pi/atomic.ts";
 import { configDir } from "../pi/config.ts";
@@ -72,6 +72,14 @@ export const NAME = /^[a-z0-9][a-z0-9_-]{0,79}$/;
 
 export function projectsDir(env = process.env): string {
   return join(configDir(env), "projects");
+}
+
+/** The cards the rules told, kept per project. Before it had this name the file held every card ever told; those ids are dropped on the next tick. */
+export function toldPath(project: string, env = process.env): string {
+  const file = join(projectsDir(env), project, "asks-told.json");
+  const old = join(projectsDir(env), project, "asks-routed.json");
+  if (!existsSync(file) && existsSync(old)) renameSync(old, file);
+  return file;
 }
 
 export const settingsPath = (name: string, env = process.env) => join(projectsDir(env), name, "settings.json");

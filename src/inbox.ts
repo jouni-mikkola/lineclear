@@ -167,9 +167,11 @@ export function answerCard(card: NonNullable<Item["card"]>, answer: string, env 
 
 /** Closes an item with a reason and no answer. The wait it declared and the coordinator card it stands for go with it. */
 export function closeItem(item: Item, reason: string, now: Date, env = process.env): void {
-  mkdirSync(shelf(item, env), { recursive: true });
-  writeAtomic(join(shelf(item, env), `${item.n}.json`), `${JSON.stringify({ ...item, closed: reason, closedAt: now.toISOString() }, null, 2)}\n`);
-  if (shelf(item, env) === closedDir(env)) rmSync(itemPath(item.n, env), { force: true });
+  writeAtomic(itemPath(item.n, env), `${JSON.stringify({ ...item, closed: reason, closedAt: now.toISOString() }, null, 2)}\n`);
+  if (shelf(item, env) === closedDir(env)) {
+    mkdirSync(closedDir(env), { recursive: true });
+    renameSync(itemPath(item.n, env), join(closedDir(env), `${item.n}.json`));
+  }
   if (item.card) answerCard(item.card, `Closed: ${reason}.`, env);
   if (waitReason(item.task, env) === `asked: ${item.question}`) clearWait(item.task, env);
 }

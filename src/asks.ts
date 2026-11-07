@@ -5,7 +5,7 @@ import { readJsonKept } from "./kept-read.ts";
 import { join } from "node:path";
 import { addItem, type InboxKind, stepRule } from "./inbox.ts";
 import { findSpace, lineclearDir, spaceTasks } from "./measure.ts";
-import { projectsDir } from "./project.ts";
+import { projectsDir, toldPath } from "./project.ts";
 import { loadableTotps, secretNames, storedLogin, totpAdvice, totpAnswers } from "../server/server/live/secrets.ts";
 import { writeWait } from "./waits.ts";
 import { DECIDE_TEXT, IDLE_NUDGE, mergeNudge, PROMISE_NUDGE, promisesNext } from "../pi/nudge.ts";
@@ -110,8 +110,6 @@ export function ruleFor(card: Card, project: string, now: Date, env = process.en
     `A stored login ${name} exists for this project. Load it with \`lineclear secrets env\` (it gives ${name}_USER and ${name}_PASSWORD), use it without printing it, and go on. ${code}`,
   );
 }
-
-const toldPath = (project: string, env = process.env) => join(projectsDir(env), project, "asks-told.json");
 
 /**
  * The chat logs of a space's live tasks (`coordinatorOnly`: just the space's coordinator chat), each parsed again only
