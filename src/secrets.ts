@@ -184,16 +184,6 @@ export function storedLoginAdvice(text: string, project: string | undefined, env
 export const totpAdvice = (logins: string[]) =>
   `${logins.map((l) => `${l}_TOTP`).join(", ")} is stored, so the owner is not asked. Never wait for a push or a number: choose the verification-code option ("Sign in another way" > "Use a verification code") and fill the code from \`lineclear totp ${logins[0]}\` in the same command, without printing it.`;
 
-/** What a task of `project` may not see: the owner-only names and every name kept where its chain does not reach. */
-function forbidden(project: string | undefined, env: Env) {
-  const own = new Set(Object.keys(valuesOf(project, env)));
-  const chain = new Set(chainOf(project, env));
-  const names = new Set<string>(Object.keys(readEnvFile(ownerFile(env))));
-  for (const [level, all] of Object.entries(readVaultQuietly(env))) if (!chain.has(level)) for (const n of Object.keys(all)) names.add(n);
-  for (const n of own) names.delete(n);
-  return { names: [...names].sort() };
-}
-
 /** `text` with every stored secret value replaced by ***. */
 export function maskSecrets(text: string, env: Env = process.env): string {
   const values = [
@@ -331,13 +321,8 @@ export async function secrets(
     for (const k of Object.keys(all).sort()) out(`export ${k}=${quote(all[k] ?? "")}`);
     return 0;
   }
-  if (sub === "deny" && rest.length === 0) {
-    // For the pi extension, which runs apart from this code: what a task in this folder may not see.
-    out(JSON.stringify(forbidden(projectOfDir(resolve(cwd), env), env)));
-    return 0;
-  }
   out(
-    "usage: lineclear secrets set <project> | --machine | --all | --owner <NAME> (value on stdin) | list <project> | env | adopt <old env folder> (import and deny are for Lineclear itself)",
+    "usage: lineclear secrets set <project> | --machine | --all | --owner <NAME> (value on stdin) | list <project> | env | adopt <old env folder> (import is for Lineclear itself)",
   );
   return 2;
 }

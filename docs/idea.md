@@ -239,8 +239,7 @@ It follows three principles:
 - Only you answer the Inbox, and only you undo an applied plan. Decision: no device pairing. Lineclear listens on 127.0.0.1 only. Your phone reaches
   it through a private network's HTTPS proxy, such as [Tailscale Serve](https://tailscale.com/kb/1312/serve),
   whose name is in `LINECLEAR_HOSTS`. That network is the pairing. Any other name is refused. An answer is a POST
-  with a token that only Lineclear's own pages hold, set when a page loads, so a plain `curl` cannot answer. The pi
-  extension refuses an Inbox answer from every agent. `lineclear doctor` warns when the server listens beyond
+  with a token that only Lineclear's own pages hold, set when a page loads, so a plain `curl` cannot answer. `lineclear doctor` warns when the server listens beyond
   127.0.0.1.
 - Safety must never cause bugs or slow work; anything heavier waits in the backlog until a real need shows. An agent
   runs as you, so these layers stop mistakes and simple prompt injections, not a determined attack.
