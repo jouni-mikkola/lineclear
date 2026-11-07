@@ -1,4 +1,5 @@
 // Reads the failures a `bun test` step printed, for the check's own output and its outside-the-change test.
+import { readFileSync } from "node:fs";
 
 export interface Failure {
   file: string;
@@ -36,3 +37,55 @@ export const outsideChange = (failures: Failure[], touched: Set<string>): boolea
 
 /** How a failure is listed: `<file> > <test>: <first error line>`, the release's held line and the check's own output alike. */
 export const describeFailure = (f: Failure): string => `${f.file ? `${f.file} > ` : ""}${f.test}: ${f.error ?? "no error line"}`;
+
+/** A test known to flake: it failed and then passed alone on one commit. `task` is the task that fixes it. */
+export interface Quarantined {
+  file: string;
+  test: string;
+  task: string;
+}
+
+export const MAX_QUARANTINE = 5;
+
+const sameTest = (q: Quarantined, f: Failure) => q.file.replace(/^\.\//, "") === f.file.replace(/^\.\//, "") && q.test === f.test;
+
+/** Reads `test/quarantine.json`: a list of `{file, test, task}`, server files named `server/<file>`. */
+export function readQuarantine(path: string): Quarantined[] {
+  const list: unknown = JSON.parse(readFileSync(path, "utf8"));
+  if (!Array.isArray(list)) throw new Error(`${path} must be a list`);
+  return list.map((q) => {
+    if (typeof q?.file !== "string" || typeof q.test !== "string" || typeof q.task !== "string" || q.task === "") {
+      throw new Error(`${path}: every entry needs a file, a test and the id of its fix task`);
+    }
+    return { file: q.file, test: q.test, task: q.task };
+  });
+}
+
+export interface Verdict {
+  /** failed alone too: the check fails */
+  broken: Failure[];
+  /** failed, then passed alone, and is in quarantine: not counted */
+  quarantined: Failure[];
+  /** failed, then passed alone, and is not in quarantine: it must be added with its fix task, and the check fails until then */
+  unlisted: Failure[];
+  /** the list is over its limit, or a new flake has no room in it */
+  full: boolean;
+}
+
+/** Sorts a step's failures by what the rerun alone showed (`failedAlone`: the ones that failed again). */
+export function judgeFailures(failures: Failure[], failedAlone: Failure[], quarantine: Quarantined[]): Verdict {
+  const broken = failures.filter((f) => failedAlone.includes(f));
+  const flaky = failures.filter((f) => !failedAlone.includes(f));
+  const quarantined = flaky.filter((f) => quarantine.some((q) => sameTest(q, f)));
+  const unlisted = flaky.filter((f) => !quarantined.includes(f));
+  return { broken, quarantined, unlisted, full: quarantine.length > MAX_QUARANTINE || (unlisted.length > 0 && quarantine.length + unlisted.length > MAX_QUARANTINE) };
+}
+
+/** Whether a step with these failures passes: nothing broke alone, and every flake is listed with room to spare. */
+export const passes = (v: Verdict): boolean => v.broken.length === 0 && v.unlisted.length === 0 && !v.full;
+
+/** The command that runs one failed test alone: its file, filtered to its name (the last part of a `describe > test` name). */
+export function aloneCommand(f: Failure): string[] {
+  const name = f.test.split(" > ").at(-1) ?? f.test;
+  return ["bun", "test", "--timeout", "120000", f.file.startsWith(".") ? f.file : `./${f.file}`, "-t", `${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`];
+}

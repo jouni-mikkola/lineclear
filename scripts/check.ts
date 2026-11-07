@@ -38,7 +38,7 @@ import {
   writeTimes,
 } from "./check-speed.ts";
 import { fastGates } from "./fast-gates.ts";
-import { describeFailure, type Failure, outsideChange, parseFailures } from "./failures.ts";
+import { aloneCommand, describeFailure, type Failure, judgeFailures, outsideChange, parseFailures, passes, readQuarantine } from "./failures.ts";
 import { changedSince } from "./gates/tools.ts";
 
 // Every step but the server's (below) runs with TMPDIR in a folder of this run, on disk. Each test process clears its own
@@ -227,6 +227,20 @@ const started = performance.now();
 const times: StepTime[] = [];
 const outcome = new Map<string, Promise<boolean>>();
 
+/** Runs each failed test of a tests step alone: one that passes alone is a flake, judged against `test/quarantine.json`. */
+async function rerunAlone(step: Step, failing: Failure[]): Promise<ReturnType<typeof judgeFailures>> {
+  const inServerDir = step.cwd === "server";
+  const prefixed = (f: Failure): Failure => (inServerDir ? { ...f, file: `server/${f.file.replace(/^\.\//, "")}` } : f);
+  const failedAlone: Failure[] = [];
+  for (const f of failing) {
+    const p = Bun.spawn(aloneCommand(f), { cwd: step.cwd, stdin: "ignore", stdout: "ignore", stderr: "ignore", env: inServerDir ? serverEnv : env });
+    if ((await p.exited) !== 0) failedAlone.push(f);
+  }
+  const quarantine = readQuarantine("test/quarantine.json");
+  const verdict = judgeFailures(failing.map(prefixed), failedAlone.map(prefixed), quarantine);
+  return verdict;
+}
+
 /** Runs one step after the steps it needs. Resolves to whether it passed; a step skipped for a failed need counts as failed. */
 async function runStep(step: Step): Promise<boolean> {
   // every step is in the map before any looks for its needs, whatever their order in the plan
@@ -235,7 +249,16 @@ async function runStep(step: Step): Promise<boolean> {
   const at = performance.now();
   const { code, failing, output } = await run(step);
   const isTests = step.name.startsWith("tests");
-  const ok = code === 0;
+  let ok = code === 0;
+  if (!ok && (isTests || step.name === "server tests") && failing.length > 0) {
+    const verdict = await rerunAlone(step, failing);
+    for (const f of verdict.quarantined) console.log(`check: quarantined, failed then passed alone: ${f.file} > ${f.test}`);
+    if (passes(verdict)) ok = true;
+    else {
+      for (const f of verdict.unlisted) console.error(`check: flaked, passed alone: ${f.file} > ${f.test}: add it to test/quarantine.json with its fix task's id`);
+      if (verdict.full) console.error("check: test/quarantine.json holds 5 tests at most: fix one before another goes in");
+    }
+  }
   times.push({ step: step.name, seconds: (performance.now() - at) / 1000, ok });
   if (!ok) {
     console.error(
