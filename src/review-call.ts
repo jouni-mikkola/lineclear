@@ -22,9 +22,9 @@ export interface Finding {
 }
 
 const RULE_FILES = ["AGENTS.md", "CLAUDE.md", "REVIEW.md"];
-const CONTEXT_LINES = 20;
-/** The diff and the rules are cut to this many characters each, so a huge change cannot overflow the model. */
-const PART_MAX = 150_000;
+const CONTEXT_LINES = 8;
+/** The diff and the rules are cut to this many characters each (about 20 k tokens), so a review stays cheap and a huge change cannot overflow the model. */
+const PART_MAX = 80_000;
 
 /** The repo's own rules, each file under its name. */
 function repoRules(repo: string): string {
@@ -34,7 +34,7 @@ function repoRules(repo: string): string {
     .slice(0, PART_MAX);
 }
 
-/** The change since the branch left its base, with 20 lines of context, committed or not. */
+/** The change since the branch left its base, with a few lines of context, committed or not. */
 function diffAgainst(repo: string, base: string): string | undefined {
   const ref = [`origin/${base}`, base].find((r) => git(repo, "rev-parse", "--verify", "--quiet", r).ok);
   const from = ref && gitText(repo, "merge-base", ref, "HEAD");

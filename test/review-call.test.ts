@@ -17,7 +17,7 @@ function repoWithChange(): string {
   return repo;
 }
 
-test("a review is one tool-less call with the brief, the diff with 20 lines of context and the rules, and stores the findings", () => {
+test("a review is one tool-less call with the brief, the diff with 8 lines of context and the rules, and stores the findings", () => {
   const repo = repoWithChange();
   const home = mkdtempSync(join(tmpdir(), "review-home-"));
   const pi = join(home, "pi");
@@ -36,7 +36,7 @@ test("a review is one tool-less call with the brief, the diff with 20 lines of c
   expect(call).toContain("RULE: short names");
   expect(call).toContain("+brand new file");
   expect(call).toContain("+changed 30");
-  expect(call).toContain(" line 10\n"); // 20 lines before the change
+  expect(call).toContain(" line 25\n"); // 8 lines before the change
   expect(call).not.toContain("\n line 9\n");
   const stored = JSON.parse(readFileSync(reviewPath("T-1", env), "utf8"));
   expect(stored.findings).toEqual([
