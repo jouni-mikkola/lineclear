@@ -1,12 +1,11 @@
 import { freshDecisions } from "../src/decision-dedupe.ts";
 import { expect, spyOn, test } from "bun:test";
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { cpus } from "node:os";
 import { join } from "node:path";
 import { readItems } from "../src/inbox.ts";
 import { decisionsPath } from "../pi/config.ts";
 import { readState, realWorld, runMain, tick, TICK_MS } from "../src/rules.ts";
-import { removeFolders } from "../src/tmpdirs.ts";
 import { pickReviewer } from "../src/stalls.ts";
 import { company } from "../src/company.ts";
 import { recordTaskSteps } from "./helpers.ts";
@@ -471,76 +470,71 @@ test("the brief tells workers about lineclear check, wait and ask", () => {
   expect(brief).toContain("lineclear wait task");
 });
 
-test("run stays up when a tick has nothing to do or throws, and ends on SIGTERM with a logged reason", async () => {
+test("run ticks in its own process, ends on SIGTERM with a logged reason, and crashes loudly when a tick throws", async () => {
   const { EventEmitter } = await import("node:events");
-  const signals = new EventEmitter();
-  let calls = 0;
   const logged: string[] = [];
   const spy = spyOn(console, "error").mockImplementation((m: string) => void logged.push(String(m)));
   try {
-    const tickFn = () => {
-      calls++;
-      if (calls === 2) throw new Error("boom");
-      return [];
-    };
+    const signals = new EventEmitter();
+    let calls = 0;
     let ended: number | undefined;
-    const done = runMain([], () => {}, realWorld(), { tick: tickFn, tickMs: 5, signals }).then((c) => (ended = c));
+    const done = runMain([], () => {}, realWorld(), { tick: () => (calls++, []), tickMs: 5, signals }).then((c) => (ended = c));
     // wait on the ticks, not on the clock: a loaded machine runs them late
     while (calls <= 3) await Bun.sleep(5);
-    expect(ended).toBeUndefined();
-    expect(logged.some((l) => l.includes("tick failed: boom"))).toBe(true);
-    signals.emit("SIGHUP");
-    signals.emit("unhandledRejection", new Error("late"));
-    const after = calls;
-    while (calls <= after + 1) await Bun.sleep(5);
     expect(ended).toBeUndefined();
     signals.emit("SIGTERM");
     await done;
     expect(ended).toBe(0);
     expect(logged.filter((l) => l.includes("stopping: SIGTERM"))).toHaveLength(1);
+
+    const crash = await runMain([], () => {}, realWorld(), {
+      tick: () => {
+        throw new Error("boom");
+      },
+      tickMs: 5,
+      signals: new EventEmitter(),
+    });
+    expect(crash).toBe(1);
+    expect(logged.some((l) => l.includes("tick failed, stopping") && l.includes("boom"))).toBe(true);
   } finally {
     spy.mockRestore();
   }
+  const source = readFileSync(join(import.meta.dir, "..", "src", "rules.ts"), "utf8");
+  expect(source).not.toMatch(/uncaughtException|unhandledRejection|SIGHUP/);
 });
 
-test("a tick that hangs on lineclear does not hold up /api/home", async () => {
-  const { EventEmitter } = await import("node:events");
-  const { webApi } = await import("../src/web.ts");
+test("a state file that is not JSON stops its project with an Inbox item that names it, and is left as it was", () => {
   const t = setup({ steps: [step("A", "none")] });
-  const started = join(t.fake, "started");
-  const release = join(t.fake, "release");
-  const finished = join(t.fake, "finished");
-  // the tick's first lineclear call hangs until the test lets it go, however slow the machine is
-  writeFileSync(
-    join(t.dir, "bin", "lineclear"),
-    `#!/bin/sh\n[ -e "${started}" ] || { touch "${started}"; while [ ! -e "${release}" ]; do sleep 0.05; done; touch "${finished}"; }\necho '[]'\n`,
-  );
-  const env = { ...t.env, PI_CODING_AGENT_DIR: join(t.dir, "pi") };
-  const saved = { ...process.env };
-  Object.assign(process.env, env);
-  const signals = new EventEmitter();
-  try {
-    const handle = webApi(env);
-    await handle(new Request("http://127.0.0.1:7420/api/home"));
-    const done = runMain([], () => {}, realWorld(env), { tickMs: 60_000, signals });
-    while (!existsSync(started)) await Bun.sleep(20);
-    // the tick hangs now: each answer comes while it still does, so nothing waited for it
-    for (let i = 0; i < 5; i++) {
-      const r = await handle(new Request("http://127.0.0.1:7420/api/home"));
-      expect(r.status).toBe(200);
-      expect(existsSync(finished)).toBe(false);
-    }
-    writeFileSync(release, "");
-    signals.emit("SIGTERM");
-    await done; // the stop waits for the tick, which ends once it is let go
-  } finally {
-    // a failed test lets the hang go too
-    writeFileSync(release, "");
-    // the handler's background reads (doctor, pi, playwright-cli) run under this TMPDIR and may outlive the test
-    removeFolders([env.TMPDIR]);
-    for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k];
-    Object.assign(process.env, saved);
+  const file = join(t.config, "projects", "demo", "state.json");
+  writeFileSync(file, "{");
+  for (let i = 0; i < 2; i++) {
+    const d = t.doTick();
+    expect(d.map((x) => `${x.kind}`)).toEqual(["stop"]);
+    expect(d[0]?.reason).toContain(file);
   }
+  expect(readFileSync(file, "utf8")).toBe("{");
+  expect(t.adds()).toEqual([]);
+  const items = readItems(t.env).filter((i) => i.question.includes(file));
+  expect(items).toHaveLength(1);
+});
+
+test("a tick writes state.json only when the state changed", () => {
+  const t = setup({ steps: [step("A", "none")] });
+  const file = join(t.config, "projects", "demo", "state.json");
+  t.doTick();
+  t.doTick();
+  const before = statSync(file);
+  const text = readFileSync(file, "utf8");
+  // a rewrite makes a new file (writeAtomic renames), so the inode tells
+  t.doTick();
+  expect(readFileSync(file, "utf8")).toBe(text);
+  expect(statSync(file).ino).toBe(before.ino);
+});
+
+test("a tick of the loop starts no process of its own", async () => {
+  const source = readFileSync(join(import.meta.dir, "..", "src", "rules.ts"), "utf8");
+  expect(source).not.toContain("Bun.spawn(");
+  expect(source).not.toContain('"--once"], {');
 });
 
 test("locks: a step's own locks replace its parts, and one with no locks line holds each part whole", () => {

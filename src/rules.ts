@@ -1,4 +1,4 @@
-import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { writeAtomic } from "../pi/atomic.ts";
 import { configDir, decisionsPath } from "../pi/config.ts";
@@ -6,7 +6,7 @@ import { routeAsks } from "./asks.ts";
 import { settlePlans } from "./plan-apply.ts";
 import { copyStoreQuietly } from "./store-copies.ts";
 import { freshDecisions } from "./decision-dedupe.ts";
-import { answerCard, closeItem, closeSettledUpdates, isOpen, type Item, readItems } from "./inbox.ts";
+import { addItem, answerCard, closeItem, closeSettledUpdates, isOpen, type Item, readItems } from "./inbox.ts";
 import { listProjectNames, projectsDir, readSettings, type Settings } from "./project.ts";
 import type { Task } from "./roadmap.ts";
 import { cutDecisionsDaily, type StallEntry } from "./stall-class.ts";
@@ -79,9 +79,23 @@ export interface State extends StartRecord {
 }
 const emptyState = (): State => ({ healthFailures: 0, stopped: false, roadmapErrors: [], last: {}, ladder: {}, models: {}, handed: [], starts: {} });
 const statePath = (name: string, env = process.env) => join(projectsDir(env), name, "state.json");
+
+/** The state and the text it came from, so a tick writes the file only when the state changed. A missing file is empty; an unreadable one throws a line that names it. */
+function loadState(name: string, env = process.env): { state: State; text: string } {
+  const file = statePath(name, env);
+  if (!existsSync(file)) return { state: emptyState(), text: "" };
+  const text = readFileSync(file, "utf8");
+  try {
+    return { state: { ...emptyState(), ...JSON.parse(text) }, text };
+  } catch (e) {
+    throw new Error(`${file} is not readable (${e instanceof Error ? e.message : e}); fix or delete it, and this project's tick resumes`);
+  }
+}
+
+/** For views: a state file that cannot be read shows as empty here; the tick stops on it instead. */
 export function readState(name: string, env = process.env): State {
   try {
-    return { ...emptyState(), ...JSON.parse(readFileSync(statePath(name, env), "utf8")) };
+    return loadState(name, env).state;
   } catch {
     return emptyState();
   }
@@ -152,7 +166,16 @@ export function tick(world: World, dryRun: boolean, env = process.env): Decision
       continue;
     }
     try {
-      const state = readState(name, env);
+      let loaded: ReturnType<typeof loadState>;
+      try {
+        loaded = loadState(name, env);
+      } catch (e) {
+        const reason = e instanceof Error ? e.message : String(e);
+        if (!dryRun) askAboutState(name, reason, world.now(), env);
+        all.push({ time: world.now().toISOString(), project: name, kind: "stop", reason: `stopped: ${reason}` });
+        continue;
+      }
+      const { state } = loaded;
       const held = holdWorld(world, settings);
       const answer = (space: string, id: string, text: string) => answerCard({ space, id }, text, env);
       const ops = { clean: (t: string) => world.clean(t), close: (t: string) => world.closeTask(t) };
@@ -170,7 +193,8 @@ export function tick(world: World, dryRun: boolean, env = process.env): Decision
         continue;
       }
       const fresh = freshDecisions(decisions, state.last);
-      writeAtomic(statePath(name, env), `${JSON.stringify(state, null, 2)}\n`);
+      const text = `${JSON.stringify(state)}\n`;
+      if (text !== loaded.text) writeAtomic(statePath(name, env), text);
       all.push(...logDecisions(fresh, env));
     } finally {
       release();
@@ -178,6 +202,13 @@ export function tick(world: World, dryRun: boolean, env = process.env): Decision
   }
   if (!dryRun) cutDecisionsDaily(decisionsPath(env), world.now());
   return all;
+}
+
+/** One open Inbox item per fault, so the owner is told once however many ticks stop on it. */
+function askAboutState(project: string, reason: string, now: Date, env: NodeJS.ProcessEnv): void {
+  const question = `${project}: ${reason}`;
+  if (readItems(env).some((i) => isOpen(i) && i.question === question)) return;
+  addItem({ kind: "step", task: "-", project, question, choices: ["Ok"], since: now.toISOString() }, env);
 }
 
 function logDecisions(ds: Decision[], env: NodeJS.ProcessEnv): Decision[] {
@@ -188,25 +219,11 @@ function logDecisions(ds: Decision[], env: NodeJS.ProcessEnv): Decision[] {
   return ds;
 }
 
-/** One tick in a process of its own, so its commands never hold up the web server. Its decision lines go to `out`. */
-async function tickAway(out: (l: string) => void): Promise<void> {
-  const p = Bun.spawn([process.execPath, join(import.meta.dir, "..", "bin", "lineclear"), "run", "--once"], {
-    env: process.env,
-    stdin: "ignore",
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  const [said, err, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
-  for (const l of said.split("\n")) if (l) out(l);
-  if (code === 0 && err.trim()) console.error(err.trim());
-  if (code !== 0) throw new Error(err.trim().split("\n").at(-1) || `exit ${code}`);
-}
-
 /** Seams for tests: the tick, its interval and where signals come from. */
 export interface RunDeps {
   tick?: (world: World, dryRun: boolean) => Decision[] | Promise<Decision[]>;
   tickMs?: number;
-  signals?: { once(e: string, f: (...a: any[]) => void): unknown; on(e: string, f: (...a: any[]) => void): unknown };
+  signals?: { once(e: string, f: (...a: any[]) => void): unknown };
 }
 
 export async function runMain(args: string[], out: (l: string) => void, world: World = realWorld(), deps: RunDeps = {}): Promise<number> {
@@ -217,47 +234,41 @@ export async function runMain(args: string[], out: (l: string) => void, world: W
   }
   const dryRun = args.includes("--dry-run");
   const show = (ds: Decision[]) => ds.forEach((d) => out(`${d.project}  ${d.step ?? "-"}  ${d.kind}  ${d.reason}`));
-  if (args.includes("--once")) {
+  const oneTick = async () => {
     show(await (deps.tick ?? tick)(world, dryRun));
     // a tick the caller replaced is a test's: it sends nothing to a real Dispatcher
     const watched = dryRun || deps.tick ? undefined : await nightWatch(world.now());
     if (watched) out(`-  -  wake  ${watched}`);
+  };
+  if (args.includes("--once")) {
+    await oneTick();
     return 0;
   }
-  // a tick that is still running is not started again, and a stop waits for it
-  let ticking: Promise<void> | undefined;
-  const safely = () => {
-    if (ticking) return;
-    const tickOnce = async () => {
-      try {
-        if (deps.tick) show(await deps.tick(world, dryRun));
-        else await tickAway(out);
-      } catch (e) {
-        console.error(`lineclear run: tick failed: ${e instanceof Error ? e.message : e}`);
-        return;
-      }
-    };
-    const mine = (ticking = tickOnce().then(() => {
-      if (ticking === mine) ticking = undefined;
-    }));
-  };
   const sig = deps.signals ?? process;
   return new Promise((resolve) => {
-    const timer = setInterval(safely, deps.tickMs ?? TICK_MS);
-    // The loop ends on SIGTERM or SIGINT only. Anything else is told and survived.
+    // a tick that is still running is not started again, and a stop waits for it
+    let ticking: Promise<void> | undefined;
+    const tickNow = () => {
+      if (ticking) return;
+      const mine = (ticking = oneTick()
+        .catch((e) => {
+          // a process in an unknown state does not go on acting on agents: it ends, and its supervisor starts a fresh one
+          console.error(`lineclear run: tick failed, stopping: ${e instanceof Error ? (e.stack ?? e.message) : e}`);
+          clearInterval(timer);
+          resolve(1);
+        })
+        .then(() => {
+          if (ticking === mine) ticking = undefined;
+        }));
+    };
+    const timer = setInterval(tickNow, deps.tickMs ?? TICK_MS);
     const stop = (reason: string) => {
       console.error(`lineclear run: stopping: ${reason}`);
       clearInterval(timer);
       void (ticking ?? Promise.resolve()).then(() => resolve(0));
     };
-    const survive = (what: string) => (e: unknown) =>
-      console.error(`lineclear run: ${what}, still running: ${e instanceof Error ? (e.stack ?? e.message) : e}`);
     sig.once("SIGTERM", () => stop("SIGTERM"));
     sig.once("SIGINT", () => stop("SIGINT"));
-    sig.on("SIGHUP", () => console.error("lineclear run: SIGHUP ignored, still running"));
-    sig.on("uncaughtException", survive("uncaught error"));
-    sig.on("unhandledRejection", survive("unhandled rejection"));
-    sig.on("beforeExit", () => console.error("lineclear run: the event loop ran empty; this is a bug"));
-    safely();
+    tickNow();
   });
 }
