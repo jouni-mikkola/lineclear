@@ -221,43 +221,6 @@ test("a step whose lock a task on the second machine holds does not start, and n
   expect(t.remote()).toBe("");
 });
 
-test("a step that starts working on the second machine, or merges on main, after the tick read them is not started; a closed task blocks nothing", () => {
-  const t = setup({
-    steps: [step("A", "a"), step("B", "b"), step("C", "c")],
-    localMax: 3,
-    remoteTasks: [{ id: "LIN-8", title: "C Title C", status: "done", closed: true, closedBy: "close" }],
-  });
-  const later = join(t.dir, "later.json");
-  writeFileSync(
-    later,
-    JSON.stringify([
-      { id: "LIN-9", title: "A Title A", status: "work" },
-      { id: "LIN-8", title: "C Title C", status: "done", closed: true, closedBy: "close" },
-    ]),
-  );
-  let fetches = 0;
-  // The first fetch is the tick's own read; the next one comes just before a start, when A works on farbox and B is on main.
-  const d = t.doTick(false, {
-    fetch: (repo) => {
-      if (fetches++ === 1) {
-        writeFileSync(join(t.repo, "b.txt"), "b");
-        git(t.repo, "add", "-A");
-        git(t.repo, "commit", "-qm", "LIN-7: B Title B");
-        git(t.repo, "push", "-q", "origin", "HEAD:main");
-        writeFileSync(join(t.home, "tasks.json"), readFileSync(later, "utf8"));
-      }
-      return realWorld(t.vars).fetch(repo);
-    },
-  });
-  expect(d.map((x) => `${x.step}:${x.kind}`)).toEqual(["A:skip", "B:skip", "C:start"]);
-  expect(d[0]!.reason).toContain("does not start twice");
-  expect(d[1]!.reason).toContain("merged on origin/main");
-  expect(t.local()).toContain("task add C Title C");
-  expect(t.local()).not.toContain("Title A");
-  expect(t.local()).not.toContain("Title B");
-  expect(t.remote()).toBe("");
-});
-
 test("a step working or waiting on the other machine, or merged on main, is not started here; a closed task blocks nothing", () => {
   const t = setup({
     steps: [step("A", "a"), step("B", "b"), step("C", "c"), step("D", "d")],

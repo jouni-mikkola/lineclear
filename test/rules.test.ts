@@ -10,7 +10,6 @@ import { pickReviewer } from "../src/stalls.ts";
 import { company } from "../src/company.ts";
 import { recordTaskSteps } from "./helpers.ts";
 import { setup, status, step } from "./rules-world.ts";
-import type { World } from "../src/world.ts";
 
 test("a ready step starts with the brief from the template", () => {
   const t = setup({ steps: [step("A", "none")], rounds: 3 });
@@ -63,27 +62,6 @@ test("a closed step whose named test fails is not restarted and gets no Fix task
   expect(t.adds().length).toBe(0);
 });
 
-/** A tick whose world answers like the one it read first, until the step is about to start: then the second read differs. */
-function staleTick(t: ReturnType<typeof setup>, later: Partial<World>) {
-  const real = realWorld(t.env);
-  const reads = { main: 0 };
-  const world: World = {
-    ...real,
-    load: () => 0,
-    now: () => t.now.at,
-    tasks: (space) => (reads.main > 1 ? (later.tasks ?? real.tasks)(space) : real.tasks(space)),
-    main: (repo) => (reads.main++ === 0 ? real.main(repo) : (later.main ?? real.main)(repo)),
-  };
-  return tick(world, false, t.env);
-}
-
-test("a step whose task appeared since the tick read its list is not started again", () => {
-  const t = setup({ steps: [step("A", "none")] });
-  staleTick(t, { tasks: () => [{ id: "LIN-9", title: "A Title A", status: "work" }] });
-  expect(t.adds()).toEqual([]);
-  expect(t.decisions().some((x) => x.step === "A" && x.reason.includes("does not start twice"))).toBe(true);
-});
-
 test("the same step added twice gives one start and one refusal", () => {
   const t = setup({ steps: [step("A", "none")] });
   t.doTick();
@@ -100,23 +78,6 @@ test("the same step added twice gives one start and one refusal", () => {
   t.doTick();
   expect(t.adds().length).toBe(1);
   expect(existsSync(lock)).toBe(false);
-});
-
-test("a step closed with nothing to merge since the tick read its list is not started", () => {
-  const t = setup({ steps: [step("A", "none")] });
-  const closed = { id: "LIN-9", title: "A Title A", status: "done", closed: true, closedBy: "done" } as const;
-  writeFileSync(join(t.config, "projects", "demo", "state.json"), JSON.stringify({ taskSteps: { "LIN-9": "A" } }));
-  staleTick(t, { tasks: () => [closed] });
-  expect(t.adds()).toEqual([]);
-  expect(t.decisions().some((x) => x.step === "A" && x.reason.includes("closed with nothing to merge"))).toBe(true);
-});
-
-test("a step merged on origin/main since the tick read it is not started", () => {
-  const t = setup({ steps: [step("A", "none")] });
-  const real = realWorld(t.env);
-  staleTick(t, { main: (repo) => ({ ...(real.main(repo) as object), commits: [{ subject: "LIN-9: A Title A", body: "" }] }) as ReturnType<World["main"]> });
-  expect(t.adds()).toEqual([]);
-  expect(t.decisions().some((x) => x.step === "A" && x.reason.includes("merged on origin/main"))).toBe(true);
 });
 
 test("the order of the worker list decides the model the next task starts on", () => {

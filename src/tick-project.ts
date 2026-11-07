@@ -22,7 +22,7 @@ type MainInfo = Exclude<ReturnType<World["main"]>, string>;
 type Parsed = ReturnType<typeof checkRoadmap>["parsed"];
 type Step = Parsed["steps"][number];
 type StepState = StepStatus;
-type Note = (kind: Decision["kind"], reason: string, step?: string, machine?: string) => void;
+type Note = (kind: Decision["kind"], reason: string, step?: string, machine?: string) => Decision;
 
 /** What every part of one project's tick needs. */
 interface Tick {
@@ -267,7 +267,13 @@ interface Planned {
   reviewer: string;
   cheap: string | undefined;
   where: string;
+  /** Its line in the tick's decisions, written as it is planned so the lines keep the steps' order; its outcome comes once the starts ran. */
+  decision: Decision;
 }
+
+/** Fills in a planned step's line once its start ran. */
+const settle = (p: Planned, kind: Decision["kind"], reason: string, machine?: string) =>
+  Object.assign(p.decision, { kind, reason }, machine === undefined ? {} : { machine });
 
 /** The task of a planned step, here or on its host. */
 function stepTask(s: Starting, { step, host, worker, reviewer }: Planned): NewTask {
@@ -346,12 +352,13 @@ function planStep(s: Starting, step: Step): Planned | undefined {
     cap.remoteFree.set(host, (cap.remoteFree.get(host) ?? 0) - 1);
   }
   for (const l of stepHeld(step)) s.held.set(l, step.id);
-  return { step, host, worker, reviewer, cheap, where };
+  return { step, host, worker, reviewer, cheap, where, decision: note("start", "", step.id) };
 }
 
 /** What the tick keeps of a step whose task was added. */
-function recordStarted(s: Starting, { step, host, worker, reviewer, cheap, where }: Planned) {
-  const { state, note } = s.t;
+function recordStarted(s: Starting, p: Planned) {
+  const { step, host, worker, reviewer, cheap, where } = p;
+  const { state } = s.t;
   state.models[step.id] = worker;
   if (cheap) (state.cheap ??= []).push(step.id);
   if (host === undefined) recordStart(state, `${step.id} ${step.title}`, step.id);
@@ -362,7 +369,7 @@ function recordStarted(s: Starting, { step, host, worker, reviewer, cheap, where
   }
   const same = company(reviewer) === company(worker) ? " (same company: no other company has room, a different model reviews with a fresh context)" : "";
   const on = `${cheap ? `routine step on the cheap worker model ${cheap}; ` : ""}worker ${worker}`;
-  note("start", `ready, locks free, slot free${where}; ${on}, reviewer ${reviewer}${same}`, step.id);
+  settle(p, "start", `ready, locks free, slot free${where}; ${on}, reviewer ${reviewer}${same}`);
 }
 
 /**
@@ -370,7 +377,7 @@ function recordStarted(s: Starting, { step, host, worker, reviewer, cheap, where
  * the task: the space names differ per machine, the repo's refs do not. A task that cannot be added gives its claim back at once.
  */
 function startPlanned(s: Starting, planned: Planned[]) {
-  const { settings, world, note, name } = s.t;
+  const { settings, world, name } = s.t;
   const claims =
     world.claimSteps?.(
       settings.repo,
@@ -378,7 +385,7 @@ function startPlanned(s: Starting, planned: Planned[]) {
     ) ?? [];
   const claimed = planned.filter((p, i) => {
     const claim = claims[i];
-    if (claim) note("skip", claim === "held" ? "another loop holds this step's claim on the repo" : `its claim cannot be made: ${claim}`, p.step.id);
+    if (claim) settle(p, "skip", claim === "held" ? "another loop holds this step's claim on the repo" : `its claim cannot be made: ${claim}`);
     return !claim;
   });
   const errors = world.addTasks(
@@ -389,7 +396,7 @@ function startPlanned(s: Starting, planned: Planned[]) {
   const failed = claimed.filter((p, i) => {
     const err = errors[i];
     if (err === undefined) recordStarted(s, p);
-    else note("skip", `task add failed: ${err}`, p.step.id, p.host ?? THIS_MACHINE);
+    else settle(p, "skip", `task add failed: ${err}`, p.host ?? THIS_MACHINE);
     return err !== undefined;
   });
   world.releaseSteps?.(
@@ -435,7 +442,7 @@ function startReadySteps(s: Starting) {
     if (why?.startsWith("lock '")) skipped.add(step.id);
   }
   if (s.t.dryRun) {
-    for (const p of planned) s.t.note("start", `would start${p.where} with worker ${p.worker}, reviewer ${p.reviewer}`, p.step.id);
+    for (const p of planned) settle(p, "start", `would start${p.where} with worker ${p.worker}, reviewer ${p.reviewer}`);
     return;
   }
   startPlanned(s, planned);
@@ -456,7 +463,9 @@ export function tickProject(
   const out: Decision[] = [];
   const time = world.now().toISOString();
   const note: Note = (kind, reason, step, machine) => {
-    out.push({ time, project: name, step, kind, reason, ...(machine === undefined ? {} : { machine }) });
+    const d = { time, project: name, step, kind, reason, ...(machine === undefined ? {} : { machine }) };
+    out.push(d);
+    return d;
   };
   const t: Tick = { name, settings, world, state, dryRun, env, note };
   const project = readProject(t);
