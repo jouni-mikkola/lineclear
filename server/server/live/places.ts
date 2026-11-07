@@ -8,7 +8,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 import { nameProblem, slugify } from '../../shared/types.ts'
 import { HOME, readJson, writeJson } from '../store.ts'
-import { Agents } from './agents.ts'
+import { agentName } from './agent-start.ts'
 import { boxHome } from './box.ts'
 import { defaultBranch, isRepo, topLevel } from './engine/git.ts'
 import { validateBase, github, githubRemote, type GitHub } from './engine/github.ts'
@@ -267,7 +267,7 @@ export class Places {
     if (!p) return null
     return {
       key: id,
-      name: Agents.nameFor(`shep-${p.name}`),
+      name: agentName(`shep-${p.name}`),
       cwd: p.path,
       workspace: p.name,
       tab: 'coordinator',

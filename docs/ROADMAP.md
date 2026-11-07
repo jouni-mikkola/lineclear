@@ -199,7 +199,7 @@ Result: An agent's record, events, start and delivery work as before from a thir
 - done when: `wc -l` of `server/server/live/agents*.ts` prints 850 or less in all (1255 today); the server's agent tests pass on GitHub.
 - locks: agent-records
 - after: none
-- files: server/server/live/agents-delivery.ts, server/server/live/agents-state.ts, server/server/live/agents-sending.ts, server/server/live/agents-helpers.ts, server/server/live/agents.ts
+- files: server/server/live/agents-delivery.ts, server/server/live/agents-state.ts, server/server/live/agents-sending.ts, server/server/live/agents-helpers.ts, server/server/live/agents.ts, server/server/live/agent-start.ts, server/server/live/agent-routes.ts, server/server/live/agent-input.ts, server/server/live/agent-terminals.ts
 
 ### L499 The live source in less code
 Result: The live source keeps its state, spaces and restarts in less code, with one reader for each.
