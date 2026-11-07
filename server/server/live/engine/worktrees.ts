@@ -21,6 +21,8 @@ export interface Made {
   path: string
   workspace: string
   root?: string
+  /** how long its install step took, in ms */
+  installMs?: number
 }
 
 /** where a task's worktree belongs: its project's repo, and the name of the project's own space (its coordinator's) */
@@ -118,7 +120,9 @@ export class Worktrees {
 
   /** its install step has run (a failure throws; the worktree stays, and the next start runs the step again) */
   private async installed(home: Home, made: Made) {
+    const t0 = Date.now()
     await G.install(made.path, home.install)
+    made.installMs = Date.now() - t0
     return made
   }
 
