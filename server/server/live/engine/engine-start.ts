@@ -81,7 +81,11 @@ export abstract class EngineStart extends EngineState {
     if (ended(t) || t.archived || t.stopped || this.holding(t) || !this.places.space(t.project)) return false
     // a go sent just now counts before its agent is seen at work; one left from long ago (its agent gone) doesn't
     const going = !!t.going && Date.now() - (this.wrote.get(t.id) ?? 0) < BRIEF_WAIT
-    return this.starting.has(t.id) || going || (this.briefing.has(t.id) && !t.todo) || this.statusOf(t) === 'work'
+    if (this.inPhase(t, 'starting') || going || (this.inPhase(t, 'briefing') && !t.todo)) return true
+    // the status last settled, while its agent agrees: the full status of every task for each held one was what made this slow
+    const working = this.agents.status(this.key(t)) === 'working'
+    if (t.told !== undefined && (t.told === 'work') === working) return working
+    return this.statusOf(t) === 'work'
   }
 
   /** how many tasks are at work here now */

@@ -36,10 +36,10 @@ export class EngineStatus extends EngineStart {
     if (this.queued(t)) return this.halts(t).length ? 'need' : 'queued'
     // held until the machine has room
     if (this.holding(t)) return 'queued'
-    if (t.todo || this.starting.has(t.id) || this.briefing.has(t.id)) return 'todo'
+    if (t.todo || this.inPhase(t, 'starting') || this.inPhase(t, 'briefing')) return 'todo'
     // on its way into main, nothing for you to do: unless its agent stopped to ask you something (then it is Ready)
     if (t.reported && t.landing && (st === 'working' || !this.asks(key))) return 'merging'
-    if (st === 'working' || this.handing.has(t.id)) return 'work'
+    if (st === 'working' || this.inPhase(t, 'handing')) return 'work'
     if (this.agents.waiting(key).length || Date.now() - (this.wrote.get(t.id) ?? 0) < ANSWER_GRACE) return 'work'
     if (t.reported) return 'ready'
     // its turn ended (or it stopped) without reporting done: it waits for you, if it asks something
@@ -65,7 +65,7 @@ export class EngineStatus extends EngineStart {
       if (status === 'need') return this.reasonOf(key) ?? NEED.reply
       if (status === 'ready') return 'Ready to merge'
       if (status === 'merging') return Lane.landingLine(t.landing!, t.base)
-      if (this.handing.has(t.id) && t.tookOver) return fitStatus(`${CLI_NAME[t.tookOver.to] ?? t.tookOver.to} takes over: ${t.tookOver.why}`)
+      if (this.inPhase(t, 'handing') && t.tookOver) return fitStatus(`${CLI_NAME[t.tookOver.to] ?? t.tookOver.to} takes over: ${t.tookOver.why}`)
       return 'Working'
     })()
     return s.length > 90 ? `${s.slice(0, 89).trimEnd()}…` : s

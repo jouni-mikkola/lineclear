@@ -10,6 +10,7 @@ import * as Lane from './lane.ts'
 import { fitStatus } from './status-line.ts'
 import { type TaskRec, type Harness, ended, labelOf, ghNow } from './engine-helpers.ts'
 import { EnginePr } from './engine-pr.ts'
+import { move } from './phase.ts'
 
 export class EngineHandoff extends EnginePr {
   /** writing to a task whose agent stopped starts it again, with its memory */
@@ -33,14 +34,14 @@ export class EngineHandoff extends EnginePr {
     const t = this.req(id)
     if (ended(t)) throw new Error(this.overWords(t))
     if (!t.worktree) throw new Error(`${t.id} hasn't started yet: it starts on what its brief says.`)
-    if (this.handing.has(t.id)) throw new Error(`${t.id}'s agent is starting again already.`)
+    if (this.inPhase(t, 'handing')) throw new Error(`${t.id}'s agent is starting again already.`)
     if (!this.installed(to.kind)) throw new Error(`${CLI_NAME[to.kind] ?? to.kind} isn't installed on this machine.`)
     const key = this.key(t)
     const h = fitHarness(to)
     const from = this.agents.record(key)?.kind ?? t.agent?.kind ?? ''
     const name = (k: string) => CLI_NAME[k] ?? k
     const words = harnessWords(h)
-    this.handing.add(t.id)
+    if (!move(t, 'handoff')) throw new Error(`${t.id} is busy: try again in a moment`)
     try {
       // what it is told, read once its turn has stopped: what it did meanwhile counts
       const first = async () => {
@@ -56,7 +57,7 @@ export class EngineHandoff extends EnginePr {
       const card = `restart:${t.id}:${Date.now()}`
       this.chats.post(key, { id: card, card: { id: card, restart: true, text: `Restarted on ${words}` } })
     } finally {
-      this.handing.delete(t.id)
+      move(t, 'over')
       this.save()
       this.settle(t)
     }
@@ -66,7 +67,7 @@ export class EngineHandoff extends EnginePr {
   /** something went in to an agent: its brief, maybe, which it may already be at work on */
   sent(key: string) {
     const t = this.task(key.split('/')[0])
-    if (!t || !this.briefing.has(t.id)) return
+    if (!t || !this.inPhase(t, 'briefing')) return
     this.begun(t)
     this.settle(t)
   }
@@ -194,7 +195,7 @@ export class EngineHandoff extends EnginePr {
   briefLost(key: string) {
     const t = this.task(key.split('/')[0])
     if (!t || key !== this.key(t) || ended(t)) return
-    this.briefing.delete(t.id)
+    move(t, 'brief-over')
     t.trouble = 'brief not delivered'
     this.settle(t)
     this.save()
@@ -258,8 +259,7 @@ export class EngineHandoff extends EnginePr {
    */
   protected async cleanup(t: TaskRec, quiet = false) {
     const p = this.places.space(t.project)
-    if (!p || this.cleaning.has(t.id)) return
-    this.cleaning.add(t.id)
+    if (!p || !move(t, 'clean')) return
     try {
       const r = await this.putAway(t, p.path, p.base)
       if (r.busy) return r
@@ -274,7 +274,7 @@ export class EngineHandoff extends EnginePr {
         })
       return r
     } finally {
-      this.cleaning.delete(t.id)
+      move(t, 'over')
     }
   }
 
