@@ -18,36 +18,12 @@ commit subject. The rules read this file, so it follows its own format.
 
 ## Open steps
 
-### L439 One server, one port
-Result: Lineclear is one process on one port: the rule loop, the web pages and the board run in one server.
-- why: `lineclear run` and `lineclear serve` are two servers on two ports with two services, and `src/lineclear-client.ts` exists only to link them; idea.md asks for one server.
-- done when: One systemd user service runs one process that serves the pages of `ui/web/`, the board's API and the rule loop on one port. `lineclear run` and `lineclear serve` start that same process. A test starts it and reads `/`, `/api/home` and the board's `/api/snapshot` on that one port.
-- locks: server, web
-- after: none
-- files: src/web.ts, src/rules.ts, src/serve.ts, src/lineclear-client.ts, server/server/main.ts, server/server/app.ts, install.sh
-
-### L440 One settings store
-Result: A project's models per role, its check and health commands and its secret names live in one store that Settings writes.
-- why: `src/project.ts` keeps the model lists and commands, and `server/server/live/settings-store.ts` keeps each role's agent, model and effort, so one choice can be set in two places.
-- done when: One module owns the settings and the other reads it through that module; the second store's file is read once to move its values and then deleted. A test sets a role's model in Settings and sees the next task start on it.
-- locks: settings
-- after: L439
-- files: src/project.ts, src/web-settings.ts, server/server/live/settings-store.ts, server/server/live/settings.ts
-
-### L441 One stall detector
-Result: A quiet or late task is found once, by one detector, and the stall ladder acts on it.
-- why: `server/server/live/engine/stalls.ts` and `src/stalls.ts` both judge which task is stuck, with their own limits.
-- done when: The server reports quiet and late tasks as facts; `src/stalls.ts` and `src/stall-class.ts` alone decide the rung (nudge, restart, handover, the owner). The limits are named once. A test plants a quiet task and sees one nudge, then one restart.
-- locks: stall-check
-- after: L439
-- files: server/server/live/engine/stalls.ts, server/server/live/engine/engine-helpers.ts, src/stalls.ts, src/stall-class.ts
-
 ### L430 Needs you means a question
 Result: A task shows Needs you only when it asks you something; one that stopped without a question is resumed by itself.
 - why: a task whose turn ends without a question still shows Needs you, so the Inbox hides the real questions among them.
 - done when: A task is in Needs you only with an open card or `lineclear wait owner`; a turn that ends with neither gets one nudge and, if still quiet, a restart. A test ends a turn with no question and sees no Inbox item.
 - locks: stall-check
-- after: L441
+- after: none
 - files: server/server/live/engine/status.ts, src/stalls.ts, src/inbox.ts
 
 ### L436 Flaky tests quarantined
@@ -57,14 +33,6 @@ Result: A test that flakes on GitHub stops blocking merges within one run and ge
 - locks: quarantine
 - after: none
 - files: scripts/check.ts, scripts/failures.ts, src/check-runs.ts, test/quarantine.json
-
-### L422 Review is one call on the diff
-Result: A review is one model call that gets the brief, the diff and the repo's rules, and answers with tagged findings.
-- why: a review is a whole agent today, with about 6 calls and over a tenth of a task's input tokens, most of it reading files the diff already shows.
-- done when: `lineclear review <task>` sends the brief, `git diff` against the base with 20 lines of context and the repo's rules in one call to a reviewer from another company than the worker, with no tools, and stores its findings as JSON (severity, file, line, why). A test checks the call and the stored findings.
-- locks: merge-line
-- after: none
-- files: server/server/live/engine/engine-merge.ts, server/server/live/prompts.ts, src/stalls.ts
 
 ## Frozen by the owner 5 Nov 2026
 

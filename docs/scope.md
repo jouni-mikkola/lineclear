@@ -2,8 +2,8 @@
 
 Each module of Lineclear, the core job of [idea.md](idea.md) it serves, its lines outside tests, and whether it stays.
 A module that serves no core job is deleted. Two modules that do one job become one: the one marked merge goes into
-the other. Each delete or merge names its area (D1 to D9 below), and each area is one delete task. A bigger merge that
-needs new code is a step of [ROADMAP.md](ROADMAP.md) and is named here by its id.
+the other. Each delete or merge names its area (D1 to D9 below), and each area is one delete task. What is left to build
+is in [ROADMAP.md](ROADMAP.md).
 
 ## The core jobs
 
@@ -77,7 +77,7 @@ Together 9987 of 56746 lines. Their tests and docs go with them.
 | `server/server/live/engine/github.ts` | Review and merge | 362 | keep | pull requests and their checks |
 | `server/server/live/engine/lane*` | Review and merge | 168 | keep | the merge lane |
 | `server/server/live/engine/merge.ts` | Review and merge | 403 | keep | the merge |
-| `server/server/live/engine/stalls.ts` | Rules | 112 | keep | quiet and late tasks; one detector with src/stalls.ts (L441) |
+| `server/server/live/engine/stalls.ts` | Rules | 112 | keep | quiet and late tasks |
 | `server/server/live/estimates.ts` | View | 75 | keep | how long tasks took, for time left |
 | `server/server/live/folders.ts` | none | 175 | delete (D3) | the old sidebar's add project; src/add-project.ts does it |
 | `server/server/live/health.ts` | Rules | 353 | keep | machine load: slots and the load limit |
@@ -106,7 +106,7 @@ Together 9987 of 56746 lines. Their tests and docs go with them.
 | `server/server/live/secret*` | Secrets | 45 | keep | secret capabilities and paths |
 | `server/server/live/secrets.ts` | Secrets | 141 | keep | the one vault |
 | `server/server/live/settings-catalog.ts` | Models | 339 | merge (D2) | keep pi only; the rest of the catalog goes |
-| `server/server/live/settings-store.ts` | Models | 470 | keep | role, model and effort settings; one store with src/project.ts (L440) |
+| `server/server/live/settings-store.ts` | Models | 470 | keep | role, model and effort settings |
 | `server/server/live/settings.ts` | Models | 16 | keep | settings entry |
 | `server/server/live/source*` | Run | 3144 | keep | the live source: state, actions, the board command |
 | `server/server/live/streaming.ts` | Dispatcher | 37 | keep | a reply as it streams |
@@ -174,7 +174,7 @@ Together 9987 of 56746 lines. Their tests and docs go with them.
 | `src/inbox*` | Inbox | 466 | keep | the Inbox and its answers |
 | `src/install-paths.ts` | Install | 85 | keep | install folders |
 | `src/kept-read.ts` | View | 89 | keep | cached reads for Home |
-| `src/lineclear-client.ts` | View | 87 | keep | the web server's link to the board server; goes with L439 |
+| `src/lineclear-client.ts` | View | 87 | keep | the web server's link to the board server |
 | `src/live*` | View | 215 | keep | live changes to the pages |
 | `src/main-branch.ts` | Run | 22 | keep | a repo's main branch |
 | `src/measure.ts` | Models | 150 | keep | tokens and cost per step |
@@ -226,7 +226,7 @@ Together 9987 of 56746 lines. Their tests and docs go with them.
 | `src/totp.ts` | Secrets | 54 | keep | login codes |
 | `src/uninstall.ts` | Install | 96 | keep | `lineclear uninstall` |
 | `src/wait*` | Rules | 485 | keep | declared waits |
-| `src/web*` | View | 876 | keep | the web server and its routes; one port with the board (L439) |
+| `src/web*` | View | 876 | keep | the web server and its routes |
 | `src/web-guard.ts` | Secrets | 39 | keep | page token and host check |
 | `src/worktree.ts` | Run | 64 | keep | a task's worktree fields |
 | `src/world.ts` | Rules | 75 | keep | what a tick needs from outside |
