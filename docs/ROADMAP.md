@@ -193,6 +193,38 @@ Result: scope.md shows the line count after the cuts, and ROADMAP.md holds the s
 - after: L470, L471, L472, L473, L474, L475, L476, L477, L478, L479, L480, L481, L482, L483, L484, L485, L496, L497
 - files: docs/scope.md, docs/ROADMAP.md
 
+### L498 Agent records in less code
+Result: An agent's record, events, start and delivery work as before from a third less code.
+- why: `agents-delivery.ts` (497 lines), `agents-state.ts` (372), `agents-sending.ts` (226), `agents-helpers.ts` and `agents.ts` are 1255 lines; delivery and sending both build the same message envelope.
+- done when: `wc -l` of `server/server/live/agents*.ts` prints 850 or less in all (1255 today); the server's agent tests pass on GitHub.
+- locks: agent-records
+- after: none
+- files: server/server/live/agents-delivery.ts, server/server/live/agents-state.ts, server/server/live/agents-sending.ts, server/server/live/agents-helpers.ts, server/server/live/agents.ts
+
+### L499 The live source in less code
+Result: The live source keeps its state, spaces and restarts in less code, with one reader for each.
+- why: `source-state.ts` (344 lines), `source-task-words.ts` (314), `source-spaces.ts` (239), `source-restarts.ts` (211), `source-upkeep.ts` (205) and `source-helpers.ts` are 1384 lines that repeat the same task and space lookups.
+- done when: `wc -l` of those six files prints 1000 or less in all (1384 today); the server's source tests pass on GitHub.
+- locks: live-source
+- after: none
+- files: server/server/live/source-state.ts, server/server/live/source-task-words.ts, server/server/live/source-spaces.ts, server/server/live/source-restarts.ts, server/server/live/source-upkeep.ts, server/server/live/source-helpers.ts
+
+### L500 The chat view in less code
+Result: The Dispatcher chat looks and moves as before, drawn by fewer parts.
+- why: `ui/kit/chat.tsx` (582 lines), `ui/web/chat-view.tsx` (315), `ui/web/chat.tsx` (194), `chat-files.tsx`, `chat-reply.tsx`, `markdown.tsx` (332) and `rich-text.tsx` are 1572 lines; the kit and the page both lay out a message.
+- done when: `wc -l` of those seven files prints 1100 or less in all (1572 today); `bun run ui:test` still passes its chat screenshot and motion cases at 1440 and 390 px on GitHub.
+- locks: chat-view
+- after: none
+- files: ui/kit/chat.tsx, ui/web/chat-view.tsx, ui/web/chat.tsx, ui/kit/chat-files.tsx, ui/kit/chat-reply.tsx, ui/kit/markdown.tsx, ui/kit/rich-text.tsx
+
+### L501 The web server in less code
+Result: The page server answers the same routes from a third less code.
+- why: `web.ts` (226 lines), `web-routes.ts` (289), `web-chat-api.ts`, `web-views.ts` and `web-files.ts` are 774 lines; each route repeats its guard, parse and error reply.
+- done when: `wc -l` of those five files prints 560 or less in all (774 today); the web tests pass on GitHub.
+- locks: web-server
+- after: none
+- files: src/web.ts, src/web-routes.ts, src/web-chat-api.ts, src/web-views.ts, src/web-files.ts
+
 ### L487 One server, one task store
 Result: One board server runs per machine and writes one task store, so a task is never in two lists.
 - why: the owner measured two `server/main.ts` processes and two task stores still running on one machine after L439.
