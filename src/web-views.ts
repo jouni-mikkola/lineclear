@@ -1,5 +1,5 @@
 import { addedSteps, type PlanView } from "./requests.ts";
-import { isOpen, type Item, readItems } from "./inbox.ts";
+import { isOpen, type Item, readAllItems } from "./inbox.ts";
 import type { WaitingTask } from "./waiting.ts";
 import type { Env } from "./web-guard.ts";
 
@@ -40,11 +40,18 @@ export interface PlanCard extends Omit<PlanView, "item"> {
   item?: InboxView;
   /** Your answer, once given. */
   answer?: string;
+  /** The plan applied by itself: the change to undo from the card, and whether it was undone. */
+  applied?: { id: number; undone: boolean };
 }
 
 export function planCard(v: PlanView): PlanCard {
   const { item, ...rest } = v;
-  return { ...rest, ...(item && isOpen(item) ? { item: inboxView(item) } : {}), ...(item?.answer ? { answer: item.answer } : {}) };
+  return {
+    ...rest,
+    ...(item && isOpen(item) ? { item: inboxView(item) } : {}),
+    ...(item?.answer ? { answer: item.answer } : {}),
+    ...(item?.auto && item.commit ? { applied: { id: item.n, undone: !!item.undone } } : {}),
+  };
 }
 
 /** A plan or roadmap change that applied by itself, as the Roadmap lists it with its undo. */
@@ -59,7 +66,7 @@ export interface AppliedChange {
 
 /** The latest ten changes that applied by themselves in a project, newest first. */
 export function appliedChanges(project: string, env: Env): AppliedChange[] {
-  return readItems(env as NodeJS.ProcessEnv)
+  return readAllItems(env as NodeJS.ProcessEnv)
     .filter((i) => i.auto && i.commit && i.project === project)
     .reverse()
     .slice(0, 10)

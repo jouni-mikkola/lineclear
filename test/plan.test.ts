@@ -4,7 +4,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, existsSync, rmSync, wr
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { inboxMain } from "../src/inbox-answer.ts";
-import { readItems } from "../src/inbox.ts";
+import { readAllItems, readItems } from "../src/inbox.ts";
 import { planMain } from "../src/plan.ts";
 import { ANSWER_MAX_TOKENS, INPUT_MAX_TOKENS } from "../src/ask-model.ts";
 import { tokensOf } from "../src/stepcheck.ts";
@@ -139,7 +139,8 @@ test("a plan that passes the checks merges by itself and is recorded as an appli
   t.edit("B");
   expect(t.plan(["submit"]).code).toBe(0);
   expect(t.calls().at(-1)).toEqual(["merge", "LIN-5"]);
-  const [item] = readItems(t.env);
+  expect(readItems(t.env)).toHaveLength(0);
+  const [item] = readAllItems(t.env);
   expect(item).toMatchObject({ kind: "choice", task: "LIN-5", project: "demo", auto: true, answer: "Approve" });
   expect(item!.diff).toContain("+### B Title B");
   expect(t.inbox([]).text).toBe("The Inbox is empty.");
@@ -192,7 +193,7 @@ test("a go keeps the answer with its model and tokens on the applied change", ()
   expect(question).not.toContain("### A Title A");
   expect(question).toContain("Tracked files:\ndocs/ROADMAP.md");
   expect(model.trim()).toBe("opencode-go/glm-5.3");
-  const checks = readItems(t.env)[0]?.checks ?? [];
+  const checks = readAllItems(t.env)[0]?.checks ?? [];
   expect(checks).toHaveLength(1);
   expect(checks[0]).toMatchObject({ step: "B", go: true, model: "opencode-go/glm-5.3", said: "B does one thing." });
   expect(checks[0]?.tokensIn).toBeGreaterThan(0);
@@ -215,7 +216,7 @@ test("a no-go goes back to the Dispatcher, and the fixed step is asked again and
   commit(t.work, "fix");
   expect(t.plan(["submit"]).code).toBe(0);
   expect(t.questions()).toHaveLength(2);
-  expect(readItems(t.env)[0]?.checks?.map((c) => c.round)).toEqual([2]);
+  expect(readAllItems(t.env)[0]?.checks?.map((c) => c.round)).toEqual([2]);
 });
 
 test("3 rounds with a no-go end the task with a report and no Inbox item", () => {
@@ -244,7 +245,7 @@ test("the Dispatcher and a checker from the same company are not refused when no
   t.edit("B");
   const r = t.plan(["submit"]);
   expect(r.code).toBe(0);
-  expect(readItems(t.env)[0]?.checks?.[0]?.model).toBe("claude-bridge-b/claude-sonnet-5-5");
+  expect(readAllItems(t.env)[0]?.checks?.[0]?.model).toBe("claude-bridge-b/claude-sonnet-5-5");
 });
 
 test("a step check that cannot run records a command-failed stall for the task", () => {
@@ -264,7 +265,7 @@ test("a long answer is kept cut to the answer size", () => {
   t.says(`SAID: ${"x".repeat(20000)}\nGO`);
   t.edit("B");
   expect(t.plan(["submit"]).code).toBe(0);
-  const check = readItems(t.env)[0]?.checks?.[0];
+  const check = readAllItems(t.env)[0]?.checks?.[0];
   expect(check?.tokensOut).toBeLessThanOrEqual(ANSWER_MAX_TOKENS);
   expect(tokensOf(check?.said ?? "")).toBeLessThanOrEqual(ANSWER_MAX_TOKENS);
   expect(check?.tokensIn).toBeLessThanOrEqual(INPUT_MAX_TOKENS);
