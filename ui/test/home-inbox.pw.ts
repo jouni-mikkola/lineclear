@@ -33,6 +33,22 @@ test("the count opens the rest in place, grouped by project", async ({ page }) =
   expect(page.url()).not.toContain("/inbox");
 });
 
+test("/inbox lists the asks newest first, 40 drawn, with the real count in the rail", async ({ page }) => {
+  await page.goto("/inbox?state=many");
+  await page.evaluate(() => document.fonts.ready);
+  const asks = page.locator("[data-view=inbox] [data-inbox-ask]");
+  await expect(asks).toHaveCount(40);
+  await expect(asks.first()).toContainText("Question 1:");
+  await expect(page.locator("[data-inbox-range]")).toHaveText("1 to 40 of 200");
+  await expect(page.locator("[data-badge]:visible").first()).toContainText("200");
+  await page.getByRole("button", { name: "Older" }).click();
+  await expect(asks).toHaveCount(40);
+  await expect(asks.first()).toContainText("Question 41:");
+  await page.getByRole("button", { name: "Newer" }).click();
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: test.info().outputPath("inbox-many.png"), fullPage: true });
+});
+
 test("an answer turns the lamp green, the strip leaves, and Undo brings the ask back", async ({ page }) => {
   await open(page, "filled");
   const live = page.locator('[data-inbox-strip=""]');

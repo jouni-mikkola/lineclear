@@ -94,7 +94,7 @@ export interface NavItem {
 const Count = ({ n, className = "" }: { n?: number; className?: string }) =>
   n ? (
     <span className={`min-w-5 rounded-full bg-caution px-1.5 text-center text-xs font-semibold leading-5 text-base tabular-nums ${className}`} data-badge>
-      {n > 99 ? "99+" : formatCount(n)}
+      {n > 999 ? "999+" : formatCount(n)}
       <span className="sr-only"> wait for you</span>
     </span>
   ) : null;
