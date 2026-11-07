@@ -62,7 +62,7 @@ export const commands: Record<string, string> = {
   plan: 'Start a planning task: plan <project> "<goal>"; plan submit sends its roadmap change to the Inbox; a task\'s agent lists its steps: plan <id> --step "..."',
   move: "Send a plan change to the Inbox: move <project> <step> --after <ids>",
   dispatcher: "Make the Dispatcher chat: dispatcher setup; dispatcher projects lists what it picks a project from",
-  ask: "Put a question with choices in the Inbox, and wait for the answer (--kind login|outward); a card in a chat is card",
+  ask: "Put a question with choices in the project's chat, and wait for the answer (--kind login|outward); a card in a chat is card",
   card: 'Ask the chat a question with choices: card "<question>" --choice "<label>" ... (the board\'s old ask)',
   inbox: "List open items of every machine (--all adds closed ones of this one), or answer one: inbox answer <n> <choice>",
   resume: "End this task's declared wait",

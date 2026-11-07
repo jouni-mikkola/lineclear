@@ -11,6 +11,7 @@ import { day } from "./progress.ts";
 import { gitText } from "./git.ts";
 import { spawnSync } from "node:child_process";
 import { serverBin } from "./paths.ts";
+import { askProjectChat, type CardPoster } from "./project-chat.ts";
 
 const waitKinds = ["owner", "login", "checks", "browser"] as const;
 /** The only things an owner wait may be for: a login code, money beyond the budget, or something that leaves the machine. */
@@ -220,6 +221,7 @@ export async function waitsMain(
   env = process.env,
   cwd = process.cwd(),
   now: () => Date = () => new Date(),
+  post?: CardPoster,
 ): Promise<number> {
   const fail = (message: string, code = 1) => {
     out(`lineclear ${name}: ${message}`);
@@ -228,7 +230,7 @@ export async function waitsMain(
   if (name === "check") return check(out, env, { cwd }, args);
   const task = findTask(cwd, env);
   if (task === undefined) return fail("cannot tell which task this is, run it inside a task's worktree");
-  const c: WaitCall = { name, task, project: findProject(cwd, env), since: now().toISOString(), out, env, now, fail };
+  const c: WaitCall = { name, task, project: findProject(cwd, env), since: now().toISOString(), out, env, now, fail, post };
 
   if (name === "resume") {
     if (args.length > 0) return (out(usage(name)), 2);
@@ -255,6 +257,7 @@ interface WaitCall {
   env: NodeJS.ProcessEnv;
   now: () => Date;
   fail: (message: string, code?: number) => number;
+  post?: CardPoster;
 }
 
 function waitUntil(c: WaitCall, rest: string[]): number {
@@ -297,6 +300,7 @@ function waitOwner(c: WaitCall, rest: string[]): number {
     if (refused) return c.fail(refused.message, refused.code);
   }
   writeWait({ task: c.task, project: c.project, kind: "owner", reason: why.trim(), since: c.since, ownerKind: given as Wait["ownerKind"] }, c.env);
+  askProjectChat(c.project, c.task, why.trim(), ["Done", "Cannot"], c.env, c.post);
   c.out(`${c.task} waits for owner (${given}): ${why.trim()}`);
   return 0;
 }

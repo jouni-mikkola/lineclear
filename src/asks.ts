@@ -7,7 +7,7 @@ import { addItem, type InboxKind, stepRule } from "./inbox.ts";
 import { findSpace, lineclearDir, spaceTasks } from "./measure.ts";
 import { projectsDir, toldPath } from "./project.ts";
 import { loadableTotps, secretNames, storedLogin, totpAdvice, totpAnswers } from "../server/server/live/secrets.ts";
-import { writeWait } from "./waits.ts";
+import { readWaits, waitsForOwner, writeWait } from "./waits.ts";
 import { DECIDE_TEXT, IDLE_NUDGE, mergeNudge, PROMISE_NUDGE, promisesNext } from "../pi/nudge.ts";
 import { type AskKind, askKind, type Card, IDLE_TEXT, isIdle, lineOf, questionIn, replyText } from "./cards.ts";
 import { HOUR_MS } from "./time.ts";
@@ -157,10 +157,12 @@ function routeCoordinator(project: string, space: { name: string; key: string },
   const dir = lineclearDir(env);
   const tasks = spaceTasks(dir, space);
   const ids = tasks.map((t) => String(t.id));
+  // a task that declared an owner wait (`lineclear ask`, `wait owner`) asked for the owner, whatever the card's words
+  const ownerWaits = new Set(readWaits(env).filter(waitsForOwner).map((w) => w.task));
   for (const card of coordinatorCards(liveChats(dir, space, true), ids)) {
     const task = tasks.find((t) => t.id === card.task);
     if (r.done.has(card.id) || task === undefined) continue;
-    const keptByOwner = ownerMatter(title(card)) || (asksToMerge(title(card)) && /^- Merge: ask me first/m.test(String(task.desc ?? "")));
+    const keptByOwner = ownerMatter(title(card)) || ownerWaits.has(card.task) || (asksToMerge(title(card)) && /^- Merge: ask me first/m.test(String(task.desc ?? "")));
     const action = keptByOwner ? undefined : ruleFor(card, project, r.now, env);
     if (action?.kind === "wait") continue;
     if (r.dryRun) {
@@ -178,7 +180,7 @@ function routeCoordinator(project: string, space: { name: string; key: string },
       const choices = card.ask?.choices ?? [];
       addItem(
         {
-          kind: route ?? (ownerMatter(title(card)) ? "outward" : "step"),
+          kind: route ?? (ownerMatter(title(card)) || ownerWaits.has(card.task) ? "outward" : "step"),
           task: card.task,
           project,
           question: title(card),
