@@ -57,7 +57,7 @@ export function Browsers({ load, session, sample }: { load: Load<Browser[]>; ses
           {byProject(tasks.slice(0, SHOWN)).map(([project, list]) => (
             <div key={project} className={project ? "mt-5 border-l-2 border-line pl-3 first:mt-0" : "first:mt-0"} data-track={project || undefined}>
               {project && <h3 className="mb-2 text-sm font-medium text-fg2">{project}</h3>}
-              <BrowserGrid items={list} card={card} lone={tasks.length === 1} />
+              <BrowserGrid items={list} card={card} />
             </div>
           ))}
           {!tasks.length && <p className="text-sm text-fg3">No task has a browser open.</p>}

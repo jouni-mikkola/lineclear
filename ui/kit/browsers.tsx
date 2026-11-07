@@ -1,7 +1,6 @@
 import { type MouseEvent, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { BrowserSession } from "../../src/browsers.ts";
 import { play } from "./motion.ts";
-import { EmptyTrack } from "./rail.tsx";
 import { Shape } from "./shapes.tsx";
 
 // The agents' browsers: a card per open session with a live picture, and the picture itself.
@@ -9,13 +8,7 @@ import { Shape } from "./shapes.tsx";
 export type Browser = BrowserSession;
 
 /** A page's host, or the address as it is when it has none. */
-export const hostOf = (url: string) => {
-  try {
-    return new URL(url).host || url;
-  } catch {
-    return url;
-  }
-};
+export const hostOf = (url: string) => (URL.canParse(url) && new URL(url).host) || url;
 
 /** Where a session is: its task, its project and what its name adds, or nothing when no task has it. */
 export const whereOf = (b: Browser) => [b.task, b.project, b.note].filter(Boolean).join(" · ");
@@ -26,11 +19,7 @@ export const splitSessions = (all: Browser[]) => ({ tasks: all.filter((b) => b.t
 function PicturePlaceholder({ host, failed }: { host?: string; failed: boolean }) {
   return (
     <div className="absolute inset-0 flex flex-col bg-raised" aria-label={failed ? "No picture yet" : "The picture is loading"} data-placeholder>
-      <div className="flex h-[12%] items-center gap-1.5 border-b border-line px-3">
-        {[0, 1, 2].map((i) => (
-          <span key={i} className="size-1.5 rounded-full bg-line" />
-        ))}
-      </div>
+      <div className="h-[12%] border-b border-line" />
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-4 text-center">
         <Globe />
         {host && <span className="max-w-full truncate text-sm text-fg2">{host}</span>}
@@ -230,23 +219,12 @@ function GrowIn({ children }: { children: ReactNode }) {
 }
 
 /** The open browsers as a grid of cards. A browser that opens grows in at its place. */
-export function BrowserGrid({ items, card, lone = true }: { items: Browser[]; card: (b: Browser) => ReactNode; lone?: boolean }) {
-  const one = items.length === 1 && lone;
+export function BrowserGrid({ items, card }: { items: Browser[]; card: (b: Browser) => ReactNode }) {
   return (
-    <ul className={`relative grid grid-cols-2 gap-3 ${one ? "sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]" : "sm:grid-cols-2 lg:grid-cols-3"}`} data-browsers>
+    <ul className="relative grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-3" data-browsers>
       {items.map((b) => (
         <GrowIn key={b.session}>{card(b)}</GrowIn>
       ))}
-      {one && (
-        // one browser fills its row: the space beside it says where the next one shows
-        <li
-          className="hidden min-w-0 flex-col items-center justify-center rounded-lg border border-dashed border-line p-6 text-center sm:flex"
-          data-browsers-more
-        >
-          <EmptyTrack />
-          <p className="mt-3 text-sm text-fg2">The next browser an agent opens shows here.</p>
-        </li>
-      )}
     </ul>
   );
 }

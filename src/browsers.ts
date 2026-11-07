@@ -26,20 +26,23 @@ export interface BrowserSession {
 
 export type BrowserInput = { do: "click"; x: number; y: number } | { do: "type"; text: string } | { do: "key"; key: string } | { do: "scroll"; dy: number };
 
-const KEYS = ["Enter", "Tab", "Backspace", "Escape", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"] as const;
+const KEYS = ["Enter", "Tab", "Backspace", "Escape", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"];
 /** How many reads may wait for a slot. */
 const QUEUE = 8;
 
 /** Too many pictures wait already: the page asks again on its next tick. */
 export class Busy extends Error {}
-
 export const SESSION_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/;
-
-const cli = (env: Env) => env.LINECLEAR_PLAYWRIGHT_CLI ?? "playwright-cli";
 
 /** Runs playwright-cli with a time limit and returns its output, or throws with its own words. */
 async function run(env: Env, args: string[], cwd: string, ms = 15_000): Promise<string> {
-  const p = Bun.spawn([cli(env), ...args], { cwd, env: env as Record<string, string>, stdin: "ignore", stdout: "pipe", stderr: "pipe" });
+  const p = Bun.spawn([env.LINECLEAR_PLAYWRIGHT_CLI ?? "playwright-cli", ...args], {
+    cwd,
+    env: env as Record<string, string>,
+    stdin: "ignore",
+    stdout: "pipe",
+    stderr: "pipe",
+  });
   const timer = setTimeout(() => p.kill("SIGKILL"), ms);
   const [out, err, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
   clearTimeout(timer);
@@ -69,9 +72,8 @@ export function taskOfSession(session: string, ids: string[]): { task: string; n
 
 /** The sessions as the view draws them, none of a task that is done: those waiting for a login or a code first, then by title. */
 function describeSessions(names: string[], env: Env, pages: Map<string, { title: string; url: string }>, taken: Set<string>): BrowserSession[] {
-  const dir = lineclearDir(env);
-  const spaces: { key?: string; name?: string }[] = readJson(join(dir, "spaces.json")) ?? [];
-  const tasks = new Map(readTasksKept(dir).tasks.map((t) => [t.id, t] as const));
+  const spaces: { key?: string; name?: string }[] = readJson(join(lineclearDir(env), "spaces.json")) ?? [];
+  const tasks = new Map(readTasksKept(lineclearDir(env)).tasks.map((t) => [t.id, t] as const));
   const asks = readItems(env).filter((i) => isOpen(i) && i.kind === "login" && i.session);
   return names
     .flatMap((session): BrowserSession[] => {
@@ -80,15 +82,16 @@ function describeSessions(names: string[], env: Env, pages: Map<string, { title:
       if (t && (t.merged === true || t.told === "done")) return [];
       const project = of && spaces.find((s) => s.key && of.task.startsWith(`${s.key}-`))?.name;
       const ask = asks.filter((i) => i.session === session).at(-1);
+      // absent fields stay undefined, so the JSON leaves them out
       return [
         {
           session,
           title: typeof t?.title === "string" ? t.title : session,
-          ...(of ? { task: of.task } : {}),
-          ...(project ? { project: String(project) } : {}),
-          ...(of?.note ? { note: of.note } : {}),
-          ...(ask ? { waits: { item: String(ask.n), question: ask.question } } : {}),
-          ...(pages.has(session) ? { page: pages.get(session) } : {}),
+          task: of?.task,
+          project: project ? String(project) : undefined,
+          note: of?.note,
+          waits: ask ? { item: String(ask.n), question: ask.question } : undefined,
+          page: pages.get(session),
           taken: taken.has(session),
         },
       ];
@@ -116,7 +119,7 @@ export function parseInput(body: any): BrowserInput | string {
   if (body?.do === "click" && n(body.x, 20_000) && n(body.y, 20_000) && body.x >= 0 && body.y >= 0)
     return { do: "click", x: Math.round(body.x), y: Math.round(body.y) };
   if (body?.do === "type" && typeof body.text === "string" && body.text.length > 0 && body.text.length <= 2000) return { do: "type", text: body.text };
-  if (body?.do === "key" && (KEYS as readonly string[]).includes(body.key)) return { do: "key", key: body.key };
+  if (body?.do === "key" && KEYS.includes(body.key)) return { do: "key", key: body.key };
   if (body?.do === "scroll" && n(body.dy, 5000)) return { do: "scroll", dy: Math.round(body.dy) };
   return "Not an input: click at x and y, type text, press a key or scroll.";
 }
@@ -128,10 +131,7 @@ const FRESH: Record<Kind, number> = { thumb: 5_000, full: 1_000 };
 /** How long the session list is served as it is: each read costs about two seconds of CPU. The Browsers view asks for the short time, other pages the long one. */
 const LIST_LIVE = 10_000;
 const LIST_IDLE = 300_000;
-/** How old the full picture behind a card may get before the card's next ask takes it again. */
-const WARM = 10_000;
 const SLOTS = 3;
-
 /** The list of open sessions, kept and read again once it is older than `listLive`. */
 function sessionCache(env: Env, now: () => number, listLive: number) {
   let listed: { at: number; read: Promise<Open[]> } | undefined;
@@ -162,9 +162,9 @@ function sessionCache(env: Env, now: () => number, listLive: number) {
 
 /** The JPEG and the page of what `pictureCode` printed. */
 function readShot(out: string) {
-  let v: any = JSON.parse(out);
-  if (typeof v === "string") v = JSON.parse(v);
-  const jpeg = Buffer.from(typeof v?.picture === "string" ? v.picture : "", "base64");
+  const parsed = JSON.parse(out);
+  const v = typeof parsed === "string" ? JSON.parse(parsed) : parsed;
+  const jpeg = Buffer.from(String(v?.picture), "base64");
   if (jpeg[0] !== 0xff || jpeg[1] !== 0xd8) throw new Error("the picture is not a JPEG");
   return { jpeg, page: { title: String(v.title ?? ""), url: String(v.url ?? "") } };
 }
@@ -211,42 +211,34 @@ export function browsers(env: Env, now = () => Date.now()) {
     const k = key(s.name, kind);
     const going = inflight.get(k);
     if (going) return going;
-    const read = runCode(s, pictureCode(kind === "thumb")).then((out) => {
+    const read: Promise<Buffer> = runCode(s, pictureCode(kind === "thumb")).then((out) => {
       const { jpeg, page } = readShot(out);
       pages.set(s.name, page);
       shots.set(k, { at: now(), jpeg });
       return jpeg;
     });
     inflight.set(k, read);
-    const end = () => inflight.get(k) === read && inflight.delete(k);
-    read.then(end, end);
+    read.finally(() => inflight.get(k) === read && inflight.delete(k)).catch(() => {});
     return read;
   };
-
   return {
     async list(live = true): Promise<BrowserSession[]> {
       const open = await latest(live ? listLive : LIST_IDLE);
       const names = new Set(open.map((s) => s.name));
       for (const k of [...taken, ...pages.keys()]) if (!names.has(k)) taken.delete(k), pages.delete(k);
       for (const k of [...shots.keys()]) if (!names.has(k.split("\0")[0] ?? "")) shots.delete(k);
-      // a session with no thumbnail yet gets one now, so the cards fill as soon as the page asks
       for (const s of open) if (!shots.has(key(s.name, "thumb")) && waiting.length < QUEUE) capture(s, "thumb").catch(() => {});
       return describeSessions([...names], env, pages, taken);
     },
-
     /** A JPEG of what the session showed lately, or undefined when it is not open. */
     async picture(name: string, kind: Kind = "full"): Promise<Buffer | undefined> {
       const s = (await latest()).find((x) => x.name === name) ?? (await find(name));
       if (!s) return undefined;
-      // a card in view may be opened next: its full picture is kept near fresh, only on an empty queue
-      const full = shots.get(key(name, "full"));
-      if (kind === "thumb" && (!full || now() - full.at > WARM) && !waiting.length && !inflight.has(key(name, "full"))) capture(s, "full").catch(() => {});
       const hit = shots.get(key(name, kind));
       if (hit) {
         if (now() - hit.at > FRESH[kind] && waiting.length < QUEUE) capture(s, kind).catch(() => {});
         return hit.jpeg;
       }
-      // a full queue is not made longer: the page asks again on its next tick
       if (waiting.length >= QUEUE && !inflight.has(key(name, kind))) throw new Busy();
       try {
         return await capture(s, kind);
@@ -255,13 +247,11 @@ export function browsers(env: Env, now = () => Date.now()) {
         throw e;
       }
     },
-
     async take(name: string, on: boolean): Promise<boolean> {
       if (!(await find(name))) return false;
       on ? taken.add(name) : taken.delete(name);
       return true;
     },
-
     /** Sends one input to a session the owner took over. */
     async input(name: string, i: BrowserInput): Promise<"ok" | "closed" | "not taken"> {
       const s = await find(name);
@@ -273,7 +263,6 @@ export function browsers(env: Env, now = () => Date.now()) {
         if (await closedNow(name)) return "closed";
         throw e;
       }
-      // the next picture shows what the input did
       shots.delete(key(name, "full"));
       return "ok";
     },
