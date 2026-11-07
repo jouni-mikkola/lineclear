@@ -43,7 +43,7 @@ console.log(s.port);
 const data = ${JSON.stringify(join(home, ".lineclear"))};
 setInterval(() => {
   if (broken() === "loop") return;
-  try { fs.writeFileSync(data + "/loop.json", JSON.stringify({ at: Date.now(), pid: process.pid, build: fs.realpathSync(data + "/builds/current") })); } catch {}
+  try { fs.writeFileSync(data + "/loop.json", JSON.stringify({ at: Date.now(), build: fs.realpathSync(data + "/builds/current") })); } catch {}
 }, 200);`,
     ],
     { stdout: "pipe", stderr: "inherit" },
