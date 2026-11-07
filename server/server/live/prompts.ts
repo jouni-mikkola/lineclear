@@ -153,8 +153,7 @@ export function queuedLine(ids: string[], when: 'start' | 'later' | 'changed', i
   const them = ids.length === 1 ? 'it is' : 'they are'
   const rest = `Lineclear tells you "Go: … start now." once ${them} done. A go from the human: run lineclear task queue ${id} --after none and start.`
   if (when === 'changed') return `You now wait for ${ids.join(', ')} instead. Don't start yet. ${rest}`
-  if (when === 'later')
-    return `Hold on: you are now queued after ${ids.join(', ')}. Stop at a clean point, reply in one line, and end your turn. ${rest}`
+  if (when === 'later') return `Hold on: you are now queued after ${ids.join(', ')}. Stop at a clean point, reply in one line, and end your turn. ${rest}`
   return `Queued: this task waits for ${ids.join(', ')}. Don't start yet: reply in one line that you have the brief, and end your turn. ${rest}`
 }
 
