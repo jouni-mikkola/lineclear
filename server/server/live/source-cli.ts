@@ -231,7 +231,7 @@ export class LiveSourceCli extends LiveSourceSubcommands {
           by: this.settings.setBy(pr),
         })
         const repo = pr ? this.places.byName(pr) : undefined
-        return `${head}${repo ? `\nBase branch: ${repo.base} (new tasks; per-task override: --base <branch>)` : ''}\n${this.settings.lines(pr, NAME, lists)}${now}\n\nEvery new task's brief${pr ? ` in ${pr}` : ''} ends with:\n${block}\n\nFor one task, set any of these with task add: --set review.rounds=1 --set merge="ask me first" (--set agent=codex, model, effort, reviewer, reviewer.model, reviewer.effort too), or say so in its brief, which wins.`
+        return `${head}${repo ? `\nBase branch: ${repo.base} (new tasks; per-task override: --base <branch>)` : ''}\n${this.settings.lines(pr, NAME, lists)}${now}\n\nEvery new task's brief${pr ? ` in ${pr}` : ''} ends with:\n${block}\n\nFor one task, set any of these with task add: --set review.rounds=1 --set merge="ask me first" (--set agent=pi, model, effort, reviewer, reviewer.model, reviewer.effort too), or say so in its brief, which wins.`
       },
       set: async () => {
         const value = a0 === 'unset' ? null : rest.join(' ')
