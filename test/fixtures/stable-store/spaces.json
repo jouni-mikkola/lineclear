@@ -1,0 +1,10 @@
+[
+  {
+    "name": "sample",
+    "path": "/tmp/sample",
+    "key": "SAM",
+    "github": null,
+    "base": "main",
+    "added": 1
+  }
+]

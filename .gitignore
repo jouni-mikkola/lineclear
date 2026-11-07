@@ -1,0 +1,9 @@
+node_modules/
+.playwright-cli/
+ui/web/dist/
+test-results/
+playwright-report/
+dist/
+server/.env
+ui/test/real-shots/
+.coverage/
