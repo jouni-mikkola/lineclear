@@ -132,6 +132,6 @@ test("a docs-only step is told it needs no review and a code step is told its re
   expect(docsBrief).not.toContain("have the change reviewed by fresh eyes");
   expect(codeBrief).toContain("have the change reviewed by fresh eyes using the model r/model");
   expect(codeBrief).toContain("unless your change touches only files under docs/");
-  expect(codeBrief).toContain('LINECLEAR_CHAT="C1/Reviewer"');
+  expect(codeBrief).toContain("`lineclear review C1`");
   expect(codeBrief).not.toContain("{{");
 });

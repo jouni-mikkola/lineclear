@@ -25,6 +25,7 @@ import { boardMain, isBoardJob, serveMain } from "./serve.ts";
 import { waitsMain } from "./waits.ts";
 import { realRemover, uninstall } from "./uninstall.ts";
 import { gitText } from "./git.ts";
+import { reviewMain } from "./review-call.ts";
 import { recordReviewCall } from "./task-work.ts";
 
 export const commands: Record<string, string> = {
@@ -39,6 +40,7 @@ export const commands: Record<string, string> = {
   show: "Show the board's few settings: show [--space <name>]",
   ready: 'A task\'s agent says its change is ready: ready <id> --summary "..."',
   merge: "Merge a task's change: merge <id>",
+  review: "Review a task's change in one model call on its diff, and store the findings as JSON: review <id> (run in the task's folder)",
   artifact: "Make, update or list a task's artifacts (a report, a dashboard)",
   pr: "Push a task's branch and open its pull request: pr <id>",
   checks: "Wait for GitHub's checks on a task's pull request: checks <id>",
@@ -173,6 +175,7 @@ const COMMANDS: Record<string, (rest: string[], out: Out) => number | Promise<nu
   totp,
   store: storeMain,
   status: statusCommand,
+  review: reviewMain,
   plan: planMain,
   move: moveMain,
   dispatcher: dispatcherMain,
