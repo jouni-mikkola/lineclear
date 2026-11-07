@@ -11,7 +11,7 @@ import { listProjectNames, projectsDir, readSettings, type Settings } from "./pr
 import { realWorld } from "./real-world.ts";
 import type { Task } from "./roadmap.ts";
 import { cutDecisionsDaily, type StallEntry } from "./stall-class.ts";
-import type { StartRecord } from "./starts.ts";
+import { holdProjectTick, type StartRecord } from "./starts.ts";
 import { tickProject } from "./tick-project.ts";
 import { sweepOldTemp } from "./tmpdirs.ts";
 import { holdWorld } from "./hold.ts";
@@ -146,26 +146,35 @@ export function tick(world: World, dryRun: boolean, env = process.env): Decision
       all.push({ time: world.now().toISOString(), project: name, kind: "skip", reason: settings });
       continue;
     }
-    const state = readState(name, env);
-    const held = holdWorld(world, settings);
-    const answer = (space: string, id: string, text: string) => answerCard({ space, id }, text, env);
-    const ops = { clean: (t: string) => world.clean(t), close: (t: string) => world.closeTask(t) };
-    const routed = routeAsks(name, settings.space, (task, text) => held.tellTask(task, text, "answer"), world.now(), dryRun, env, ops, answer).map(
-      (reason): Decision => ({ time: world.now().toISOString(), project: name, kind: "wake", reason }),
-    );
-    const decisions = [
-      ...routed,
-      ...closeOver(name, settings, world, dryRun, env),
-      ...serviceWaits(name, held, dryRun, env),
-      ...tickProject(name, settings, held, state, dryRun, readWaits(env), loadLimit(env), env),
-    ];
-    if (dryRun) {
-      all.push(...decisions);
+    const release = dryRun ? () => {} : holdProjectTick(join(projectsDir(env), name, "tick.lock"));
+    if (!release) {
+      all.push({ time: world.now().toISOString(), project: name, kind: "skip", reason: "another tick is running for this project, so no step starts twice" });
       continue;
     }
-    const fresh = freshDecisions(decisions, state.last);
-    writeAtomic(statePath(name, env), `${JSON.stringify(state, null, 2)}\n`);
-    all.push(...logDecisions(fresh, env));
+    try {
+      const state = readState(name, env);
+      const held = holdWorld(world, settings);
+      const answer = (space: string, id: string, text: string) => answerCard({ space, id }, text, env);
+      const ops = { clean: (t: string) => world.clean(t), close: (t: string) => world.closeTask(t) };
+      const routed = routeAsks(name, settings.space, (task, text) => held.tellTask(task, text, "answer"), world.now(), dryRun, env, ops, answer).map(
+        (reason): Decision => ({ time: world.now().toISOString(), project: name, kind: "wake", reason }),
+      );
+      const decisions = [
+        ...routed,
+        ...closeOver(name, settings, world, dryRun, env),
+        ...serviceWaits(name, held, dryRun, env),
+        ...tickProject(name, settings, held, state, dryRun, readWaits(env), loadLimit(env), env),
+      ];
+      if (dryRun) {
+        all.push(...decisions);
+        continue;
+      }
+      const fresh = freshDecisions(decisions, state.last);
+      writeAtomic(statePath(name, env), `${JSON.stringify(state, null, 2)}\n`);
+      all.push(...logDecisions(fresh, env));
+    } finally {
+      release();
+    }
   }
   if (!dryRun) cutDecisionsDaily(decisionsPath(env), world.now());
   return all;

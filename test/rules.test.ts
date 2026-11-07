@@ -1,6 +1,6 @@
 import { freshDecisions } from "../src/decision-dedupe.ts";
 import { expect, spyOn, test } from "bun:test";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { cpus } from "node:os";
 import { join } from "node:path";
 import { readItems } from "../src/inbox.ts";
@@ -83,6 +83,33 @@ test("a step whose task appeared since the tick read its list is not started aga
   staleTick(t, { tasks: () => [{ id: "LIN-9", title: "A Title A", status: "work" }] });
   expect(t.adds()).toEqual([]);
   expect(t.decisions().some((x) => x.step === "A" && x.reason.includes("does not start twice"))).toBe(true);
+});
+
+test("the same step added twice gives one start and one refusal", () => {
+  const t = setup({ steps: [step("A", "none")] });
+  t.doTick();
+  writeFileSync(join(t.fake, "tasks.json"), JSON.stringify([{ id: "LIN-1", title: "A Title A", status: "work" }]));
+  const second = t.doTick();
+  expect(t.adds().length).toBe(1);
+  expect(second.some((x) => x.kind === "start")).toBe(false);
+  const lock = join(t.config, "projects", "demo", "tick.lock");
+  writeFileSync(lock, String(process.pid));
+  const refused = t.doTick();
+  expect(refused.some((x) => x.kind === "skip" && x.reason.includes("another tick is running"))).toBe(true);
+  expect(t.adds().length).toBe(1);
+  rmSync(lock);
+  t.doTick();
+  expect(t.adds().length).toBe(1);
+  expect(existsSync(lock)).toBe(false);
+});
+
+test("a step closed with nothing to merge since the tick read its list is not started", () => {
+  const t = setup({ steps: [step("A", "none")] });
+  const closed = { id: "LIN-9", title: "A Title A", status: "done", closed: true, closedBy: "done" } as const;
+  writeFileSync(join(t.config, "projects", "demo", "state.json"), JSON.stringify({ taskSteps: { "LIN-9": "A" } }));
+  staleTick(t, { tasks: () => [closed] });
+  expect(t.adds()).toEqual([]);
+  expect(t.decisions().some((x) => x.step === "A" && x.reason.includes("closed with nothing to merge"))).toBe(true);
 });
 
 test("a step merged on origin/main since the tick read it is not started", () => {

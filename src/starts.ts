@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { closeSync, existsSync, openSync, readdirSync, readFileSync, unlinkSync, writeSync } from "node:fs";
 import { herdrArgv } from "./herdr.ts";
 import { join } from "node:path";
 import { fileClash, stepHeld, stepNeeds } from "./parts.ts";
@@ -100,6 +100,35 @@ export function liveSteps(steps: Step[], tasks: Task[], remote: Task[], taskStep
     if (id !== undefined) live.add(id);
   }
   return live;
+}
+
+/**
+ * Takes the lock of one project's tick, so two ticks never read the same task list and each start a step. Returns the
+ * release, or undefined when a live process holds it. A lock whose process is gone is taken over.
+ */
+export function holdProjectTick(path: string): (() => void) | undefined {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const fd = openSync(path, "wx");
+      writeSync(fd, String(process.pid));
+      closeSync(fd);
+      return () => {
+        try {
+          unlinkSync(path);
+        } catch {}
+      };
+    } catch {
+      try {
+        process.kill(Number(readFileSync(path, "utf8").trim()), 0);
+        return undefined;
+      } catch {
+        try {
+          unlinkSync(path);
+        } catch {}
+      }
+    }
+  }
+  return undefined;
 }
 
 /** A ready step skipped for locks this many ticks in a row reserves what it needs. */
