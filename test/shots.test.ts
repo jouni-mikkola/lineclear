@@ -19,7 +19,7 @@ test("pictures are found in Markdown and in HTML, and web links are not pictures
 test("a listed screenshot, the mark and a captioned direction pass", () => {
   expect(strayPictures("README.md", `<img src="docs/shots/home-1440.png" alt="">`, LISTED)).toEqual([]);
   expect(strayPictures("docs/design.md", `![](shots/home-390.png)`, LISTED)).toEqual([]);
-  expect(strayPictures("README.md", `<img src="docs/readme/line.svg" alt="">`, LISTED)).toEqual([]);
+  expect(strayPictures("README.md", `<img src="ui/brand/mark.svg" alt="">`, LISTED)).toEqual([]);
   expect(strayPictures("docs/brand.md", `![Direction: The line](brand/home/direction-line.png)`, LISTED)).toEqual([]);
 });
 
