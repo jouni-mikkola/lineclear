@@ -9,7 +9,6 @@ import type { Action, AddSpace, ServerEvent, UpdateStatus, WorktreeAsk } from '.
 import { frameResponse, wrapPage } from './frame.ts'
 import type { Source } from './source.ts'
 import type { Push } from './push.ts'
-import { held, measureLoop, profileLoop, startLoopLag } from './live/loop-lag.ts'
 
 type Sock =
   /** visible: the screen is on; push: its push subscription, which gets no alerts while the screen is on */
@@ -25,14 +24,9 @@ export interface AppOptions {
   host?: string
   /** update.json: how the last update of Lineclear went, shown on every screen */
   updates?: string
-  /** gets a line for each loop lag over 200 ms (default: the console's warning) */
-  log?: (line: string) => void
 }
 
-/** The seconds a measure asks for (`window`), in ms: 1 to 600 s, 10 s by default. */
-const windowOf = (q: URLSearchParams) => Math.min(600, Math.max(0.05, Number(q.get('window')) || 10)) * 1000
-
-export function startApp({ source, push, port, host = '127.0.0.1', updates, log }: AppOptions) {
+export function startApp({ source, push, port, host = '127.0.0.1', updates }: AppOptions) {
   const live = new Set<ServerWebSocket<Sock>>()
   const send = (ws: ServerWebSocket<Sock>, e: ServerEvent) => ws.send(JSON.stringify(e))
 
@@ -66,12 +60,10 @@ export function startApp({ source, push, port, host = '127.0.0.1', updates, log 
     if (snapTimer) return
     snapTimer = setTimeout(() => {
       snapTimer = null
-      held('snapshot push', () => {
-        if (!live.size) return
-        // one string for every screen
-        const text = JSON.stringify({ type: 'snapshot', snapshot: source.snapshot() } satisfies ServerEvent)
-        for (const ws of live) ws.send(text)
-      })
+      if (!live.size) return
+      // one string for every screen
+      const text = JSON.stringify({ type: 'snapshot', snapshot: source.snapshot() } satisfies ServerEvent)
+      for (const ws of live) ws.send(text)
     }, 30)
   })
   source.on('chat', (key) => {
@@ -104,7 +96,6 @@ export function startApp({ source, push, port, host = '127.0.0.1', updates, log 
 
   const json = (v: unknown, status = 200) => Response.json(v, { status })
 
-  startLoopLag(log)
   const server = Bun.serve<Sock>({
     port,
     hostname: host,
@@ -115,151 +106,145 @@ export function startApp({ source, push, port, host = '127.0.0.1', updates, log 
       const at = url.pathname.indexOf('/api/')
       const path = at >= 0 ? url.pathname.slice(at) : url.pathname
       const q = url.searchParams
-      return held(`route ${path}`, async () => {
-        // only this app's own pages may act: another website in your browser can't (no cross-site requests)
-        if (path.startsWith('/api/') && path !== '/api/font/InterVariable.woff2' && !sameSite(req, path)) return new Response('forbidden', { status: 403 })
+      // only this app's own pages may act: another website in your browser can't (no cross-site requests)
+      if (path.startsWith('/api/') && path !== '/api/font/InterVariable.woff2' && !sameSite(req, path)) return new Response('forbidden', { status: 403 })
 
-        if (path === '/api/ws')
-          return srv.upgrade(req, { data: { kind: 'live', chats: [], term: null, visible: false, push: null } })
-            ? undefined
-            : new Response('upgrade failed', { status: 400 })
-        if (path === '/api/browser') {
-          if (!source.browser) return new Response('no browser here', { status: 404 })
-          return srv.upgrade(req, { data: { kind: 'browser', task: q.get('task') ?? '' } }) ? undefined : new Response('upgrade failed', { status: 400 })
+      if (path === '/api/ws')
+        return srv.upgrade(req, { data: { kind: 'live', chats: [], term: null, visible: false, push: null } })
+          ? undefined
+          : new Response('upgrade failed', { status: 400 })
+      if (path === '/api/browser') {
+        if (!source.browser) return new Response('no browser here', { status: 404 })
+        return srv.upgrade(req, { data: { kind: 'browser', task: q.get('task') ?? '' } }) ? undefined : new Response('upgrade failed', { status: 400 })
+      }
+
+      try {
+        if (path === '/api/chat') {
+          const key = q.get('chat') ?? ''
+          return json({ chat: source.chat(key) ?? null, status: source.chatStatus?.(key) })
         }
-
-        try {
-          if (path === '/api/chat') {
-            const key = q.get('chat') ?? ''
-            return json({ chat: source.chat(key) ?? null, status: source.chatStatus?.(key) })
+        if (path === '/api/snapshot') return json(source.snapshot())
+        // which Lineclear answers: a start from another plugin folder or version stops it (scripts/plugin.ts)
+        if (path === '/api/version') return json(running())
+        if (path === '/api/folders') {
+          if (!source.folders) return json({ error: 'Adding spaces is not possible here.' }, 404)
+          return json(await source.folders(q.get('machine') ?? '', q.get('path') ?? '~'))
+        }
+        if (path === '/api/spaces' && req.method === 'POST') {
+          if (!source.addSpace) return json({ error: 'Adding spaces is not possible here.' }, 404)
+          const b = (await req.json()) as AddSpace
+          return json(
+            await source.addSpace({
+              machine: String(b.machine ?? ''),
+              path: String(b.path ?? ''),
+              name: b.name === undefined ? undefined : String(b.name),
+              create: !!b.create,
+            }),
+          )
+        }
+        if (path === '/api/worktree') {
+          if (!source.worktree) return json({ error: 'Not possible here.' }, 404)
+          const what = q.get('what')
+          if (what !== 'files' && what !== 'file' && what !== 'diff' && what !== 'patch' && what !== 'pr')
+            return json({ error: 'Ask for files, file, diff, patch or pr.' }, 400)
+          const ask = { task: q.get('task') ?? '', what, path: q.get('path') ?? '' } as WorktreeAsk
+          return json(await source.worktree(ask))
+        }
+        if (path === '/api/activity') {
+          if (!source.activity) return json({ error: 'Not possible here.' }, 404)
+          const what = q.get('what')
+          if (what !== 'turn' && what !== 'output' && what !== 'job') return json({ error: 'Ask for turn, output or job.' }, 400)
+          return json(await source.activity({ chat: q.get('chat') ?? '', what, id: q.get('id') ?? '' }))
+        }
+        if (path === '/api/action' && req.method === 'POST') {
+          const a = (await req.json()) as Action
+          return json((await source.act(a)) ?? {})
+        }
+        // an artifact: its page wrapped for a sealed frame, its data alone (pushed into open frames when only that
+        // changed), the check's picture of it, and all of it raw for the main machine to pass on
+        if (path.startsWith('/api/artifacts/')) {
+          const [id, part] = decodeURIComponent(path.slice('/api/artifacts/'.length)).split('/')
+          const v = Number(q.get('v')) || undefined
+          if (part === 'thumb') {
+            const b = await source.artifactThumb(id, q.has('dark'))
+            return b
+              ? new Response(b, { headers: { 'content-type': b.type || 'image/png', 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff' } })
+              : new Response('no picture', { status: 404 })
           }
-          if (path === '/api/snapshot') return json(source.snapshot())
-          // a measure waits out its window, longer than the idle timeout
-          if (path === '/api/loop-lag' || path === '/api/loop-profile') srv.timeout(req, 0)
-          if (path === '/api/loop-lag') return json(await measureLoop(windowOf(q)))
-          if (path === '/api/loop-profile') return json(await profileLoop(windowOf(q)))
-          // which Lineclear answers: a start from another plugin folder or version stops it (scripts/plugin.ts)
-          if (path === '/api/version') return json(running())
-          if (path === '/api/folders') {
-            if (!source.folders) return json({ error: 'Adding spaces is not possible here.' }, 404)
-            return json(await source.folders(q.get('machine') ?? '', q.get('path') ?? '~'))
-          }
-          if (path === '/api/spaces' && req.method === 'POST') {
-            if (!source.addSpace) return json({ error: 'Adding spaces is not possible here.' }, 404)
-            const b = (await req.json()) as AddSpace
-            return json(
-              await source.addSpace({
-                machine: String(b.machine ?? ''),
-                path: String(b.path ?? ''),
-                name: b.name === undefined ? undefined : String(b.name),
-                create: !!b.create,
-              }),
-            )
-          }
-          if (path === '/api/worktree') {
-            if (!source.worktree) return json({ error: 'Not possible here.' }, 404)
-            const what = q.get('what')
-            if (what !== 'files' && what !== 'file' && what !== 'diff' && what !== 'patch' && what !== 'pr')
-              return json({ error: 'Ask for files, file, diff, patch or pr.' }, 400)
-            const ask = { task: q.get('task') ?? '', what, path: q.get('path') ?? '' } as WorktreeAsk
-            return json(await source.worktree(ask))
-          }
-          if (path === '/api/activity') {
-            if (!source.activity) return json({ error: 'Not possible here.' }, 404)
-            const what = q.get('what')
-            if (what !== 'turn' && what !== 'output' && what !== 'job') return json({ error: 'Ask for turn, output or job.' }, 400)
-            return json(await source.activity({ chat: q.get('chat') ?? '', what, id: q.get('id') ?? '' }))
-          }
-          if (path === '/api/action' && req.method === 'POST') {
-            const a = (await req.json()) as Action
-            return json((await source.act(a)) ?? {})
-          }
-          // an artifact: its page wrapped for a sealed frame, its data alone (pushed into open frames when only that
-          // changed), the check's picture of it, and all of it raw for the main machine to pass on
-          if (path.startsWith('/api/artifacts/')) {
-            const [id, part] = decodeURIComponent(path.slice('/api/artifacts/'.length)).split('/')
-            const v = Number(q.get('v')) || undefined
-            if (part === 'thumb') {
-              const b = await source.artifactThumb(id, q.has('dark'))
-              return b
-                ? new Response(b, { headers: { 'content-type': b.type || 'image/png', 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff' } })
-                : new Response('no picture', { status: 404 })
+          const a = await source.artifact(id, v)
+          if (part === 'raw') return a ? json(a) : json({ error: 'No such artifact' }, 404)
+          if (part === 'data') return a ? json({ data: a.data ?? null }) : json({ error: 'No such artifact' }, 404)
+          if (!a) return new Response('no such artifact', { status: 404 })
+          return frameResponse(
+            wrapPage(a.html, {
+              sent: a.sent,
+              data: a.data,
+              big: q.has('full'),
+              phone: q.get('device') === 'phone',
+              theme: q.get('theme') === 'dark' ? 'dark' : q.get('theme') === 'light' ? 'light' : undefined,
+            }),
+          )
+        }
+        // the app's font, for artifacts in sealed frames (their origin is opaque, so it is fetched cross-origin)
+        if (path === '/api/font/InterVariable.woff2')
+          return new Response(Bun.file(FONT), {
+            headers: { 'content-type': 'font/woff2', 'access-control-allow-origin': '*', 'cache-control': 'public, max-age=86400' },
+          })
+        if (path === '/api/upload' && req.method === 'POST') {
+          const form = await req.formData()
+          const file = form.get('file') as File | null
+          const chat = String(form.get('chat') ?? '')
+          if (!file) return json({ error: 'No file' }, 400)
+          const p = await source.upload(chat, file.name, new Uint8Array(await file.arrayBuffer()))
+          return json({ path: p })
+        }
+        if (path === '/api/file') {
+          const at = q.get('path') ?? ''
+          const blob = await source.attachment(q.get('chat') ?? '', at)
+          return blob ? attachment(blob, basename(at).replace(/^[a-z0-9]+-/, ''), q.has('download')) : new Response('no such file', { status: 404 })
+        }
+        if (path === '/api/cli' && req.method === 'POST') {
+          const cli = (
+            source as Source & {
+              cli?(a: string[], c: { chat?: string; cwd?: string; stdin?: string; local?: boolean; proof?: string }): Promise<{ out: string; code: number }>
             }
-            const a = await source.artifact(id, v)
-            if (part === 'raw') return a ? json(a) : json({ error: 'No such artifact' }, 404)
-            if (part === 'data') return a ? json({ data: a.data ?? null }) : json({ error: 'No such artifact' }, 404)
-            if (!a) return new Response('no such artifact', { status: 404 })
-            return frameResponse(
-              wrapPage(a.html, {
-                sent: a.sent,
-                data: a.data,
-                big: q.has('full'),
-                phone: q.get('device') === 'phone',
-                theme: q.get('theme') === 'dark' ? 'dark' : q.get('theme') === 'light' ? 'light' : undefined,
-              }),
-            )
-          }
-          // the app's font, for artifacts in sealed frames (their origin is opaque, so it is fetched cross-origin)
-          if (path === '/api/font/InterVariable.woff2')
-            return new Response(Bun.file(FONT), {
-              headers: { 'content-type': 'font/woff2', 'access-control-allow-origin': '*', 'cache-control': 'public, max-age=86400' },
+          ).cli
+          if (!cli)
+            return json({
+              out:
+                source.kind === 'demo'
+                  ? 'This demo server does not accept lineclear commands. Target your owning live server or installed helper.\n'
+                  : 'This server does not provide the lineclear command. Check the target URL or installed helper.\n',
+              code: 1,
             })
-          if (path === '/api/upload' && req.method === 'POST') {
-            const form = await req.formData()
-            const file = form.get('file') as File | null
-            const chat = String(form.get('chat') ?? '')
-            if (!file) return json({ error: 'No file' }, 400)
-            const p = await source.upload(chat, file.name, new Uint8Array(await file.arrayBuffer()))
-            return json({ path: p })
-          }
-          if (path === '/api/file') {
-            const at = q.get('path') ?? ''
-            const blob = await source.attachment(q.get('chat') ?? '', at)
-            return blob ? attachment(blob, basename(at).replace(/^[a-z0-9]+-/, ''), q.has('download')) : new Response('no such file', { status: 404 })
-          }
-          if (path === '/api/cli' && req.method === 'POST') {
-            const cli = (
-              source as Source & {
-                cli?(a: string[], c: { chat?: string; cwd?: string; stdin?: string; local?: boolean; proof?: string }): Promise<{ out: string; code: number }>
-              }
-            ).cli
-            if (!cli)
-              return json({
-                out:
-                  source.kind === 'demo'
-                    ? 'This demo server does not accept lineclear commands. Target your owning live server or installed helper.\n'
-                    : 'This server does not provide the lineclear command. Check the target URL or installed helper.\n',
-                code: 1,
-              })
-            const b = (await req.json()) as { args: string[]; chat?: string; cwd?: string; stdin?: string }
-            // some commands wait long (lineclear checks waits for GitHub's): no idle cut-off for these
-            srv.timeout(req, 0)
-            return json(
-              await cli.call(source, b.args ?? [], {
-                chat: b.chat,
-                cwd: b.cwd,
-                stdin: b.stdin,
-                local: direct(req),
-                proof: req.headers.get('authorization')?.match(/^Bearer ([a-f0-9]{64})$/)?.[1],
-              }),
-            )
-          }
-          if (path === '/api/push/key') return json({ key: push?.publicKey ?? null })
-          // what waits on you: the service worker sets the app icon's count with it after a notification button answers
-          if (path === '/api/waiting') return json(waiting(source.snapshot()))
-          if (path === '/api/push/subscribe' && req.method === 'POST') {
-            const b = await req.json()
-            push?.subscribe(b.sub, b.device)
-            source.emit('snapshot')
-            return json({ ok: true })
-          }
-          if (path.startsWith('/api/')) return json({ error: 'Not found' }, 404)
-        } catch (e) {
-          return json({ error: (e as Error).message }, 500)
+          const b = (await req.json()) as { args: string[]; chat?: string; cwd?: string; stdin?: string }
+          // some commands wait long (lineclear checks waits for GitHub's): no idle cut-off for these
+          srv.timeout(req, 0)
+          return json(
+            await cli.call(source, b.args ?? [], {
+              chat: b.chat,
+              cwd: b.cwd,
+              stdin: b.stdin,
+              local: direct(req),
+              proof: req.headers.get('authorization')?.match(/^Bearer ([a-f0-9]{64})$/)?.[1],
+            }),
+          )
         }
-        // no page is served: the new UI and the CLI use the API alone
-        return new Response('Not found', { status: 404 })
-      })
+        if (path === '/api/push/key') return json({ key: push?.publicKey ?? null })
+        // what waits on you: the service worker sets the app icon's count with it after a notification button answers
+        if (path === '/api/waiting') return json(waiting(source.snapshot()))
+        if (path === '/api/push/subscribe' && req.method === 'POST') {
+          const b = await req.json()
+          push?.subscribe(b.sub, b.device)
+          source.emit('snapshot')
+          return json({ ok: true })
+        }
+        if (path.startsWith('/api/')) return json({ error: 'Not found' }, 404)
+      } catch (e) {
+        return json({ error: (e as Error).message }, 500)
+      }
+      // no page is served: the new UI and the CLI use the API alone
+      return new Response('Not found', { status: 404 })
     },
     websocket: {
       open(ws) {
