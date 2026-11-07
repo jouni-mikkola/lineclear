@@ -1,6 +1,6 @@
 import type { SetBy } from '../../shared/brief.ts'
 import { chatProblem } from './readers/index.ts'
-import { settingsLines, type Said, type Ways } from './prompts.ts'
+import type { Said, Ways } from './prompts.ts'
 import { projectModel } from './project-models.ts'
 import { effortFor, effortsOf, findModel, knowsModels, modelsOf } from '../../../src/models.ts'
 import { LINECLEAR_MODELS, kindOf, CLI_NAME, type Role, ROLES } from './settings-catalog.ts'
