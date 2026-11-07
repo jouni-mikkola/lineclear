@@ -1,3 +1,4 @@
+import { Database } from "bun:sqlite";
 import { beforeAll, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, readdirSync, readlinkSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -29,15 +30,19 @@ function installBroken(how: string) {
   git("reset", "-q", "--hard", good);
   return { r, good, after };
 }
-// The Inbox items on disk (read here, not through src/inbox.ts: importing that module early changes other test files)
+// The Inbox items in the store (read here, not through src/inbox.ts: importing that module early changes other test files)
 const inbox = (): { kind: string; question: string }[] => {
-  const dir = join(home, ".config/lineclear/inbox");
-  return existsSync(dir)
-    ? readdirSync(dir)
-        .filter((f) => f.endsWith(".json"))
-        .sort((a, b) => parseInt(a, 10) - parseInt(b, 10))
-        .map((f) => JSON.parse(readFileSync(join(dir, f), "utf8")))
-    : [];
+  const file = join(home, ".config/lineclear/store.sqlite");
+  if (!existsSync(file)) return [];
+  const db = new Database(file);
+  try {
+    return db
+      .query("select item from inbox order by n")
+      .all()
+      .map((row) => JSON.parse((row as { item: string }).item));
+  } finally {
+    db.close();
+  }
 };
 
 test("an update that wipes the task store is rolled back and the tasks come back", () => {
