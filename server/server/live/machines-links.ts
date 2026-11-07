@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { appendFileSync, mkdirSync, openSync, rmSync } from 'node:fs'
+import { mkdirSync, openSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Chat } from '../../shared/types.ts'
 import { HOME, writeJson } from '../store.ts'
@@ -8,7 +8,7 @@ import { MERGE_DEADLINE } from './engine/engine.ts'
 import type { Kept } from './kept.ts'
 import { LinkPoll, workerRecord } from './link-poll.ts'
 import { CONNECTING_FOR, type Link, dirOf, fits, machineHome, sameBox, workerHome } from './machines-helpers.ts'
-import { codeVersion, running, type Worker } from './worker-process.ts'
+import { codeVersion, readAddress, running, type Worker } from './worker-process.ts'
 
 export class MachinesLinks extends LinkPoll {
   constructor(
@@ -257,27 +257,10 @@ export class MachinesLinks extends LinkPoll {
       stderr: log,
     })
     this.own(l, w)
-    void this.readAddress(l, w, logFile)
-  }
-
-  /** the worker prints its address when it serves; the rest of its output goes to its log */
-  protected async readAddress(l: Link, w: Worker & { stdout: ReadableStream<Uint8Array> }, logFile: string) {
-    const decoder = new TextDecoder()
-    let seen = false
-    try {
-      const reader = w.stdout.getReader()
-      for (let r = await reader.read(); !r.done; r = await reader.read()) {
-        const chunk = r.value
-        const text = decoder.decode(chunk, { stream: true })
-        appendFileSync(logFile, text)
-        const port = seen ? undefined : text.match(/lineclear on http:\/\/127\.0\.0\.1:(\d+)/)?.[1]
-        if (!port || l.worker !== w) continue
-        seen = true
-        l.rec.url = `http://127.0.0.1:${port}`
-        void this.poll(l)
-      }
-    } catch {
-      /* the worker is gone: its exit is handled where it is awaited */
-    }
+    void readAddress(w.stdout, logFile, (port) => {
+      if (l.worker !== w) return
+      l.rec.url = `http://127.0.0.1:${port}`
+      void this.poll(l)
+    })
   }
 }

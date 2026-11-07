@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { appendFileSync, existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 
 export interface Worker {
@@ -24,6 +24,29 @@ export function codeVersion(dir = join(import.meta.dir, '..', '..')) {
   for (const f of ['package.json', 'bun.lock']) if (existsSync(join(dir, f))) h.update(f).update(readFileSync(join(dir, f)))
   code = h.digest('hex').slice(0, 16)
   return code
+}
+
+/** a worker prints its address when it serves: the port is found in its output, which goes on to its log */
+export async function readAddress(stdout: ReadableStream<Uint8Array>, logFile: string, found: (port: number) => void) {
+  const decoder = new TextDecoder()
+  const reader = stdout.getReader()
+  let line = ''
+  let seen = false
+  try {
+    for (let r = await reader.read(); !r.done; r = await reader.read()) {
+      const text = decoder.decode(r.value, { stream: true })
+      appendFileSync(logFile, text)
+      if (seen) continue
+      line += text
+      const port = line.match(/lineclear on http:\/\/127\.0\.0\.1:(\d+)/)?.[1]
+      if (port) {
+        seen = true
+        found(Number(port))
+      } else line = line.slice(line.lastIndexOf('\n') + 1)
+    }
+  } catch {
+    /* the worker is gone */
+  }
 }
 
 /** the token a process was started with: a reused pid has none, or another */
