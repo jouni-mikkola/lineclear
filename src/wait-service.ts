@@ -1,10 +1,11 @@
 // The waits a task asked for with a time or another task: stopped while they hold, woken when they are over.
-import type { Decision, World } from "./rules.ts";
+import { type DecisionCode, kindOf } from "./decision-code.ts";
 import { readSettings } from "./project.ts";
 import type { Task } from "./roadmap.ts";
+import type { Decision, World } from "./rules.ts";
 import { clearWait, readWaits, writeWait } from "./waits.ts";
 
-type Note = (kind: Decision["kind"], reason: string) => void;
+type Note = (code: DecisionCode, reason: string) => void;
 
 /** One move on a wait: on a dry run only what it would do, else the move, then the wait kept up to date and what was done. */
 function move(
@@ -15,7 +16,7 @@ function move(
 ): void {
   const err = dryRun ? undefined : m.act();
   if (dryRun) note(kind, `would ${m.would}`);
-  else if (err) note("skip", `could not ${kind} ${m.task}: ${err}`);
+  else if (err) note("broken", `could not ${kind} ${m.task}: ${err}`);
   else {
     m.keep();
     note(kind, m.did);
@@ -35,7 +36,7 @@ export function serviceWaits(project: string, world: World, dryRun: boolean, env
   };
   for (const w of readWaits(env)) {
     if (w.project !== project) continue;
-    const note: Note = (kind, reason) => out.push({ time: now.toISOString(), project, step: w.task, kind, reason });
+    const note: Note = (code, reason) => out.push({ time: now.toISOString(), project, step: w.task, kind: kindOf(code), code, reason });
     const wake = (why: string, text: string, did: string) =>
       move(dryRun, note, "wake", {
         task: w.task,

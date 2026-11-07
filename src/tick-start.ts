@@ -1,5 +1,6 @@
 import { DEFAULT_ROUNDS, stepBrief } from "./brief.ts";
 import { company } from "./company.ts";
+import { type DecisionCode, kindOf } from "./decision-code.ts";
 import { ownerStepItem } from "./owner-steps.ts";
 import { stepHeld } from "./parts.ts";
 import type { Settings } from "./project.ts";
@@ -15,7 +16,7 @@ import type { World } from "./world.ts";
 
 export type MainInfo = Exclude<ReturnType<World["main"]>, string>;
 type Step = ReturnType<typeof checkRoadmap>["parsed"]["steps"][number];
-export type Note = (kind: Decision["kind"], reason: string, step?: string, machine?: string) => Decision;
+export type Note = (code: DecisionCode, reason: string, step?: string, machine?: string) => Decision;
 
 /** What every part of one project's tick needs. */
 export interface Tick {
@@ -90,7 +91,7 @@ export function workerPicker(t: Tick, offered: () => Set<string> | undefined) {
     // Ask for a key only when nothing before it in the list has room.
     const keyed = workers.find((m) => availability(m, env, world.now()) !== "out");
     const asked = worker === undefined && keyed !== undefined && !dryRun ? askKey(keyed, world, world.now(), env) : undefined;
-    if (asked) note("skip", asked);
+    if (asked) note("owner", asked);
     pick = { workers, worker };
     return pick;
   };
@@ -145,8 +146,8 @@ interface Planned {
 }
 
 /** Fills in a planned step's line once its start ran. */
-const settle = (p: Planned, kind: Decision["kind"], reason: string, machine?: string) =>
-  Object.assign(p.decision, { kind, reason }, machine === undefined ? {} : { machine });
+const settle = (p: Planned, code: DecisionCode, reason: string, machine?: string) =>
+  Object.assign(p.decision, { kind: kindOf(code), code, reason }, machine === undefined ? {} : { machine });
 
 /** The task of a planned step, here or on its host. */
 function stepTask(s: Starting, { step, host, worker, reviewer }: Planned): NewTask {
@@ -194,12 +195,12 @@ function planStep(s: Starting, step: Step): Planned | undefined {
   const { t, cap, limit } = s;
   const { settings, world, note, env } = t;
   const held = whyHeldUnrecorded(s, step);
-  if (held) return (note("skip", held, step.id), undefined);
+  if (held) return (note("blocked", held, step.id), undefined);
   // A routine step (docs, tests, baselines) starts on the cheapest worker model that has room; the stall ladder moves it back after two failed checks.
   const cheap = routineWorker(step, s.picked().workers, env, (m) => availability(m, env, world.now()) === "ok");
   const worker = cheap ?? (s.picked().worker as string);
   const reviewer = reviewerFor(worker, settings, world, s.offered(), env);
-  if (!reviewer) return (note("skip", `no reviewer model that pi offers has room`, step.id), undefined);
+  if (!reviewer) return (note("no-room", `no reviewer model that pi offers has room`, step.id), undefined);
   // The machine with the most free room, this one and the linked ones alike.
   const localRoom = !cap.offHere && !cap.overloaded && cap.max !== undefined && cap.free > 0;
   const candidates: Candidate[] = [
@@ -258,7 +259,12 @@ function startPlanned(s: Starting, planned: Planned[]) {
     ) ?? [];
   const claimed = planned.filter((p, i) => {
     const claim = claims[i];
-    if (claim) settle(p, "skip", claim === "held" ? "another loop holds this step's claim on the repo" : `its claim cannot be made: ${claim}`);
+    if (claim)
+      settle(
+        p,
+        claim === "held" ? "blocked" : "broken",
+        claim === "held" ? "another loop holds this step's claim on the repo" : `its claim cannot be made: ${claim}`,
+      );
     return !claim;
   });
   const errors = world.addTasks(
@@ -269,7 +275,7 @@ function startPlanned(s: Starting, planned: Planned[]) {
   const failed = claimed.filter((p, i) => {
     const err = errors[i];
     if (err === undefined) recordStarted(s, p);
-    else settle(p, "skip", `task add failed: ${err}`, p.host ?? THIS_MACHINE);
+    else settle(p, "broken", `task add failed: ${err}`, p.host ?? THIS_MACHINE);
     return err !== undefined;
   });
   world.releaseSteps?.(
@@ -288,11 +294,11 @@ function refileReopened(s: Starting, step: Step): boolean {
   const line = (step.fields["done when"]?.more ?? []).find((l) => /^\s+- Reopened: /.test(l));
   const since = line === undefined ? undefined : world.commitsSince?.(settings.repo, line);
   if (line !== undefined && since === undefined) {
-    note("skip", "its Reopened line cannot be placed in main's history: nothing starts", step.id);
+    note("blocked", "its Reopened line cannot be placed in main's history: nothing starts", step.id);
     return true;
   }
   if (since === undefined || !doneIds(s.commits.slice(0, since), new Set([step.id])).has(step.id)) return false;
-  note("skip", "a task merged but the Reopened line stayed: nothing starts until the line is deleted", step.id);
+  note("blocked", "a task merged but the Reopened line stayed: nothing starts until the line is deleted", step.id);
   return true;
 }
 
@@ -307,9 +313,10 @@ export function startReadySteps(s: Starting, red: boolean) {
     if (isFrozen(step) || (step.ownerOnly && ownerStepItem(s.t, step))) continue;
     if (step.reopened && refileReopened(s, step)) continue;
     const locked = red ? undefined : lockWhy(step, s.held, reserved);
-    const why = red ? "main is red: new starts are stopped" : (locked ?? whyNoRoom(s));
+    const room = red || locked ? undefined : whyNoRoom(s);
+    const why = red ? "main is red: new starts are stopped" : (locked ?? room);
     if (locked) skipped.add(step.id);
-    if (why) s.t.note("skip", why, step.id);
+    if (why) s.t.note(room ? "no-room" : "blocked", why, step.id);
     else {
       const p = planStep(s, step);
       if (p) planned.push(p);

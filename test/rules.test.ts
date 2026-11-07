@@ -5,7 +5,7 @@ import { cpus } from "node:os";
 import { join } from "node:path";
 import { readItems } from "../src/inbox.ts";
 import { decisionsSince } from "../src/decisions-store.ts";
-import { readState, realWorld, runMain, tick, TICK_MS } from "../src/rules.ts";
+import { type Decision, readState, realWorld, runMain, tick, TICK_MS } from "../src/rules.ts";
 import { pickReviewer } from "../src/stalls.ts";
 import { company } from "../src/company.ts";
 import { recordTaskSteps } from "./helpers.ts";
@@ -268,6 +268,16 @@ test("a skip is written when it starts and when it ends, not while only its numb
   t.doTick();
   expect(t.decisions().map((d) => d.kind)).toEqual(["skip", "wake", "start"]);
   expect(t.decisions()[1]?.reason).toStartWith("no longer skipped: no free slot");
+});
+
+test("100 ticks of one blocked step write its skip and its end, then the start", () => {
+  const last: Record<string, string> = {};
+  const tick = (d: Decision) => freshDecisions([d], last).length;
+  const skip = (n: number): Decision => ({ time: "t", project: "p", step: "S", kind: "skip", code: "no-room", reason: `no free slot (${n} of 1 working)` });
+  let lines = 0;
+  for (let n = 0; n < 99; n++) lines += tick(skip(n));
+  lines += tick({ time: "t", project: "p", step: "S", kind: "start", code: "start", reason: "started" });
+  expect(lines).toBe(3);
 });
 
 test("--once --dry-run prints the decisions and changes nothing", async () => {

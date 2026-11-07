@@ -5,6 +5,7 @@ import { stepHeld } from "./parts.ts";
 import type { Settings } from "./project.ts";
 import { checkRoadmap, closedSteps, type Task } from "./roadmap.ts";
 import { statusesFrom, stepInputs } from "./task-steps.ts";
+import { kindOf } from "./decision-code.ts";
 import type { Decision, State } from "./rules.ts";
 import { askMachines } from "./spread.ts";
 import { climbStalls, serviceAccounts } from "./stalls.ts";
@@ -23,23 +24,23 @@ function readProject(t: Tick) {
   const text = world.roadmap(settings.repo) ?? (existsSync(roadmapFile) ? readFileSync(roadmapFile, "utf8") : undefined);
   if (text === undefined) {
     state.roadmapErrors = [`${roadmapFile}: no such file`];
-    note("skip", "no roadmap yet, nothing starts");
+    note("broken", "no roadmap yet, nothing starts");
     return undefined;
   }
   const { parsed, errors } = checkRoadmap(text);
   state.roadmapErrors = errors.map((e) => `${roadmapFile}:${e.line}: ${e.message}`);
   if (errors.length > 0) {
-    note("skip", `roadmap is broken, nothing starts (${state.roadmapErrors[0]})`);
+    note("broken", `roadmap is broken, nothing starts (${state.roadmapErrors[0]})`);
     return undefined;
   }
   const main = world.main(settings.repo);
   if (typeof main === "string") {
-    note("skip", main);
+    note("broken", main);
     return undefined;
   }
   const tasks = world.tasks(settings.space);
   if (typeof tasks === "string") {
-    note("skip", tasks);
+    note("broken", tasks);
     return undefined;
   }
   return { text, parsed, main, tasks };
@@ -77,8 +78,8 @@ export function tickProject(
 ): Decision[] {
   const out: Decision[] = [];
   const time = world.now().toISOString();
-  const note: Note = (kind, reason, step, machine) => {
-    const d = { time, project: name, step, kind, reason, ...(machine === undefined ? {} : { machine }) };
+  const note: Note = (code, reason, step, machine) => {
+    const d: Decision = { time, project: name, step, kind: kindOf(code), code, reason, ...(machine === undefined ? {} : { machine }) };
     out.push(d);
     return d;
   };
@@ -103,7 +104,7 @@ export function tickProject(
     state,
     world.now().getTime(),
     (host) => world.room?.(host, settings.space) ?? "this world cannot reach other machines",
-    (host, why) => note("skip", why, `machine:${host}`, host),
+    (host, why) => note("unreachable", why, `machine:${host}`, host),
   );
   bindStarts(state, tasks);
   const stallArgs = { project: name, settings, world, state, dryRun, waits, tasks, steps: parsed.steps, offered, note, env };
@@ -112,7 +113,7 @@ export function tickProject(
   const { status, byId, held } = stepStates(t, parsed.steps, main, tasks, remote);
 
   if (settings.paused) {
-    note("skip", "the project is paused, no step starts");
+    note("paused", "the project is paused, no step starts");
     return out;
   }
   if (!dryRun) {
@@ -123,12 +124,12 @@ export function tickProject(
     );
   }
   if (settings.starts === false) {
-    note("skip", "this machine does not start steps for the repo (starts: false), it only runs what it is given");
+    note("paused", "this machine does not start steps for the repo (starts: false), it only runs what it is given");
     return out;
   }
   const cap = capacityOf(t, tasks, waits, rooms, overloaded, limit);
   if (overloaded && (settings.machines ?? []).length === 0) {
-    note("skip", cap.overloadNote);
+    note("no-room", cap.overloadNote);
     return out;
   }
   const known = [...tasks, ...remote];

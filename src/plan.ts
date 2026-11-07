@@ -153,7 +153,7 @@ function endPlan(
 
 /** Writes one line to the decisions table, where the rule loop logs its choices. */
 function logDecision(task: string, project: string | undefined, reason: string, env: NodeJS.ProcessEnv, now: () => Date): void {
-  const d: Decision = { time: now().toISOString(), project: project ?? "-", step: task, kind: "skip", reason };
+  const d: Decision = { time: now().toISOString(), project: project ?? "-", step: task, kind: "skip", code: "broken", reason };
   addDecisions(env, [d]);
 }
 
