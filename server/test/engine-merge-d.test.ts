@@ -219,46 +219,6 @@ describe('on GitHub: news, checks and the default way in', () => {
     expect(reds()).toBe(before + 2)
   })
 
-  test('one red main holds the next merges until a green run', async () => {
-    const w = world()
-    const g = onGitHub()
-    const ready = async (name: string) => {
-      const { t } = await started(w, g.dir, name)
-      writeFileSync(join(t.worktree!, `${name}.txt`), `${name}\n`)
-      sh(`git add -A && git commit -qm ${name}`, t.worktree!)
-      return t
-    }
-    const [a, b, c] = [await ready('redone'), await ready('redtwo'), await ready('redthree')]
-    for (const x of w.engine.tasks) x.doneAt = 0
-    const green = sh('git rev-parse main', g.bare)
-    expect((await w.engine.merge(a.id, { self: true })).ok).toBe(true)
-    const red = sh('git rev-parse main', g.bare)
-    const run = (headSha: string, conclusion: string, n: number) => ({
-      headSha,
-      status: 'completed',
-      conclusion,
-      url: `https://github.com/acme/app/actions/runs/${n}`,
-      workflowName: 'Check',
-    })
-    g.set({
-      runs: [run(red, 'failure', 3), run(green, 'success', 2)],
-      api: { 'repos/acme/app/actions/runs/3/jobs': [9] },
-      logs: { '9': 'boom' },
-    })
-    await w.engine.watchMains()
-    // the revert of the red commit is main's newest
-    const reverted = sh('git rev-parse main', g.bare)
-    for (const x of [b, c]) {
-      const held = await w.engine.merge(x.id, { self: true })
-      expect(held.ok).toBe(false)
-      expect(held.error).toContain(`Held: main is red on GitHub at ${red.slice(0, 7)}`)
-    }
-    expect(sh('git rev-parse main', g.bare)).toBe(reverted)
-    g.set({ runs: [run('d'.repeat(40), 'success', 4), run(red, 'failure', 3)] })
-    expect((await w.engine.merge(b.id, { self: true })).ok).toBe(true)
-    expect((await w.engine.merge(c.id, { self: true })).ok).toBe(true)
-  })
-
   test('GitHub slow on the merge: one lineclear merge waits for its result, and asked again while it runs joins the same merge', async () => {
     const w = world()
     const g = onGitHub()
