@@ -63,9 +63,41 @@ describe('phase across a restart', () => {
       tasks: ['handing', 'cleaning', 'briefing'].map((phase, i) => record(project, i + 1, { ...own, phase })),
     })
     const w = world()
-    w.engine.resumeQueue()
+    w.engine.resumeAfterStart()
     expect(w.engine.tasks.map((t) => t.phase)).toEqual([undefined, undefined, 'briefing'])
     expect(w.engine.statusOf(w.engine.tasks[2])).toBe('todo')
+  })
+})
+
+describe('the start waits for pi', () => {
+  test('a restart in starting sends the brief once, however often it is resumed', async () => {
+    const dir = repo()
+    const p = await world().places.add(dir, 'phase-once')
+    const project = placeId.space(p.name)
+    writeJson('tasks.json', {
+      next: { [p.key]: 2 },
+      tasks: [record(project, 1, { told: 'work', worktree: '/tmp/phase-wt', branch: 'phase', phase: 'starting', going: 'Go: start now.' })],
+    })
+    const w = world()
+    w.engine.resumeAfterStart()
+    w.engine.resumeAfterStart()
+    expect(w.sent.filter((x) => x.key === 'PH-1/Agent').length).toBe(1)
+  })
+
+  test('a task whose agent exited is orphaned at that event, not after hours', async () => {
+    const dir = repo()
+    const p = await world().places.add(dir, 'phase-orphan')
+    const project = placeId.space(p.name)
+    writeJson('tasks.json', {
+      next: { [p.key]: 2 },
+      tasks: [record(project, 1, { told: 'work', worktree: '/nonexistent', branch: 'phase' })],
+    })
+    const w = world()
+    w.engine.resumeAfterStart()
+    w.agentIs('PH-1/Agent', 'working')
+    expect(w.engine.view(w.engine.tasks[0]).orphaned).toBeUndefined()
+    w.agentIs('PH-1/Agent', 'gone')
+    expect(w.engine.view(w.engine.tasks[0]).orphaned).toBe(true)
   })
 })
 

@@ -12,8 +12,6 @@ import { age, ago, clockWithDay } from '../../../shared/time.ts'
 import { move } from './phase.ts'
 import { EngineStalls } from './stalls.ts'
 
-const ORPHAN_AFTER = 2 * 60 * 60_000
-
 export class EngineLaunch extends EngineStalls {
   /** settle one task, then the tasks queued after others: what it did may be what one of them waits for */
   protected settle(t: TaskRec) {
@@ -25,10 +23,10 @@ export class EngineLaunch extends EngineStalls {
 
   /* ---------- the view the screen draws ---------- */
 
-  /** not done, its worktree gone and its agent dead for over ORPHAN_AFTER: nothing runs for it, so it holds no locks */
+  /** not done, its worktree gone and its agent gone once herdr has listed: nothing runs for it, so it holds no locks */
   protected orphaned(t: TaskRec, status: string): boolean {
     if (ended(t) || status === 'done' || !t.worktree || existsSync(t.worktree)) return false
-    return Date.now() - t.updated > ORPHAN_AFTER && this.agents.status(this.key(t)) === 'gone'
+    return this.resumed && this.agents.status(this.key(t)) === 'gone'
   }
 
   view(t: TaskRec): Task {
@@ -115,9 +113,12 @@ export class EngineLaunch extends EngineStalls {
   }
 
   /**
-   * After a start: a go that never reached its agent (a restart cut it off) is sent again; then the queue is checked.
+   * Once herdr has listed its agents after a start: a go that never reached its agent (a restart cut it off) is sent
+   * again; then the queue is checked.
    */
-  resumeQueue() {
+  resumeAfterStart() {
+    if (this.resumed) return
+    this.resumed = true
     this.endPhases()
     for (const t of this.tasks.filter((t) => t.going && !ended(t) && !t.stopped && this.agents.status(this.key(t)) !== 'working'))
       this.agents.send(this.key(t), hidden(t.going!, 'go'), { ensure: () => this.launch(t) }).catch((e) => this.troubled(t, e))

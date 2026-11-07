@@ -283,7 +283,7 @@ describe('Queued after other tasks', () => {
     const w = world()
     expect(w.engine.task(id(2))!.after).toEqual([id(1)])
     expect(w.engine.statusOf(w.engine.task(id(2))!)).toBe('queued')
-    w.engine.resumeQueue()
+    w.engine.resumeAfterStart()
     expect(w.engine.statusOf(w.engine.task(id(2))!)).toBe('queued')
     expect(w.sent.find((x) => x.key === `${id(3)}/Agent`)?.text).toBe('<lineclear><go>Go: X-1 is done, start now.</go></lineclear>')
     // seen at work: it is not sent again
