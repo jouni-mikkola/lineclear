@@ -98,7 +98,7 @@ test("the model list is read only when a step is about to start, and at most eve
   expect(t.piCalls()).toEqual([]);
   const s = setup({ steps: [step("A", "none", "a"), step("B", "none", "b")], max: 1 });
   expect(s.doTick().map((x) => x.kind)).toEqual(["start", "skip"]);
-  expect(s.piCalls()).toEqual(["--list-models"]);
+  expect(s.piCalls()).toEqual(["--mode rpc --no-session"]);
   s.doTick();
   expect(s.piCalls().length).toBe(1);
   s.now.at = new Date(s.now.at.getTime() + 11 * 60_000);

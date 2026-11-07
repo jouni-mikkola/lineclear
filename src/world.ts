@@ -3,14 +3,14 @@ import { loadavg } from "node:os";
 import { join } from "node:path";
 import { claimWorld } from "./claims.ts";
 import { sessionFolderPath } from "./harness-pi.ts";
-import { gitLimited as git } from "./git.ts";
+import { gitLimited as git, READ_TIMEOUT_MS } from "./git.ts";
 import { mainRefs } from "./main-branch.ts";
 import { lineclearDir } from "./measure.ts";
 import { lineclearServer, readSnapshot } from "./lineclear-client.ts";
-import { harnesses, readRegistry } from "./models.ts";
+import { readOfferedRpc } from "./models.ts";
 import { readTasksKept } from "./tasks-kept.ts";
 import { serverBin } from "./paths.ts";
-import type { Settings } from "./project.ts";
+import { readSetup, type Settings } from "./project.ts";
 import { fitTitle, type Task } from "./roadmap.ts";
 import { runAll } from "./run-all.ts";
 import { addTasksAt, type NewTask, type Room, readRoom } from "./spread.ts";
@@ -37,6 +37,7 @@ export interface World {
   roadmap(repo: string): string | undefined;
   /** The space's tasks; with `archived`, only the archived ones. */
   tasks(space: string, archived?: boolean): Task[] | string;
+  /** The machine's task slots, or undefined when the board does not say. */
   maxTasks(space: string): number | undefined;
   /** `provider/model` names pi offers, or undefined when pi cannot say. */
   offered(now: Date): Set<string> | undefined;
@@ -80,7 +81,7 @@ export interface World {
   started(id: string): StartState;
   /** Types a line and Enter into the task's pane. */
   nudge(id: string, text: string): string | undefined;
-  /** `reviewer.model` from `lineclear show`, or undefined when it names none. */
+  /** The reviewer Settings > Models chose, or undefined when none is chosen. */
   reviewerSetting(space: string): string | undefined;
   /** Chat cards of a space with their text, for reading a reported usage limit. */
   chatCards(space: string, repo: string): ChatCard[];
@@ -116,8 +117,12 @@ const failure = (r: ReturnType<Run>) => (r.code === 0 ? undefined : (r.err || r.
 
 const run: Run = (cmd, cwd) => {
   try {
-    const p = Bun.spawnSync(cmd, { cwd, stdin: "ignore", timeout: HEALTH_TIMEOUT_MS });
-    return { code: p.exitCode ?? 1, out: p.stdout.toString(), err: p.stderr.toString() };
+    const p = Bun.spawnSync(cmd, { cwd, stdin: "ignore", timeout: READ_TIMEOUT_MS });
+    return {
+      code: p.exitCode ?? 1,
+      out: p.stdout.toString(),
+      err: p.exitedDueToTimeout ? `${cmd[0]} timed out after ${READ_TIMEOUT_MS / 1000} s` : p.stderr.toString(),
+    };
   } catch (e) {
     return { code: 127, out: "", err: String(e) };
   }
@@ -126,19 +131,32 @@ const run: Run = (cmd, cwd) => {
 type Readers = ReturnType<typeof readers<ReturnType<Run>>>;
 
 /** The git side of the world: main, fetch, the roadmap, branches. */
-function gitWorld(refsOf: (repo: string) => [string, string]): Pick<World, "main" | "fetch" | "commitsSince" | "roadmap" | "branchOf"> {
+function gitWorld(
+  refsOf: (repo: string) => [string, string],
+  headOf: (repo: string) => ReturnType<typeof git>,
+): Pick<World, "main" | "fetch" | "commitsSince" | "roadmap" | "branchOf"> {
+  // What a log says of a head never changes: it is read again only when the ref points elsewhere.
+  const logs = new Map<string, { head: string; read: Exclude<ReturnType<World["main"]>, string> }>();
+  const since = new Map<string, number | undefined>();
   return {
     main(repo) {
-      const log = git(repo, "log", refsOf(repo)[0], "-z", "--format=%H%x01%s%x01%b");
+      const ref = headOf(repo);
+      if (!ref.ok) return `cannot read the main branch in ${repo}: ${ref.err}`;
+      const sha = ref.out.trim();
+      const kept = logs.get(repo);
+      if (kept?.head === sha) return kept.read;
+      const log = git(repo, "log", sha, "-z", "--format=%H%x01%s%x01%b");
       if (!log.ok) return `cannot read the main branch in ${repo}: ${log.err}`;
       const rows = log.out
         .split("\0")
         .filter((r) => r.trim() !== "")
         .map((r) => r.split("\x01"));
-      return {
+      const read = {
         head: (rows[0]?.[0] ?? "").trim(),
         commits: rows.map(([, subject = "", body = ""]) => ({ subject: subject.trim(), body })),
       };
+      logs.set(repo, { head: sha, read });
+      return read;
     },
     fetch(repo) {
       // A fetch over https costs a git, a remote helper and two credential helpers: once in FETCH_EVERY_MS is enough.
@@ -151,11 +169,16 @@ function gitWorld(refsOf: (repo: string) => [string, string]): Pick<World, "main
       if (onMain && git(repo, "status", "--porcelain").out.trim() === "") git(repo, "merge", "--ff-only", "--quiet", origin);
     },
     commitsSince(repo, line) {
-      const [main] = refsOf(repo);
+      const ref = headOf(repo);
+      if (!ref.ok) return undefined;
+      const main = ref.out.trim();
+      const key = `${repo}\0${main}\0${line}`;
+      if (since.has(key)) return since.get(key);
       const added = git(repo, "log", main, "-n", "1", "--format=%H", "-S", line.trim(), "--", "docs/ROADMAP.md").out.trim();
-      if (added === "") return undefined;
-      const n = git(repo, "rev-list", "--count", `${added}..${main}`);
-      return n.ok ? Number(n.out.trim()) : undefined;
+      const n = added === "" ? undefined : git(repo, "rev-list", "--count", `${added}..${main}`);
+      const count = n?.ok ? Number(n.out.trim()) : undefined;
+      since.set(key, count);
+      return count;
     },
     roadmap(repo) {
       const { ok, out } = git(repo, "show", `${refsOf(repo)[0]}:docs/ROADMAP.md`);
@@ -182,21 +205,29 @@ function taskWorld(
   // a done task has no pane: refused here, before the server and herdr are asked
   const doneTask = (id: string) =>
     taskStatus(run([lineclear, "task", "show", id, "--json"]).out) === "done" ? `${id} is Done already: it has no agent, so nothing is sent to it.` : undefined;
-  const setting = (space: string, pattern: RegExp) => {
-    const r = io.read([lineclear, "show", "--space", space]);
-    const m = pattern.exec(r.out);
-    return r.code === 0 && m ? m[1] : undefined;
-  };
   return {
     tasks(space, archived) {
       const r = readTasks(env, space, archived);
       return "tasks" in r ? r.tasks : `task list failed: ${r.why}`;
     },
-    maxTasks(space) {
-      const n = setting(space, /^machine\.maxTasks\s+(\d+)/m);
-      return n === undefined ? undefined : Number(n);
+    // `lineclear room` is JSON: its `max` is the machine's task slots
+    maxTasks() {
+      const r = io.read([lineclear, "room"]);
+      if (r.code !== 0) return undefined;
+      try {
+        const max = JSON.parse(r.out)?.max;
+        return typeof max === "number" ? max : undefined;
+      } catch {
+        return undefined;
+      }
     },
-    reviewerSetting: (space) => setting(space, /^reviewer\.model\s+(\S+\/\S+)/m),
+    reviewerSetting() {
+      try {
+        return readSetup(env).reviewer;
+      } catch {
+        return undefined;
+      }
+    },
     stopTask: (id) => doneTask(id) ?? failure(io.change([lineclear, "task", "stop", id])),
     // The mark tells the agent's log apart from a message of the owner (see ownerWrote), and a resume from other lines.
     tellTask: (id, text, kind) => doneTask(id) ?? failure(io.change([lineclear, "task", "tell", id, `${ownMark(kind)} ${text}`])),
@@ -223,14 +254,16 @@ function taskWorld(
   };
 }
 
-/** `provider/model` names pi offers, read at most once in OFFERED_TTL_MS. */
+/**
+ * `provider/model` names pi offers, asked over its RPC at most once in OFFERED_TTL_MS. When pi does not answer, the
+ * last list stands, and with none, nothing is offered: an unreadable list never means every model.
+ */
 function offeredModels(env: NodeJS.ProcessEnv): World["offered"] {
-  let cached: { at: number; set: Set<string> | undefined } | undefined;
+  let cached: { at: number; set: Set<string> } | undefined;
   return (now) => {
     const at = now.getTime();
     if (!cached || at - cached.at >= OFFERED_TTL_MS) {
-      const set = new Set(readRegistry(harnesses(env)).map((m) => `${m.provider}/${m.name}`));
-      if (set.size === 0) return undefined;
+      const set = readOfferedRpc(env) ?? cached?.set ?? new Set<string>();
       cached = { at, set };
     }
     return cached.set;
@@ -269,7 +302,7 @@ export function realWorld(env = process.env): World {
     load: () => loadavg()[0] ?? 0,
     room: (host, space) => readRoom(host, space, snapshot.latest(), env),
     mainRed: (repo, head) => head !== "" && readTasksKept(lineclearDir(env)).red?.[repo] === head,
-    ...gitWorld(refsOf),
+    ...gitWorld(refsOf, (repo) => io.memo(`head:${repo}`, () => git(repo, "rev-parse", "--verify", "--quiet", refsOf(repo)[0]))),
     ...claimWorld(
       run,
       (cmds) => runAll(cmds, env),

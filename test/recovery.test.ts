@@ -57,10 +57,13 @@ function machine() {
     `case "$1 $2" in
   "task list") if [ -f "${fake}/down" ]; then echo "network is unreachable" >&2; exit 1; fi; echo '[{"id":"LIN-1","title":"Waiting task","status":"need"}]' ;;
   "task add") echo "$3" >> "${fake}/adds.log" ;;
-  show*) echo "machine.maxTasks       3  (box)" ;;
+  room*) echo '{"max":3}' ;;
 esac`,
   );
-  script("pi", `echo "provider model context"; echo "anthropic claude-sonnet-5-5 1M"; echo "anthropic claude-opus-5-5 1M"; echo "openai-codex gpt-6.1-sol 1M"`);
+  script(
+    "pi",
+    `cat > /dev/null; echo '{"type":"response","command":"get_available_models","success":true,"data":{"models":[{"provider":"anthropic","id":"claude-sonnet-5-5"},{"provider":"anthropic","id":"claude-opus-5-5"},{"provider":"openai-codex","id":"gpt-6.1-sol"}]}}'`,
+  );
   writeFileSync(
     join(config, "projects", "demo", "settings.json"),
     JSON.stringify({

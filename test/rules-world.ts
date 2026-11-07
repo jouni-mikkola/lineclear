@@ -66,10 +66,14 @@ export function setup(o: Opts = {}) {
   "task list") cat "${fake}/tasks.json" ;;
   "task add") { flock 9; for a in "$@"; do printf '%s\\001' "$a"; done >> "${fake}/adds.log"; printf '\\002' >> "${fake}/adds.log"; } 9>"${fake}/adds.lock" ;;
   "task stop"|"task tell") echo "$*" >> "${fake}/calls.log" ;;
-  show*) echo "machine.maxTasks       $(cat "${fake}/max")  (laptop)" ;;
+  room*) echo '{"max":'$(cat "${fake}/max")'}' ;;
 esac`,
   );
-  script("pi", `echo "$*" >> "${fake}/pi.log"; echo "provider model context"; cat "${fake}/models.txt"`);
+  // a pi RPC double: it answers get_available_models from models.txt ("provider id ..." per line)
+  script(
+    "pi",
+    `echo "$*" >> "${fake}/pi.log"; cat > /dev/null; awk 'BEGIN{printf "{\\"type\\":\\"response\\",\\"command\\":\\"get_available_models\\",\\"success\\":true,\\"data\\":{\\"models\\":["} {printf "%s{\\"provider\\":\\"%s\\",\\"id\\":\\"%s\\"}", (NR>1?",":""), $1, $2} END{print "]}}"}' "${fake}/models.txt"`,
+  );
   writeFileSync(join(fake, "tasks.json"), JSON.stringify(o.tasks ?? []));
   writeFileSync(join(fake, "max"), String(o.max ?? 3));
   writeFileSync(
