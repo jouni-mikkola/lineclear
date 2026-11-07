@@ -2,7 +2,7 @@ import { existsSync } from '../mfs.ts'
 import type { Question } from '../../../shared/types.ts'
 import { hidden } from '../agents.ts'
 import type { Space } from '../places.ts'
-import { restartLine, resumedLine, taskFirst } from '../prompts.ts'
+import { restartLine, resumedLine, splitBrief, taskFirst } from '../prompts.ts'
 import { CLI_NAME } from '../settings.ts'
 import { fitHarness, harnessWords, recentChat } from '../restart.ts'
 import * as G from './git.ts'
@@ -10,7 +10,7 @@ import * as GH from './github.ts'
 import { unmerged } from './branch-work.ts'
 import * as Lane from './lane.ts'
 import { fitStatus } from './status-line.ts'
-import { type TaskRec, type Harness, ended, labelOf, CHECKS_EVERY, CHECKS_SHOW, failKey, ghNow } from './engine-helpers.ts'
+import { type TaskRec, type Harness, ended, labelOf, CHECKS_EVERY, CHECKS_SHOW, LATER, failKey, ghNow } from './engine-helpers.ts'
 import { EngineLaunch } from './engine-launch.ts'
 
 export class EngineHandoff extends EngineLaunch {
@@ -280,7 +280,7 @@ export class EngineHandoff extends EngineLaunch {
    */
   protected prBody(t: TaskRec) {
     if (!t.said) return 'Work in progress: the summary comes when the task is done.'
-    const why = (t.desc ?? '').split(/\n\s*Settings:/)[0].trim().split(/\n\s*\n/)[0].trim()
+    const why = splitBrief(t.desc ?? '')[0].replace(LATER, '').trim().split(/\n\s*\n/)[0]
     const proof = (t.facts ?? '')
       .split(' · ')
       .map((f) => f.trim())

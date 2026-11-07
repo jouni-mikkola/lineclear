@@ -92,9 +92,12 @@ describe('on GitHub: a pull request per task', () => {
     expect(sh(`git rev-parse refs/heads/${t.branch}`, g.bare)).toBe(sh('git rev-parse HEAD', t.worktree!))
     // no checks on this repo: nothing to wait for
     expect((await w.engine.checks(t.id, 0)).text).toContain('no checks')
+    t.desc = 'Greet the user.\n\nMore detail.\n\nSettings: (from lineclear show; where the brief above says otherwise, it wins)\n- Review: on.'
     await w.engine.done(t.id, 'Added hello.txt.', 'commit 1a2b3c4 · checks passed')
     await until(() => !g.gh().prs[0].isDraft)
     expect(g.gh().prs[0].body.startsWith('## What\nAdded hello.txt.')).toBe(true)
+    expect(g.gh().prs[0].body).toContain('## Why\nGreet the user.\n\n## Proof')
+    expect(g.gh().prs[0].body).not.toContain('Review: on')
     expect(g.gh().prs[0].body).toContain('## Proof\n- commit 1a2b3c4\n- checks passed')
     const m = await w.engine.merge(t.id, { self: true })
     expect(m).toEqual({ ok: true, note: 'merged PR #1 on GitHub, not waiting for its checks' })
