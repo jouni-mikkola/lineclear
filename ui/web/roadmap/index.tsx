@@ -8,7 +8,6 @@ import type { Load } from "../data.ts";
 import { isOpen, Label, needsYou, StepPic, stateWord } from "./common.tsx";
 import { PhaseLine } from "./line.tsx";
 import { LineOfRoadmap, RunSwitch } from "./summary.tsx";
-import { SinceLook } from "./since-look.tsx";
 import { AppliedStrip, PlanStrip } from "./since.tsx";
 import { ProjectContext, StepDetails, StepPage } from "./step.tsx";
 
@@ -113,7 +112,6 @@ function Filled({ d, plan, planNote }: { d: RoadmapData; plan?: PlanCard; planNo
         <RunSwitch key={d.project} project={d.project} paused={d.paused === true} />
         <LineOfRoadmap line={d.line} project={d.project} />
         {plan && <PlanStrip plan={plan} byId={byId} />}
-        <SinceLook d={d} />
         <AppliedStrip project={d.project} />
         {planNote && (
           <p className="mt-8 break-words text-sm text-fg3" data-plan-note>

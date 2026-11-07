@@ -1,17 +1,7 @@
 // The UI bar on a task's terminal, artifacts and changes (`/task/<id>?tab=`), served by `lineclear run`. The pictures use the
 // sample states (`?state=`).
-import { expect, type Page, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { PAGE_STATES } from "./bar.ts";
-
-// the search loads after the page, so the key is pressed until its box is there
-const openSearch = async (page: Page) => {
-  const box = page.getByLabel("Search tasks, chats and steps");
-  await expect(async () => {
-    await page.keyboard.press("/");
-    await expect(box).toBeVisible({ timeout: 300 });
-  }).toPass();
-  return box;
-};
 
 for (const tab of ["terminal", "artifacts", "changes"]) {
   test(`a task's ${tab} in every state, at this width`, async ({ page }) => {
@@ -57,7 +47,7 @@ test("the changes open file by file and link to the pull request", async ({ page
   await expect(second).toContainText("Math.round");
 });
 
-test("keys pick a task's tab and / opens the search", async ({ page }) => {
+test("keys pick a task's tab", async ({ page }) => {
   await page.goto("/task/WEB-3?state=filled");
   await page.waitForSelector("[data-task-tabs]");
   await expect(async () => {
@@ -66,24 +56,9 @@ test("keys pick a task's tab and / opens the search", async ({ page }) => {
   }).toPass();
   await page.keyboard.press("1");
   await expect(page).not.toHaveURL(/tab=/);
-  await (await openSearch(page)).fill("cart");
-  await expect(page.locator("[data-hit]")).toHaveCount(3);
-  await page.locator('[data-hit="step"]').click();
-  await expect(page).toHaveURL(/web-shop\/roadmap\/W4/);
 });
 
-test("the search says when it finds nothing and when it fails", async ({ page }) => {
-  for (const [state, text] of [
-    ["empty", "Nothing found"],
-    ["error", "did not answer"],
-  ]) {
-    await page.goto(`/task/WEB-3?state=${state}`);
-    await (await openSearch(page)).fill("cart");
-    await expect(page.locator("[data-search]")).toContainText(text as string);
-  }
-});
-
-test("a tab pick and the search fade in, and nothing moves under reduced motion", async ({ page }) => {
+test("a tab pick fades in, and nothing moves under reduced motion", async ({ page }) => {
   await page.goto("/task/WEB-3?state=filled");
   await page.waitForSelector("[data-task-tabs]");
   await page.evaluate(() => {
@@ -91,19 +66,17 @@ test("a tab pick and the search fade in, and nothing moves under reduced motion"
     w.__fades = [];
     const animate = Element.prototype.animate;
     Element.prototype.animate = function (k, o) {
-      w.__fades.push(`${(o as KeyframeAnimationOptions).id}:${(this as HTMLElement).dataset.taskLive ?? (this as HTMLElement).dataset.search ?? ""}`);
+      w.__fades.push(`${(o as KeyframeAnimationOptions).id}:${(this as HTMLElement).dataset.taskLive ?? ""}`);
       return animate.call(this, k, o);
     };
   });
   await page.keyboard.press("2");
   await expect(page.locator("[data-task-live]")).toBeVisible();
-  await openSearch(page);
   const seen = await page.evaluate(() => (window as unknown as { __fades: string[] }).__fades);
   expect(seen.some((s) => s.startsWith("part-change:terminal"))).toBe(true);
   expect(seen.join()).toContain("part-change:idle");
   await page.emulateMedia({ reducedMotion: "reduce" });
   const before = seen.length;
-  await page.keyboard.press("Escape");
   await page.keyboard.press("3");
   await expect(page.locator('[data-task-live="artifacts"]')).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { __fades: string[] }).__fades.length)).toBe(before);

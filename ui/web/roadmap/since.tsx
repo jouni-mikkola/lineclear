@@ -8,7 +8,7 @@ import { plural, StepPic, stateWord } from "./common.tsx";
 
 const DISPATCHER = "dispatcher";
 
-// Since you last looked: what changed by itself, the steps of your request, and the merges.
+// What changed by itself, and the steps of your request.
 
 /** Changes that applied by themselves once the rules and the readiness check said go. One tap reverts one; it is no approval. */
 export function AppliedStrip({ project }: { project: string }) {

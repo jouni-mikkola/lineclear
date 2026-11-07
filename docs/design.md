@@ -79,8 +79,7 @@ on its task and the Inbox strip.
 Parts, at 1440 x 900, with no scroll of the page (each part scrolls inside itself when it holds more):
 
 - **The line** across the top, 25 % of the height at most. A lane per project, its steps as stations, the work in
-  progress as trains that move along it through build, check, review and merge. A station merged since you last looked
-  is marked on its lane (the time of your last look is kept in the browser). Past about 8 projects the lanes fold to
+  progress as trains that move along it through build, check, review and merge. Past about 8 projects the lanes fold to
   one row each, the ones with a lamp first. A project's name opens its full roadmap.
 - **The Inbox strip** above the line, only when something needs the owner: one row, the first ask with its answers
   as buttons, and a count when more. It is absent otherwise, and its height is not reserved. Answering turns the lamp
@@ -318,7 +317,7 @@ view still needed lived in Lineclear's UI. Each part gets one word: "Lineclear h
 | Browser | Lineclear has it | `/browsers` lists every agent's browser, lets you watch one and take it over. |
 | Settings | Lineclear has it | `/settings` has machines, commands and secret names; the order of the models per role and the chat address have a card each. Settings the new product does not have do not move. |
 | Voice | goes | Calls through a hosted voice agent need a paid third party service and a second route to the Dispatcher. Typed chat is enough. Dictation in the composer, if wanted, goes to `docs/backlog.md`. |
-| Keyboard and search | moves, now `/` and `1` to `4` | `/` opens a search box on any page: tasks, their last chat card and roadmap steps. On a task, `1` to `4` pick its tab. The other key bindings go with the old layout (U60). |
+| Keyboard | moves, now `1` to `4` | On a task, `1` to `4` pick its tab. The other key bindings go with the old layout (U60). |
 | Health | Lineclear has it | Settings shows each machine's load against its limit and holds new tasks over it. Memory, disk, GPU and herdr readings go: the doctor names a machine that needs a fix. |
 | Alerts | Lineclear has it | The page registers a service worker and pushes each new Inbox item, so you can leave the page. |
 | Coordinator timer | goes | A coordinator that wakes itself is replaced by the rule loop, which acts by written rules and asks the Inbox only for what waits for you. |

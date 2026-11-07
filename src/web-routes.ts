@@ -15,7 +15,6 @@ import { harnesses, readRegistry } from "./models.ts";
 import { planViews } from "./requests.ts";
 import { saveOffered, setupView } from "./setup.ts";
 import type { RoadmapRead } from "./roadmap-view.ts";
-import { searchAnswer } from "./search.ts";
 import { changesReply } from "./task-changes.ts";
 import { taskDetailReply } from "./task-detail.ts";
 import { taskLiveApi, type taskTerminalLinks } from "./task-live.ts";
@@ -70,11 +69,6 @@ const changesRoute: Route = (c, req, url) => {
   const changes = new RegExp(`^/api/task/(${ID})/changes$`).exec(url.pathname);
   return req.method === "GET" && changes ? changesReply(changes[1] ?? "", lineclearDir(c.env), json) : undefined;
 };
-
-const searchRoute: Route = async (c, req, url) =>
-  req.method === "GET" && url.pathname === "/api/search"
-    ? json(await searchAnswer(url.searchParams.get("q") ?? "", await c.readProjects(c.now()), listProjectNames(c.env), (n) => c.roadmap(n).ready(60_000)))
-    : undefined;
 
 const homeRoute: Route = async (c, req, url) => {
   if (req.method !== "GET" || url.pathname !== "/api/home") return undefined;
@@ -263,7 +257,6 @@ const ROUTES: Route[] = [
   taskChatRoute,
   taskLiveRoute,
   changesRoute,
-  searchRoute,
   homeRoute,
   detectRoute,
   reposRoute,
