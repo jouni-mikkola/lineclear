@@ -125,7 +125,7 @@ function Filled({ d, plan, planNote }: { d: RoadmapData; plan?: PlanCard; planNo
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Find a step"
           aria-label="Find a step"
-          className="mt-6 min-h-10 w-full rounded-sm border border-line bg-base px-3 text-sm text-fg placeholder:text-fg3 focus-visible:outline-2 focus-visible:outline-accent md:max-w-sm"
+          className="mt-4 min-h-10 w-full rounded-sm border border-line bg-base px-3 text-sm text-fg placeholder:text-fg3 focus-visible:outline-2 focus-visible:outline-accent md:max-w-sm"
           data-step-search
         />
 
