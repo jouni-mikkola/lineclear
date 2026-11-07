@@ -29,7 +29,7 @@ const TAIL = 4000
 const FAST_GATES_TIMEOUT_MS = 2 * 60_000
 
 /** the settings of the Lineclear project whose folder is this repo; none when it has no project */
-function projectSettings(repo: string, env: Record<string, string | undefined>): Record<string, unknown> | undefined {
+function settingsOfRepo(repo: string, env: Record<string, string | undefined>): Record<string, unknown> | undefined {
   const dir = join(env.LINECLEAR_CONFIG ?? join(homedir(), '.config', 'lineclear'), 'projects')
   if (!existsSync(dir)) return undefined
   for (const name of readdirSync(dir)) {
@@ -45,7 +45,7 @@ function projectSettings(repo: string, env: Record<string, string | undefined>):
 
 /** how long a merge may hold its repo's line: the project's `turnLimitMinutes`, else 30 minutes */
 export function turnLimitMs(repo: string, env: Record<string, string | undefined> = process.env): number {
-  const m = projectSettings(repo, env)?.turnLimitMinutes
+  const m = settingsOfRepo(repo, env)?.turnLimitMinutes
   return (typeof m === 'number' && Number.isFinite(m) && m > 0 ? m : 30) * 60_000
 }
 

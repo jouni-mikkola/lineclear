@@ -48,7 +48,7 @@ export function accountSettings(env: Env): AccountSetting[] {
     });
 }
 
-export function projectSettings(env: Env): ProjectSettings[] {
+export function settingsList(env: Env): ProjectSettings[] {
   const out: ProjectSettings[] = [];
   for (const name of listProjectNames(env as NodeJS.ProcessEnv)) {
     const s = readSettings(name, env as NodeJS.ProcessEnv);

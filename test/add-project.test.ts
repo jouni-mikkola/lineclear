@@ -3,7 +3,7 @@ import { chmodSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync }
 import { dirname, join } from "node:path";
 import { detectProject, FIRST_ROADMAP, findRepos, pickModels, saveProject } from "../src/add-project.ts";
 import { companyOfModel, type ModelFile, modelFile } from "../src/models.ts";
-import { detectCheck } from "../src/project.ts";
+import { detectCheck } from "../src/project-detect.ts";
 import { pickReviewer } from "../src/stalls.ts";
 import { tmp } from "./helpers.ts";
 

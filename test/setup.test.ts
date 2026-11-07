@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../src/cli.ts";
 import { harnesses, readRegistry } from "../src/models.ts";
-import { changeSettings, projectsDir, readSettings, readSetup, saveSetup, type Settings, setupGate } from "../src/project.ts";
+import { changeSettings } from "../src/project-change.ts";
+import { projectsDir, readSettings, readSetup, saveSetup, type Settings, setupGate } from "../src/project.ts";
 import { saveOffered, setupMain, setupView } from "../src/setup.ts";
 
 function fake(body: string): string {

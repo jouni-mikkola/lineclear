@@ -10,7 +10,8 @@ import { projectDecisions, readItems } from "./inbox.ts";
 import { lineclearDir, worktreeCost } from "./measure.ts";
 import type { Pusher } from "./notify.ts";
 import type { Aside } from "./read-aside.ts";
-import { type AskBefore, changeSettings, listProjectNames, type Role, setupRoles } from "./project.ts";
+import { changeSettings } from "./project-change.ts";
+import { type AskBefore, listProjectNames, type Role, setupRoles } from "./project.ts";
 import { harnesses, readRegistry } from "./models.ts";
 import { planViews } from "./requests.ts";
 import { saveOffered, setupView } from "./setup.ts";
@@ -21,7 +22,7 @@ import { taskLiveApi, type taskTerminalLinks } from "./task-live.ts";
 import { waitingForYou } from "./waiting.ts";
 import { browserApi, chatApi } from "./web-chat-api.ts";
 import { type Env, json, ownPage } from "./web-guard.ts";
-import { accountSettings, projectSettings, type SettingsData } from "./web-settings.ts";
+import { accountSettings, settingsList, type SettingsData } from "./web-settings.ts";
 import { doctorProblems } from "./home-doctor.ts";
 import { appliedChanges, inboxView, planCard, waitingView } from "./web-views.ts";
 
@@ -110,7 +111,7 @@ const addProjectRoute: Route = async (c, req, url) => {
 const settingsRoute: Route = (c, req, url) =>
   req.method === "GET" && url.pathname === "/api/settings"
     ? json({
-        projects: projectSettings(c.env),
+        projects: settingsList(c.env),
         accounts: accountSettings(c.env),
         showPaused: readPrefs(c.env as NodeJS.ProcessEnv).showPaused === true,
       } satisfies SettingsData)
