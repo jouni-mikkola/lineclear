@@ -1,16 +1,18 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { writeAtomic } from "../pi/atomic.ts";
+import { decisionsPath } from "../pi/config.ts";
 import { DISPATCHER } from "./chat.ts";
 import { lineclearServer, postAction, readSnapshot } from "./lineclear-client.ts";
 import { dataDir } from "./paths.ts";
 import { listProjectNames, readSettings } from "./project.ts";
+import type { Decision } from "./rules.ts";
+import { classify, readDecisionsSince } from "./stall-class.ts";
 
 type Env = Record<string, string | undefined>;
 
 /** The night as local hours, `22-7` unless LINECLEAR_NIGHT_WATCH says another window; `off` turns the watch off. */
 const NIGHT = "22-7";
-const WATCH_EVERY_MS = 2 * 60 * 60 * 1000;
 /** A send that failed (no Dispatcher, board away) is tried again after this, not every tick. */
 const RETRY_MS = 15 * 60 * 1000;
 
@@ -22,13 +24,26 @@ export function inNight(now: Date, window: string): boolean {
   return from <= to ? h >= from && h < to : h >= from || h < to;
 }
 
-/** The checklist the Dispatcher works through, for the projects that run. */
-export function checklist(projects: string[]): string {
+/** The loop's lines the Dispatcher should hear: a stall, or a skip that waits for the owner. */
+function worthHearing(d: Decision): boolean {
+  return (d.kind === "stall" && d.event === "stall") || (d.kind === "skip" && classify(d) === "owner");
+}
+
+/** The message: what the rules found, one line each, so the Dispatcher acts on it without a search. */
+export function report(found: Decision[]): string {
+  const lines = [...new Set(found.map((d) => `- ${d.project}${d.step ? ` ${d.step}` : ""}: ${d.reason}`))];
   return [
-    "Night watch. Work through this once and answer in one short line per project:",
-    ...projects.map((p) => `- ${p}: any open step ready that did not start, any stalled or silent task, any task waiting on a check or a merge?`),
+    "Night watch. The rules found this since the last message:",
+    ...lines,
     "Fix what the rules allow (tell a task to go on). Ask the owner only for a login, money or something that leaves the machine.",
   ].join("\n");
+}
+
+/** When tonight began, in ms: the last whole hour outside the night window, walking back from `now`. */
+function nightStart(now: Date, window: string): number {
+  let t = new Date(now).setMinutes(0, 0, 0);
+  while (inNight(new Date(t - 3_600_000), window)) t -= 3_600_000;
+  return t;
 }
 
 const sentPath = (env: Env) => join(dataDir(env), "night-watch.json");
@@ -53,8 +68,9 @@ async function sendToDispatcher(text: string, env: Env): Promise<string | undefi
 }
 
 /**
- * The rule loop's night part: at night, every WATCH_EVERY_MS, sends the Dispatcher the checklist for the projects that
- * run. Returns a decision line, or undefined when nothing was due. A send that fails is tried again next tick.
+ * The rule loop's night part: at night, sends the Dispatcher what the rules found (a stall, a skip that waits for the
+ * owner) in the projects that run, since the last send or the start of the night. A quiet night sends nothing.
+ * Returns a decision line, or undefined when nothing was due. A send that fails is tried again after RETRY_MS.
  */
 export async function nightWatch(
   now: Date,
@@ -63,14 +79,19 @@ export async function nightWatch(
 ): Promise<string | undefined> {
   const last = lastTimes(env);
   const at = now.getTime();
-  if (!inNight(now, env.LINECLEAR_NIGHT_WATCH ?? NIGHT) || at - last.sent < WATCH_EVERY_MS || at - last.tried < RETRY_MS) return undefined;
+  const window = env.LINECLEAR_NIGHT_WATCH ?? NIGHT;
+  if (!inNight(now, window) || at - last.tried < RETRY_MS) return undefined;
   const running = listProjectNames(env as NodeJS.ProcessEnv).filter((n) => {
     const s = readSettings(n, env as NodeJS.ProcessEnv);
     return typeof s !== "string" && !s.paused;
   });
-  if (running.length === 0) return undefined;
-  const failed = await send(checklist(running));
+  const since = Math.max(last.sent, nightStart(now, window));
+  const found = readDecisionsSince(decisionsPath(env as NodeJS.ProcessEnv), since).filter(
+    (d) => Date.parse(d.time) > since && running.includes(d.project) && worthHearing(d),
+  );
+  if (found.length === 0) return undefined;
+  const failed = await send(report(found));
   writeAtomic(sentPath(env), `${JSON.stringify({ sent: failed ? last.sent : at, tried: at })}\n`);
   if (failed) return `night watch: the Dispatcher was not reached: ${failed}`;
-  return `night watch: sent the Dispatcher its checklist for ${running.join(", ")}`;
+  return `night watch: sent the Dispatcher ${found.length} finding${found.length === 1 ? "" : "s"} for ${[...new Set(found.map((d) => d.project))].join(", ")}`;
 }
