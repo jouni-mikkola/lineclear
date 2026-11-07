@@ -10,7 +10,7 @@ import { RoleIcon, type RoleName } from "./roles.tsx";
 // The line's small parts: a train with its number, the card it shows, the signal before the junction, the key
 // under the map, and the words of the same facts (the list of a project's work, an account's name line).
 
-const STAGE_WORD: Record<Stage, string> = { queued: "in line", work: "at work", review: "in review", ready: "ready to merge", done: "merged" };
+export const STAGE_WORD: Record<Stage, string> = { queued: "in line", work: "at work", review: "in review", ready: "ready to merge", done: "merged" };
 /** Who acts on a task at each stage. */
 const STAGE_ROLE: Record<Stage, RoleName> = { queued: "rules", work: "worker", review: "reviewer", ready: "main", done: "main" };
 

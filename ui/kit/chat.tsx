@@ -421,6 +421,7 @@ export function Composer({
   accept,
   placeholder = "Ask the Dispatcher",
   label = "Message to the Dispatcher",
+  disabled,
   replying,
 }: {
   text: string;
@@ -435,6 +436,8 @@ export function Composer({
   accept: string;
   placeholder?: string;
   label?: string;
+  /** There is no one to write to: the box, the attach button and send are off. */
+  disabled?: boolean;
   /** The message you answer, with the way to drop it. */
   replying?: { text: string; onCancel: () => void };
 }) {
@@ -481,7 +484,8 @@ export function Composer({
         <button
           type="button"
           onClick={() => picker.current?.click()}
-          className="grid size-11 shrink-0 place-items-center rounded-sm text-fg2 hover:bg-raised3 hover:text-fg focus-visible:outline-2 focus-visible:outline-accent"
+          disabled={disabled}
+          className="grid size-11 shrink-0 place-items-center rounded-sm text-fg2 hover:bg-raised3 hover:text-fg focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40 disabled:hover:bg-transparent"
           aria-label="Attach files"
           data-attach
         >
@@ -513,6 +517,7 @@ export function Composer({
           ref={box}
           value={text}
           rows={1}
+          disabled={disabled}
           onChange={(e) => onText(e.target.value)}
           onPaste={paste}
           onKeyDown={(e) => {

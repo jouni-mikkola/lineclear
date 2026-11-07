@@ -18,7 +18,7 @@ import {
   useKeyboardInset,
 } from "../kit/index.ts";
 import { Quote, Reactions } from "../kit/task-chat.tsx";
-import { TaskHead, TaskNote } from "../kit/task-head.tsx";
+import { TaskNote } from "../kit/task-head.tsx";
 import { QUESTIONS } from "./samples.ts";
 import type { Pending, useChat } from "./chat.tsx";
 
@@ -127,7 +127,7 @@ function dispatcherState(view: ChatView | undefined, online: boolean, writing: b
 }
 
 /** Why the composer cannot send now (`cut`) and the one line under it (`note`). */
-function composerNotes(chat: ReturnType<typeof useChat>, uploading: boolean, text: string) {
+function composerNotes(chat: ReturnType<typeof useChat>, uploading: boolean, text: string, task?: string) {
   const { view } = chat;
   const cut = !chat.online
     ? "You are offline. You can write, and send once the connection is back."
@@ -138,7 +138,9 @@ function composerNotes(chat: ReturnType<typeof useChat>, uploading: boolean, tex
         : undefined;
   const note =
     view?.state === "none"
-      ? view.reason
+      ? task
+        ? undefined
+        : view.reason
       : cut
         ? undefined
         : uploading
@@ -192,7 +194,7 @@ function ThreadBody({
   ready: boolean;
 }) {
   if (!view) return <Part state="loading" label="The chat" empty={{ text: "" }} rows={3} />;
-  if (view.state === "none") return task ? <TaskNote text={view.reason ?? "This task has no chat."} none /> : <NoDispatcher />;
+  if (view.state === "none") return task ? <TaskNote text="This task has no chat." none /> : <NoDispatcher />;
   if (!items.length && !writing)
     return task ? <TaskNote text="No messages yet. Write to its agent below." /> : <ChatEmpty questions={QUESTIONS} onAsk={onAsk} disabled={!ready} />;
   return (
@@ -239,7 +241,7 @@ export function Chat({
   const uploading = attached.some((a) => a.state === "uploading");
   const ready = view?.state === "ready" && online;
   const canSend = ready && !uploading && (!!text.trim() || attached.some((a) => a.state === "ready")) && text.length <= MAX_TEXT;
-  const { cut, note } = composerNotes(chat, uploading, text);
+  const { cut, note } = composerNotes(chat, uploading, text, task);
   const send = () => {
     chat.send(text);
     setText("");
@@ -275,7 +277,7 @@ export function Chat({
         chat.attach([...e.dataTransfer.files]);
       }}
     >
-      {!panel && (task ? <TaskHead id={task} state={state} /> : <DispatcherHead state={state} />)}
+      {!panel && !task && <DispatcherHead state={state} />}
       <div
         ref={panel ? box : undefined}
         className={panel ? "min-h-0 w-full flex-1 overflow-y-auto px-4 pt-4" : "mx-auto mt-8 w-full max-w-[760px] flex-1"}
@@ -306,6 +308,7 @@ export function Chat({
           note={note}
           accept={ACCEPT}
           {...(task ? { placeholder: "Write to the agent", label: `Message to the agent of ${task}` } : {})}
+          disabled={view?.state === "none"}
           replying={chat.replyTo && { text: chat.replyTo.text, onCancel: () => chat.setReplyTo(undefined) }}
         />
       </div>
