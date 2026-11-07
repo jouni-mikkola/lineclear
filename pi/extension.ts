@@ -104,9 +104,48 @@ export function beatDuringCalls(
   });
 }
 
+/** A tool result longer than this many lines is cut before the next turn: every later turn re-reads it from the cache. */
+export const MAX_RESULT_LINES = 100;
+/** Lines kept from the start and from the end of a cut tool result. */
+const KEPT_LINES = 40;
+
+type Block = { type?: string; text?: string };
+
+/** The result with its middle cut when it has more than MAX_RESULT_LINES lines; the same block when it is short. */
+export function cutLongResult(block: Block): Block {
+  if (block?.type !== "text" || typeof block.text !== "string") return block;
+  const lines = block.text.split("\n");
+  if (lines.length <= MAX_RESULT_LINES) return block;
+  const cut = lines.length - 2 * KEPT_LINES;
+  const note = `[${cut} lines cut to save tokens: read the file or rerun with grep or tail for the part you need]`;
+  return { ...block, text: [...lines.slice(0, KEPT_LINES), note, ...lines.slice(-KEPT_LINES)].join("\n") };
+}
+
+/** Cuts the long tool results in a task agent's session before each call, so they are not re-sent on every later turn. */
+export function cutLongResults(pi: Pi, env: Env = process.env): void {
+  if (!lineclearAgent(env)) return;
+  pi.on("context", (event) => {
+    try {
+      if (!Array.isArray(event?.messages)) return undefined;
+      let changed = false;
+      const messages = event.messages.map((m: any) => {
+        if (m?.role !== "toolResult" || !Array.isArray(m.content)) return m;
+        const content = m.content.map(cutLongResult);
+        if (content.every((b: Block, i: number) => b === m.content[i])) return m;
+        changed = true;
+        return { ...m, content };
+      });
+      return changed ? { messages } : undefined;
+    } catch {
+      return undefined; // cutting must never get in the way of a call
+    }
+  });
+}
+
 export default async function lineclearExtension(pi: Pi): Promise<void> {
   nudgeQuietTurns(pi);
   beatDuringCalls(pi);
+  cutLongResults(pi);
   freshDispatcher(pi);
   compactChats(pi);
   accountFallback(pi);
