@@ -40,6 +40,25 @@ export class EngineLand extends EngineHandoff {
     return true
   }
 
+  /**
+   * Every look at the board: a task at Ready to merge whose agent is at rest is merged by the engine, which rebases
+   * itself on a conflict. A conflict the rebase cannot settle goes back to the agent and opens one card, once.
+   */
+  async landReady() {
+    if (this.closing) return
+    for (const t of this.tasks.filter((t) => this.statusOf(t) === 'ready' && !t.archived && !t.landing && !this.landings.has(t.id))) {
+      if (t.askFirst || this.settings.ways(this.proj(t).name).merge === 'ask me first') continue
+      const r = await this.merge(t.id).catch(() => undefined)
+      if (r && !r.ok && /^Conflict with /.test(r.error ?? '') && !t.landCard) {
+        t.landCard = true
+        this.save()
+        const id = `land:${t.id}`
+        const text = `conflict with ${t.base} the rebase could not settle: ${(r.error ?? '').replace(/^Conflict with [^:]*: /, '').slice(0, 200)}`
+        this.chats.post(this.key(t), { id, card: { id, task: t.id, status: 'need', text, pr: t.pr } })
+      }
+    }
+  }
+
   private async endAndMerge(t: TaskRec) {
     const key = this.key(t)
     for (const end = Date.now() + TURN_END_WAIT_MS; this.agents.status(key) === 'working' && Date.now() < end; ) await Bun.sleep(500)
