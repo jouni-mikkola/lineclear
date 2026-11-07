@@ -404,6 +404,7 @@ export class EngineLaunch extends EngineStalls {
       this.save()
       await G.validateBase(p.path, t.base)
       let made: Made
+      const began = Date.now()
       try {
         made = await this.wtOf(t).create({ repo: p.path, name: p.name, install: p.install }, branch, t.base, labelOf(t))
       } catch (e) {
@@ -422,9 +423,14 @@ export class EngineLaunch extends EngineStalls {
         this.save()
         return
       }
+      const madeAt = Date.now()
       Object.assign(t, { branch, worktree: made.path })
       this.save()
       await this.launch(t, this.queued(t) ? `${taskFirst(t)}\n\n${queuedLine(this.open(t), 'start', t.id)}` : taskFirst(t), made)
+      const up = Date.now()
+      const install = made.installMs ?? 0
+      t.startMs = { worktree: madeAt - began - install, install, session: up - madeAt, at: up }
+      this.save()
       this.briefing.add(t.id)
       clearTimeout(this.later.get(`${t.id}:brief`))
       const x = setTimeout(() => {

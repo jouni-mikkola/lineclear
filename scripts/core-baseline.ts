@@ -1,6 +1,7 @@
 // Core speed baseline numbers (docs/numbers.md, "Core baseline"): one mode per measure, each prints median, p90 and worst.
 // Usage: bun scripts/core-baseline.ts <start|tokens|stalls|gh|time|snapshot|chat-tokens> [args]
-//   start  [n=20]       task add to the agent's first tool call, from the last n done tasks' session files
+//   start  [n=20]       task add to the agent's first tool call, from the last n done tasks' session files,
+//                       then each start phase (worktree, install, session, first call)
 //   tokens [n=20]       tokens per task by role (agent, reviewer), from the last n done tasks' session files
 //   stalls              stalls per hour and failed starts per machine, from the board's task history
 //   gh     [n=20]       GitHub check time on main per job, from the last n runs of check.yml
@@ -12,7 +13,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-type Task = { id: string; project: string; created: number; doneAt?: number; worktree: string; briefResent?: unknown; mergeStopped?: unknown };
+type Task = { id: string; project: string; created: number; doneAt?: number; worktree: string; briefResent?: unknown; startMs?: { worktree: number; install: number; session: number; at: number }; mergeStopped?: unknown };
 type Usage = { input: number; output: number; cacheRead: number; cacheWrite: number };
 type Session = { role: "agent" | "reviewer"; firstToolCallAt?: number; usage: Usage };
 
@@ -71,13 +72,21 @@ function sessionsOf(task: Task): Session[] {
 
 function start(n: number): void {
   const secs: number[] = [];
+  const phases: Record<string, number[]> = { worktree: [], install: [], session: [], "first call": [] };
   let resent = 0;
   for (const t of doneTasks(n)) {
     const first = sessionsOf(t).find((s) => s.role === "agent")?.firstToolCallAt;
     if (first) secs.push((first - t.created) / 1000);
+    if (t.startMs) {
+      phases.worktree?.push(t.startMs.worktree / 1000);
+      phases.install?.push(t.startMs.install / 1000);
+      phases.session?.push(t.startMs.session / 1000);
+      if (first) phases["first call"]?.push((first - t.startMs.at) / 1000);
+    }
     if (t.briefResent) resent++;
   }
   line("task add to first tool call", secs, "s");
+  for (const [name, xs] of Object.entries(phases)) if (xs.length) line(`  phase ${name}`, xs, "s");
   console.log(`tasks whose brief was sent again: ${resent}`);
 }
 

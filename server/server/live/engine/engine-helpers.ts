@@ -58,6 +58,8 @@ export interface TaskRec {
   readyNudged?: number
   /** its brief was sent again because its agent never began on it: once */
   briefResent?: boolean
+  /** where its start went, in ms: worktree made, install step, agent session up; `at` is when the session was up (the baseline's start phases) */
+  startMs?: { worktree: number; install: number; session: number; at: number }
   /** its place was put away once done: agent, space, worktree and branch (what lost nothing) */
   cleaned?: boolean
   /** what putting it away kept, and why ("~/x (uncommitted changes)") */
