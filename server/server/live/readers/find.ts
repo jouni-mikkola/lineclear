@@ -1,17 +1,23 @@
-// Where each CLI keeps an agent's log file. Homes follow the CLIs' own settings: CODEX_HOME, PI_CODING_AGENT_DIR (tests point these at fixtures).
-import { closeSync, openSync, readdirSync, readSync, statSync } from 'node:fs'
+// Where pi keeps an agent's log file. The home follows pi's own setting, PI_CODING_AGENT_DIR (tests point it at fixtures).
+import { readdirSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
-const env = (k: string) => process.env[k] || undefined
-
-const codexHome = () => env('CODEX_HOME') ?? join(homedir(), '.codex')
-const piHome = () => env('PI_CODING_AGENT_DIR') ?? join(homedir(), '.pi', 'agent')
+const piHome = () => process.env.PI_CODING_AGENT_DIR || join(homedir(), '.pi', 'agent')
 
 const trimSlash = (p: string) => (p.length > 1 ? p.replace(/[/\\]+$/, '') : p)
 
-/** newest .jsonl in a folder changed at or after sinceMs */
-function newestLog(dir: string, sinceMs = 0): string | undefined {
+/** pi names a session folder "--<cwd without its leading slash, / \ and : turned into ->--" */
+export function piSessionDir(cwd: string): string {
+  const name = `--${trimSlash(cwd)
+    .replace(/^[/\\]/, '')
+    .replace(/[/\\:]/g, '-')}--`
+  return join(piHome(), 'sessions', name)
+}
+
+/** the newest pi session log for this cwd, changed at or after sinceMs */
+export function findPiLog(cwd: string, sinceMs = 0): string | undefined {
+  const dir = piSessionDir(cwd)
   let best: { f: string; m: number } | undefined
   let names: string[]
   try {
@@ -30,121 +36,7 @@ function newestLog(dir: string, sinceMs = 0): string | undefined {
   return best?.f
 }
 
-/* ---------- Codex ---------- */
-
-/** the first line of a file (Codex's session_meta is ~20KB: it carries the system prompt) */
-function firstLine(f: string, max = 1 << 20): string | undefined {
-  let fd: number
-  try {
-    fd = openSync(f, 'r')
-  } catch {
-    return undefined
-  }
-  try {
-    let text = ''
-    const buf = Buffer.alloc(64 << 10)
-    for (let pos = 0; pos < max; ) {
-      const got = readSync(fd, buf, 0, buf.length, pos)
-      if (got <= 0) break
-      const nl = buf.subarray(0, got).indexOf(10)
-      if (nl !== -1) return text + buf.toString('utf8', 0, nl)
-      text += buf.toString('utf8', 0, got)
-      pos += got
-    }
-    return undefined
-  } finally {
-    closeSync(fd)
-  }
-}
-
-const ymd = (d: Date, utc: boolean) => (utc ? [d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate()] : [d.getFullYear(), d.getMonth() + 1, d.getDate()])
-
-function mainCodexLog(file: string, cwd: string) {
-  try {
-    const meta = JSON.parse(firstLine(file) ?? '')
-    const p = meta?.type === 'session_meta' ? meta.payload : undefined
-    return (
-      !!p &&
-      typeof p.cwd === 'string' &&
-      trimSlash(p.cwd) === trimSlash(cwd) &&
-      p.thread_source !== 'subagent' &&
-      !(p.source && typeof p.source === 'object' && 'subagent' in p.source)
-    )
-  } catch {
-    return false
-  }
-}
-
-/** the day folders a session started since sinceMs can be in: today, yesterday and sinceMs's day, local and UTC */
-function codexDayDirs(sinceMs?: number): string[] {
-  const now = Date.now()
-  const times = [now, now - 86_400_000]
-  if (sinceMs) times.push(sinceMs)
-  const dirs = new Set<string>()
-  for (const t of times) {
-    for (const utc of [false, true]) {
-      const [y, m, d] = ymd(new Date(t), utc)
-      dirs.add(join(codexHome(), 'sessions', String(y), String(m).padStart(2, '0'), String(d).padStart(2, '0')))
-    }
-  }
-  return [...dirs]
-}
-
-/** the newest Codex rollout started in this cwd and changed at or after sinceMs (subagents' rollouts are left out) */
-export function findCodexLog(cwd: string, sinceMs = 0): string | undefined {
-  const want = trimSlash(cwd)
-  const files: { f: string; m: number }[] = []
-  for (const dir of codexDayDirs(sinceMs)) {
-    let names: string[]
-    try {
-      names = readdirSync(dir)
-    } catch {
-      continue
-    }
-    for (const n of names) {
-      if (!n.startsWith('rollout-') || !n.endsWith('.jsonl')) continue
-      const f = join(dir, n)
-      try {
-        const m = statSync(f).mtimeMs
-        if (m >= sinceMs) files.push({ f, m })
-      } catch {}
-    }
-  }
-  files.sort((a, b) => b.m - a.m)
-  for (const { f } of files) {
-    if (mainCodexLog(f, want)) return f
-  }
-  return undefined
-}
-
-/* ---------- pi ---------- */
-
-/** pi names a session folder "--<cwd without its leading slash, / \ and : turned into ->--" */
-export function piSessionDir(cwd: string): string {
-  const name = `--${trimSlash(cwd)
-    .replace(/^[/\\]/, '')
-    .replace(/[/\\:]/g, '-')}--`
-  return join(piHome(), 'sessions', name)
-}
-
-/** the newest pi session log for this cwd, changed at or after sinceMs */
-export const findPiLog = (cwd: string, sinceMs?: number) => newestLog(piSessionDir(cwd), sinceMs)
-
-/** Runtime log discovery, also used to decide which kinds can supply chat. */
-export const LOG_FINDERS: Record<string, (cwd: string, sinceMs?: number) => string | undefined> = {
-  codex: findCodexLog,
-  pi: findPiLog,
-}
-
-/** the newest log of this CLI for this cwd */
-export function findLog(cli: string, cwd: string, sinceMs?: number): string | undefined {
-  return Object.hasOwn(LOG_FINDERS, cli) ? LOG_FINDERS[cli](cwd, sinceMs) : undefined
-}
-
-/** which CLI wrote this log, by where it lies: an agent a backup took over from has logs of two CLIs */
+/** which CLI wrote this log, by where it lies: an agent a backup took over from may have older logs of another */
 export function logKind(file: string): string | undefined {
-  const under = (dir: string) => file.startsWith(`${trimSlash(dir)}/`)
-  if (under(join(codexHome(), 'sessions'))) return 'codex'
-  if (under(join(piHome(), 'sessions'))) return 'pi'
-  return undefined
+  return file.startsWith(`${trimSlash(join(piHome(), 'sessions'))}/`) ? 'pi' : undefined
 }

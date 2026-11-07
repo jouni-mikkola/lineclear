@@ -34,7 +34,7 @@ export function launchHarness(h: Harness): Harness {
   return { kind: h.kind, ...(model ? { model } : {}), ...(effort ? { effort } : {}) }
 }
 
-/** "Codex (Model Code 6, high)", "Claude Code" */
+/** "pi (Model Code 6, high)" */
 export function harnessWords(h: Harness) {
   const m = modelOf(h)
   const bits = [m ? (findModel(h.kind, m)?.label ?? m) : '', effortOf(h)].filter(Boolean)

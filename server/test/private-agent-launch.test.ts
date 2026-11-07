@@ -23,7 +23,7 @@ describe('private launch prompt delivery', () => {
           sessionId: 'old-session',
           system: 'Synthetic personal rule.',
         }
-        const args = a.args(r, resume)
+        const args = a.args(r)
         const path = args[args.indexOf('--append-system-prompt') + 1]
         expect(path).not.toStartWith(r.cwd)
         expect(readFileSync(path, 'utf8')).toBe(r.system)

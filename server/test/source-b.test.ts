@@ -210,17 +210,8 @@ describe("a task's CLI, model and effort, continued", () => {
       effort,
       access: 'full' as const,
     })
-    for (const key of ['space-key', 'SHE-9/Agent', 'SHE-9/Reviewer']) {
-      for (const resume of [false, true]) {
-        const args = src.agents.args({ ...rec('codex', '', ''), key, env: { LINECLEAR_CHAT: 'ST-1/Reviewer', LINECLEAR_URL: 'http://127.0.0.1:7787' } }, resume)
-        const policy = args.find((a) => a.startsWith('shell_environment_policy.set='))!
-        expect(policy).toContain(`"LINECLEAR_CHAT"="${key}"`)
-        expect(policy).toContain('"LINECLEAR_COMMAND"=')
-        expect(policy).toContain('"PATH"=')
-      }
-    }
-    expect(src.agents.args(rec('pi', 'openai/gpt-5.5', 'lowest'), false)).toEqual(['--model', 'openai/gpt-5.5', '--thinking', 'minimal'])
-    expect(src.agents.args(rec('gemini', 'x', 'high'), false)).toEqual([])
+    expect(src.agents.args(rec('pi', 'openai/gpt-5.5', 'lowest'))).toEqual(['--model', 'openai/gpt-5.5', '--thinking', 'minimal'])
+    expect(src.agents.args(rec('gemini', 'x', 'high'))).toEqual([])
   })
 })
 

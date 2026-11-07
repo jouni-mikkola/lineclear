@@ -1,6 +1,4 @@
-// What a CLI's own log file says, in one shape for every CLI. One reader per CLI turns its log into these.
-// Readers keep only what the chat shows: what the human typed, the agent's replies, the CLI's own questions, where a
-// session starts and its errors.
+// What pi's log file says, in the shape the chat reads. Readers keep only what the chat shows.
 import type { AgentRuntime } from '../../../shared/types.ts'
 
 interface CliChoice {
@@ -34,7 +32,7 @@ export type LogEvent =
   | { kind: 'answered'; id: string; at: number }
   /** tokens one model call used (input, cached input and output together); ids are unique per call, so they sum */
   | { kind: 'usage'; id: string; at: number; tokens: number }
-  /** the agent's turn began: your message, news, or (Claude Code) its background work woke it */
+  /** the agent's turn began */
   | { kind: 'turn-start'; id: string; at: number }
   /** the agent's turn ended (the CLI wrote its end-of-turn marker) */
   | { kind: 'turn-end'; id: string; at: number }
@@ -42,13 +40,12 @@ export type LogEvent =
   | { kind: 'error'; id: string; at: number; text: string; code?: string; status?: number }
 
 export interface Reader {
-  /** herdr's agent kind this reader is for: claude, codex, pi */
+  /** herdr's agent kind this reader is for */
   cli: string
   /**
-   * Parses complete lines of a log file. `lines` never contains a partial last line; ids must be stable across
-   * re-reads of the same file (derived from the log's own ids, or file offset when it has none).
+   * Parses complete lines of a log file. `lines` never has a partial last line; ids stay stable across re-reads.
    */
   parse(lines: { text: string; offset: number }[], file: string): LogEvent[]
-  /** added: forget what was read of this file (it was truncated or replaced and is read again from the start) */
+  /** forget what was read of this file (it was truncated or replaced) */
   reset?(file: string): void
 }

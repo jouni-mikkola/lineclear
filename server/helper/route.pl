@@ -53,10 +53,10 @@ sub prune_dead_routes {
 
 sub agent_executable {
   my ($exe, $entry) = @_;
-  return 1 if ($exe // '') =~ m{(?:^|/)(?:codex|claude|pi)$};
+  return 1 if ($exe // '') =~ m{(?:^|/)(?:claude|pi)$};
   return 0 unless ($exe // '') =~ m{(?:^|/)(?:node|bun)$};
-  return 1 if ($entry // '') =~ m{(?:^|/)(?:codex|claude|pi)(?:\.js)?$};
-  return ($entry // '') =~ m{/(?:pi-coding-agent|claude-code|\@openai/codex)/.*\.(?:m?js|cjs)$};
+  return 1 if ($entry // '') =~ m{(?:^|/)(?:claude|pi)(?:\.js)?$};
+  return ($entry // '') =~ m{/(?:pi-coding-agent|claude-code)/.*\.(?:m?js|cjs)$};
 }
 
 sub cli_environment {
