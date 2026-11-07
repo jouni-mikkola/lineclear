@@ -19,6 +19,11 @@ test('3 merges on a red main: the 2nd and 3rd are held until it is green', async
   const data = (w.engine as unknown as { data: { red?: Record<string, string> } }).data
   data.red = { [p.path]: 'b'.repeat(40) }
   const merge = (i: number) => w.engine.merge(tasks[i].id, { self: true })
+  // a first merge that fails (a conflict marker) does not use up the turn
+  writeFileSync(join(tasks[0].worktree!, 'bad.txt'), '<<<<<<< x\n=======\n>>>>>>> y\n')
+  sh('git add -A && git commit -qm bad', tasks[0].worktree!)
+  expect((await merge(0)).ok).toBe(false)
+  sh('git rm -q bad.txt && git commit -qm fix', tasks[0].worktree!)
   expect((await merge(0)).ok).toBe(true)
   const second = await merge(1)
   expect(second.ok).toBe(false)
