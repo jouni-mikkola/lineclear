@@ -81,26 +81,55 @@ const storePath = (env = process.env) => join(configDir(env), "settings.json");
 /** The store from before settings.json: read once to migrate, then deleted. */
 const legacySetupPath = (env = process.env) => join(configDir(env), "setup.json");
 
-function readStored(file: string): Setup {
+/** The machine store's format. A file with no `version` is version 1. */
+export const STORE_VERSION = 2;
+
+type Store = { version: number; setup: Setup };
+
+/** Reads a JSON object, or throws a message that names the file: a bad file is never read as empty, so no later save writes over it. */
+function readObject(file: string): Record<string, unknown> {
+  let value: unknown;
   try {
-    return JSON.parse(readFileSync(file, "utf8")) as Setup;
-  } catch {
-    return {};
+    value = JSON.parse(readFileSync(file, "utf8"));
+  } catch (e) {
+    throw new Error(`${file} cannot be read as JSON (${(e as Error).message}); fix or remove the file, it is left unchanged`);
   }
+  if (typeof value !== "object" || value === null || Array.isArray(value))
+    throw new Error(`${file} is not a JSON object; fix or remove the file, it is left unchanged`);
+  return value as Record<string, unknown>;
 }
+
+/** The machine store, migrated to the current version: the old file is kept as settings.json.v<n>.bak and the new one written atomically. */
+function readStore(env: NodeJS.ProcessEnv): Store {
+  const file = storePath(env);
+  if (!existsSync(file)) return { version: STORE_VERSION, setup: {} };
+  const raw = readObject(file);
+  const version = raw.version === undefined ? 1 : raw.version;
+  if (typeof version !== "number" || !Number.isInteger(version) || version < 1)
+    throw new Error(`${file} has an unknown settings version ${JSON.stringify(version)}`);
+  if (version > STORE_VERSION) throw new Error(`${file} is settings version ${version}, newer than this Lineclear reads (${STORE_VERSION}); update Lineclear`);
+  const setup = (raw.setup ?? {}) as Setup;
+  if (version === STORE_VERSION) return { version, setup };
+  writeAtomic(`${file}.v${version}.bak`, readFileSync(file, "utf8"));
+  writeAtomic(file, `${JSON.stringify({ version: STORE_VERSION, setup }, null, 2)}\n`);
+  return { version: STORE_VERSION, setup };
+}
+
+/** The settings version the machine store is in, after any migration. Throws when the file cannot be read. */
+export const storeVersion = (env = process.env): number => readStore(env).version;
 
 /** Writes the role models into the one store, the file Settings writes. */
 export function writeSetup(next: Setup, env = process.env): void {
   mkdirSync(configDir(env), { recursive: true });
-  writeAtomic(storePath(env), `${JSON.stringify({ setup: next }, null, 2)}\n`);
+  writeAtomic(storePath(env), `${JSON.stringify({ version: STORE_VERSION, setup: next }, null, 2)}\n`);
 }
 
 /** The model chosen for each role: the machine's defaults, which a project's own `models` override. */
 export function readSetup(env = process.env): Setup {
   const legacy = legacySetupPath(env);
-  const stored = readStored(storePath(env)) as { setup?: Setup };
-  if (!existsSync(legacy)) return stored.setup ?? {};
-  const merged = { ...readStored(legacy), ...stored.setup };
+  const stored = readStore(env).setup;
+  if (!existsSync(legacy)) return stored;
+  const merged = { ...(readObject(legacy) as Setup), ...stored };
   writeSetup(merged, env);
   rmSync(legacy, { force: true });
   return merged;
@@ -117,7 +146,12 @@ export function saveSetup(choice: Setup, companyOf: (model: string) => string, e
 
 /** The line that stops `run` and `project add` until every role has a model, or undefined when none is missing. */
 export function setupGate(env = process.env): string | undefined {
-  const chosen = readSetup(env);
+  let chosen: Setup;
+  try {
+    chosen = readSetup(env);
+  } catch (e) {
+    return (e as Error).message;
+  }
   const missing = setupRoles.filter((r) => !chosen[r]);
   return missing.length ? `no model chosen for the ${missing.join(", ")}: run 'lineclear setup'` : undefined;
 }
