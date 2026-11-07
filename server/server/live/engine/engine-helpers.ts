@@ -64,6 +64,8 @@ export interface TaskRec {
   cleaned?: boolean
   /** what putting it away kept, and why ("~/x (uncommitted changes)") */
   kept?: string[]
+  /** milliseconds its start spent on the worktree, the install step and the agent's session (until herdr says it is ready) */
+  startMs?: { worktree: number; install: number; session: number }
   /** starting it went wrong */
   trouble?: string
   /** its worktree's install step failed: a stall (news for its coordinator, shown as stuck), not a question; a message to it starts it again */

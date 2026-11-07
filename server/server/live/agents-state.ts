@@ -31,6 +31,7 @@ export class AgentsState extends Emitter<Events> {
   secretScope: (chat: string) => string[] | undefined = () => undefined
   protected refreshing = false
   protected readAgain = false
+  protected readSoon = new Set<string>()
   /** the subscription dropped and has not opened again: a read that answers meanwhile does not make herdr reachable */
   protected subDown = false
   protected retryTimer: ReturnType<typeof setTimeout> | null = null

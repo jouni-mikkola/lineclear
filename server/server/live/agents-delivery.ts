@@ -320,7 +320,8 @@ export class AgentsDelivery extends AgentsState {
         await new Promise((res) => setTimeout(res, 750))
       }
     }
-    await this.refresh()
+    // forced: a read already in flight began before herdr said ready, and would leave the brief waiting for the next event
+    await this.refresh(true)
     await this.bindRoute(r, pane)
     // CLIs without an option for extra instructions get them first, hidden from the chat. Both wait until the CLI is
     // ready, ahead of what you sent meanwhile (a restart)
@@ -439,7 +440,10 @@ export class AgentsDelivery extends AgentsState {
           drop()
           continue
         }
-        if (this.heldBy(key, next)) return
+        if (this.heldBy(key, next)) {
+          this.readAgainSoon(key)
+          return
+        }
         try {
           await this.put(key, next)
         } catch (e) {
@@ -460,6 +464,17 @@ export class AgentsDelivery extends AgentsState {
     } finally {
       this.delivering.delete(key)
     }
+  }
+
+  /** a CLI herdr has not called ready yet is asked about again soon: nothing else tells Lineclear when it turns ready */
+  protected readAgainSoon(key: string) {
+    if (this.info(key)?.interactive_ready !== false || this.readSoon.has(key)) return
+    this.readSoon.add(key)
+    const t = setTimeout(() => {
+      this.readSoon.delete(key)
+      if (!this.stopped) void this.refresh(true).then(() => this.deliver(key))
+    }, STARTING_RETRY_MS)
+    t.unref?.()
   }
 
   /** a hand-over failed: backed off, and given up on once it can't be waited for */
