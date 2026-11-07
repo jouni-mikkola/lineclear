@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import type { AgentStatus, HerdrError } from './herdr.ts'
+import type { AgentInfo, AgentStatus, HerdrError } from './herdr.ts'
 import { claudeHome, claudeLogPath } from './readers/find.ts'
 import type { Said } from './readers/hooks.ts'
 import * as task from './mfs.ts'
@@ -26,6 +26,13 @@ export function statusFrom(said: Said | undefined, seen: AgentStatus | 'gone'): 
   if (said.helper) return 'blocked'
   if (said.state !== 'idle') return said.state
   return seen === 'done' || seen === 'blocked' ? seen : 'idle'
+}
+
+/** herdr refused a start because the agent's name sits on a pane: the pane (not `except`, the new one) that holds
+ *  exactly this name, which is the agent's own earlier pane; never a pane under another name */
+export function ownOldPane(e: unknown, list: AgentInfo[], name: string, except: string): string | undefined {
+  if (!/already used/.test((e as Error)?.message ?? '')) return undefined
+  return list.find((a) => a.name === name && a.pane_id !== except)?.pane_id
 }
 
 /** what a refusal from herdr means for what you send: a menu is up, or the agent just started and herdr doesn't count

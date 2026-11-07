@@ -10,7 +10,7 @@ import * as task from './mfs.ts'
 import { mirrored } from './mfs.ts'
 import { agentEnv, BOX } from './box.ts'
 import { ROOT } from '../root.ts'
-import { carryClaudeSession, holdFrom, canResume } from './agent-start.ts'
+import { carryClaudeSession, holdFrom, canResume, ownOldPane } from './agent-start.ts'
 import { type AgentRecord, type Spec, HOOKS_DIR, promptPath, hidden } from './agents-helpers.ts'
 import { addLog } from './log-list.ts'
 import { AgentsState } from './agents-state.ts'
@@ -345,6 +345,12 @@ export class AgentsDelivery extends AgentsState {
       } catch (e) {
         const code = (e as { code?: string }).code
         if (code === 'agent_not_ready') break
+        // the agent's own earlier pane (Done, still open) holds its name: closed, then started again
+        const old = ownOldPane(e, await herdr.agents().catch(() => []), r.name, pane)
+        if (old) {
+          await herdr.closePane(old).catch(() => undefined)
+          continue
+        }
         if (i >= 8) {
           console.error(`lineclear: could not start ${r.name}: ${(e as Error).message}`)
           r.finished = true
