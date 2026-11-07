@@ -1,6 +1,6 @@
 import { type Account, readAccounts } from "./full.ts";
 import { type AskBefore, askBefore, listProjectNames, readSettings, type Role } from "./project.ts";
-import { secretNames } from "./secrets.ts";
+import { secretNames } from "../server/server/live/secrets.ts";
 import type { Env } from "./web-guard.ts";
 
 /** A project as the Settings view shows it: its commands, its model lists, and its secrets by name only. */

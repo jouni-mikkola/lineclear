@@ -2,8 +2,8 @@
 import { expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { secretNames, secrets, storedLoginAdvice } from "../../src/secrets.ts";
-import { tmp } from "../helpers.ts";
+import { secretNames, storedLoginAdvice } from "../../server/server/live/secrets.ts";
+import { keepSecret, tmp } from "../helpers.ts";
 
 /** A temporary config folder with project `alpha` in it. */
 const fresh = () => {
@@ -17,15 +17,7 @@ const fresh = () => {
   return env;
 };
 
-const store = async (env: ReturnType<typeof fresh>, name: string, value: string) =>
-  expect(
-    await secrets(
-      ["set", "alpha", name],
-      () => {},
-      env,
-      async () => `${value}\n`,
-    ),
-  ).toBe(0);
+const store = async (env: ReturnType<typeof fresh>, name: string, value: string) => keepSecret(env, "p:box:alpha-space", name, value);
 
 test("secretNames gives a project's names sorted and never a value", async () => {
   const env = fresh();

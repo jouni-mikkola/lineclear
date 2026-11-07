@@ -4,7 +4,7 @@ import { herdrArgv, herdrVersionOf } from "./herdr.ts";
 import { userInfo } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import { readJson } from "../pi/config.ts";
-import { failureTail } from "./secrets.ts";
+import { failureTail } from "../server/server/live/secrets.ts";
 import { copiesProblem, runByNote } from "./store-copies.ts";
 import { cacheEnvFile, dataDir, extensionFile, INSTALL_URL, type Paths, SERVICE } from "./paths.ts";
 import { diskTrouble, freeBytes } from "./health.ts";

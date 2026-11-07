@@ -26,8 +26,7 @@ beforeEach(() => {
 beforeEach(() => chooseModels(join(root, "config")));
 afterEach(() => rmSync(root, { recursive: true, force: true }));
 
-import { secrets } from "../src/secrets.ts";
-import { chooseModels, runCli } from "./helpers.ts";
+import { chooseModels, keepSecret, runCli } from "./helpers.ts";
 
 const models = ["--worker", "a/x,a/y", "--reviewer", "b/z", "--planner", "c/w"];
 const settingsFile = (name = "myrepo") => join(root, "config", "projects", name, "settings.json");
@@ -131,12 +130,7 @@ test("check passes, then fails on a bad command, then on a missing repo", async 
   expect(bad.out).toContain("exit 3");
 
   await run(["project", "add", repo, "--name", "loud", "--check", "seq 1 30; echo token=hunter2 >&2; exit 4", ...models]);
-  await secrets(
-    ["set", "--all", "TOKEN"],
-    () => {},
-    env,
-    async () => "hunter2\n",
-  );
+  keepSecret(env, "all", "TOKEN", "hunter2");
   const loud = await run(["project", "check", "loud"]);
   expect(loud.code).toBe(1);
   expect(loud.out).toContain("exit 4");
@@ -186,12 +180,7 @@ test("add works when lineclear is not installed, and rejects an empty model list
 
 test("set changes the commands and a role's model order, and list shows them with the secret names only", async () => {
   await run(["project", "add", repo, "--check", "true", ...models]);
-  await secrets(
-    ["set", "--all", "API_TOKEN"],
-    () => {},
-    env,
-    async () => "s3cret\n",
-  );
+  keepSecret(env, "all", "API_TOKEN", "s3cret");
   expect((await run(["project", "set", "myrepo", "--check", "make check", "--health", "curl -f localhost", "--worker", "a/y,a/x"])).code).toBe(0);
   const s = JSON.parse(readFileSync(settingsFile(), "utf8"));
   expect(s).toMatchObject({ check: "make check", health: "curl -f localhost", models: { worker: ["a/y", "a/x"], reviewer: ["b/z"] } });

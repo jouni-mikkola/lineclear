@@ -6,7 +6,7 @@ import { askBefore, readSettings } from "./project.ts";
 import type { StepCheck } from "./stepcheck.ts";
 import { clearWait, findProject, findTask, readWaits, writeWait } from "./waits.ts";
 import { configDir } from "../pi/config.ts";
-import { storedLoginAdvice } from "./secrets.ts";
+import { storedLoginAdvice } from "../server/server/live/secrets.ts";
 import { git, gitText } from "./git.ts";
 
 /** The five kinds of item the Inbox holds. */

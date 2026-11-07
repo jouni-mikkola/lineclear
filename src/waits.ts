@@ -5,7 +5,7 @@ import { writeAtomic } from "../pi/atomic.ts";
 import { dirname, join } from "node:path";
 import { guardGroup, killGroup } from "./process-group.ts";
 import * as Q from "../server/server/live/engine/machine.ts";
-import { storedLoginAdvice } from "./secrets.ts";
+import { storedLoginAdvice } from "../server/server/live/secrets.ts";
 import { listProjectNames, readSettings } from "./project.ts";
 import { day } from "./progress.ts";
 import { gitText } from "./git.ts";

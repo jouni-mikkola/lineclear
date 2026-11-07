@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { addItem, type InboxKind, stepRule } from "./inbox.ts";
 import { chatFiles, findSpace, lineclearDir, spaceTasks } from "./measure.ts";
 import { projectsDir } from "./project.ts";
-import { loadableTotps, secretNames, storedLogin, totpAdvice, totpAnswers } from "./secrets.ts";
+import { loadableTotps, secretNames, storedLogin, totpAdvice, totpAnswers } from "../server/server/live/secrets.ts";
 import { writeWait } from "./waits.ts";
 import { IDLE_NUDGE, PROMISE_NUDGE, promisesNext } from "../pi/nudge.ts";
 import { type AskKind, askKind, type Card, IDLE_TEXT, isIdle, lineOf, questionIn, replyText } from "./cards.ts";

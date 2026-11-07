@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Task } from "./roadmap.ts";
 import { quote, REMOTE_PATH, sshArgs } from "./ssh.ts";
-import { secretsText } from "./secrets.ts";
+import { secretsText } from "../server/server/live/secrets.ts";
 
 type Env = Record<string, string | undefined>;
 

@@ -5,6 +5,13 @@ import { main } from "../src/cli.ts";
 import { testedHerdr } from "../src/doctor.ts";
 import { PAGE_TOKEN } from "../src/web-guard.ts";
 import { webApi } from "../src/web.ts";
+import { Vault } from "../server/server/live/secrets.ts";
+
+/** Keeps a secret in the vault under `LINECLEAR_MAIN_HOME` at a level (`all`, `m:<machine>` or `p:<machine>:<space>`). */
+export function keepSecret(env: Record<string, string | undefined>, level: string, name: string, value: string): void {
+  const kept = new Vault(env.LINECLEAR_MAIN_HOME as string).set(level, name, value);
+  if (!kept.ok) throw new Error(kept.error);
+}
 
 /** Chooses a model for every role in a config folder, so `run` and `project add` are not stopped by the first-run setup. */
 export function chooseModels(configFolder: string): void {
