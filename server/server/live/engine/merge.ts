@@ -359,8 +359,8 @@ export class EngineLand extends EngineHandoff {
       await this.sendBack(t, `${why} ${this.fixIt(t)}`)
       return { ok: false, error: `${why} Sent back to ${t.id}'s agent to fix.` }
     }
-    const held = await this.holdForRedMain(t, p)
-    if (held) return { ok: false, error: held }
+    const heldNow = await this.holdForRedMain(t, p)
+    if (heldNow) return { ok: false, error: heldNow }
     const m = await GH.mergePr(g, wt, n, head, `${t.id}: ${t.title} (#${n})`, t.said ?? '')
     let state = (await GH.viewPr(g, wt, n))?.state
     // a repo with a merge queue only queues the pull request: GitHub's full check runs there and merges it when green
