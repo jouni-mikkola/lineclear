@@ -131,6 +131,11 @@ export function worktreeCost(worktree: string, env: Env): number | undefined {
   return total;
 }
 
+/** Tokens a working folder's sessions sent to the model, fresh and read from cache; undefined when no session was found. */
+export function worktreeInput(worktree: string, env: Env): number | undefined {
+  return worktreeUsage(worktree, env)?.reduce((n, u) => n + u.input + u.cacheRead, 0);
+}
+
 /** The price of the same model in pi's model data: the same provider first, then any provider. */
 export function priceFinder(store: any): (u: Usage) => Price | undefined {
   const find = (provider: string | undefined, model: string): Price | undefined => {

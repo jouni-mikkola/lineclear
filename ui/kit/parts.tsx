@@ -25,6 +25,8 @@ export interface Task extends TrainFacts, RowFacts {
   model?: string;
   /** Since when it is at its stage (ms). */
   since?: number;
+  /** Tokens sent to the model so far. */
+  input?: number;
   /** No sign of life from it for a while. */
   stalled?: boolean;
   /** Its machine did not answer the last read: when it last did (ms). */

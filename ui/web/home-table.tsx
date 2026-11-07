@@ -1,6 +1,7 @@
 import type { TaskDetail } from "../../src/task-detail.ts";
-import { type Browser, type Column, DataTable, dollars, exact, type InboxItem, LivePicture, ago, type Project, type Task } from "../kit/index.ts";
-import { type HomeData, type Load, useTaskDetail } from "./data.ts";
+import { type Browser, type Column, DataTable, dollars, exact, type InboxItem, LivePicture, ago } from "../kit/index.ts";
+import { type Load, useTaskDetail } from "./data.ts";
+import type { Row } from "./home-rows.ts";
 import { AskInRow } from "./inbox-strip.tsx";
 
 type Choose = (item: InboxItem, choice: string, note?: string) => void;
@@ -8,44 +9,6 @@ import { samplePictureOf } from "./browser-samples.ts";
 
 // Home's table of working tasks: one row each, the row opens in place with the log tail, the diff stat, the check,
 // the review's findings and the task's browser.
-
-interface Row {
-  id: string;
-  project: string;
-  step: string;
-  title: string;
-  machine: string;
-  stage: string;
-  stuck: boolean;
-  last?: Task["last"];
-  files?: number;
-  check?: "pass" | "fail";
-  task: Task;
-  /** The ask this task waits on, shown in its open row. */
-  ask?: InboxItem;
-}
-
-const STAGE_WORD = { queued: "in line", work: "at work", review: "in review", ready: "ready to merge", done: "merged" } as const;
-
-/** Every task at work or waiting on you, in the order of the projects. */
-export function rowsOf(projects: Project[], loose: HomeData["loose"], host: string, asks: InboxItem[] = []): Row[] {
-  const make = (project: string, t: Task): Row => ({
-    id: t.id,
-    project,
-    step: t.step ?? "",
-    title: t.title,
-    machine: t.machine ?? host,
-    stage: t.state === "need" ? (t.text ?? "waits for you") : t.silentSince ? "not reached" : t.stalled ? "no sign of life" : STAGE_WORD[t.stage ?? "work"],
-    stuck: t.state === "need" || !!t.stalled,
-    last: t.last,
-    files: t.files,
-    check: t.check,
-    task: t,
-    ask: asks.find((a) => a.task === t.id),
-  });
-  const working = (t: Task) => t.state === "need" || (t.state === "work" && t.stage !== "queued" && t.stage !== "done");
-  return [...projects.flatMap((p) => p.tasks.filter(working).map((t) => make(p.name, t))), ...(loose ?? []).filter(working).map((t) => make(t.space, t))];
-}
 
 const columns: Column<Row>[] = [
   { key: "project", label: "Project" },
@@ -59,7 +22,10 @@ const columns: Column<Row>[] = [
     ),
   },
   { key: "machine", label: "Machine", show: (r) => <span className="whitespace-nowrap">{r.machine}</span> },
-  { key: "stage", label: "Stage", show: (r) => <span className={`inline sm:block sm:min-w-28 ${r.stuck ? "text-caution" : "text-fg2"}`}>{r.stage}</span> },
+  { key: "phase", label: "Phase", show: (r) => <span className="whitespace-nowrap text-fg2">{r.phase}</span> },
+  { key: "input", label: "Input", num: true, show: (r) => (r.input === undefined ? "-" : `${Math.round(r.input / 1000)}k`), sortBy: (r) => r.input ?? 0 },
+  { key: "minutes", label: "Min", num: true },
+  { key: "wait", label: "Wait", show: (r) => <span className={`inline sm:block sm:min-w-28 ${r.stuck ? "text-caution" : "text-fg2"}`}>{r.wait || "-"}</span> },
   {
     key: "last",
     label: "Last",
@@ -173,7 +139,7 @@ export function TaskTable({ rows, sample, browsers, onChoose }: { rows: Row[]; s
       label="Working tasks"
       columns={columns}
       rows={rows}
-      card={["stage", "check"]}
+      card={["wait", "check"]}
       height="fill"
       group={(r) => r.project}
       cardTitle={(r) => `${r.id}: ${r.step && !r.title.startsWith(r.step) ? `${r.step} ` : ""}${r.title}`}
