@@ -202,10 +202,7 @@ export function startApp({ source, push, port, host = '127.0.0.1', updates }: Ap
           ).cli
           if (!cli)
             return json({
-              out:
-                source.kind === 'demo'
-                  ? 'This demo server does not accept lineclear commands. Target your owning live server or installed helper.\n'
-                  : 'This server does not provide the lineclear command. Check the target URL or installed helper.\n',
+              out: 'This server does not provide the lineclear command. Check the target URL or installed helper.\n',
               code: 1,
             })
           const b = (await req.json()) as { args: string[]; chat?: string; cwd?: string; stdin?: string }

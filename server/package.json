@@ -9,7 +9,6 @@
     "plugins": "bun scripts/build-plugins.ts",
     "build": "bun scripts/build-plugins.ts",
     "start": "bun server/main.ts",
-    "demo": "LINECLEAR_SOURCE=demo bun server/main.ts",
     "typecheck": "bun scripts/build-plugins.ts && tsc --noEmit",
     "typecheck:changed": "bun scripts/build-plugins.ts && tsc --noEmit --incremental --tsBuildInfoFile node_modules/.cache/tsc-changed.tsbuildinfo",
     "test": "bun scripts/test.ts",

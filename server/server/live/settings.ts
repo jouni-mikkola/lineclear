@@ -8,7 +8,6 @@ export {
   REVIEWERS,
   defaultMaxTasks,
   CATALOG,
-  defaultOf,
   refuse,
 } from './settings-catalog.ts'
 export { machineNote, Settings, setForTask, repositorySection } from './settings-store.ts'

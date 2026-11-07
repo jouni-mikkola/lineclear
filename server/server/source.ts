@@ -1,5 +1,4 @@
-// A source fills the view model and carries out actions. The live source reads herdr and the CLIs' logs; the demo
-// source holds the prototype's fictional world, for side-by-side review and tests.
+// A source fills the view model and carries out actions. The live source reads herdr and the CLIs' logs.
 import type { Action, ActivityAnswer, ActivityAsk, AddSpace, Alert, Chat, Folders, Snapshot, TermScreen, WorktreeAsk } from '../shared/types.ts'
 
 export type SourceEvents = {
@@ -33,7 +32,6 @@ export class Emitter<E extends Record<string, unknown[]>> {
 }
 
 export interface Source extends Emitter<SourceEvents> {
-  readonly kind: 'live' | 'demo'
   snapshot(): Snapshot
   /** Owning agent status, for the chat view. */
   chatStatus?(key: string): string

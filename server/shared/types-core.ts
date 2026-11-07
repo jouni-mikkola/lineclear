@@ -93,7 +93,7 @@ export interface HealthMeter {
   level: HealthLevel
 }
 
-export interface MachineHealth {
+interface MachineHealth {
   /** CPU, Memory, Disk, and GPU where the machine has one */
   meters: HealthMeter[]
   /** herdr answers */
@@ -166,7 +166,7 @@ export interface Report {
 export type TaskStatus = 'need' | 'ready' | 'merging' | 'work' | 'queued' | 'todo' | 'done'
 
 /** A task's one agent: tapping the task opens its chat. */
-export interface TaskAgent {
+interface TaskAgent {
   /** chat key */
   chat: string
   role: string

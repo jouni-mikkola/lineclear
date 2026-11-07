@@ -55,7 +55,7 @@ export function restartHint(on: Harness, set: Harness | undefined, want: Harness
 }
 
 /** each CLI the sheet offers: its models (with the levels each takes) where Lineclear passes them */
-export function restartClis(kinds: string[]): RestartCli[] {
+function restartClis(kinds: string[]): RestartCli[] {
   return kinds
     .filter((kind) => !chatProblem(kind))
     .map((kind) => {

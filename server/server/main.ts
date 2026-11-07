@@ -1,34 +1,24 @@
-// Starts Lineclear: LINECLEAR_SOURCE=demo for the fictional world (review, tests), otherwise live on herdr.
+// Starts Lineclear: the live source on herdr.
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { startApp } from './app.ts'
-import { DemoWorld } from './demo/world.ts'
 import { holderPort, lockStore } from './lock.ts'
 import { Push } from './push.ts'
-import type { Source } from './source.ts'
 import { DEFAULT_PORT, HOME, writeJson } from './store.ts'
 
 const port = Number(process.env.LINECLEAR_PORT ?? DEFAULT_PORT)
-const kind = process.env.LINECLEAR_SOURCE === 'demo' ? 'demo' : 'live'
 
-async function makeSource(): Promise<Source> {
-  if (kind === 'demo') return new DemoWorld()
-  const { LiveSource } = await import('./live/source.ts')
-  return new LiveSource()
+const holder = lockStore(HOME)
+if (holder !== undefined) {
+  const at = holderPort(HOME, holder)
+  console.error(
+    `lineclear: another server (process ${holder}${at ? `, port ${at}` : ''}) already runs on ${HOME}. Stop it first, or use another LINECLEAR_HOME.`,
+  )
+  process.exit(1)
 }
-
-if (kind === 'live') {
-  const holder = lockStore(HOME)
-  if (holder !== undefined) {
-    const at = holderPort(HOME, holder)
-    console.error(
-      `lineclear: another server (process ${holder}${at ? `, port ${at}` : ''}) already runs on ${HOME}. Stop it first, or use another LINECLEAR_HOME.`,
-    )
-    process.exit(1)
-  }
-}
-const source = await makeSource()
-const push = kind === 'live' && !process.env.LINECLEAR_BOX ? new Push() : undefined
+const { LiveSource } = await import('./live/source.ts')
+const source = new LiveSource()
+const push = !process.env.LINECLEAR_BOX ? new Push() : undefined
 if (push && 'devices' in source && 'pushWarnings' in source) {
   ;(source as { devices: () => string[] }).devices = () => push.devices.map(deviceName)
   ;(source as { pushWarnings: () => string[] }).pushWarnings = () => push.warnings(deviceName)
@@ -37,15 +27,14 @@ if (push && 'devices' in source && 'pushWarnings' in source) {
 const worker = !!process.env.LINECLEAR_BOX
 const server = startApp({ source, push: worker ? undefined : push, port, updates: worker ? undefined : join(HOME, 'update.json') })
 // a worker says which code it runs: the main server keeps it across its own restart while that is the same
-if (kind === 'live')
-  writeJson('server.json', { port: server.port, pid: process.pid, code: worker ? (await import('./live/machines.ts')).codeVersion() : undefined })
+writeJson('server.json', { port: server.port, pid: process.pid, code: worker ? (await import('./live/machines.ts')).codeVersion() : undefined })
 let tunnel: { stop(): void } | undefined
 if (worker) {
   // the agents there reach this worker's lineclear command through an SSH tunnel to it
   tunnel = (await import('./live/tunnel.ts')).keepTunnel(server.port!)
   orphaned()
 }
-console.log(`lineclear (${kind}) on http://127.0.0.1:${server.port}, ready ${Math.round(performance.now())} ms after start`)
+console.log(`lineclear on http://127.0.0.1:${server.port}, ready ${Math.round(performance.now())} ms after start`)
 
 /** A worker outlives a restart of its main server, which takes it back; one whose main server stays gone stops. */
 function orphaned() {
