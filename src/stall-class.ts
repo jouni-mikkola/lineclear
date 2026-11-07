@@ -72,6 +72,9 @@ export const CLASS_INFO: Record<StallClass, ClassInfo> = {
 /** A reason that waits for the owner, a dry run, or a declared wait: not a stall of the system. */
 const OWNER = /paid key|waits for your answer|declared wait|is paused|^would |^rung 4: would/;
 
+/** Not a stop: another machine of the project starts the step, or an aged ready step goes first and is watched itself. */
+const NOT_BLOCKED = /^the project is kept off this machine|^lock '.*' is reserved for /;
+
 const PATTERNS: [RegExp, StallClass][] = [
   [/no \w+ fix task started: fix loop: /, "fix-loop"],
   [/signed out/i, "signed-out"],
@@ -100,6 +103,7 @@ export function classify(d: Pick<Decision, "kind" | "reason">): StallClass | "ow
   // the item after the colon is the roadmap's done-when text, not Lineclear's words
   if (/^\S+ is merged, unproven:/.test(d.reason)) return undefined;
   if (OWNER.test(d.reason)) return "owner";
+  if (NOT_BLOCKED.test(d.reason)) return undefined;
   if (/is back: its limit has reset|^stall |^remedy /.test(d.reason)) return undefined;
   for (const [re, c] of PATTERNS) if (re.test(d.reason)) return c;
   return d.kind === "skip" ? "unknown" : undefined;

@@ -87,6 +87,8 @@ test("each class is named from its reason, and the owner's waits are no stall", 
   expect(c("LIN-5: its agent never answered, but the nudge failed: no pane")).toBe("brief-unsent");
   expect(c("typed its brief nudge into the pane of LIN-5: its agent never answered", "stall")).toBe("brief-unsent");
   expect(c("something no pattern knows")).toBe("unknown");
+  expect(c("the project is kept off this machine (local: false)")).toBeUndefined();
+  expect(c("lock 'ui' is reserved for B5, skipped for locks 3 ticks")).toBeUndefined();
   expect(c("a paid key is not allowed: waits for your answer")).toBe("owner");
   expect(c("the project is paused, no step starts")).toBe("owner");
   expect(c("would start A", "start")).toBeUndefined();
