@@ -36,6 +36,8 @@ export const MOTIONS = {
   "model-move": { ms: MS.quick, what: "A model moves in its role's list: it slides to its new place and the one it passed slides the other way." },
   "chat-arrive": { ms: MS.move, what: "A chat message arrives: it slides up 12 px into place as it fades in." },
   "chat-typing": { ms: MS.long, what: "The Dispatcher writes: one grey dot after another rises and brightens." },
+  "tab-change": { ms: 160, what: "A tab is picked: its content fades in and slides up 6 px." },
+  "list-add": { ms: MS.move, what: "A row joins a list: it fades in and slides up 8 px." },
   "part-change": { ms: 160, what: "A part goes between empty, loading, error and filled: the new state fades in." },
   "value-change": { ms: MS.long, what: "A number or a bar changes: the number counts to its new value and the bar grows or shrinks to it." },
 } as const;

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useFadeIn } from "../kit/hooks.ts";
+import { useTabIn } from "../kit/hooks.ts";
 import type { Task } from "../kit/parts.tsx";
 import { TaskHead, TaskNotFound } from "../kit/task-head.tsx";
 import { Chat } from "./chat-view.tsx";
@@ -95,7 +95,7 @@ export function TaskView({ id }: { id: string }) {
 
 // keyed by the tab, so each pick fades its content in
 function LiveTab({ tab, id }: { tab: Exclude<Tab, "chat">; id: string }) {
-  const box = useFadeIn<HTMLDivElement>();
+  const box = useTabIn<HTMLDivElement>();
   return (
     <div ref={box} className="py-4" data-task-live={tab}>
       {tab === "terminal" ? <TerminalTab id={id} /> : <ChangesTab id={id} />}

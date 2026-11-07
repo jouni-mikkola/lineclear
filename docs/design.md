@@ -422,6 +422,8 @@ input. Under prefers-reduced-motion none runs and every change is instant.
 | `model-move` | A model moves in its role's list | It slides to its new place, the one it passed slides the other way | 200 ms |
 | `chat-arrive` | A chat message arrives | It slides up 12 px into place as it fades in | 240 ms |
 | `chat-typing` | The Dispatcher writes | Its three grey dots rise and brighten one after another, a beat each | 280 ms |
+| `tab-change` | A tab is picked | Its content fades in and slides up 6 px | 160 ms |
+| `list-add` | A row joins a list | It fades in and slides up 8 px | 240 ms |
 | `part-change` | A part goes between empty, loading, error and filled, or its line changes on an event | The new state fades in | 160 ms |
 | `value-change` | A number or a bar changes: a count, spend, a load | The number counts to its new value in fixed-width digits, the bar grows or shrinks to it | 280 ms |
 
