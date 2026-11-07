@@ -192,7 +192,12 @@ function serverSteps(): Step[] {
     { name: "server types", cmd: ["bun", "run", full || known === undefined ? "typecheck" : "typecheck:changed"], cwd: "server", needs: serverNeeds() },
     {
       name: "server tests",
-      cmd: ["bun", "scripts/test.ts", full || known === undefined ? "--force" : "changed", ...(shard ? [`--shard=${shard.i - INSTALL_JOBS}/${shard.n - INSTALL_JOBS}`] : [])],
+      cmd: [
+        "bun",
+        "scripts/test.ts",
+        full || known === undefined ? "--force" : "changed",
+        ...(shard ? [`--shard=${shard.i - INSTALL_JOBS}/${shard.n - INSTALL_JOBS}`] : []),
+      ],
       cwd: "server",
       needs: serverNeeds(),
     },
