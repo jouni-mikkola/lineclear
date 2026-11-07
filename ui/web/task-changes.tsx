@@ -49,7 +49,7 @@ export function ChangesTab({ id }: { id: string }) {
     const load = () =>
       get<TaskChanges>(`/api/task/${encodeURIComponent(id)}/changes`, (d) => Array.isArray((d as TaskChanges)?.files)).then(
         (d) => live && setRead(d),
-        (e) => live && setRead({ error: String(e?.message ?? e) }),
+        () => live && setRead({ error: "The changes could not be read. The board server did not answer." }),
       );
     void load();
     const t = setInterval(load, 10_000);

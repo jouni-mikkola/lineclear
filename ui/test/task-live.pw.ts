@@ -15,6 +15,18 @@ for (const tab of ["terminal", "changes"]) {
   });
 }
 
+for (const tab of ["terminal", "changes"]) {
+  test(`a task's ${tab} shows no raw error text in its error states`, async ({ page }) => {
+    for (const state of ["error", "offline"]) {
+      await page.goto(`/task/WEB-3?tab=${tab}&state=${state}`);
+      await page.waitForSelector("[data-task-live]");
+      const text = await page.locator("[data-task-live]").innerText();
+      expect(text).toMatch(/\./);
+      expect(text).not.toMatch(/TypeError|Error:|Failed to fetch|HTTP \d|ECONN|\{|undefined|\bat \w+\(/);
+    }
+  });
+}
+
 test("the terminal takes words and keys, and the tab stays in the address", async ({ page }) => {
   await page.goto("/task/WEB-3?state=filled");
   await page.getByRole("button", { name: "Terminal" }).click();
