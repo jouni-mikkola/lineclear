@@ -1,0 +1,25 @@
+# Working on Lineclear
+
+How to run, build and lay out the code: [docs/develop.md](docs/develop.md).
+
+## Tests
+
+- No tests on this machine: it keeps the CPU for herdr, the server and the agents. While you work and before you
+  merge, run only `bun run typecheck` (seconds). Don't run `bun run test`, `bun test`, `bun run test changed`,
+  `bun run check` or any browser test here.
+- Check what you changed on the screen by hand in a browser (playwright-cli), for the proof.
+- GitHub runs the whole check (types, every test with the browser tests, the build) after each merge: the Check
+  workflow (`.github/workflows/check.yml`) on every push to main, not on pull requests. A red main reaches the
+  coordinator, who has it fixed forward. A failure's log is `gh run view <run> --log-failed`.
+- Running the whole check on your branch before merging, `gh workflow run check.yml --ref <branch>` then
+  `gh run watch`, is for rare cases only (a review asks for it, or the change is to the tests' own setup): it costs
+  Actions minutes.
+- Still write tests with your change: GitHub runs them. A new browser test goes in the `layout-*.test.ts` file of its
+  topic (setup in `test/layout.ts`); split a file that grows past about 20 s.
+- If someone runs tests here by hand anyway, they run at the lowest priority and never touch `~/.lineclear`.
+
+## Releases
+
+- Never cut a new release (version bump, tag, GitHub release, publish) without asking the human first and getting a
+  yes.
+- Version bumps are patch only (2.0.0 → 2.0.1) unless the human explicitly asks for a minor or major one.
