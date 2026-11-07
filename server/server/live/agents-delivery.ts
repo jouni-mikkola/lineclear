@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { dirname } from 'node:path'
 import { herdr, paneEvents, type AgentInfo, type AgentStatus, type HerdrEvent } from './herdr.ts'
 import { findLog, logKind } from './readers/find.ts'
-import { chooseModel, effortFor, modelArg } from '../../../src/models.ts'
+import { chooseModel, effortFor, firstModel, modelArg } from '../../../src/models.ts'
 import * as task from './mfs.ts'
 import { agentEnv, BOX } from './box.ts'
 import { ROOT } from '../root.ts'
@@ -285,6 +285,11 @@ export class AgentsDelivery extends AgentsState {
     this.byName.set(r.name, r.key)
     this.save()
     task.mkdirSync(r.cwd, { recursive: true })
+    let chosen: string | undefined
+    if (chooseModel(r.kind, r.model)) {
+      chosen = firstModel(r.kind)
+      if (chosen) r.model = chosen
+    }
     const unset = chooseModel(r.kind, r.model)
     if (unset) throw new Error(unset)
     const pane = place ? await place() : await this.paneFor(r, was)
@@ -323,6 +328,7 @@ export class AgentsDelivery extends AgentsState {
       r.key,
       [
         r.kind !== 'pi' && (!resume || changedPrompt) && r.system ? hidden(r.system) : '',
+        chosen ? hidden(`No model was set, so the machine's first available model was chosen: ${chosen}. Note it in your facts.`) : '',
         lost ? hidden('Your earlier conversation could not be resumed. Read your brief and your branch, then carry on from where you were.') : '',
         first ?? '',
       ].filter(Boolean),

@@ -251,6 +251,11 @@ export function nearest(levels: string[], effort?: string): string | undefined {
 /** an effort as this CLI and model take it: the nearest level it has, or nothing for its own default */
 export const effortFor = (kind: string, effort?: string, model?: string) => nearest(effortsOf(kind, model), effort);
 
+/** the machine's first available model of a CLI that lists its models, for a start that has none set */
+export function firstModel(kind: string): string | undefined {
+  return modelsOf(kind)?.models[0]?.id;
+}
+
 /** why a CLI that lists its models won't start without one: no model is picked for it by default */
 export function chooseModel(kind: string, model?: string): string | undefined {
   const c = modelsOf(kind);
