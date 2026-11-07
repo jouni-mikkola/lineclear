@@ -1,7 +1,7 @@
 import { chmodSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { piHarness } from "./harness-pi.ts";
+import { sessionsRoot } from "./harness-pi.ts";
 import { writeAtomic } from "../pi/atomic.ts";
 import { runMain } from "./rules.ts";
 import { startWeb } from "./web.ts";
@@ -163,7 +163,7 @@ function writeUsage(dir: string, now: number) {
     const at = now - (DAILY_K_TOKENS.length - 1 - i) * DAY - HOUR_MS;
     return [sessionLine(at, "anthropic", "demo-sonnet", k * 1000), ...(i % 3 === 0 ? [sessionLine(at, "openai", "demo-codex", k * 400)] : [])];
   });
-  write(join(piHarness.sessionsRoot(join(dir, "pi")), "demo", "work.jsonl"), `${lines.flat().join("\n")}\n`);
+  write(join(sessionsRoot(join(dir, "pi")), "demo", "work.jsonl"), `${lines.flat().join("\n")}\n`);
   write(join(dir, "pi", "models-store.json"), PRICES);
   const window = (percent: number, hours: number) => ({ percent, resetAt: new Date(now + hours * HOUR_MS).toISOString() });
   const at = new Date(now).toISOString();

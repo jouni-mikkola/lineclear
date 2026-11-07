@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { closeSync, existsSync, openSync, readSync, statSync } from "node:fs";
 import { writeAtomic } from "../pi/atomic.ts";
 import { agentName } from "./starts.ts";
-import { piHarness } from "./harness-pi.ts";
+import { namesUsageLimit } from "./harness-pi.ts";
 import { rankByRoom } from "./pace.ts";
 import type { Decision, State, World } from "./rules.ts";
 import { DAY } from "./time.ts";
@@ -187,7 +187,7 @@ function markLimitedReviewers(a: Args): void {
   state.limitSeen ??= [];
   const now = world.now();
   for (const card of world.chatCards(settings.space, settings.repo)) {
-    if (state.limitSeen.includes(card.id) || card.at < (state.stallSince ?? 0) || !piHarness.stallSignal(card.text) || OUR_TELL.test(card.text)) continue;
+    if (state.limitSeen.includes(card.id) || card.at < (state.stallSince ?? 0) || !namesUsageLimit(card.text) || OUR_TELL.test(card.text)) continue;
     // A provider that is already out is not blamed again: a card that repeats its limit is the worker's report of the fallback.
     const provider = [...providers].find((p) => p !== "" && card.text.toLowerCase().includes(p.toLowerCase()) && availability(`${p}/x`, env, now) !== "out");
     if (provider === undefined) continue;

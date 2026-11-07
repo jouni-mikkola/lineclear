@@ -5,7 +5,7 @@ import { writeAtomic } from "../pi/atomic.ts";
 import { readJson } from "../pi/config.ts";
 import type { Account } from "./full.ts";
 import { costOf, priceFinder, type Price } from "./measure.ts";
-import { piHarness } from "./harness-pi.ts";
+import { allSessionFiles } from "./harness-pi.ts";
 import { piDir } from "./paths.ts";
 import { sessionUsage, type Usage } from "./session-text.ts";
 import { DAY, HOUR_MS } from "./time.ts";
@@ -151,7 +151,7 @@ function sessionMessages(env: Env, since: number, cacheFile: string): Message[] 
   }
   const kept: Record<string, CacheEntry> = {};
   let changed = false;
-  for (const { files } of piHarness.allSessionFolders(env)) {
+  for (const files of allSessionFiles(env)) {
     for (const path of files) {
       const st = statSync(path);
       if (st.mtimeMs < since) continue;

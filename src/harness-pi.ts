@@ -1,33 +1,44 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { type Harness, jsonlFiles, type SessionFolder, stallFromText } from "./harness.ts";
 import { piDir } from "./paths.ts";
-import { sessionUsage } from "./session-text.ts";
 
 /** pi keeps a folder of sessions per working folder: its path with `/` as `-`, between `--`. */
 export function sessionFolder(worktree: string): string {
   return `--${worktree.replace(/^\//, "").replace(/\//g, "-")}--`;
 }
 
-const sessionsRoot = (home: string) => join(home, "sessions");
+export const sessionsRoot = (home: string) => join(home, "sessions");
 
-const folderPath = (worktree: string, env: Record<string, string | undefined>) => join(sessionsRoot(piDir(env)), sessionFolder(worktree));
+/** The `.jsonl` files of a folder, by name; none when it is missing or not a folder. */
+function jsonlFiles(folder: string): string[] {
+  try {
+    return readdirSync(folder)
+      .filter((f) => f.endsWith(".jsonl"))
+      .sort()
+      .map((f) => join(folder, f));
+  } catch {
+    // missing, or a stray file where a folder should be: no sessions
+    return [];
+  }
+}
 
-const sessionFiles = (worktree: string, env: Record<string, string | undefined>) => (worktree ? jsonlFiles(folderPath(worktree, env)) : []);
+export const sessionFolderPath = (worktree: string, env: Record<string, string | undefined>) => join(sessionsRoot(piDir(env)), sessionFolder(worktree));
 
-export const piHarness: Harness = {
-  name: "pi",
-  start: (model, prompt) => ["pi", ...(model ? ["--model", model] : []), prompt],
-  home: piDir,
-  sessionsRoot,
-  sessionFolderPath: folderPath,
-  sessionFiles,
-  readSessions: (worktree, env) => sessionFiles(worktree, env).map((f) => readFileSync(f, "utf8")),
-  allSessionFolders(env): SessionFolder[] {
-    const root = sessionsRoot(piDir(env));
-    if (!existsSync(root)) return [];
-    return readdirSync(root).map((name) => ({ name, files: jsonlFiles(join(root, name)) }));
-  },
-  usage: sessionUsage,
-  stallSignal: stallFromText,
-};
+/** The text of each session file of a working folder, none when it has no sessions. */
+export const readSessions = (worktree: string, env: Record<string, string | undefined>): string[] =>
+  worktree ? jsonlFiles(sessionFolderPath(worktree, env)).map((f) => readFileSync(f, "utf8")) : [];
+
+/** Every session file pi keeps, by folder. */
+export function allSessionFiles(env: Record<string, string | undefined>): string[][] {
+  const root = sessionsRoot(piDir(env));
+  try {
+    return readdirSync(root).map((name) => jsonlFiles(join(root, name)));
+  } catch {
+    return [];
+  }
+}
+
+const USAGE_LIMIT = /usage limit|quota|\b429\b.*(limit|too many|rate)|(limit|too many|rate).*\b429\b/i;
+
+/** Whether a message names a usage limit. */
+export const namesUsageLimit = (text: string): boolean => USAGE_LIMIT.test(text);

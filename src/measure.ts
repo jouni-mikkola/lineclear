@@ -3,8 +3,8 @@ import { dataDir, piDir } from "./paths.ts";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { readTasksKept, type TaskLine } from "./kept-read.ts";
 import { join } from "node:path";
-import { piHarness } from "./harness-pi.ts";
-import { reviewerRound, type Usage } from "./session-text.ts";
+import { readSessions } from "./harness-pi.ts";
+import { reviewerRound, sessionUsage, type Usage } from "./session-text.ts";
 
 export { sessionFolder } from "./harness-pi.ts";
 
@@ -105,15 +105,15 @@ export function taskStart(task: any, files: any[]): number | undefined {
 
 /** The usage of a working folder's pi sessions, or undefined when none were found. */
 function worktreeUsage(worktree: string, env: Env): Usage[] | undefined {
-  const texts = piHarness.readSessions(worktree, env);
+  const texts = readSessions(worktree, env);
   if (texts.length === 0) return undefined;
   let count = 0;
   return texts.flatMap((t) => {
     const named = reviewerRound(t);
-    if (named === undefined) return piHarness.usage(t);
+    if (named === undefined) return sessionUsage(t);
     count++;
     const round = named || count;
-    return piHarness.usage(t).map((u) => ({ ...u, role: "reviewer" as const, round }));
+    return sessionUsage(t).map((u) => ({ ...u, role: "reviewer" as const, round }));
   });
 }
 
