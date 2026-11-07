@@ -57,12 +57,15 @@ describe("a task's CLI, model and effort", () => {
       shell: '/bin/sh',
     })
     const place = placeId.space((await src.places.add(dir, 'reviewer-source')).name)
+    setRegistry([{ harness: 'pi', provider: 'fakeco', name: 'zeta-1' }])
     for (const [args, says] of <[string[], string][]>[
+      [['--reviewer-model', 'nope'], '--reviewer-model nope: pi has no such model'],
       [['--reviewer', 'gemini'], '--reviewer gemini: Pick one of: pi.'],
       [['--reviewer-effort', 'extreme'], '--reviewer-effort takes default, off, minimal, low, medium, high, xhigh, max on pi'],
     ]) {
       await expectRefused(place, args, says)
     }
+    setRegistry([])
     const id = (out: string) => out.match(/([A-Z]+-\d+)/)![1]
     const plain = src.engine.task(id((await src.cli(['task', 'add', 'Plain review', '--desc', 'x'], { chat: place })).out))!
     expect(plain.reviewer).toEqual({ kind: 'pi', model: undefined, effort: undefined })

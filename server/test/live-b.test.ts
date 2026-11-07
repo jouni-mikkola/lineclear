@@ -143,8 +143,8 @@ describe('settings', () => {
       'task:X-1': { 'merge.by': 'by itself' },
     })
     let s = new Settings()
-    expect(s.get('task.agent')).toBe('pi')
-    expect(s.get('coordinator.agent')).toBe('pi')
+    expect(s.pick('task.agent')).toEqual({ value: 'pi', from: 'all' })
+    expect(s.pick('coordinator.agent')).toEqual({ value: 'pi', from: 'all' })
     // coordinator timer's old limits, wake picks and heartbeat interval are dropped
     s.set('task.agent', null)
     expect(readJson('settings.json', {})).toEqual({ everywhere: { 'coordinator.agent': 'pi' }, machine: {}, spaces: {} })
