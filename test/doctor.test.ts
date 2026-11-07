@@ -7,7 +7,6 @@ import { trimCache } from "../src/tmpdirs.ts";
 import { doctor, doctorChecks, herdrUnsaved, herdrVersions, realProbe, testedHerdr, type Probe } from "../src/doctor.ts";
 import { storedTaskIds } from "../src/doctor-task-ids.ts";
 import { cacheEnvFile, pathsFor } from "../src/paths.ts";
-import { isOpen, noticeTimers, readItems } from "../src/inbox.ts";
 import { fixRetired } from "../src/retire.ts";
 
 const paths = pathsFor({ HOME: "/nonexistent-home" });
@@ -128,24 +127,13 @@ test("doctor names coordinator timers, and --fix turns them off", () => {
   rmSync(dir, { recursive: true });
 });
 
-test("heal never flips a mode: it shows the timer in the Inbox once, and honours LINECLEAR_COORDINATOR_TIMER like the server", () => {
-  const dir = mkdtempSync(join(tmpdir(), "doctor-heal-"));
+test("the doctor honours LINECLEAR_COORDINATOR_TIMER like the server", () => {
+  const dir = mkdtempSync(join(tmpdir(), "doctor-timer-"));
   const data = join(dir, "data");
   mkdirSync(data, { recursive: true });
   writeFileSync(join(data, "modes.json"), JSON.stringify({ a: "autopilot" }));
   const p = probe({ dataDir: data });
-  const env = { ...process.env, HOME: dir, LINECLEAR_CONFIG: join(dir, "config"), LINECLEAR_COORDINATOR_TIMER: undefined };
-  const out: string[] = [];
   const was = process.env.LINECLEAR_COORDINATOR_TIMER;
-  delete process.env.LINECLEAR_COORDINATOR_TIMER;
-  const report = (spaces: string[]) => noticeTimers(spaces, env);
-  fixRetired(p, (l) => out.push(l), report);
-  fixRetired(p, (l) => out.push(l), report);
-  expect(out).toEqual([]);
-  expect(JSON.parse(readFileSync(join(data, "modes.json"), "utf8"))).toEqual({ a: "autopilot" });
-  const open = readItems(env).filter(isOpen);
-  expect(open).toHaveLength(1);
-  expect(open[0]!.question).toContain("Coordinator timer is on for a");
   process.env.LINECLEAR_COORDINATOR_TIMER = "on";
   try {
     expect(doctorChecks(p).find((c) => c.name === "no coordinator on a timer")?.problem).toBe("");

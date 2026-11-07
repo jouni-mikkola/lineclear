@@ -129,15 +129,6 @@ export function addItem(item: Omit<Item, "n">, env = process.env): Item {
   }
 }
 
-/** A space on a timer the rules do not allow shows in the Inbox once; heal never changes a mode itself. */
-export function noticeTimers(spaces: string[], env = process.env): void {
-  const question = `Coordinator timer is on for ${spaces.join(", ")}, but Lineclear runs no coordinator on a timer. Nothing was changed. Turn it off with lineclear mode <space> regular.`;
-  const open = readItems(env).filter((i) => isOpen(i) && i.question.startsWith("Coordinator timer is on for "));
-  if (open.some((i) => i.question === question)) return;
-  for (const old of open) closeItem(old, "the spaces on a timer changed", new Date(), env);
-  addItem({ kind: "stuck", task: "-", question, choices: ["Ok"], alert: "Coordinator timer is on", since: new Date().toISOString() }, env);
-}
-
 /** Answers a card of a space's coordinator chat in words, which closes it. Returns an error text, or undefined. */
 export function answerCard(card: NonNullable<Item["card"]>, answer: string, env = process.env): string | undefined {
   const r = Bun.spawnSync([lineclear(env), "answer", card.id, answer, "--space", card.space], { stdin: "ignore" });

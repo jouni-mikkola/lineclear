@@ -8,7 +8,7 @@ import { buildNames } from "./builds.ts";
 import { dataDir, pathsFor } from "./paths.ts";
 import { promotionRefusal } from "./promote.ts";
 import { follows, readRelease, saveRelease } from "./release.ts";
-import { selfProject } from "./self-fix.ts";
+import { selfProject } from "./project.ts";
 
 type Env = Record<string, string | undefined>;
 

@@ -3,7 +3,6 @@ import { cpus } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_ROUNDS, fill, stepBrief, template } from "./brief.ts";
 import { CHECKS_PER_TICK, type ProveTools, missingItem, needsProof, testOf } from "./doneproof.ts";
-import { type FixSpec, fileFix } from "./self-fix.ts";
 import { ownerStepItem } from "./owner-steps.ts";
 import { overStartLimit, recordStepStart, START_LIMIT, startsInDay } from "./start-limit.ts";
 import { placeHeld } from "./held.ts";
@@ -129,50 +128,16 @@ function proveTools(t: Tick): ProveTools {
   };
 }
 
-/** A fix of a step's own: one ledger entry per project, step and kind, and a title that starts with the step id. */
-type FixKind = "closed" | "reopened" | "unproven" | "faulted";
-function stepFix(t: Tick, step: Step, kind: FixKind, brief: string, evidence: string[], basis?: string, title?: string): FixSpec {
-  return {
-    key: `${t.name}:${step.id}:${kind}`,
-    title: title ?? `${step.id} Fix: ${step.title}`.slice(0, 80),
-    project: { name: t.name, settings: t.settings },
-    brief,
-    evidence,
-    basis,
-  };
-}
-
-/** Files a step's fix and logs one decision with the step's id: a `start` naming the kind, or a `skip` with the reason it was held. */
-export function fileStepFix(t: Tick, step: Step, kind: FixKind, why: string, brief: string, evidence: string[], basis?: string, title?: string) {
-  const got = fileFix(t.world, stepFix(t, step, kind, brief, evidence, basis, title), t.env);
-  if (got.filed) t.note("start", `${step.id}: ${why}, started one ${kind} fix task`, step.id);
-  else t.note("skip", `${step.id}: ${why}, and no ${kind} fix task started: ${got.why}`, step.id);
-  return got;
-}
-
 /**
  * A step closed with nothing to merge is done for good, so it is never restarted. Its named test runs once; when it
- * fails the step gets one Fix task instead (it is recorded already, so this runs once per step).
+ * fails the tick says so (it is recorded already, so this runs once per step).
  */
 function proveClosed(t: Tick, step: Step) {
   const { settings, world } = t;
   const cmd = testOf(step);
   if (cmd === undefined) return;
   const r = world.health(settings.repo, cmd);
-  if (r.ok) return;
-  const brief = `Step ${step.id} ${step.title} was closed with nothing to merge: its work is on main. The test its done-when names fails now.
-
-Command: \`${cmd}\`
-
-Its output (the end of it):
-
-\`\`\`
-${r.output.slice(-4000).trimEnd()}
-\`\`\`
-
-Fix the cause, run \`${settings.check}\` before you merge, then rebase on main and merge it yourself.
-`;
-  fileStepFix(t, step, "closed", "its test failed", brief, [`${cmd}: ${r.output.slice(-300).trim()}`]);
+  if (!r.ok) t.note("skip", `${step.id}: closed with nothing to merge, but its test fails now: ${cmd}`, step.id);
 }
 
 /**
@@ -463,7 +428,7 @@ function startStep(s: Starting, step: Step): boolean {
  */
 function refileReopened(s: Starting, step: Step): boolean {
   const { t } = s;
-  const { settings, world, dryRun, note } = t;
+  const { settings, world, note } = t;
   if (overStartLimit({ ...t, space: settings.space }, step, START_LIMIT)) return true;
   const line = (step.fields["done when"]?.more ?? []).find((l) => /^\s+- Reopened: /.test(l));
   const since = line === undefined ? undefined : world.commitsSince?.(settings.repo, line);
@@ -472,18 +437,7 @@ function refileReopened(s: Starting, step: Step): boolean {
     return true;
   }
   if (since === undefined || !doneIds(s.commits.slice(0, since), new Set([step.id])).has(step.id)) return false;
-  if (dryRun) {
-    note("start", "would file one Fix task: a task merged, but the Reopened line stayed", step.id);
-    return true;
-  }
-  const brief = `Step ${step.id} ${step.title} is reopened, but a task for it merged after its Reopened line was added, and the line stayed in docs/ROADMAP.md. The runner would start the step again and again.
-
-Check whether the proof its done-when names is in docs/numbers.md. If it is, delete the Reopened line of ${step.id} in docs/ROADMAP.md in the same commit as the proof. If it is not and you can record it here, record it and delete the line. If it needs something you cannot do here (a real machine, a login), leave the line and say so in your facts: never write a proof that did not happen.
-
-Run \`${settings.check}\` before you merge, then rebase on main and merge it yourself.
-`;
-  const last = s.commits[0]?.subject;
-  fileStepFix(t, step, "reopened", "a task merged but the Reopened line stayed", brief, [last ?? "a task merged, the Reopened line stayed"], line);
+  note("skip", "a task merged but the Reopened line stayed: nothing starts until the line is deleted", step.id);
   return true;
 }
 
@@ -491,24 +445,17 @@ const RETRY_MS = 30 * 60_000;
 
 /**
  * A merged step with an unproven item starts again with that item as the brief: twice in 24 hours at most. After that
- * it gets a Fix task instead. Returns whether the step should start now.
+ * it waits. Returns whether the step should start now.
  */
 function restartUnproven(s: Starting, step: Step, item: string): boolean {
-  const { settings, world, state, dryRun, note } = s.t;
+  const { settings, world, state, note } = s.t;
   // A restart that merged since the last reading is not judged yet: wait for the checker to read the new main.
   const main = world.main(settings.repo);
   if (typeof main !== "string" && world.proofs?.(settings.repo)[step.id]?.head !== main.head) return false;
   const list = world.tasks(settings.space);
   const n = startsInDay(state, step.id, world.now(), typeof list === "string" ? [] : list);
   if (n < START_LIMIT) return true;
-  if (dryRun) return (note("start", `would file one Fix task: ${step.id} is still unproven after ${n} starts in 24 hours`, step.id), false);
-  const brief = `Step ${step.id} ${step.title} is merged, but this item of its done-when is not proven: ${item}
-
-The step was started ${n} times in 24 hours and the independent checker still records the item false. Find out why and make it true. An action outside the repo (a tag, a GitHub release, a recorded run) is proven by a command the checker runs (\`git ls-remote --tags origin\`, \`gh release view\`), not by text. If it needs something you cannot do here, say so in your facts and do not claim it.
-
-Run \`${settings.check}\` before you merge, then rebase on main and merge it yourself.
-`;
-  fileStepFix(s.t, step, "unproven", `unproven after ${n} starts in 24 hours`, brief, [item], item);
+  note("skip", `${step.id} is still unproven after ${n} starts in 24 hours: item ${item}`, step.id);
   return false;
 }
 

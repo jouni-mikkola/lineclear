@@ -55,14 +55,13 @@ test("a task closed any other way (moved, Dispatcher close) does not mark its st
   expect(t.doTick().some((x) => x.kind === "close")).toBe(false);
 });
 
-test("a closed step whose named test fails gets one Fix task and is not restarted", () => {
+test("a closed step whose named test fails is not restarted and gets no Fix task", () => {
   const named = step("A", "none").replace("first A", "`bun test missing.test.ts` passes");
   const t = setup({ steps: [named], tasks: [{ id: "LIN-1", title: "A Title A", status: "done", closed: true, closedBy: "done" }] });
   writeFileSync(join(t.config, "projects", "demo", "state.json"), JSON.stringify({ taskSteps: { "LIN-1": "A" } }));
   t.doTick();
   t.doTick();
-  expect(t.adds().length).toBe(1);
-  expect(t.adds()[0]?.join(" ")).toContain("A Fix: Title A");
+  expect(t.adds().length).toBe(0);
 });
 
 /** A tick whose world answers like the one it read first, until the step is about to start: then the second read differs. */

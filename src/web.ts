@@ -78,17 +78,11 @@ export function webApi(
   now = () => Date.now(),
   aside: Aside = readAside(env),
   push?: Promise<Pusher>,
-  heal = false,
+  setup = false,
   feed?: ProjectsFeed,
 ) {
   let projects: { at: number; data: HomeData["projects"] } | undefined;
   const pi = keptAside(() => aside("spend") as Promise<PiSpend>, 60_000, now);
-  // the problems with a safe fix are fixed by the server itself, whether or not anyone looks
-  if (heal) {
-    const fix = () => void aside("heal").catch(() => {});
-    fix();
-    setInterval(fix, 30_000).unref();
-  }
   const roadmaps = new Map<string, Kept<RoadmapRead>>();
   const warmed = new Set<string>();
   const roadmap = (name: string) => {
@@ -123,7 +117,7 @@ export function webApi(
       env,
       undefined,
       undefined,
-      heal ? async () => ((await aside("dispatcher").catch(() => ({ code: 1 }))) as { code: number }).code : undefined,
+      setup ? async () => ((await aside("dispatcher").catch(() => ({ code: 1 }))) as { code: number }).code : undefined,
     ));
   const taskChats = taskChatLinks(env);
   const taskTerminals = taskTerminalLinks(env);
