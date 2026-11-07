@@ -57,6 +57,12 @@ extension_file() {
   printf '%s\n' "$want" >"$2.tmp" && mv -f "$2.tmp" "$2"
 }
 
+# drop_old_extensions <extensions folder>: removes pi's quota-switch and api-guard, which an older tool left there. The
+# account fallback is in Lineclear's own extension now (pi/account-fallback.ts), over the project's model lists.
+drop_old_extensions() {
+  rm -f "$1/quota-switch.ts" "$1/quota-switch.json" "$1/api-guard.ts"
+}
+
 # The commit a ref names on the remote, or nothing when the ref is not a branch or tag there.
 remote_commit() {
   git -C "$app" ls-remote origin "refs/heads/$ref" "refs/tags/$ref" "refs/tags/$ref^{}" |
@@ -166,6 +172,7 @@ install_release() {
   code=$builds/current
   link "$code/bin/lineclear" "$bindir/lineclear"
   extension_file "$code" "$ext"
+  drop_old_extensions "$(dirname "$ext")"
   say "Lineclear: command in $bindir, pi extension in $ext"
 }
 
@@ -211,6 +218,7 @@ install_lineclear() {
   build_deps || die "building the dependencies failed"
   link "$app/bin/lineclear" "$bindir/lineclear"
   extension_file "$app" "$ext"
+  drop_old_extensions "$(dirname "$ext")"
   say "Lineclear: command in $bindir, pi extension in $ext"
 }
 
