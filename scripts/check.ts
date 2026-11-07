@@ -104,7 +104,13 @@ const TEST_SHARDS = 4;
 const SHARD_PROCESSES = 2;
 // install.sh builds the web pages with vite for real: a run on GitHub, never in a worker's loop
 const BUILD_WEIGHT_S = 45;
-const BUILDING_TESTS = ["test/install.test.ts", "test/install-update.test.ts", "test/install-update-store.test.ts", "test/install-release.test.ts"];
+const BUILDING_TESTS = [
+  "test/install.test.ts",
+  "test/install-update.test.ts",
+  "test/install-wipe.test.ts",
+  "test/install-good.test.ts",
+  "test/install-release.test.ts",
+];
 
 // the tests the change reaches: a failure in any other file is not the change's
 // none when the change reaches every test or the whole run is asked for: then no failure is outside it

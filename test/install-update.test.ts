@@ -1,45 +1,20 @@
 import { beforeAll, expect, setDefaultTimeout, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadFactor } from "../scripts/check-speed.ts";
 import { sh } from "./helpers.ts";
+import { brokenInstalls } from "./install-broken.ts";
 import { installFixture } from "./install-fixture.ts";
 
 // Each test runs install.sh for real: 30 s covers an idle machine, and the limit grows with the load.
 setDefaultTimeout(30_000 * loadFactor());
 
-const { home, repo, state, app, git, install, passes } = await installFixture();
+const fixture = await installFixture();
+const { state, app, install, passes } = fixture;
+const { installBroken, inbox } = brokenInstalls(fixture);
 
 // two files, so the rollback tests run beside the install tests and each other in other jobs
 beforeAll(() => passes(install()), 180_000);
-
-/** Commits a version that breaks the service the way BROKEN says, installs it, and puts the repository back. */
-function installBroken(how: string) {
-  // the project p is Running before the update
-  const dir = join(home, ".config/lineclear/projects/p");
-  mkdirSync(dir, { recursive: true });
-  const settings = join(dir, "settings.json");
-  writeFileSync(settings, JSON.stringify({ repo, space: "p", check: "true", models: {} }));
-  writeFileSync(join(repo, "BROKEN"), `${how}\n`);
-  git("add", "-A");
-  git("commit", "-q", "-m", `broken: ${how}`);
-  const good = git("rev-parse", "HEAD~1").out.trim();
-  const r = install();
-  const after = JSON.parse(readFileSync(settings, "utf8"));
-  rmSync(dir, { recursive: true });
-  git("reset", "-q", "--hard", good);
-  return { r, good, after };
-}
-// The Inbox items on disk (read here, not through src/inbox.ts: importing that module early changes other test files)
-const inbox = (): { kind: string; question: string }[] => {
-  const dir = join(home, ".config/lineclear/inbox");
-  return existsSync(dir)
-    ? readdirSync(dir)
-        .filter((f) => f.endsWith(".json"))
-        .sort((a, b) => parseInt(a, 10) - parseInt(b, 10))
-        .map((f) => JSON.parse(readFileSync(join(dir, f), "utf8")))
-    : [];
-};
 
 test("an update that breaks the chat is rolled back, and the Inbox says so", () => {
   const before = sh(["git", "-C", app, "rev-parse", "HEAD"]).out.trim();
