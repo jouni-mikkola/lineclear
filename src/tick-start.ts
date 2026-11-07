@@ -236,11 +236,6 @@ function recordStarted(s: Starting, p: Planned) {
   state.models[step.id] = worker;
   if (cheap) (state.cheap ??= []).push(step.id);
   if (host === undefined) recordStart(state, `${step.id} ${step.title}`, step.id);
-  else {
-    // Remembered at once: if that machine is down next tick, its new task still holds its step and locks.
-    const seen = (state.remoteSeen ??= {});
-    seen[host] = [...(seen[host] ?? []), { title: `${step.id} ${step.title}`, status: "work", sub: `on ${host}` }];
-  }
   const same = company(reviewer) === company(worker) ? " (same company: no other company has room, a different model reviews with a fresh context)" : "";
   const on = `${cheap ? `routine step on the cheap worker model ${cheap}; ` : ""}worker ${worker}`;
   settle(p, "start", `ready, locks free, slot free${where}; ${on}, reviewer ${reviewer}${same}`);
