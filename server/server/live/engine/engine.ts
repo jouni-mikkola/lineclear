@@ -72,6 +72,7 @@ export class Engine extends EngineTidy {
     const watch = () =>
       this.watchPrs()
         .then(() => this.watchMains())
+        .then(() => this.landReady())
         .catch(() => undefined)
     const watchFirst = setTimeout(watch, WATCH_FIRST)
     const watchEvery = setInterval(watch, WATCH_EVERY)

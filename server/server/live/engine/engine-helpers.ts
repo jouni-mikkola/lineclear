@@ -45,6 +45,10 @@ export interface TaskRec {
   merged?: boolean
   /** why its last merge stopped, until it merges */
   mergeStopped?: string
+  /** the card for a conflict the engine's rebase could not settle was opened (once until the agent reports ready again) */
+  landCard?: boolean
+  /** when the engine last tried to land it and was refused: it tries again later, not at every look */
+  landTriedAt?: number
   /** the commit its squash merge made on its base: what its branch is checked against when it is put away */
   squash?: string
   /** done with nothing merged (lineclear task close, or done with no changes): Done all the same */
@@ -217,6 +221,8 @@ export const MERGE_DEADLINE = 90_000
 /** done tasks' pull requests are looked at for news (failed checks, comments) this long after starting, then this often */
 export const WATCH_FIRST = 30_000
 export const WATCH_EVERY = 120_000
+/** how long the engine leaves a ready task its merge refused before it tries again */
+export const LAND_RETRY = 10 * 60_000
 /** a working task with no sign of life this long (no output, status report or commit) has stalled; looked at this often */
 export const STALL_QUIET = 20 * 60_000
 /** Needs you with no question, plan or login this long is a stall; a card each time it lasts this long again */

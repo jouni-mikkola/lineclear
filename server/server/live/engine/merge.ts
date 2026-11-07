@@ -4,7 +4,7 @@ import type { Space } from '../places.ts'
 import * as G from './git.ts'
 import * as GH from './github.ts'
 import * as Lane from './lane.ts'
-import { type TaskRec, ended, ANSWER_GRACE, CHECKS_EVERY } from './engine-helpers.ts'
+import { type TaskRec, ended, ANSWER_GRACE, CHECKS_EVERY, LAND_RETRY } from './engine-helpers.ts'
 import { EngineHandoff } from './engine-handoff.ts'
 
 /** how long a merge waits for a merge queue to run its check and merge the pull request */
@@ -38,6 +38,39 @@ export class EngineLand extends EngineHandoff {
     if (t.askFirst || this.settings.ways(this.proj(t).name).merge === 'ask me first') return false
     void this.endAndMerge(t).catch(() => undefined)
     return true
+  }
+
+  /**
+   * Every look at the board: a task at Ready to merge whose agent is at rest is merged by the engine, which rebases
+   * itself on a conflict. A conflict the rebase cannot settle goes back to the agent and opens one card, once.
+   */
+  async landReady() {
+    if (this.closing) return
+    const waiting = this.tasks.filter((t) => this.statusOf(t) === 'ready' && !t.archived && !t.landing && !this.landings.has(t.id))
+    for (const t of waiting) {
+      if (t.askFirst || this.settings.ways(this.proj(t).name).merge === 'ask me first') continue
+      if (Date.now() - (t.landTriedAt ?? 0) < LAND_RETRY) continue
+      // not waited for: a merge held by a red main must not hold up the watch that turns main green
+      void this.merge(t.id).then(
+        (r) => this.landed(t, r),
+        () => undefined,
+      )
+    }
+  }
+
+  private landed(t: TaskRec, r: { ok: boolean; error?: string }) {
+    t.landTriedAt = r.ok ? undefined : Date.now()
+    // only the rebase that failed: main moving on GitHub meanwhile is rebased by the next try
+    const clash = /^Conflict with \S+: rebase .* Conflicting files: (.*)\. Sent back to/.exec(r.error ?? '')
+    if (clash && !t.landCard) {
+      t.landCard = true
+      const id = `land:${t.id}`
+      this.chats.post(this.key(t), {
+        id,
+        card: { id, task: t.id, status: 'need', text: `conflict with ${t.base} the rebase could not settle: ${clash[1]}`, pr: t.pr },
+      })
+    }
+    this.save()
   }
 
   private async endAndMerge(t: TaskRec) {
