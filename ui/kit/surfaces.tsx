@@ -85,6 +85,8 @@ export interface NavItem {
   id: string;
   label: string;
   href: string;
+  /** Drawn before the label. */
+  icon?: React.ReactNode;
   /** What waits for you there; only the Inbox has one. */
   count?: number;
 }
@@ -117,6 +119,7 @@ export function BottomBar({ items, current }: { items: NavItem[]; current: strin
             className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-xs hover:bg-raised2 ${on ? "text-fg" : "text-fg3"}`}
           >
             {on && <span className="absolute inset-x-0 top-0 mx-auto h-0.5 w-6 rounded-full bg-accent" aria-hidden="true" />}
+            {it.icon}
             <span className="flex min-h-5 items-center gap-1">
               {it.label}
               <Count n={it.count} />
@@ -156,8 +159,9 @@ export function SideRail({
             href={it.href}
             data-block
             aria-current={on ? "page" : undefined}
-            className={`flex h-9 items-center gap-2.5 rounded-sm px-2.5 text-sm hover:bg-raised2 ${on ? "bg-raised3 text-fg" : "text-fg2"}`}
+            className={`flex h-11 items-center gap-2.5 rounded-sm px-2.5 text-sm hover:bg-raised2 ${on ? "bg-raised3 text-fg" : "text-fg2"}`}
           >
+            {it.icon}
             <span className="flex-1">{it.label}</span>
             <Count n={it.count} />
           </a>
