@@ -134,6 +134,8 @@ const touched = reached ? new Set([...changed, ...reached]) : undefined;
 
 const allTests = () => Array.from(new Bun.Glob("test/**/*.test.{ts,tsx}").scanSync(".")).map((f) => `./${f}`);
 
+const runsServerSteps = () => inServer && !(shard && shard.i <= INSTALL_JOBS);
+
 const SERVER_INSTALL: Step = { name: "server install", cmd: ["bun", "install", "--frozen-lockfile"], cwd: "server" };
 
 // a run of the whole suite records which files each test loads (scripts/load-map.ts) for the next changed run
@@ -173,7 +175,8 @@ function testSteps(): Step[] {
     ...(needs.length ? { needs } : {}),
     cmd: ["bun", "test", "--timeout", "120000", "--reporter=junit", `--reporter-outfile=${join(reports, `unit-${i}.xml`)}`, ...run],
   }));
-  return [...(installs && !inServer ? [SERVER_INSTALL] : []), ...tests];
+  // the server's steps bring their own install, except in an install job, which runs none of them
+  return [...(installs && !runsServerSteps() ? [SERVER_INSTALL] : []), ...tests];
 }
 
 // a worker's loop reuses the installed server packages unless the lockfile or package.json is newer than them
@@ -185,7 +188,7 @@ const serverInstalled = () => {
 const serverNeeds = () => (onlyChanged && serverInstalled() ? [] : ["server install"]);
 
 function serverSteps(): Step[] {
-  if (!inServer || (shard && shard.i <= INSTALL_JOBS)) return [];
+  if (!runsServerSteps()) return [];
   return [
     ...(serverNeeds().length ? [SERVER_INSTALL] : []),
     { name: "server types", cmd: ["bun", "run", full || known === undefined ? "typecheck" : "typecheck:changed"], cwd: "server", needs: serverNeeds() },
@@ -271,7 +274,11 @@ const outcome = new Map<string, Promise<boolean>>();
 async function runStep(step: Step): Promise<boolean> {
   // every step is in the map before any looks for its needs, whatever their order in the plan
   await null;
-  for (const need of step.needs ?? []) if (!(await outcome.get(need))) return false;
+  for (const need of step.needs ?? []) {
+    if (await outcome.get(need)) continue;
+    console.error(`check: ${step.name} did not run: ${need} ${outcome.has(need) ? "failed" : "is not in this plan"}`);
+    return false;
+  }
   const at = performance.now();
   const { code, failing, output } = await run(step);
   const isTests = step.name.startsWith("tests");
