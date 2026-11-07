@@ -10,7 +10,8 @@ import { type Events, type Link, dirOf } from './machines-helpers.ts'
 import { running, type Worker } from './worker-process.ts'
 
 /** what a worker says of itself in its server.json */
-export const workerRecord = (label: string) => readJson<{ port?: number; pid?: number; code?: string }>(join('workers', dirOf(label), 'server.json'), {})
+export const workerRecord = (label: string) =>
+  readJson<{ port?: number; pid?: number; code?: string; token?: string }>(join('workers', dirOf(label), 'server.json'), {})
 
 /** The links of the machines and the talk over them: the poll of each worker, its live link, the actions sent to it.
  *  Starting a worker is MachinesLinks'. */
@@ -130,7 +131,7 @@ export abstract class LinkPoll extends Emitter<Events> {
     const s = workerRecord(l.saved.label)
     const url = s.port ? `http://127.0.0.1:${s.port}` : ''
     if (!url || url === l.rec.url) return false
-    const w = s.pid === l.worker?.pid ? l.worker : running(s.pid)
+    const w = s.pid === l.worker?.pid ? l.worker : running(s.pid, s.token)
     if (!w) return false
     if (w !== l.worker) this.own(l, w)
     l.rec.url = url

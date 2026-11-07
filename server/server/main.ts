@@ -43,7 +43,12 @@ const mounted =
   !worker && process.env.LINECLEAR_MOUNT ? await ((await import(process.env.LINECLEAR_MOUNT)) as { mount: () => Promise<Mounted> }).mount() : undefined
 const server = startApp({ source, push: worker ? undefined : push, port, mounted: mounted?.fetch })
 // a worker says which code it runs: the main server keeps it across its own restart while that is the same
-writeJson('server.json', { port: server.port, pid: process.pid, code: worker ? (await import('./live/machines.ts')).codeVersion() : undefined })
+writeJson('server.json', {
+  port: server.port,
+  pid: process.pid,
+  code: worker ? (await import('./live/machines.ts')).codeVersion() : undefined,
+  token: process.env.LINECLEAR_TOKEN,
+})
 let tunnel: { stop(): void } | undefined
 if (worker) {
   // the agents there reach this worker's lineclear command through an SSH tunnel to it

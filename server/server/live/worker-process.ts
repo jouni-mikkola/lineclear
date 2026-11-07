@@ -26,33 +26,31 @@ export function codeVersion(dir = join(import.meta.dir, '..', '..')) {
   return code
 }
 
-/** a process's command line: /proc where there is one (no process is started on the loop for it), else ps */
-function commandOf(pid: number): string {
+/** the token a process was started with: a reused pid has none, or another */
+function tokenOf(pid: number): string | undefined {
   try {
-    return readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0').join(' ')
+    const env = readFileSync(`/proc/${pid}/environ`, 'utf8')
+    return env
+      .split('\0')
+      .find((e) => e.startsWith('LINECLEAR_TOKEN='))
+      ?.slice(16)
   } catch {
-    return Bun.spawnSync(['ps', '-o', 'command=', '-p', String(pid)]).stdout.toString()
+    // no /proc (macOS): ps prints the environment after the command
+    const out = Bun.spawnSync(['ps', 'eww', '-o', 'command=', '-p', String(pid)]).stdout.toString()
+    return out.match(/(?:^|\s)LINECLEAR_TOKEN=(\S+)/)?.[1]
   }
 }
 
-/** a worker from before this server started, still running: its process, if it is one of Lineclear's */
-export function running(pid: number | undefined): Worker | undefined {
-  if (!pid || pid === process.pid) return undefined
+/** a worker from before this server started, still running: adopted only when it was started with this token */
+export function running(pid: number | undefined, token: string | undefined): Worker | undefined {
+  if (!pid || !token || pid === process.pid) return undefined
   try {
     process.kill(pid, 0)
   } catch {
     return undefined
   }
-  if (!commandOf(pid).includes('server/main.ts')) return undefined
-  const exited = new Promise((done) => {
-    const t = setInterval(() => {
-      try {
-        process.kill(pid, 0)
-      } catch {
-        clearInterval(t)
-        done(undefined)
-      }
-    }, 2000)
-  })
+  if (tokenOf(pid) !== token) return undefined
+  // not our child, so no exit event: a small child process waits for it, and the loop is not touched
+  const exited = Bun.spawn(['sh', '-c', 'while kill -0 "$0" 2>/dev/null; do sleep 1; done', String(pid)], { stdout: 'ignore', stderr: 'ignore' }).exited
   return { pid, kill: (signal = 'SIGTERM') => process.kill(pid, signal), exited }
 }
