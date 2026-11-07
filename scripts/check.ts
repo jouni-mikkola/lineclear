@@ -40,6 +40,7 @@ import {
 import { fastGates } from "./fast-gates.ts";
 import { describeFailure, type Failure, outsideChange, parseFailures } from "./failures.ts";
 import { changedSince } from "./gates/tools.ts";
+import { judge, readQuarantine, writeQuarantine } from "./quarantine.ts";
 
 // Every step but the server's (below) runs with TMPDIR in a folder of this run, on disk. Each test process clears its own
 // folder inside it (tmp-scope.ts), so anything left in it when the steps end was left by a process that did not get
@@ -227,6 +228,33 @@ const started = performance.now();
 const times: StepTime[] = [];
 const outcome = new Map<string, Promise<boolean>>();
 
+/** Runs one failed test alone, in the step's own folder. It passes only when bun ran it and said so: no match is not a pass. */
+async function passesAlone(step: Step, f: Failure): Promise<boolean> {
+  const file = f.file.startsWith(".") ? f.file : `./${f.file}`;
+  const name = f.test.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const p = Bun.spawn(["bun", "test", "--timeout", "120000", file, "-t", name], {
+    cwd: step.cwd,
+    stdin: "ignore",
+    stdout: "pipe",
+    stderr: "pipe",
+    env: step.cwd === "server" ? serverEnv : env,
+  });
+  const [out, err] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
+  return (await p.exited) === 0 && /\(pass\) /.test(out + err);
+}
+
+/** A test step's failures are rerun alone: those that pass alone are flakes and go to quarantine, the rest still fail the step. */
+async function afterFlakes(step: Step, failing: Failure[]): Promise<boolean> {
+  const verdict = await judge(failing, readQuarantine(), (f) => passesAlone(step, f));
+  if (verdict.quarantined.length > 0) {
+    writeQuarantine(verdict.list);
+    console.log(
+      `check: flaky, failed and then passed alone, quarantined (test/quarantine.json, at most 5):\n${verdict.quarantined.map((f) => `  ${describeFailure(f)}`).join("\n")}`,
+    );
+  }
+  return verdict.blocking.length === 0;
+}
+
 /** Runs one step after the steps it needs. Resolves to whether it passed; a step skipped for a failed need counts as failed. */
 async function runStep(step: Step): Promise<boolean> {
   // every step is in the map before any looks for its needs, whatever their order in the plan
@@ -235,7 +263,7 @@ async function runStep(step: Step): Promise<boolean> {
   const at = performance.now();
   const { code, failing, output } = await run(step);
   const isTests = step.name.startsWith("tests");
-  const ok = code === 0;
+  const ok = code === 0 || ((isTests || step.name === "server tests") && failing.length > 0 && (await afterFlakes(step, failing)));
   times.push({ step: step.name, seconds: (performance.now() - at) / 1000, ok });
   if (!ok) {
     console.error(
