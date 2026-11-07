@@ -1,5 +1,4 @@
-// Lineclear's pi extension. It gives
-// Lineclear's agents the kit (kit/): its rules in the system prompt and its skills, so no agent needs personal files.
+// Lineclear's pi extension. It gives Lineclear's agents the kit (kit/): its rules in the system prompt and its skills, so no agent needs personal files.
 import { delimiter, dirname, join } from "node:path";
 import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
