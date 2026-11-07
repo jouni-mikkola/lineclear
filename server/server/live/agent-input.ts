@@ -1,10 +1,12 @@
 import { herdr, type AgentInfo, type AgentStatus } from './herdr.ts'
 import { inputHoldsText } from './paste-watch.ts'
+import type { RpcAgent } from './agent-rpc.ts'
 import { type AgentRecord, type OutItem, holdFrom, sleep } from './agents-helpers.ts'
 
 /** what getting text into an agent's CLI needs to know of the agents */
 export interface InputHost {
   records: Record<string, AgentRecord>
+  rpcs: Map<string, RpcAgent>
   /** since when herdr lists an agent that just started but won't take input yet */
   unready: Map<string, number>
   /** the pane each agent was last started in, to find it again when herdr lists it without its name */
@@ -21,6 +23,8 @@ const justStarted = (h: InputHost, key: string) => Date.now() - (h.records[key]?
 /** one thing into the CLI. One just started takes no input yet: wait (at most readyMs) until herdr says it is ready, so
  *  the text is not pasted into a screen that is not listening */
 export async function putInto(h: InputHost, key: string, item: OutItem) {
+  const rpc = h.rpcs.get(key)
+  if (rpc) return void (await rpc.prompt(item.text))
   if (justStarted(h, key)) for (let t = 0; h.info(key)?.interactive_ready === false && t < h.readyMs; t += 100) await sleep(100)
   await herdr.prompt(h.records[key].name, item.text)
   void submitted(h, key)

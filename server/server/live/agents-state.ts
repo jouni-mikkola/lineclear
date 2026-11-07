@@ -12,6 +12,7 @@ import { machineNews } from './quiet.ts'
 import { mirrored } from './mfs.ts'
 import { SecretAccess } from './secret-access.ts'
 import { AgentRoutes } from './agent-routes.ts'
+import { type RpcAgent, rpcPane } from './agent-rpc.ts'
 import type { AgentRecord, OutItem, Hold, Sent, Events } from './agents-helpers.ts'
 
 /** internal news carries a cid of this form and is never a screen's message */
@@ -25,6 +26,8 @@ export class AgentsState extends Emitter<Events> {
   // news held in an older version's outbox is dropped too (quiet.ts)
   outbox: OutItem[] = readJson<OutItem[]>('outbox.json', []).filter((o) => !machineNews(o.text))
   live = new Map<string, AgentInfo>()
+  /** the agents that run as a child of this server, by chat key: herdr knows nothing of them */
+  rpcs = new Map<string, RpcAgent>()
   protected byName = new Map<string, string>()
   protected timer: ReturnType<typeof setInterval> | null = null
   protected sub!: Subscription
@@ -135,6 +138,21 @@ export class AgentsState extends Emitter<Events> {
     return r ? this.live.get(r.name) : undefined
   }
 
+  /** an RPC agent as an entry of the agent list, so everything that reads `live` reads it the same */
+  protected rpcInfo(r: AgentRecord, a: RpcAgent): AgentInfo {
+    return {
+      agent: r.kind,
+      agent_status: a.status,
+      agent_session: a.sessionFile ? { source: 'rpc', agent: r.kind, kind: 'path', value: a.sessionFile } : null,
+      cwd: r.cwd,
+      name: r.name,
+      pane_id: rpcPane(r.key),
+      tab_id: '',
+      workspace_id: '',
+      interactive_ready: true,
+    }
+  }
+
   /** herdr's word on the agent as the events and reads kept it: nothing is asked of herdr */
   herdrView(key: string): AgentHerdr | undefined {
     const a = this.info(key)
@@ -149,7 +167,7 @@ export class AgentsState extends Emitter<Events> {
   protected lookAtPastes() {
     for (const key of this.byName.values()) {
       if (this.stopped) return
-      if (this.pasteDue.delete(key)) void this.paste.look(key, this.records[key]?.started ?? 0, () => this.info(key)?.pane_id)
+      if (this.pasteDue.delete(key) && !this.rpcs.has(key)) void this.paste.look(key, this.records[key]?.started ?? 0, () => this.info(key)?.pane_id)
     }
   }
 

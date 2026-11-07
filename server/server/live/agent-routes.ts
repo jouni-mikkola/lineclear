@@ -4,6 +4,7 @@ import { agentEnv, BOX, helperDir, run } from './box.ts'
 import { ROOT } from '../root.ts'
 import type { SecretAccess } from './secret-access.ts'
 import { isAgentProcess } from './agent-process.ts'
+import { isRpcPane } from './agent-rpc.ts'
 import { type AgentRecord, ROUTING_FAILURE } from './agents-helpers.ts'
 
 export interface RouteHost {
@@ -35,23 +36,28 @@ export class AgentRoutes {
 
   /** Bind the actual CLI process, not HERDR_PANE_ID (old shells can inherit another pane's id). */
   async bind(r: AgentRecord, pane: string) {
-    const { records, stopping, secretAccess } = this.host
     const p = await herdr.processInfo(pane)
     const proc = p.foreground_processes?.find((x) => x.pid && isAgentProcess(r.kind, x.argv))
-    if (!proc?.pid || r.finished || records[r.key]?.finished || stopping.has(r.key)) return this.drop(r.key)
+    return this.bindPid(r, proc?.pid)
+  }
+
+  /** the same for a CLI whose pid is known (an RPC child of this server) */
+  async bindPid(r: AgentRecord, pid: number | undefined) {
+    const { records, stopping, secretAccess } = this.host
+    if (!pid || r.finished || records[r.key]?.finished || stopping.has(r.key)) return this.drop(r.key)
     const env = agentEnv(r.key, ROOT)
     const chain = this.host.secretScope(r.key)
     const route = {
       chat: r.key,
       cwd: r.cwd,
-      capability: chain ? secretAccess.issue(r.key, `${proc.pid}:${r.started}`, chain) : undefined,
+      capability: chain ? secretAccess.issue(r.key, `${pid}:${r.started}`, chain) : undefined,
       credentialFile: records[r.key]?.env?.LINECLEAR_SECRET_FILE ?? r.env?.LINECLEAR_SECRET_FILE ?? env.LINECLEAR_SECRET_FILE,
       ...(BOX ? { helper: env.LINECLEAR_COMMAND } : { url: env.LINECLEAR_URL }),
     }
-    const signature = JSON.stringify([proc.pid, route])
+    const signature = JSON.stringify([pid, route])
     if (this.bound.get(r.key) !== signature) {
       const router = join(BOX ? helperDir(BOX.home) : join(ROOT, 'helper'), 'route.pl')
-      const result = await run(['perl', router, '--bind', String(proc.pid)], { stdin: JSON.stringify(route), timeoutMs: 5000 })
+      const result = await run(['perl', router, '--bind', String(pid)], { stdin: JSON.stringify(route), timeoutMs: 5000 })
       if (result.code) {
         this.drop(r.key)
         throw new Error(ROUTING_FAILURE)
@@ -73,7 +79,7 @@ export class AgentRoutes {
         const a = this.host.live.get(r.name)
         const was = this.tried.get(r.key)
         if (!a) this.tried.delete(r.key)
-        if (!a || (was && was.pane === a.pane_id && (was.ok || Date.now() - was.at < 30_000))) continue
+        if (!a || isRpcPane(a.pane_id) || (was && was.pane === a.pane_id && (was.ok || Date.now() - was.at < 30_000))) continue
         const tried = { pane: a.pane_id, at: Date.now(), ok: true }
         this.tried.set(r.key, tried)
         await this.bind(r, a.pane_id)

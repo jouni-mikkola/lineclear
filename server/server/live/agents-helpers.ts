@@ -52,7 +52,14 @@ export interface OutItem {
 
 /** what starts an agent: its record, the first thing it is told, where its pane comes from when it isn't its workspace by
  *  label (a task's worktree space), and `was`, the label the workspace had before (renamed in place if still open) */
-export type Spec = Omit<AgentRecord, 'logs' | 'started'> & { first?: string; pane?: () => Promise<string>; was?: string; fresh?: boolean }
+export type Spec = Omit<AgentRecord, 'logs' | 'started'> & {
+  first?: string
+  pane?: () => Promise<string>
+  was?: string
+  fresh?: boolean
+  /** runs as a `pi --mode rpc` child of this server, not in a pane (pi on the server's own machine only) */
+  rpc?: boolean
+}
 
 /** why what you send waits: a menu or permission prompt is up, the agent is starting, or (a CLI command) mid-turn */
 export type Hold = 'menu' | 'start' | 'turn'

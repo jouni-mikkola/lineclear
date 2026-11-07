@@ -185,6 +185,7 @@ export abstract class EngineStart extends EngineState {
         privatePrompt(this.settings.instructions('task', this.nameOf(t)), this.settings.instructions('reviewer', this.nameOf(t))),
       env,
       first,
+      rpc: true,
       pane: () => this.wtOf(t).agentPane({ home, wt: t.worktree!, label: labelOf(t), tab: 'Agent', env, made }),
     }
     // a start, not a message to a running agent that launch only heals

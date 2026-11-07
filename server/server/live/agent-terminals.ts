@@ -2,6 +2,7 @@ import type { TermScreen } from '../../shared/types.ts'
 import { herdr, type AgentInfo } from './herdr.ts'
 import { TerminalClock } from './terminal-clock.ts'
 import { BOX } from './box.ts'
+import { isRpcPane } from './agent-rpc.ts'
 
 /** the terminals a screen watches: each pane's recent lines and size, read as they change */
 export class AgentTerminals {
@@ -22,7 +23,7 @@ export class AgentTerminals {
    *  at most every few seconds, not on every change on the screen */
   async screen(key: string): Promise<TermScreen> {
     const a = this.info(key)
-    if (!a) return { ansi: '' }
+    if (!a || isRpcPane(a.pane_id)) return { ansi: '' }
     const known = this.sizes.get(a.pane_id)
     const fresh = known && Date.now() - known.at < 3000
     const [ansi, size] = await Promise.all([herdr.read(a.pane_id, 'ansi', 300), fresh ? known.size : herdr.size(a.pane_id).catch(() => null)])
