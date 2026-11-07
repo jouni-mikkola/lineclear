@@ -286,10 +286,10 @@ export class AgentsDelivery extends AgentsState {
     this.save()
     task.mkdirSync(r.cwd, { recursive: true })
     // no model set: the machine's first one, noted so the task's facts say it
-    const first = chooseModel(r.kind, r.model) ? firstModel(r.kind) : undefined
-    if (first) {
-      r.model = first
-      r.chosenModel = first
+    const fallback = chooseModel(r.kind, r.model) ? firstModel(r.kind) : undefined
+    if (fallback) {
+      r.model = fallback
+      r.chosenModel = fallback
     }
     const unset = chooseModel(r.kind, r.model)
     if (unset) throw new Error(unset)

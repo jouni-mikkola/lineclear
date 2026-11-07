@@ -18,7 +18,7 @@ describe('reading what pi takes', () => {
     expect(modelsOf('pi')!.models).toEqual([])
     expect(chooseModel('pi')).toBeUndefined()
   })
-  test('a start with no model set takes the machine\'s first available one', () => {
+  test("a start with no model set takes the machine's first available one", () => {
     setRegistry([
       { harness: 'pi', provider: 'fakeco', name: 'zeta-1' },
       { harness: 'pi', provider: 'fakeco', name: 'zeta-2' },
