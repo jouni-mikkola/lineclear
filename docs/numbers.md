@@ -86,15 +86,16 @@ Stalls and failed starts (`bun scripts/core-baseline.ts stalls`):
 - The board's task history on one machine holds 194 tasks over 62 hours. It has no per-machine failed-start record,
   only 22 tasks that needed their brief sent again (0.11 per task).
 - The rule loop's `decisions.jsonl` (`~/.config/lineclear/`) holds 2614 `stall` lines from 2026-10-31 to 2026-11-07
-  (about 168 hours), 15.6 per hour. By class: lock-held 552, unknown 545, no-sign-of-life 386, brief-unsent 32,
-  coordinator-gone 16, head-of-line 12, no-room 6, machine-unreachable 4, other 2.
-  Count again: `grep -c '"kind":"stall"' ~/.config/lineclear/decisions.jsonl`.
+  (about 169 hours), 15.5 per hour. 1559 of them are `stall <class>` lines and 1055 are ladder steps (`rung N`,
+  `remedy`). By class: lock-held 552, unknown 545, no-sign-of-life 386, brief-unsent 32, coordinator-gone 16,
+  head-of-line 12, no-room 6, machine-unreachable 4, roadmap-broken 2, idle-after-done 2, command-failed 2.
+  Count again: `bun scripts/core-baseline.ts stalls`.
 - Other machines: the board keeps no history of them here, so there is no number yet.
 
 ## Speed and stability baseline
 
-Measured on 2026-11-07 on the one machine with this repo's history. The Speed and stability steps of
-[ROADMAP.md](ROADMAP.md) compare against these rows. Medians and p90 come from `bun scripts/core-baseline.ts`.
+Measured on the one machine with this repo's history, under light load. The Speed and stability steps of
+[ROADMAP.md](ROADMAP.md) compare against these rows, not the older "Core baseline" above (a smaller sample). Medians and p90 come from `bun scripts/core-baseline.ts`.
 
 | Measure | Median | p90 | Runs | Measure again |
 | --- | --- | --- | --- | --- |
@@ -108,7 +109,7 @@ Measured on 2026-11-07 on the one machine with this repo's history. The Speed an
 | Agent cache reads per task | 798 k | 10502 k | last 20 done tasks | `tokens` |
 | Coordinator new input per session | 227 k | 12702 k | last 6 sessions | `chat-tokens` |
 | Dispatcher new input per session | 38 k | 2773 k | last 11 sessions | `chat-tokens` |
-| Stall lines per hour in `decisions.jsonl` | 15.6 | | 168 hours | grep above |
+| Stall-kind lines per hour in `decisions.jsonl` | 15.5 | | 169 hours | `stalls` |
 
 The reviewer ran in 2 of the last 20 done tasks' session folders, so its tokens have too few runs to set a target.
 

@@ -101,7 +101,21 @@ function tokens(n: number): void {
   }
 }
 
+function stallLines(): void {
+  const file = join(homedir(), ".config/lineclear/decisions.jsonl");
+  if (!existsSync(file)) return;
+  const lines = readFileSync(file, "utf8")
+    .split("\n")
+    .filter((l) => l.includes('"kind":"stall"'));
+  const times = lines.map((l) => Date.parse((JSON.parse(l) as { time: string }).time));
+  const hours = (Math.max(...times) - Math.min(...times)) / 3.6e6;
+  const byClass = Object.entries(Object.groupBy(lines, (l) => /"reason":"stall ([a-z-]+)/.exec(l)?.[1] ?? "ladder step"));
+  console.log(`decisions.jsonl: ${lines.length} stall-kind lines over ${hours.toFixed(0)} h (${(lines.length / hours).toFixed(1)} per h)`);
+  for (const [cls, ls] of byClass.sort((x, y) => (y[1]?.length ?? 0) - (x[1]?.length ?? 0))) console.log(`  ${cls}: ${ls?.length}`);
+}
+
 function stalls(): void {
+  stallLines();
   const tasks = (JSON.parse(readFileSync(join(BOARD, "tasks.json"), "utf8")) as { tasks: Task[] }).tasks;
   const chat = readdirSync(join(BOARD, "chatlog"))
     .filter((f) => f.startsWith("p_"))

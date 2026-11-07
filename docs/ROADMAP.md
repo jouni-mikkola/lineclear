@@ -69,7 +69,7 @@ Result: The board loads from a snapshot of at most 200 KB, so a phone gets the f
 ### L451 An agent starts in 10 seconds
 Result: A task's agent makes its first tool call at most 10 s after `lineclear task add`, median, and 30 s at p90.
 - why: from add to first tool call takes 23 s (median) and 131 s (p90) today, and 22 of 194 tasks needed their brief sent again.
-- done when: `bun scripts/core-baseline.ts start 20` prints a median of 10 s or less and a p90 of 30 s or less over 20 new tasks; the brief-resent count of `bun scripts/core-baseline.ts stalls` over those tasks is 0.
+- done when: `bun scripts/core-baseline.ts start 20` prints a median of 10 s or less and a p90 of 30 s or less over 20 new tasks; no task of those 20 needed its brief sent again. Baseline today: median 23 s, p90 131 s.
 - locks: agent-start
 - after: none
 - files: server/server/live/engine/engine-launch.ts, server/server/live/engine/briefs.ts, src/starts.ts
@@ -83,73 +83,65 @@ Result: `lineclear task list`, `lineclear show` and `lineclear room` each finish
 - files: src/cli.ts, src/task-read.ts, src/herdr.ts
 
 ### L453 Main is never red
-Result: Every commit on main gets a finished `check.yml` run, and a commit that turns main red is reverted within 10 minutes.
+Result: No push to main cancels another's `check.yml` run, and a commit that turns main red is reverted within 10 minutes.
 - why: of the last 50 runs on main 14 failed and 15 were cancelled by the next push (its `concurrency` group cancels in progress), so main's state is often unknown.
-- done when: `check.yml` does not cancel a run on main; a merge that turns main red is reverted by the merge lane within 10 minutes and gets a fix task. `gh run list --workflow check.yml --branch main --limit 50 --json conclusion` lists 0 `failure` and 0 `cancelled` for runs after the step's merge; a test plants a red main and sees the revert.
+- done when: `gh run list --workflow check.yml --branch main --limit 20 --json conclusion` lists 0 `cancelled` over 20 runs after the step's merge; a test plants a red main and sees a revert commit and a fix task within 10 simulated minutes. Baseline today: 14 failed and 15 cancelled of the last 50 runs.
 - locks: main-green
 - after: none
 - files: .github/workflows/check.yml, server/server/live/engine/lane.ts, server/server/live/engine/lane-watch.ts
 
 ### L454 Stable follows green main only
-Result: The stable install updates only to a commit whose GitHub `check` is green on main, and it names that commit.
+Result: `lineclear promote <commit>` installs a commit as stable only when its GitHub `check` is green on main, and prints the commit.
 - why: the machines run the stable install, and a promotion of a red or unchecked commit puts every machine on a bug.
-- done when: `lineclear update` refuses a commit without a green `check` run and prints the commit it installed otherwise; a test updates to a red, a pending and a green commit and sees refuse, refuse, install.
+- done when: a test runs `lineclear promote` on a red, a pending and a green commit and sees refuse, refuse, install; `bun scripts/canary.ts` still passes on the installed commit. Baseline today: no command checks the commit's `check` run before an install.
 - locks: promotion
 - after: none
-- files: src/builds.ts, src/published.ts, src/main-branch.ts
+- files: src/builds.ts, scripts/canary.ts, install.sh
 
 ### L455 GitHub check in 45 seconds
 Result: The whole `check.yml` run on main finishes in 45 s or less, median, and 60 s at p90.
 - why: merge waits for the check, which takes 66 s (median) and 86 s (p90) today; jobs 1/4 and 3/4 take 24 s and 22 s while 2/4 and 4/4 take 46 s and 57 s.
-- done when: `bun scripts/core-baseline.ts gh 20` prints a run median of 45 s or less and a p90 of 60 s or less over 20 runs on main; the slowest of the 4 jobs is at most 1.5 times the fastest.
+- done when: `bun scripts/core-baseline.ts gh 20` prints a run median of 45 s or less and a p90 of 60 s or less over 20 runs on main. Baseline today: median 66 s, p90 86 s.
 - locks: check-ci
 - after: none
 - files: scripts/check-speed.ts, scripts/load-map.ts, test/check-speed.test.ts
 
-### L456 Waiting for a lock is no stall
-Result: A step that waits for a lock another step holds shows as waiting and raises no stall line.
-- why: `lock-held` is 552 of the 2614 stall lines in `decisions.jsonl` (21 %), though the wait is the rule loop working as designed.
-- done when: a `lock-held` wait writes no `stall` line and `lineclear roadmap locks` still lists it; a test holds a lock for 10 minutes and finds 0 stall lines. `grep -c '"kind":"stall"'` over a day of `decisions.jsonl` has 0 `lock-held`.
-- locks: lock-waits
-- after: none
-- files: src/waits.ts, src/home-waits.ts
-
-### L457 Every stall has a class
-Result: Each stall line names one cause, so no stall line is `unknown`, and each cause has a remedy that clears it.
-- why: 545 of 2614 stall lines are `unknown` and 386 are `no-sign-of-life`, so the loop restarts what it cannot name.
-- done when: a day of `decisions.jsonl` after the merge holds 0 `stall unknown` lines and at most 2 stall lines per hour; a test feeds each of the 9 classes of numbers.md and sees its one remedy.
+### L456 Every stall is real and named
+Result: A lock wait raises no stall line, and every other stall line names a class other than `unknown`, with a remedy that clears it.
+- why: of 1559 `stall <class>` lines in `decisions.jsonl`, `lock-held` is 552 (a wait the rule loop handles by design) and `unknown` is 545, so the loop restarts what it cannot name.
+- done when: `bun scripts/core-baseline.ts stalls` prints, for a day of `decisions.jsonl` after the merge, 0 lines of `lock-held` and of `unknown` and at most 2 stall lines per hour; a test feeds each class of `STALL_CLASSES` and sees its one remedy and, for a lock wait, `lineclear roadmap locks` still listing the wait. Baseline today: 15.5 stall-kind lines per hour.
 - locks: stall-classes
 - after: none
-- files: src/stall-class.ts, src/heal.ts, src/health.ts
+- files: src/stall-class.ts, src/waits.ts, src/heal.ts, src/health.ts
 
-### L458 Agents read less
+### L457 Agents read less
 Result: A task agent spends at most 40 k new input tokens at the median and 150 k at p90, with its prompt and skills trimmed to match.
 - why: a task agent spends 55 k new input tokens (median) and 276 k (p90), and 798 k cache reads (p90 10.5 M).
-- done when: `bun scripts/core-baseline.ts tokens 20` over 20 new tasks prints agent new input of 40 k or less (median) and 150 k or less (p90); the agent prompt text of `prompts.ts` is at most 70 % of its size today.
+- done when: `bun scripts/core-baseline.ts tokens 20` over 20 new tasks prints agent new input of 40 k or less (median) and 150 k or less (p90); `wc -c server/server/live/prompts.ts` prints at most 9400 bytes (70 % of 13418 today).
 - locks: agent-prompt
 - after: none
 - files: server/server/live/prompts.ts, server/skill/lineclear-agent/SKILL.md, src/brief.ts
 
-### L459 Chats compact before they grow
+### L458 Chats compact before they grow
 Result: The coordinator and the Dispatcher compact at a set size, so a session never passes 1 M new input tokens.
 - why: a coordinator session reaches 12.7 M new input tokens (p90) and a Dispatcher session 2.8 M, against 227 k and 38 k at the median.
-- done when: `bun scripts/core-baseline.ts chat-tokens 20` over 20 new sessions prints a p90 of new input of 1000 k or less for the coordinator and 500 k or less for the Dispatcher; `bun test test/chat-limits.test.ts` ends a long session and sees a compaction.
+- done when: `bun scripts/core-baseline.ts chat-tokens 20` over 20 new sessions prints a p90 of new input of 1000 k or less for the coordinator and 500 k or less for the Dispatcher; `bun test test/dispatcher-chat.test.ts` has a case that ends a long session and sees a compaction.
 - locks: chat-context
 - after: none
-- files: src/chat-limits.ts, src/dispatcher.ts, src/chat.ts
+- files: src/harness-pi.ts, src/dispatcher.ts, src/chat.ts
 
-### L460 Failed starts per machine
+### L459 Failed starts per machine
 Result: `lineclear doctor` lists each machine's failed starts of the last 24 hours with their cause.
 - why: the board keeps no failed-start record per machine, so a machine that fails starts looks the same as one that does not.
-- done when: `lineclear doctor` prints one line per machine with its failed-start count and causes (brief unsent 32 and machine unreachable 4 per week today are the baseline); a test fails a start on one of two machines and sees only that machine's line change.
+- done when: `lineclear doctor` prints one line per machine with its failed-start count and causes (brief unsent 32 and machine unreachable 4 lines per week today are the baseline); a test fails a start on one of two machines and sees only that machine's line change.
 - locks: start-record
 - after: none
 - files: src/doctor.ts, src/home-doctor.ts, src/measure.ts
 
-### L461 45 agents work at once
+### L460 45 agents work at once
 Result: With 45 ready steps on disjoint locks, 45 agents are working within 5 minutes across machines of 10, 12 and 25 slots.
 - why: one machine ran 2 tasks at the baseline and the rule loop wrote 6 `no-room` stall lines in a week, so the slots are not yet shown to fill.
-- done when: a test with 3 fake machines of 10, 12 and 25 slots and 45 ready steps starts 45 within 5 simulated minutes and never more than a machine's slots; `lineclear roadmap locks` on this file lists every step of this section as startable together.
+- done when: a test with 3 fake machines of 10, 12 and 25 slots and 45 ready steps starts 45 within 5 simulated minutes and never more than a machine's slots; `lineclear roadmap locks . --space <name>` on this file lists every step of this section as startable together.
 - locks: slots
 - after: none
 - files: src/rules.ts, src/tick-project.ts, src/spread.ts
