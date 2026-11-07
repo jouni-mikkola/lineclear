@@ -293,7 +293,7 @@ describe('an agent ends at ready', () => {
     expect(w.engine.landAtReady(t.id)).toBe(true)
     w.agentIs(key, 'idle')
     await until(() => !!t.merged)
-    expect(w.agents.record(key)?.finished).toBe(true)
+    expect(w.finishedKeys).toContain(key)
     expect(existsSync(join(dir, 'hello.txt'))).toBe(true)
   })
 
