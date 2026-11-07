@@ -21,7 +21,7 @@ test("check --changed outside GitHub spawns no tsc and writes no type cache", ()
       writeFileSync(join(bin, name), `#!/bin/sh\necho "${name} $*" >> ${log}\n`);
       chmodSync(join(bin, name), 0o755);
     }
-    const env = { ...process.env, PATH: `${bin}:${process.env.PATH}` };
+    const env: Record<string, string | undefined> = { ...process.env, PATH: `${bin}:${process.env.PATH}` };
     delete env.GITHUB_ACTIONS;
     const cache = join(repoRoot, "node_modules", ".cache");
     const before = bytesUnder(cache);
