@@ -1,7 +1,6 @@
-import { configDir } from "../pi/config.ts";
+import { tables } from "./tables.ts";
 import { readTasks } from "./task-read.ts";
-import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
-import { writeAtomic } from "../pi/atomic.ts";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { guardGroup, killGroup } from "./process-group.ts";
 import * as Q from "../server/server/live/engine/machine.ts";
@@ -36,9 +35,6 @@ export interface Wait {
   stopped?: boolean;
 }
 
-const waitsDir = (env = process.env) => join(configDir(env), "waits");
-export const waitPath = (task: string, env = process.env) => join(waitsDir(env), `${task}.json`);
-
 /** A machine's load limit: its machine.json's load per core (1 if unset) times its cores. */
 export const loadLimit = (env = process.env) => Q.machineLimits(env).loadLimit;
 
@@ -46,25 +42,15 @@ export const loadLimit = (env = process.env) => Q.machineLimits(env).loadLimit;
 export const waitsForOwner = (w: Wait) => w.kind === "owner" || w.kind === "login" || w.kind === "browser";
 
 export function readWaits(env = process.env): Wait[] {
-  if (!existsSync(waitsDir(env))) return [];
-  const waits: Wait[] = [];
-  for (const f of readdirSync(waitsDir(env)).sort()) {
-    if (!f.endsWith(".json")) continue;
-    try {
-      waits.push(JSON.parse(readFileSync(join(waitsDir(env), f), "utf8")) as Wait);
-    } catch {
-      // a half-written file is read again next time
-    }
-  }
-  return waits;
+  const rows = tables(env).query("select wait from waits order by task").all() as { wait: string }[];
+  return rows.map((r) => JSON.parse(r.wait) as Wait);
 }
 
 export function writeWait(w: Wait, env = process.env): void {
-  mkdirSync(waitsDir(env), { recursive: true });
-  writeAtomic(waitPath(w.task, env), `${JSON.stringify(w, null, 2)}\n`);
+  tables(env).query("insert or replace into waits (task, wait) values (?, ?)").run(w.task, JSON.stringify(w));
 }
 
-export const clearWait = (task: string, env = process.env) => rmSync(waitPath(task, env), { force: true });
+export const clearWait = (task: string, env = process.env) => void tables(env).query("delete from waits where task = ?").run(task);
 
 const real = (p: string) => {
   try {
@@ -234,7 +220,7 @@ export async function waitsMain(
 
   if (name === "resume") {
     if (args.length > 0) return (out(usage(name)), 2);
-    if (!existsSync(waitPath(task, env))) return fail(`${task} has no wait`);
+    if (!readWaits(env).some((w) => w.task === task)) return fail(`${task} has no wait`);
     clearWait(task, env);
     out(`${task} runs again`);
     return 0;

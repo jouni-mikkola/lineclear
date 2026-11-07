@@ -51,14 +51,3 @@ export function writeAtomic(file: string, data: string, opts: { mode?: number } 
     throw e;
   }
 }
-
-/** Like `writeAtomic`, but throws EEXIST when the file is already there, and never shows a half-written file. */
-export function createAtomic(file: string, data: string, opts: { mode?: number } = {}): void {
-  const tmp = stage(file, data, opts.mode);
-  try {
-    fs.linkSync(tmp, file);
-    syncDir(file);
-  } finally {
-    fs.rmSync(tmp, { force: true });
-  }
-}

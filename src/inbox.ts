@@ -1,11 +1,8 @@
 import { pathsFor, serverBin } from "./paths.ts";
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync } from "node:fs";
-import { createAtomic, writeAtomic } from "../pi/atomic.ts";
-import { join } from "node:path";
+import { inboxFlags, tables } from "./tables.ts";
 import { askBefore, readSettings } from "./project.ts";
 import type { StepCheck } from "./stepcheck.ts";
 import { clearWait, findProject, findTask, readWaits, writeWait } from "./waits.ts";
-import { configDir } from "../pi/config.ts";
 import { storedLoginAdvice } from "../server/server/live/secrets.ts";
 import { git, gitText } from "./git.ts";
 import { askProjectChat, type CardPoster } from "./project-chat.ts";
@@ -83,10 +80,6 @@ export function cardExtras(i: Item): { needsNote?: string; stepChecks?: GoChecks
 /** An item still waiting for the owner. */
 export const isOpen = (i: Item) => i.answer === undefined && i.closed === undefined;
 
-const inboxDir = (env = process.env) => join(configDir(env), "inbox");
-export const itemPath = (n: number, env = process.env) => join(inboxDir(env), `${n}.json`);
-/** Items the Inbox closed with no answer: kept for the numbers and the record, never read again. */
-const closedDir = (env = process.env) => join(inboxDir(env), "closed");
 export const waitReason = (task: string, env = process.env) => readWaits(env).find((w) => w.task === task)?.reason;
 export const lineclear = serverBin;
 
@@ -101,63 +94,46 @@ export function projectDecisions(project: string, steps: { title: string; task?:
     });
 }
 
-const reported = new Set<string>();
+const itemRows = (rows: unknown[]) => (rows as { item: string }[]).map((r) => JSON.parse(r.item) as Item);
 
-/** Where a closed item lives. A plan stays in the folder: its tries and its request's state are read from it. */
-const shelf = (item: Item, env: NodeJS.ProcessEnv) => (item.kind === "plan" ? inboxDir(env) : closedDir(env));
-
-/** The items of the Inbox folder, never the ones under `closed/`. One closed before items moved there is moved now. A file that is not JSON is reported once. */
+/** The items of the Inbox, never the ones that left the list when they closed (a closed plan stays: its tries and its request's state are read from it). */
 export function readItems(env = process.env): Item[] {
-  return itemNumbers(env, false)
-    .flatMap((n) => {
-      const file = itemPath(n, env);
-      try {
-        const item = JSON.parse(readFileSync(file, "utf8")) as Item;
-        if (item.closed === undefined || shelf(item, env) === inboxDir(env)) return [item];
-        mkdirSync(closedDir(env), { recursive: true });
-        renameSync(file, join(closedDir(env), `${item.n}.json`));
-        return [];
-      } catch (e) {
-        if (existsSync(file) && !reported.has(file)) console.error(`lineclear: inbox item ${file} cannot be read: ${(e as Error).message}`);
-        reported.add(file);
-        return [];
-      }
-    })
-    .sort((a, b) => a.n - b.n);
+  return itemRows(tables(env).query("select item from inbox where shelved = 0 order by n").all());
 }
 
 /** Every item, the closed ones too: for the CLI's `--all` and for an answer to a closed item. */
 export function readAllItems(env = process.env): Item[] {
-  const closed = itemNumbers(env)
-    .filter((n) => existsSync(join(closedDir(env), `${n}.json`)))
-    .flatMap((n) => {
-      try {
-        return [JSON.parse(readFileSync(join(closedDir(env), `${n}.json`), "utf8")) as Item];
-      } catch {
-        return [];
-      }
-    });
-  return [...readItems(env), ...closed].sort((a, b) => a.n - b.n);
+  return itemRows(tables(env).query("select item from inbox order by n").all());
 }
 
-/** The numbers of the Inbox's items from the file names alone (no file is read); `closed`: those under `closed/` as well. */
-export function itemNumbers(env = process.env, closed = true): number[] {
-  const names = (dir: string) => (existsSync(dir) ? readdirSync(dir) : []);
-  return [...names(inboxDir(env)), ...(closed ? names(closedDir(env)) : [])].flatMap((f) => (/^\d+\.json$/.test(f) ? [Number.parseInt(f, 10)] : []));
+/** The newest item number and the count of changes made to items: the pair changes whenever the Inbox does. */
+export function inboxStamp(env = process.env): string {
+  const r = tables(env).query("select coalesce(max(n), 0) as newest, coalesce(sum(rev), 0) as rev from inbox").get() as { newest: number; rev: number };
+  return `${r.newest}:${r.rev}`;
 }
 
-/** Adds an item under the next free number. The numbers never repeat, answered items stay. */
+/** The number of the newest item, 0 for an empty Inbox. */
+export const newestItem = (env = process.env): number =>
+  (tables(env).query("select coalesce(max(n), 0) as newest from inbox").get() as { newest: number }).newest;
+
+/** Adds an item under the next number, which the store gives. The numbers never repeat, answered items stay. */
 export function addItem(item: Omit<Item, "n">, env = process.env): Item {
-  mkdirSync(inboxDir(env), { recursive: true });
-  for (let n = Math.max(0, ...itemNumbers(env)) + 1; ; n++) {
-    try {
+  const store = tables(env);
+  const { open, shelved } = inboxFlags(item);
+  return store
+    .transaction(() => {
+      const { n } = store.query("insert into inbox (open, shelved, item) values (?, ?, '') returning n").get(open, shelved) as { n: number };
       const full = { n, ...item };
-      createAtomic(itemPath(n, env), `${JSON.stringify(full, null, 2)}\n`);
+      store.query("update inbox set item = ? where n = ?").run(JSON.stringify(full), n);
       return full;
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
-    }
-  }
+    })
+    .immediate();
+}
+
+/** Writes an item's new state under its number. */
+export function saveItem(item: Item, env = process.env): void {
+  const { open, shelved } = inboxFlags(item);
+  tables(env).query("update inbox set open = ?, shelved = ?, item = ?, rev = rev + 1 where n = ?").run(open, shelved, JSON.stringify(item), item.n);
 }
 
 /** Answers a card of a space's coordinator chat in words, which closes it. Returns an error text, or undefined. */
@@ -168,11 +144,7 @@ export function answerCard(card: NonNullable<Item["card"]>, answer: string, env 
 
 /** Closes an item with a reason and no answer. The wait it declared and the coordinator card it stands for go with it. */
 export function closeItem(item: Item, reason: string, now: Date, env = process.env): void {
-  writeAtomic(itemPath(item.n, env), `${JSON.stringify({ ...item, closed: reason, closedAt: now.toISOString() }, null, 2)}\n`);
-  if (shelf(item, env) === closedDir(env)) {
-    mkdirSync(closedDir(env), { recursive: true });
-    renameSync(itemPath(item.n, env), join(closedDir(env), `${item.n}.json`));
-  }
+  saveItem({ ...item, closed: reason, closedAt: now.toISOString() }, env);
   if (item.card) answerCard(item.card, `Closed: ${reason}.`, env);
   if (waitReason(item.task, env) === `asked: ${item.question}`) clearWait(item.task, env);
 }
