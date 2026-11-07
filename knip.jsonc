@@ -16,5 +16,5 @@
     }
   },
   // a tool of the machine, not of npm
-  "ignoreBinaries": ["perl"]
+  "ignoreBinaries": ["perl", "systemd-run"]
 }

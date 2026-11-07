@@ -8,13 +8,13 @@ export const isRpcPane = (pane?: string) => !!pane?.startsWith('rpc:')
 /** the CLI an RPC agent runs: found on PATH, as herdr's panes find it */
 const KIND = process.env.LINECLEAR_PI ?? 'pi'
 
-export interface MemoryCap {
+interface MemoryCap {
   high: string
   max: string
 }
 
 /** an agent needs about 420 MB: past `high` it is slowed, past `max` the kernel kills it and nothing else */
-export const MEMORY_CAP: MemoryCap = { high: '450M', max: '700M' }
+const MEMORY_CAP: MemoryCap = { high: '450M', max: '700M' }
 
 let systemdFound: boolean | undefined
 

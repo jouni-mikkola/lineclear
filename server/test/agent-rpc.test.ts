@@ -94,7 +94,22 @@ describe('the memory cap of a task agent', () => {
   test('argv is a capped systemd scope when systemd is there', () => {
     const [cmd, argv] = rpcCommand(['--model', 'm'], true)
     expect(cmd).toBe('systemd-run')
-    expect(argv).toEqual(['--user', '--scope', '-q', '-p', 'MemoryHigh=450M', '-p', 'MemoryMax=700M', '-p', 'MemorySwapMax=0', 'pi', '--mode', 'rpc', '--model', 'm'])
+    expect(argv).toEqual([
+      '--user',
+      '--scope',
+      '-q',
+      '-p',
+      'MemoryHigh=450M',
+      '-p',
+      'MemoryMax=700M',
+      '-p',
+      'MemorySwapMax=0',
+      'pi',
+      '--mode',
+      'rpc',
+      '--model',
+      'm',
+    ])
   })
 
   test('argv is plain when systemd is not there', () => {
