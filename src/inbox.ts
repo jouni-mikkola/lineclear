@@ -1,5 +1,5 @@
 import { pathsFor, serverBin } from "./paths.ts";
-import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync } from "node:fs";
 import { createAtomic, writeAtomic } from "../pi/atomic.ts";
 import { join } from "node:path";
 import { askBefore, readSettings } from "./project.ts";
@@ -84,7 +84,8 @@ export const isOpen = (i: Item) => i.answer === undefined && i.closed === undefi
 
 const inboxDir = (env = process.env) => join(configDir(env), "inbox");
 export const itemPath = (n: number, env = process.env) => join(inboxDir(env), `${n}.json`);
-const writeItem = (item: Item, env = process.env) => writeAtomic(itemPath(item.n, env), `${JSON.stringify(item, null, 2)}\n`);
+/** Items the Inbox closed with no answer: kept for the numbers and the record, never read again. */
+const closedDir = (env = process.env) => join(inboxDir(env), "closed");
 export const waitReason = (task: string, env = process.env) => readWaits(env).find((w) => w.task === task)?.reason;
 export const lineclear = serverBin;
 
@@ -99,24 +100,55 @@ export function projectDecisions(project: string, steps: { title: string; task?:
     });
 }
 
+const reported = new Set<string>();
+
+/** Where a closed item lives. A plan stays in the folder: its tries and its request's state are read from it. */
+const shelf = (item: Item, env: NodeJS.ProcessEnv) => (item.kind === "plan" ? inboxDir(env) : closedDir(env));
+
+/** The items of the Inbox folder, never the ones under `closed/`. One closed before items moved there is moved now. A file that is not JSON is reported once. */
 export function readItems(env = process.env): Item[] {
-  if (!existsSync(inboxDir(env))) return [];
-  const items: Item[] = [];
-  for (const f of readdirSync(inboxDir(env))) {
-    if (!f.endsWith(".json")) continue;
-    try {
-      items.push(JSON.parse(readFileSync(join(inboxDir(env), f), "utf8")) as Item);
-    } catch {
-      // a half-written file is read again next time
-    }
-  }
-  return items.sort((a, b) => a.n - b.n);
+  return itemNumbers(env, false)
+    .flatMap((n) => {
+      const file = itemPath(n, env);
+      try {
+        const item = JSON.parse(readFileSync(file, "utf8")) as Item;
+        if (item.closed === undefined || shelf(item, env) === inboxDir(env)) return [item];
+        mkdirSync(closedDir(env), { recursive: true });
+        renameSync(file, join(closedDir(env), `${item.n}.json`));
+        return [];
+      } catch (e) {
+        if (existsSync(file) && !reported.has(file)) console.error(`lineclear: inbox item ${file} cannot be read: ${(e as Error).message}`);
+        reported.add(file);
+        return [];
+      }
+    })
+    .sort((a, b) => a.n - b.n);
+}
+
+/** Every item, the closed ones too: for the CLI's `--all` and for an answer to a closed item. */
+export function readAllItems(env = process.env): Item[] {
+  const closed = itemNumbers(env)
+    .filter((n) => existsSync(join(closedDir(env), `${n}.json`)))
+    .flatMap((n) => {
+      try {
+        return [JSON.parse(readFileSync(join(closedDir(env), `${n}.json`), "utf8")) as Item];
+      } catch {
+        return [];
+      }
+    });
+  return [...readItems(env), ...closed].sort((a, b) => a.n - b.n);
+}
+
+/** The numbers of the Inbox's items from the file names alone (no file is read); `closed`: those under `closed/` as well. */
+export function itemNumbers(env = process.env, closed = true): number[] {
+  const names = (dir: string) => (existsSync(dir) ? readdirSync(dir) : []);
+  return [...names(inboxDir(env)), ...(closed ? names(closedDir(env)) : [])].flatMap((f) => (/^\d+\.json$/.test(f) ? [Number.parseInt(f, 10)] : []));
 }
 
 /** Adds an item under the next free number. The numbers never repeat, answered items stay. */
 export function addItem(item: Omit<Item, "n">, env = process.env): Item {
   mkdirSync(inboxDir(env), { recursive: true });
-  for (let n = Math.max(0, ...readItems(env).map((i) => i.n)) + 1; ; n++) {
+  for (let n = Math.max(0, ...itemNumbers(env)) + 1; ; n++) {
     try {
       const full = { n, ...item };
       createAtomic(itemPath(n, env), `${JSON.stringify(full, null, 2)}\n`);
@@ -135,7 +167,11 @@ export function answerCard(card: NonNullable<Item["card"]>, answer: string, env 
 
 /** Closes an item with a reason and no answer. The wait it declared and the coordinator card it stands for go with it. */
 export function closeItem(item: Item, reason: string, now: Date, env = process.env): void {
-  writeItem({ ...item, closed: reason, closedAt: now.toISOString() }, env);
+  writeAtomic(itemPath(item.n, env), `${JSON.stringify({ ...item, closed: reason, closedAt: now.toISOString() }, null, 2)}\n`);
+  if (shelf(item, env) === closedDir(env)) {
+    mkdirSync(closedDir(env), { recursive: true });
+    renameSync(itemPath(item.n, env), join(closedDir(env), `${item.n}.json`));
+  }
   if (item.card) answerCard(item.card, `Closed: ${reason}.`, env);
   if (waitReason(item.task, env) === `asked: ${item.question}`) clearWait(item.task, env);
 }

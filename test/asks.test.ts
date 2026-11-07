@@ -1,4 +1,4 @@
-import { afterAll, afterEach, expect, mock, test } from "bun:test";
+import { afterAll, afterEach, expect, mock, spyOn, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { promisesNext } from "../pi/nudge.ts";
@@ -177,8 +177,36 @@ test("a dry run changes nothing, and a failed tell is tried again", () => {
   expect(routeAsks("demo", "Demo", w.tell, new Date(), true, w.env)).toEqual(["would answer T-3 (merge-chat) by a rule"]);
   expect(w.told).toEqual([]);
   expect(routeAsks("demo", "Demo", () => "boom", new Date(), false, w.env)[0]).toContain("could not answer T-3: boom");
-  expect(existsSync(join(w.config, "projects", "demo", "asks-routed.json"))).toBe(false);
+  expect(existsSync(join(w.config, "projects", "demo", "asks-told.json"))).toBe(false);
   expect(routeAsks("demo", "Demo", w.tell, new Date(), false, w.env)).toHaveLength(1);
+});
+
+test("a tick reads no archived chat, parses an unchanged live chat 0 times and rewrites nothing", () => {
+  const w = world([mergeChat]);
+  const shep = w.env.LINECLEAR_HOME ?? "";
+  mkdirSync(join(shep, "archive", "chatlog"), { recursive: true });
+  for (let i = 0; i < 200; i++) {
+    const card = { ...mergeChat, id: `old${i}`, task: `T-${100 + i}` };
+    writeFileSync(join(shep, "archive", "chatlog", `T-${100 + i}_Agent.json`), JSON.stringify({ posted: [{ at: 1, id: card.id, card }] }));
+  }
+  const now = new Date("2026-10-30T12:00:00Z");
+  expect(routeAsks("demo", "Demo", w.tell, now, false, w.env)).toEqual(["T-3 was told how to go on (merge-chat)"]);
+  expect(w.told).toHaveLength(1); // the 200 archived cards were not answered
+  const told = join(w.config, "projects", "demo", "asks-told.json");
+  const wrote = readFileSync(told, "utf8");
+  const parse = JSON.parse;
+  let parses = 0;
+  const spy = spyOn(JSON, "parse").mockImplementation(((text: string, ...rest: []) => {
+    if (String(text).includes("merge-chat") || String(text).includes("Waits for your")) parses++;
+    return parse(text, ...rest);
+  }) as typeof JSON.parse);
+  try {
+    expect(routeAsks("demo", "Demo", w.tell, now, false, w.env)).toEqual([]);
+  } finally {
+    spy.mockRestore();
+  }
+  expect(parses).toBe(0);
+  expect(readFileSync(told, "utf8")).toBe(wrote);
 });
 
 test("a report of a done task closes by a rule and a question is answered by a rule", () => {
@@ -259,7 +287,7 @@ test("a quiet turn in Merging is told to merge again, the second is left alone",
   const shep = w.env.LINECLEAR_HOME ?? "";
   writeFileSync(join(shep, "tasks.json"), JSON.stringify({ tasks: [{ id: "T-1", status: "merging" }] }));
   // a nudge from Work earlier in the hour does not count against the merge
-  writeFileSync(join(w.config, "projects", "demo", "asks-routed.json"), JSON.stringify([`nudge:T-1@${Date.now() - 60_000}`]));
+  writeFileSync(join(w.config, "projects", "demo", "asks-told.json"), JSON.stringify([`nudge:T-1@${Date.now() - 60_000}`]));
   const idle = { clean: () => true, close: () => undefined };
   // a fixed clock: nudges are keyed by the millisecond, so real time would let the rounds depend on the machine's speed
   const start = Date.now();
@@ -276,7 +304,7 @@ test("a quiet turn after a nudge is answered in each of three ways", () => {
   const replies = ["", "I'll keep calling `lineclear merge T-2` until it goes through.", "I set a wait on it."];
   const w = world(replies.map((r, i) => idleCard(`T-${i + 1}`, `q${i}`, r)));
   const earlier = (i: number) => `nudge:T-${i + 1}@${Date.now() - 600_000}`;
-  writeFileSync(join(w.config, "projects", "demo", "asks-routed.json"), JSON.stringify(replies.map((_, i) => earlier(i))));
+  writeFileSync(join(w.config, "projects", "demo", "asks-told.json"), JSON.stringify(replies.map((_, i) => earlier(i))));
   const out = w.route({ clean: () => true, close: () => undefined });
   expect(out).toHaveLength(3);
   expect(w.told.map((l) => l.split(":")[0])).toEqual(["T-1", "T-2", "T-3"]);

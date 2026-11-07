@@ -1,7 +1,7 @@
 import { writeAtomic } from "../pi/atomic.ts";
 import { undoApplied } from "./plan-apply.ts";
 import { applyMove } from "./dispatcher.ts";
-import { answerCard, isOpen, type Item, itemPath, KIND_LABEL, readItems, lineclear, usage, waitReason } from "./inbox.ts";
+import { answerCard, isOpen, type Item, itemPath, KIND_LABEL, readAllItems, lineclear, usage, waitReason } from "./inbox.ts";
 import { readSettings } from "./project.ts";
 import { clearWait } from "./waits.ts";
 import { gitText } from "./git.ts";
@@ -17,7 +17,7 @@ const describe = (i: Item) =>
 export function inboxMain(args: string[], out: (l: string) => void, env = process.env): number {
   const bail = (code: number, line: string) => (out(line), code);
   if (args.length === 0 || (args.length === 1 && args[0] === "--all")) {
-    const shown = readItems(env).filter((i) => args.length === 1 || isOpen(i));
+    const shown = readAllItems(env).filter((i) => args.length === 1 || isOpen(i));
     out(shown.length === 0 ? "The Inbox is empty." : shown.map(describe).join("\n"));
     return 0;
   }
@@ -27,7 +27,7 @@ export function inboxMain(args: string[], out: (l: string) => void, env = proces
   const note = noted?.join(" ").trim();
   const isUndo = verb === "undo" && tail.length === 0;
   if (!/^\d+$/.test(n ?? "") || !(isUndo || (verb === "answer" && rest.length > 0 && note !== ""))) return bail(2, usage("inbox"));
-  const item = readItems(env).find((i) => i.n === Number(n));
+  const item = readAllItems(env).find((i) => i.n === Number(n));
   if (item === undefined) return bail(1, `lineclear inbox: no item ${n}`);
   if (isUndo) {
     const problem = undoApplied(item, new Date(), env);
