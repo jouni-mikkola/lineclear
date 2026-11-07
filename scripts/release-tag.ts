@@ -7,17 +7,14 @@ import { join } from "node:path";
 const LIMIT_MS = 30 * 60_000; // an install that downloads tools ends by this limit rather than hangs
 export type Release = { ok: boolean; lines: string[] };
 type Ran = { ok: boolean; out: string };
-
-/** Exit 0 when GitHub's "check" passed on HEAD. */
+// exit 0 when GitHub's "check" passed on HEAD
 const GITHUB_GREEN = [
   "sh",
   "-c",
   `gh api "repos/{owner}/{repo}/commits/$(git rev-parse HEAD)/check-runs" --jq '[.check_runs[] | select(.name == "check") | .conclusion] | unique | join(",")' | grep -qx success`,
 ];
-
 /** What release runs; tests swap the check and the install for stand-ins. `install` puts `tag` of `repo` into `home` and returns its doctor. */
 export type ReleaseSteps = { repo: string; check: string[]; install: (repo: string, tag: string, home: string) => Ran };
-
 function run(cmd: string[], cwd: string, env?: Record<string, string>): Ran {
   const p = Bun.spawnSync(cmd, { cwd, env, stdin: "ignore", stdout: "pipe", stderr: "pipe", timeout: LIMIT_MS });
   return { ok: p.exitCode === 0, out: (p.stdout.toString() + p.stderr.toString()).trim() };
@@ -74,8 +71,7 @@ export function releaseProblems(root: string = join(import.meta.dir, "..")): str
     if (!text.startsWith(`# Lineclear ${f.replace(/\.md$/, "")}\n\n![`)) out.push(`${f} does not start with the template's title and a picture`);
     if (/\{[a-z]+\}/.test(text)) out.push(`${f} leaves a template field unfilled`);
     const own = heads(text);
-    if (own.some((h) => !template.includes(h)) || JSON.stringify(own) !== JSON.stringify(template.filter((h) => own.includes(h))))
-      out.push(`${f} leaves the template's parts or their order`);
+    if (JSON.stringify(own) !== JSON.stringify(template.filter((h) => own.includes(h)))) out.push(`${f} leaves the template's parts or their order`);
     const pictures = [...text.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map(([, p = ""]) => p);
     if (pictures.length === 0) out.push(`${f} shows no picture of what changed`);
     for (const p of pictures) if (!existsSync(join(dir, p))) out.push(`${f} shows ${p}, which is not there`);

@@ -26,19 +26,16 @@ const json = (name: string): unknown => JSON.parse(readFileSync(join(home, name)
 
 /** Every value set must be one this build keeps: the server drops a key it does not know when it next saves. */
 function settings(): string[] {
-  const raw = json('settings.json') as { everywhere?: Values; machine?: Values; spaces?: Record<string, Values> }
-  const read = new Settings(structuredClone({ everywhere: raw.everywhere ?? {}, machine: raw.machine ?? {}, spaces: raw.spaces ?? {} }))
+  const { everywhere = {}, machine = {}, spaces = {} } = json('settings.json') as { everywhere?: Values; machine?: Values; spaces?: Record<string, Values> }
+  const read = new Settings(structuredClone({ everywhere, machine, spaces }))
   if (older) return []
   const levels: [string, Values, 'all' | 'machine' | { space: string }][] = [
-    ['everywhere', raw.everywhere ?? {}, 'all'],
-    ['machine', raw.machine ?? {}, 'machine'],
-    ...Object.entries(raw.spaces ?? {}).map(([space, v]): [string, Values, { space: string }] => [`space ${space}`, v, { space }]),
+    ['everywhere', everywhere, 'all'],
+    ['machine', machine, 'machine'],
+    ...Object.entries(spaces).map(([space, v]): [string, Values, { space: string }] => [`space ${space}`, v, { space }]),
   ]
-  const lost = levels.flatMap(([name, values, level]) =>
-    Object.entries(values)
-      .filter(([k, v]) => read.pick(k, level).value !== v)
-      .map(([k]) => `${name} ${k}`),
-  )
+  const lost: string[] = []
+  for (const [name, values, level] of levels) for (const [k, v] of Object.entries(values)) if (read.pick(k, level).value !== v) lost.push(`${name} ${k}`)
   return lost.length ? [`settings.json: this build would drop ${lost.join(', ')}`] : []
 }
 
@@ -83,14 +80,8 @@ function chats(): string[] {
 }
 
 const out: string[] = []
-const readers: [string, () => string[]][] = [
-  ['settings.json', settings],
-  ['tasks.json', tasks],
-  ['spaces.json', spaces],
-  ['chatlog', chats],
-  ['task-ids.sqlite', taskIds],
-]
-for (const [name, check] of readers) {
+const readers = { 'settings.json': settings, 'tasks.json': tasks, 'spaces.json': spaces, chatlog: chats, 'task-ids.sqlite': taskIds }
+for (const [name, check] of Object.entries(readers)) {
   try {
     if (existsSync(join(home, name))) out.push(...check())
   } catch (e) {
