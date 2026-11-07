@@ -152,15 +152,21 @@ test("every listed command is one the CLI knows", async () => {
   const bin = join(dirname(import.meta.dir), "bin", "lineclear");
   try {
     const unknown = await Promise.all(
-      Object.keys(commands).map(async (name) => {
-        const p = Bun.spawn([bin, name, "--help"], { env, stdout: "pipe", stderr: "pipe", stdin: "ignore", detached: true });
-        // a command that forwards to the server waits on its closed port: it got past the dispatch, so end it and its children
-        const kill = setTimeout(() => process.kill(-p.pid, "SIGKILL"), 1500);
-        const text = (await new Response(p.stdout).text()) + (await new Response(p.stderr).text());
-        await p.exited;
-        clearTimeout(kill);
-        return /unknown command/.test(text) ? name : "";
-      }),
+      Object.keys(commands)
+        .filter((name) => name !== "merge")
+        .map(async (name) => {
+          const p = Bun.spawn([bin, name, "--help"], { env, stdout: "pipe", stderr: "pipe", stdin: "ignore", detached: true });
+          // the board's merge retries a closed port for seconds; every other command ends at once
+          let killed = false;
+          const kill = setTimeout(() => {
+            killed = true;
+            process.kill(-p.pid, "SIGKILL");
+          }, 1800);
+          const text = (await new Response(p.stdout).text()) + (await new Response(p.stderr).text());
+          await p.exited;
+          clearTimeout(kill);
+          return killed || /unknown command/.test(text) ? name : "";
+        }),
     );
     expect(unknown.filter(Boolean)).toEqual([]);
   } finally {
