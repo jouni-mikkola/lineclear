@@ -195,16 +195,10 @@ test("install loads the token pack: parts show in doctor, a switch holds, a seco
   git("commit", "-q", "-m", "a part");
   const r = install();
   expect(r.code).toBe(0);
-  expect(r.out).toContain(
-    "Token pack: on   batched-reads, on   compaction, on   compaction-notes, on   compaction-point, on   cut-output, on   no-sleep, on   sample",
-  );
-  expect(lineclear("doctor").out).toContain(
-    "ok     token pack: batched-reads on, compaction on, compaction-notes on, compaction-point on, cut-output on, no-sleep on, sample on",
-  );
+  expect(r.out).toContain("Token pack: on   batched-reads, on   cut-output, on   no-sleep, on   sample");
+  expect(lineclear("doctor").out).toContain("ok     token pack: batched-reads on, cut-output on, no-sleep on, sample on");
   expect(lineclear("pack", "off", "sample").out).toContain("sample: off");
-  expect(lineclear("doctor").out).toContain(
-    "ok     token pack: batched-reads on, compaction on, compaction-notes on, compaction-point on, cut-output on, no-sleep on, sample off",
-  );
+  expect(lineclear("doctor").out).toContain("ok     token pack: batched-reads on, cut-output on, no-sleep on, sample off");
   const before = snapshot(home);
   passes(install());
   expect(snapshot(home)).toEqual(before); // the switch is kept, and no file changed
