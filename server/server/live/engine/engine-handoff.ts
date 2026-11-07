@@ -212,7 +212,9 @@ export class EngineHandoff extends EnginePr {
     if (facts) t.facts = facts
     this.markClosed(t, 'close')
     // putting it away closes the agent too, after looking at its work
-    return { kept: (await this.cleanup(t, true))?.kept ?? [] }
+    const kept = (await this.cleanup(t, true))?.kept ?? []
+    await this.dropPr(t)
+    return { kept }
   }
 
   /** what a task's worktree and branch hold that its base lacks, in words ("~/x (uncommitted changes)"); none: nothing is lost */

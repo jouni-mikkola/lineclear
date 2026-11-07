@@ -255,7 +255,11 @@ export class EngineMerge extends EngineLand {
     for (const t of this.tasks.filter(ended)) {
       const p = this.places.space(t.project)
       const st = this.agents.status(this.key(t))
-      if (!p || t.machine || st === 'working' || (t.cleaned && st !== 'gone')) continue
+      if (!p || t.machine || st === 'working') continue
+      if (t.cleaned && st !== 'gone') {
+        await this.dropPr(t)
+        continue
+      }
       const left = !t.cleaned || (!!t.worktree && (await exists(t.worktree))) || (!!t.branch && (await G.branchExists(p.path, t.branch)))
       if (left) {
         try {
@@ -263,7 +267,7 @@ export class EngineMerge extends EngineLand {
         } catch (e) {
           console.error(`sweeping ${t.id}:`, e)
         }
-      }
+      } else await this.dropPr(t)
     }
   }
 
