@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { LinkBackoff, WorkerHealth } from '../server/live/recovery.ts'
+import { LinkBackoff } from '../server/live/recovery.ts'
 import { EventEmitter } from 'node:events'
 import { Subscription } from '../server/live/herdr.ts'
 import { Tunnel } from '../server/live/tunnel.ts'
@@ -17,25 +17,6 @@ describe('machine link recovery', () => {
     expect(b.fail(20)).toBe(30000)
     b.success(30)
     expect(b.fail(60_030)).toBe(3000)
-  })
-
-  test('watchdog gives three minutes, backs off restarts, and ignores healthy idle', () => {
-    const h = new WorkerHealth()
-    h.observe(false, 0)
-    expect(h.restartDue(179_999)).toBe(false)
-    expect(h.restartDue(180_000)).toBe(true)
-    h.restarting(180_000)
-    expect(h.restartDue(359_999)).toBe(false)
-    expect(h.restartDue(360_000)).toBe(true)
-    h.restarting(360_000)
-    expect(h.restartDue(540_000)).toBe(false)
-    expect(h.restartDue(720_000)).toBe(true)
-    h.observe(true, 720_000)
-    expect(h.restartDue(900_000)).toBe(false)
-    h.observe(true, 780_000)
-    h.observe(false, 800_000)
-    h.restarting(980_000)
-    expect(h.restartDue(1_160_000)).toBe(true)
   })
 
   test('a tunnel retries failed setup once, never overlaps, and cancels pending retry', async () => {
@@ -134,74 +115,49 @@ describe('machine link recovery', () => {
     expect(opened).toBe(false)
   })
 
-  test('HTTP snapshot with herdr off triggers one watchdog restart, waits for exit, and queues work', async () => {
-    let healthy = false
+  test('a worker is one socket: one snapshot fetch while idle, and a killed link comes back', async () => {
+    let fetches = 0,
+      opened = 0
+    const open: { close(): void }[] = []
+    const snap = { machines: [{ status: 'idle' }], tasks: [] } as unknown as Snapshot
     const s = Bun.serve({
       hostname: '127.0.0.1',
       port: 0,
-      fetch: () => Response.json({ machines: [{ status: healthy ? 'idle' : 'off' }], tasks: [] } as unknown as Snapshot),
-    })
-    const m = new Machines(null, async () => ({}))
-    const l = m.adopt('fake-watchdog', `http://127.0.0.1:${s.port}`)
-    // Access lifecycle entry points without running real probes, worker processes or SSH.
-    type TestLink = typeof l
-    const internals = m as unknown as { poll(link: TestLink): Promise<void>; start(link: TestLink): Promise<void> }
-    let starts = 0,
-      kills = 0,
-      exit!: () => void
-    internals.start = async () => {
-      starts++
-    }
-    const worker = {
-      pid: -1,
-      kill: () => {
-        kills++
+      fetch: (req, server) => {
+        if (new URL(req.url).pathname === '/api/ws') return server.upgrade(req) ? undefined : new Response('no', { status: 400 })
+        fetches++
+        return Response.json(snap)
       },
-      exited: new Promise<void>((r) => {
-        exit = r
-      }),
-    }
-    l.worker = worker
-    const originalNow = Date.now
-    let clock = originalNow()
-    Date.now = () => clock
+      websocket: {
+        open(ws) {
+          opened++
+          open.push(ws)
+          ws.send(JSON.stringify({ type: 'snapshot', snapshot: snap }))
+        },
+        message() {},
+      },
+    })
+    const intervals: unknown[] = []
+    const realInterval = globalThis.setInterval
+    globalThis.setInterval = ((...a: Parameters<typeof setInterval>) => (intervals.push(a), realInterval(...a))) as typeof setInterval
+    const m = new Machines(null, async () => ({}))
+    const l = m.adopt('fake-socket', `http://127.0.0.1:${s.port}`)
+    ;(m as unknown as { retryAfter: number }).retryAfter = 50
     try {
-      await until(() => !l.polling)
-      expect(l.reachable).toBe(false)
-      expect(await m.act(l, { type: 'noop' } as never)).toEqual({ waiting: true })
-      expect(l.waiting).toHaveLength(1)
-      l.waiting.length = 0
-      clock += 179_000
-      await internals.poll(l)
-      expect(kills).toBe(0)
-      clock += 2000
-      await Promise.all([internals.poll(l), internals.poll(l)])
-      expect(kills).toBe(1)
-      expect(starts).toBe(0)
-      await internals.poll(l)
-      expect(kills).toBe(1)
-      exit()
-      await until(() => starts === 1)
-      l.worker = worker
-      await internals.poll(l)
-      expect(kills).toBe(1)
-      healthy = true
-      await internals.poll(l)
-      expect(l.reachable).toBe(true)
-      clock += 900_000
-      await internals.poll(l)
-      expect(kills).toBe(1)
-      m.stop()
-      healthy = false
-      await internals.poll(l)
-      expect(kills).toBe(1)
+      await until(() => opened === 1 && l.reachable)
+      await Bun.sleep(1200)
+      expect(fetches).toBe(1)
+      expect(intervals).toHaveLength(0)
+      open[0].close()
+      await until(() => opened === 2 && l.reachable)
+      expect(fetches).toBe(2)
     } finally {
-      Date.now = originalNow
-      exit()
+      globalThis.setInterval = realInterval
       m.stop()
       s.stop(true)
     }
   })
+
   test('removing a machine cancels cached writes and late probes cannot restore it', async () => {
     const { HOME } = await import('../server/store.ts')
     const m = new Machines(null, async () => ({}))
