@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { projectLists } from './project-models.ts'
 import { HELP, one, parseArgs, summaryOpts, type Parsed } from './args.ts'
 import { ended } from './engine/engine.ts'
 import { room } from './herdr-forward.ts'
@@ -223,14 +224,17 @@ export class LiveSourceCli extends LiveSourceSubcommands {
         const pr = this.placeOfCommand(p, ctx)?.name
         const now = `${this.health.last ? `\n\n${NAME} now: ${summary(this.health.last)} · ${this.workingLine()}` : ''}`
         const head = `Defaults for ${pr ? `${this.places.nameOf(placeId.space(pr))} on ${NAME}` : NAME} (a space's own win over its machine's, which win over Everywhere; in brackets where each comes from):`
+        // tasks take their model from the space's ordered lists (Settings > Models), not from a model setting
+        const lists = pr ? projectLists(pr) : undefined
+        const listed = (h: { kind: string; effort?: string }, role: 'worker' | 'reviewer') => ({ ...h, model: lists?.[role]?.join(', then ') })
         const block = settingsBlock('<id>', {
           ways: this.settings.ways(pr),
-          reviewer: this.settings.harness('reviewer', pr),
-          agent: this.settings.harness('task', pr),
+          reviewer: listed(this.settings.harness('reviewer', pr), 'reviewer'),
+          agent: listed(this.settings.harness('task', pr), 'worker'),
           by: this.settings.setBy(pr),
         })
         const repo = pr ? this.places.byName(pr) : undefined
-        return `${head}${repo ? `\nBase branch: ${repo.base} (new tasks; per-task override: --base <branch>)` : ''}\n${this.settings.lines(pr, NAME)}${now}\n\nEvery new task's brief${pr ? ` in ${pr}` : ''} ends with:\n${block}\n\nFor one task, set any of these with task add: --set review.rounds=1 --set merge="ask me first" (--set agent=codex, model, effort, reviewer, reviewer.model, reviewer.effort too), or say so in its brief, which wins.`
+        return `${head}${repo ? `\nBase branch: ${repo.base} (new tasks; per-task override: --base <branch>)` : ''}\n${this.settings.lines(pr, NAME, lists)}${now}\n\nEvery new task's brief${pr ? ` in ${pr}` : ''} ends with:\n${block}\n\nFor one task, set any of these with task add: --set review.rounds=1 --set merge="ask me first" (--set agent=codex, model, effort, reviewer, reviewer.model, reviewer.effort too), or say so in its brief, which wins.`
       }
       case 'set':
       case 'unset': {

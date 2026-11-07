@@ -9,7 +9,7 @@ import { checkTitle, type TaskRec } from './engine/engine.ts'
 import { validateBase } from './engine/git.ts'
 import { checkResult } from './engine/result.ts'
 import { BOX, machineRef, noTasks, runOn } from './box.ts'
-import { placeId } from './places.ts'
+import { NAME, placeId } from './places.ts'
 import { CLI_NAME, CLIS, kindOf, setForTask } from './settings.ts'
 import { SECRET_NAME } from './secrets.ts'
 import { statusLine, harnessOf, reviewerOf, fit, taskAddArgs } from './source-helpers.ts'
@@ -210,7 +210,7 @@ export class LiveSourceSubcommands extends LiveSourceActions {
             sub: statusLine(t),
             closed: 'closed' in t && t.closed ? true : undefined,
             closedBy: 'closedBy' in t && t.closed ? t.closedBy : undefined,
-            machine: 'machine' in t ? t.machine : undefined,
+            machine: 'machine' in t && t.machine ? t.machine : NAME,
             space: 'place' in t ? t.place.split(':').slice(2).join(':') : undefined, // the name `--space` takes
             archived: t.archived,
             pinned: t.pinned,
@@ -223,7 +223,7 @@ export class LiveSourceSubcommands extends LiveSourceActions {
         )
       const rows = all.map(
         (t) =>
-          `${t.id.padEnd(8)} ${t.status.padEnd(5)} ${t.name}${t.pinned ? '  (pinned)' : ''}${statusLine(t) ? `  · ${statusLine(t)}` : ''}${'machine' in t ? `  (on ${t.machine})` : ''}`,
+          `${t.id.padEnd(8)} ${t.status.padEnd(5)} ${t.name}${t.pinned ? '  (pinned)' : ''}${statusLine(t) ? `  · ${statusLine(t)}` : ''}  (on ${'machine' in t && t.machine ? t.machine : NAME})`,
       )
       const archived = p.flags.has('archived') ? 0 : this.engine.tasks.filter((t) => t.archived && (!pr || t.project === placeId.space(pr.name))).length
       const tail = archived ? `\n(${archived} archived: lineclear task list --archived)` : ''

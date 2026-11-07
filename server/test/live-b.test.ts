@@ -23,6 +23,12 @@ describe('settings', () => {
       expect(s.set(k, 'any').ok).toBe(false)
     for (const k of ['check.command', 'merge.by', 'plan.approve', 'worker.agent', 'limit.tokens', 'agent']) expect(s.set(k, 'x').ok).toBe(false)
   })
+  test("show prints the space's ordered model lists, not a stored model nothing uses", () => {
+    const text = new Settings().lines('games', 'box', { worker: ['p/a', 'p/b'], reviewer: ['p/c'] })
+    expect(text).toContain('p/a, then p/b  (Settings > Models)')
+    expect(text).toContain('p/c  (Settings > Models)')
+    expect(text).not.toContain('backup.model')
+  })
   test("the worker, reviewer and backup models are Lineclear's lists: read-only here, and refused when set", () => {
     const s = new Settings()
     const rows = s
