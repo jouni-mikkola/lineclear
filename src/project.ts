@@ -1,8 +1,8 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
-import { writeAtomic } from "../pi/atomic.ts";
 import { configDir } from "../pi/config.ts";
 import { ENDLESS, scriptRunner } from "./project-detect.ts";
+import { setupTable } from "./tables.ts";
 
 export const roles = ["worker", "reviewer"] as const;
 export type Role = (typeof roles)[number];
@@ -84,63 +84,22 @@ export function toldPath(project: string, env = process.env): string {
 
 export const settingsPath = (name: string, env = process.env) => join(projectsDir(env), name, "settings.json");
 
-const storePath = (env = process.env) => join(configDir(env), "settings.json");
-
-/** The store from before settings.json: read once to migrate, then deleted. */
-const legacySetupPath = (env = process.env) => join(configDir(env), "setup.json");
-
-/** The machine store's format. A file with no `version` is version 1. */
-const STORE_VERSION = 2;
-
-type Store = { version: number; setup: Setup };
-
-/** Reads a JSON object, or throws a message that names the file: a bad file is never read as empty, so no later save writes over it. */
-function readObject(file: string): Record<string, unknown> {
-  let value: unknown;
-  try {
-    value = JSON.parse(readFileSync(file, "utf8"));
-  } catch (e) {
-    throw new Error(`${file} cannot be read as JSON (${(e as Error).message}); fix or remove the file, it is left unchanged`);
-  }
-  if (typeof value !== "object" || value === null || Array.isArray(value))
-    throw new Error(`${file} is not a JSON object; fix or remove the file, it is left unchanged`);
-  return value as Record<string, unknown>;
-}
-
-/** The machine store, migrated to the current version: the old file is kept as settings.json.v<n>.bak and the new one written atomically. */
-function readStore(env: NodeJS.ProcessEnv): Store {
-  const file = storePath(env);
-  if (!existsSync(file)) return { version: STORE_VERSION, setup: {} };
-  const raw = readObject(file);
-  const version = raw.version === undefined ? 1 : raw.version;
-  if (typeof version !== "number" || !Number.isInteger(version) || version < 1)
-    throw new Error(`${file} has an unknown settings version ${JSON.stringify(version)}`);
-  if (version > STORE_VERSION) throw new Error(`${file} is settings version ${version}, newer than this Lineclear reads (${STORE_VERSION}); update Lineclear`);
-  const setup = (raw.setup ?? {}) as Setup;
-  if (version === STORE_VERSION) return { version, setup };
-  writeAtomic(`${file}.v${version}.bak`, readFileSync(file, "utf8"));
-  writeAtomic(file, `${JSON.stringify({ version: STORE_VERSION, setup }, null, 2)}\n`);
-  return { version: STORE_VERSION, setup };
-}
-
-/** The settings version the machine store is in, after any migration. Throws when the file cannot be read. */
-export const storeVersion = (env = process.env): number => readStore(env).version;
-
-/** Writes the role models into the one store, the file Settings writes. */
+/** Writes the role models into the table, in one transaction. */
 export function writeSetup(next: Setup, env = process.env): void {
-  mkdirSync(configDir(env), { recursive: true });
-  writeAtomic(storePath(env), `${JSON.stringify({ version: STORE_VERSION, setup: next }, null, 2)}\n`);
+  const store = setupTable(env);
+  store
+    .transaction(() => {
+      store.exec("delete from setup");
+      const put = store.query("insert into setup (role, model) values (?, ?)");
+      for (const [role, model] of Object.entries(next)) if (model) put.run(role, model);
+    })
+    .immediate();
 }
 
 /** The model chosen for each role: the machine's defaults, which a project's own `models` override. */
 export function readSetup(env = process.env): Setup {
-  const legacy = legacySetupPath(env);
-  const stored = readStore(env).setup;
-  if (!existsSync(legacy)) return stored;
-  const merged = { ...(readObject(legacy) as Setup), ...stored };
-  writeSetup(merged, env);
-  rmSync(legacy, { force: true });
-  return merged;
+  const rows = setupTable(env).query("select role, model from setup").all() as { role: SetupRole; model: string }[];
+  return Object.fromEntries(rows.map((r) => [r.role, r.model]));
 }
 
 /** Saves the chosen models over the earlier ones. A reviewer of the worker's company is refused, and nothing is saved. */

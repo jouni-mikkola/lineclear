@@ -1,11 +1,12 @@
-import { afterAll, expect, test } from "bun:test";
+import { afterAll, expect, spyOn, test } from "bun:test";
 import { chmodSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { detectProject, FIRST_ROADMAP, findRepos, pickModels, saveProject } from "../src/add-project.ts";
 import { companyOfModel, type ModelFile, modelFile } from "../src/models.ts";
 import { detectCheck } from "../src/project-detect.ts";
+import { addProject } from "../src/project-write.ts";
 import { pickReviewer } from "../src/stalls.ts";
-import { tmp } from "./helpers.ts";
+import { seedSpace, tmp } from "./helpers.ts";
 
 const root = tmp("add-project");
 afterAll(() => rmSync(root, { recursive: true, force: true }));
@@ -38,6 +39,25 @@ esac
   chmodSync(bin, 0o755);
   return bin;
 }
+
+test("project add finds the space in the store and starts no child process", async () => {
+  const dir = join(root, "nochild");
+  const r = repo(join(dir, "app"));
+  const env = { ...process.env, HOME: dir, LINECLEAR_CONFIG: join(dir, "config"), LINECLEAR_HOME: join(dir, "data") };
+  seedSpace(env.LINECLEAR_HOME, "app-space", r);
+  const sync = spyOn(Bun, "spawnSync");
+  const async = spyOn(Bun, "spawn");
+  try {
+    const said: string[] = [];
+    expect(await addProject([r, "--check", "true", "--worker", "a/x", "--reviewer", "b/y"], null, (l) => said.push(l), env)).toBe(0);
+    expect(sync).toHaveBeenCalledTimes(0);
+    expect(async).toHaveBeenCalledTimes(0);
+    expect(JSON.parse(readFileSync(join(dir, "config", "projects", "app", "settings.json"), "utf8")).space).toBe("app-space");
+  } finally {
+    sync.mockRestore();
+    async.mockRestore();
+  }
+});
 
 test("the best models pi offers come first, the second from another company, a lesser one last", () => {
   const offered = [
@@ -134,8 +154,8 @@ test("a repo with a roadmap starts with no planning task", async () => {
   const dir = join(root, "planned");
   const bin = board(join(dir, "board"));
   const r = repo(join(dir, "app"), { "docs/ROADMAP.md": "# Roadmap\n" });
-  writeFileSync(join(dir, "board", "spaces.txt"), `app-space  ${r}\n`);
   const env = { HOME: dir, LINECLEAR_CONFIG: join(dir, "config"), LINECLEAR_HOME: join(dir, "data"), LINECLEAR_SERVER_BIN: bin };
+  seedSpace(env.LINECLEAR_HOME, "app-space", r);
   expect(await saveProject({ repo: r, check: "make test", models: ["a/b"] }, env)).toEqual({ name: "app" });
   expect(readFileSync(join(dir, "board", "calls.log"), "utf8")).not.toContain("task add");
 });

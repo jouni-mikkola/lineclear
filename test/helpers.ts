@@ -1,3 +1,4 @@
+import { Database } from "bun:sqlite";
 import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -145,4 +146,13 @@ export function webShopDir(prefix: string): string {
   mkdirSync(join(dir, "lineclear"), { recursive: true });
   writeFileSync(join(dir, "lineclear", "spaces.json"), JSON.stringify([{ key: "WEB", name: "web-shop", path: join(dir, "none") }]));
   return dir;
+}
+
+/** The board's store with one space, as the board writes it. */
+export function seedSpace(home: string, name: string, path: string): void {
+  mkdirSync(home, { recursive: true });
+  const store = new Database(join(home, "store.sqlite"), { create: true });
+  store.exec("create table if not exists spaces (position integer primary key, data text not null)");
+  store.query("insert into spaces (position, data) values (0, ?)").run(JSON.stringify({ name, path }));
+  store.close();
 }

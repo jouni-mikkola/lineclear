@@ -8,7 +8,7 @@ import { doctor, doctorChecks, herdrVersions, realProbe, testedHerdr, type Probe
 import { storedTaskIds } from "../src/doctor-task-ids.ts";
 import { cacheEnvFile, pathsFor } from "../src/paths.ts";
 import { setRegistry } from "../src/models.ts";
-import { setupRoles } from "../src/project.ts";
+import { setupRoles, writeSetup } from "../src/project.ts";
 
 const paths = pathsFor({ HOME: "/nonexistent-home" });
 const realProbeWith = (env: Record<string, string>) => probe({ ...realProbe(paths, env) });
@@ -283,7 +283,7 @@ test("doctor names each role whose model a settings migration lost, and none whe
   const env = { LINECLEAR_CONFIG: dir };
   const roleProblems = () => doctorChecks(probe({ setup: realSetup(env) })).filter((c) => c.name.endsWith(" model") && c.problem);
   try {
-    // the old store held no models, so the migration to settings.json carries none over
+    // the old store held no models, so the migration carries none over
     writeFileSync(join(dir, "setup.json"), JSON.stringify({}));
     const lines: string[] = [];
     const code = doctor(probe({ setup: realSetup(env), which: (c) => `/usr/bin/${c}` }), (l) => lines.push(l));
@@ -293,21 +293,19 @@ test("doctor names each role whose model a settings migration lost, and none whe
     expect(code).toBe(1);
 
     const full = Object.fromEntries(setupRoles.map((r) => [r, `p/${r}`]));
-    writeFileSync(join(dir, "settings.json"), JSON.stringify({ setup: full }));
+    writeSetup(full, env);
     expect(roleProblems()).toHaveLength(0);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test("doctor prints the settings version, and fails naming a file it cannot read", () => {
+test("doctor fails naming a settings file it cannot read", () => {
   const dir = mkdtempSync(join(tmpdir(), "doctor-version-"));
   const env = { LINECLEAR_CONFIG: dir };
   const file = join(dir, "settings.json");
   const settingsCheck = () => doctorChecks(realProbeWith(env)).find((c) => c.name === "settings file");
   try {
-    writeFileSync(file, JSON.stringify({ setup: {} }));
-    expect(settingsCheck()).toMatchObject({ problem: "", info: "settings version 2" });
     writeFileSync(file, "{ truncated");
     expect(settingsCheck()?.problem).toContain(file);
     expect(readFileSync(file, "utf8")).toBe("{ truncated");

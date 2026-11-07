@@ -3,7 +3,7 @@ import { chmodSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { main } from "../src/cli.ts";
 import { removeFolders } from "../src/tmpdirs.ts";
-import { chooseModels, ownEnv, sh, tmp } from "./helpers.ts";
+import { chooseModels, ownEnv, sh, tmp, seedSpace } from "./helpers.ts";
 
 const bin = join(import.meta.dir, "..", "bin", "lineclear");
 let root: string;
@@ -18,6 +18,7 @@ beforeEach(async () => {
   const fake = join(root, "lineclear");
   writeFileSync(fake, `#!/bin/sh\nprintf 'demo  DEM  ${repo}  github:x/y\\n'\n`);
   chmodSync(fake, 0o755);
+  seedSpace(join(root, "home"), "demo", repo);
   vars = ownEnv(root, { LINECLEAR_CONFIG: join(root, "config"), HOME: root, LINECLEAR_SERVER_BIN: fake, LINECLEAR_BIN: bin });
   chooseModels(join(root, "config"));
   const saved = { ...process.env };

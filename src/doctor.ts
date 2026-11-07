@@ -3,13 +3,14 @@ import { existsSync, lstatSync, readFileSync, readlinkSync } from "node:fs";
 import { herdrArgv, herdrVersionOf } from "./herdr.ts";
 import { userInfo } from "node:os";
 import { delimiter, dirname, join } from "node:path";
-import { configDir, readJson } from "../pi/config.ts";
+import { readJson } from "../pi/config.ts";
 import { failureTail } from "../server/server/live/secrets.ts";
 import { copiesProblem, runByNote } from "./store-copies.ts";
 import { cacheEnvFile, dataDir, extensionFile, INSTALL_URL, type Paths, SERVICE } from "./paths.ts";
 import { diskTrouble, freeBytes } from "./health.ts";
 import { firstModel, readModelFile } from "./models.ts";
-import { readSetup, type Setup, setupRoles, storeVersion } from "./project.ts";
+import { setupChosen } from "./tables.ts";
+import { readSetup, type Setup, setupRoles } from "./project.ts";
 import { checkoutPointers } from "./install-paths.ts";
 import { buildNames, buildProblem, buildsDir, installReleaseCommand, type RunFrom, unitCommand } from "./builds.ts";
 import { publishedAddress, serveCommand } from "./published.ts";
@@ -33,8 +34,8 @@ export interface Probe {
   paths: Paths;
   /** The model chosen for each role. Without it the roles are not checked. */
   setup?: Setup;
-  /** The version of this machine's settings file, or what stops it from being read. Without it the file is not checked. */
-  settings?: { version: number } | { problem: string };
+  /** What stops this machine's settings from being read. Without it they are not checked. */
+  settings?: { problem: string };
   /** Lineclear's data folder. */
   dataDir?: string;
   /** Whether Lineclear's own server runs now. */
@@ -305,24 +306,19 @@ function newTaskModel(): Check {
   return { name: "model", problem: "", fix: "", info: model ? `a new task with no model set starts on ${model}` : "pi lists no model yet" };
 }
 
-/** The chosen models and the file's version, or only the problem when the file is bad. A machine with no file has chosen none yet (a fresh install has nothing to lose). */
+/** The chosen models, or the problem when the store cannot be read. A machine with no model chosen yet checks none (a fresh install has nothing to lose). */
 function storedSettings(env: Record<string, string | undefined>): Pick<Probe, "setup" | "settings"> {
   try {
-    // reading first: it moves a pre-settings.json setup.json into the file
-    const setup = readSetup(env);
-    if (!existsSync(join(configDir(env), "settings.json"))) return {};
-    return { setup, settings: { version: storeVersion(env) } };
+    return setupChosen(env) ? { setup: readSetup(env) } : {};
   } catch (e) {
     return { settings: { problem: (e as Error).message } };
   }
 }
 
-/** The settings file of this machine: its version, or the reason it cannot be read. */
+/** The settings of this machine: the reason they cannot be read, when they cannot. */
 function settingsFile(p: Probe): Check[] {
   if (!p.settings) return [];
-  if ("problem" in p.settings)
-    return [{ name: "settings file", problem: p.settings.problem, fix: "fix or remove the file named, then run 'lineclear doctor'" }];
-  return [{ name: "settings file", problem: "", fix: "", info: `settings version ${p.settings.version}` }];
+  return [{ name: "settings file", problem: p.settings.problem, fix: "fix or remove the file named, then run 'lineclear doctor'" }];
 }
 
 const ROLE_WORDS: Record<string, string> = { stepChecker: "step checker" };

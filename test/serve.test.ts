@@ -1,5 +1,6 @@
+import { Database } from "bun:sqlite";
 import { expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../src/cli.ts";
@@ -20,15 +21,27 @@ test("serve takes only --port with a number", async () => {
 
 test("a new board runs pi for every role, and a board with settings keeps them", () => {
   const dir = mkdtempSync(join(tmpdir(), "lc-serve-"));
-  const file = join(dir, "settings.json");
-  const read = () => JSON.parse(readFileSync(file, "utf8"));
+  const read = () => {
+    const store = new Database(join(dir, "store.sqlite"), { readonly: true });
+    const rows = store.query("select level, key, value from settings order by key").all();
+    store.close();
+    return rows;
+  };
   piByDefault({ LINECLEAR_HOME: dir });
-  expect(read().everywhere).toEqual({ "task.agent": "pi", "coordinator.agent": "pi", "reviewer.agent": "pi" });
+  expect(read()).toEqual(["coordinator.agent", "reviewer.agent", "task.agent"].map((key) => ({ level: "all", key, value: "pi" })));
 
-  writeFileSync(file, JSON.stringify({ everywhere: { "reviewer.agent": "Codex", alerts: "x" }, machine: { a: "1" }, spaces: {} }));
+  const store = new Database(join(dir, "store.sqlite"));
+  store.exec("delete from settings; insert into settings values ('all', 'reviewer.agent', 'Codex')");
+  store.close();
   piByDefault({ LINECLEAR_HOME: dir });
-  expect(read()).toEqual({ everywhere: { "reviewer.agent": "Codex", alerts: "x" }, machine: { a: "1" }, spaces: {} });
+  expect(read()).toEqual([{ level: "all", key: "reviewer.agent", value: "Codex" }]);
+
+  const old = mkdtempSync(join(tmpdir(), "lc-serve-old-"));
+  writeFileSync(join(old, "settings.json"), "{}");
+  piByDefault({ LINECLEAR_HOME: old });
+  expect(existsSync(join(old, "store.sqlite"))).toBe(false);
   rmSync(dir, { recursive: true });
+  rmSync(old, { recursive: true });
 });
 
 test("the board's help says Lineclear, renames its ask to card and leaves out the lines Lineclear answers itself", () => {

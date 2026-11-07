@@ -6,7 +6,7 @@ import { configDir } from "../pi/config.ts";
 import { main } from "../src/cli.ts";
 import { harnesses, readRegistry } from "../src/models.ts";
 import { changeSettings } from "../src/project-change.ts";
-import { projectsDir, readSettings, readSetup, saveSetup, type Settings, setupGate, storeVersion } from "../src/project.ts";
+import { projectsDir, readSettings, readSetup, saveSetup, type Settings, setupGate } from "../src/project.ts";
 import { saveOffered, setupMain, setupView } from "../src/setup.ts";
 
 function fake(body: string): string {
@@ -77,11 +77,10 @@ test("the web view lists harnesses and accounts, and saves through the same chec
   expect(setupView(registry(), env).chosen).toEqual({ worker: "anthropic/opus-x" });
 });
 
-test("a role model set in Settings is the next task's model, and setup.json is migrated once and deleted", () => {
+test("a role model set in Settings is the next task's model, and setup.json is imported once", () => {
   const env = { ...process.env, LINECLEAR_CONFIG: mkdtempSync(join(tmpdir(), "lc-store-")) };
   writeFileSync(join(env.LINECLEAR_CONFIG, "setup.json"), JSON.stringify({ worker: "a/old", reviewer: "b/r", stepChecker: "b/r" }));
   expect(readSetup(env).worker).toBe("a/old");
-  expect(existsSync(join(env.LINECLEAR_CONFIG, "setup.json"))).toBe(false);
   mkdirSync(join(projectsDir(env), "p"), { recursive: true });
   writeFileSync(join(projectsDir(env), "p", "settings.json"), JSON.stringify({ repo: "/r", space: "p", check: "true", models: { worker: [], reviewer: [] } }));
   expect((readSettings("p", env) as Settings).models.worker).toEqual(["a/old"]);
@@ -104,22 +103,14 @@ describe("the machine settings file", () => {
     expect(setupGate(env)).toContain(file(env));
   });
 
-  test("a v1 file migrates to v2 keeping every role's model and leaving settings.json.v1.bak", () => {
+  test("a settings.json of any version is imported into the table once and left in place", () => {
     const env = configEnv();
     mkdirSync(configDir(env), { recursive: true });
-    const old = JSON.stringify({ setup: { worker: "a/x", reviewer: "b/y", stepChecker: "b/s" } });
-    writeFileSync(file(env), old);
+    writeFileSync(file(env), JSON.stringify({ setup: { worker: "a/x", reviewer: "b/y", stepChecker: "b/s" } }));
     expect(readSetup(env)).toEqual({ worker: "a/x", reviewer: "b/y", stepChecker: "b/s" });
-    expect(JSON.parse(readFileSync(file(env), "utf8")).version).toBe(2);
-    expect(storeVersion(env)).toBe(2);
-    expect(readFileSync(`${file(env)}.v1.bak`, "utf8")).toBe(old);
-  });
-
-  test("a file from a newer version is refused", () => {
-    const env = configEnv();
-    mkdirSync(configDir(env), { recursive: true });
-    writeFileSync(file(env), JSON.stringify({ version: 9, setup: {} }));
-    expect(() => readSetup(env)).toThrow("newer");
+    expect(existsSync(file(env))).toBe(true);
+    writeFileSync(file(env), JSON.stringify({ setup: { worker: "a/changed" } }));
+    expect(readSetup(env).worker).toBe("a/x");
   });
 });
 

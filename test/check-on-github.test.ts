@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { main } from "../src/cli.ts";
-import { chooseModels, ownEnv, sh, tmp } from "./helpers.ts";
+import { chooseModels, ownEnv, sh, tmp, seedSpace } from "./helpers.ts";
 
 const bin = join(import.meta.dir, "..", "bin", "lineclear");
 let root: string;
@@ -38,6 +38,7 @@ beforeEach(async () => {
   vars = ownEnv(root, { LINECLEAR_CONFIG: join(root, "config"), HOME: root, LINECLEAR_SERVER_BIN: join(root, "lineclear"), LINECLEAR_BIN: bin });
   fakeServer("echo ok");
   chooseModels(join(root, "config"));
+  seedSpace(join(root, "home"), "demo", repo);
   const saved = { ...process.env };
   Object.assign(process.env, vars);
   try {
