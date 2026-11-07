@@ -12,7 +12,16 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-type Task = { id: string; project: string; created: number; doneAt?: number; worktree: string; briefResent?: unknown; mergeStopped?: unknown };
+type Task = {
+  id: string;
+  project: string;
+  created: number;
+  doneAt?: number;
+  worktree: string;
+  startMs?: { worktree: number; install: number; session: number };
+  briefResent?: unknown;
+  mergeStopped?: unknown;
+};
 type Usage = { input: number; output: number; cacheRead: number; cacheWrite: number };
 type Session = { role: "agent" | "reviewer"; firstToolCallAt?: number; usage: Usage };
 
@@ -71,13 +80,22 @@ function sessionsOf(task: Task): Session[] {
 
 function start(n: number): void {
   const secs: number[] = [];
+  const phases: Record<string, number[]> = { worktree: [], install: [], session: [], "first call": [] };
   let resent = 0;
   for (const t of doneTasks(n)) {
     const first = sessionsOf(t).find((s) => s.role === "agent")?.firstToolCallAt;
     if (first) secs.push((first - t.created) / 1000);
+    if (first && t.startMs) {
+      const { worktree, install, session } = t.startMs;
+      phases.worktree?.push(worktree / 1000);
+      phases.install?.push(install / 1000);
+      phases.session?.push(session / 1000);
+      phases["first call"]?.push((first - t.created - worktree - install - session) / 1000);
+    }
     if (t.briefResent) resent++;
   }
   line("task add to first tool call", secs, "s");
+  for (const [name, xs] of Object.entries(phases)) if (xs.length) line(`  phase ${name}`, xs, "s");
   console.log(`tasks whose brief was sent again: ${resent}`);
 }
 
