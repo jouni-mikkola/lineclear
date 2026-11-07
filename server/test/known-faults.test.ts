@@ -4,6 +4,7 @@ import { describe, expect, spyOn, test } from 'bun:test'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { AgentInfo } from '../server/live/herdr.ts'
+import { until } from './until.ts'
 
 // no herdr is reached: every call that is not mocked fails at once
 process.env.HERDR_SOCKET_PATH = join(tmpdir(), 'no-herdr-known-faults.sock')
@@ -80,7 +81,7 @@ describe('a brief pasted while the CLI starts', () => {
     }) as never)
     try {
       await put(a, 'Do the work.')
-      for (let i = 0; i < 40 && a.status(key) !== 'working'; i++) await Bun.sleep(50)
+      await until(() => a.status(key) === 'working', 'the agent to be working')
       expect(a.status(key)).toBe('working')
       expect(keys).toHaveBeenCalledTimes(2)
       expect(prompt).toHaveBeenCalledTimes(1)
@@ -129,7 +130,7 @@ describe('a brief pasted while the CLI starts', () => {
     try {
       await put(a, 'Do the work.')
       // a loaded machine delays the timers: wait for the second Enter instead of a fixed time
-      for (let i = 0; i < 40 && keys.mock.calls.length === 0; i++) await Bun.sleep(100)
+      await until(() => keys.mock.calls.length > 0, 'the keys to be sent')
       expect(prompt).toHaveBeenCalledTimes(1)
       expect(keys).toHaveBeenCalledTimes(1)
       expect(a.status(key)).toBe('working')

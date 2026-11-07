@@ -51,7 +51,7 @@ describe("a task's CLI, model and effort", () => {
     const d = await src.cli(['task', 'add', 'Plain', '--desc', 'x', '--model', 'default'], { chat: place })
     expect(src.engine.task(d.out.match(/([A-Z]+-\d+)/)![1])!.agent).toEqual({ kind: 'claude', model: '', effort: undefined })
     src.settings.set('task.model', null)
-    for (let i = 0; !t.trouble && i < 250; i++) await Bun.sleep(20)
+    await until(() => !!t.trouble, 'the task to show trouble')
   })
   test("its brief's Reviewer line names the reviewer: Settings', or task add's --reviewer flags for one task", async () => {
     const dir = mkdtempSync(join(tmpdir(), 'shep-src-repo-'))
@@ -295,7 +295,7 @@ describe("a coordinator's alert about a task", () => {
   // CI-quarantine: fails on a GitHub runner only, cause not found yet
   test.skipIf(Boolean(process.env.CI))("says what the task needs, then the why, in place of the task's own alert", async () => {
     const { t } = await workedTask('alerted')
-    for (let i = 0; src.engine.statusOf(t) !== 'need' && i < 100; i++) await Bun.sleep(20)
+    await until(() => src.engine.statusOf(t) === 'need', 'the task to need you')
     expect(src.engine.statusOf(t)).toBe('need')
     const alerts: import('../shared/types.ts').Alert[] = []
     const off = src.on('alert', (a) => void alerts.push(a))

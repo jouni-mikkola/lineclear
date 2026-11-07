@@ -6,12 +6,8 @@ import { EventEmitter } from 'node:events'
 import { Subscription } from '../server/live/herdr.ts'
 import { Tunnel } from '../server/live/tunnel.ts'
 import { Machines } from '../server/live/machines.ts'
+import { until } from './until.ts'
 import type { Snapshot } from '../shared/types.ts'
-
-const until = async (f: () => boolean) => {
-  for (let i = 0; i < 6000 && !f(); i++) await Bun.sleep(10)
-  expect(f()).toBe(true)
-}
 
 describe('machine link recovery', () => {
   test('retry delay is bounded and only stable success resets it', () => {
