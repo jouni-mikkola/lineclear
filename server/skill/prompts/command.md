@@ -1,0 +1,1 @@
+Your authoritative command is LINECLEAR_CHAT={{chat}} {{lineclear}}. Use it if a shell finds another lineclear. Never start a server to repair routing. For a dev/demo server use the repo command with --url <URL>.

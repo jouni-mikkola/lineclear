@@ -1,185 +1,59 @@
-// What each agent is told at start, and the Settings block of a task's brief.
+// What each agent is told at start: the texts live in skill/prompts/<name>.md, this fills them in.
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { SET_BY, SETTINGS_HEAD, type SetBy } from '../../shared/brief.ts'
 import { ROOT } from '../root.ts'
 import { BOX, helperDir } from './box.ts'
 
-const OWN = BOX ? helperDir(BOX.home) : ROOT
+const OWN = BOX ? helperDir(BOX.home) : ROOT // the helper's copy on another machine
+const skill = (name: string) => join(OWN, 'skill', name, 'SKILL.md')
+const known: Record<string, () => string> = {
+  lineclear: () => join(OWN, 'bin', 'lineclear'),
+  lineclear_skill: () => skill('lineclear'),
+  coordinator_skill: () => skill('lineclear-coordinator'),
+  agent_skill: () => skill('lineclear-agent'),
+  start: () => join(OWN, 'skill', 'lineclear-agent', 'START.md'),
+}
 
-// the helper's copy on another machine
-const SKILLS = join(OWN, 'skill')
-const skill = (name: string) => join(SKILLS, name, 'SKILL.md')
+function fill(name: string, vars: Record<string, string | number> = {}): string {
+  const text = readFileSync(join(ROOT, 'skill', 'prompts', `${name}.md`), 'utf8')
+  const value = (k: string) =>
+    k === 'chat' && name === 'command' ? JSON.stringify(vars.chat) : (known[k]?.() ?? String(vars[k] ?? (k === 'command' ? fill('command', vars) : '')))
+  return text
+    .replace(/\{\{(\w+)\}\}/g, (_, k) => value(k))
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
 
-const commandLine = (chat: string) =>
-  `Your authoritative command is LINECLEAR_CHAT=${JSON.stringify(chat)} ${join(OWN, 'bin', 'lineclear')}. Use it if a shell finds another lineclear. Never start a server to repair routing. For a dev/demo server use the repo command with --url <URL>.`
-
+const ids = (xs: string[]) => ({ ids: xs.join(', '), is: xs.length === 1 ? 'is' : 'are' })
 export const readSection = (name: string, section: string) => `Read the section "${section}" of ${skill(name)}.`
-
-const base = (who: string, own: string) =>
-  `You are ${who}, running inside Lineclear (the board the human uses). Read ${skill('lineclear')} first, then ${skill(own)}. The human reads your replies in a calm chat: keep them short and plain.`
-
-/** a short card, not two whole skills: a refusing command names the section to read */
-const taskBase = (id: string) =>
-  `You are the agent of task ${id}, running inside Lineclear (the board the human uses). Read ${join(SKILLS, 'lineclear-agent', 'START.md')} first: it is your whole start. Open a skill (${skill('lineclear')}, ${skill('lineclear-agent')}) only at the section a command names. The human reads your replies in a calm chat: keep them short and plain.`
-
-export interface Ways {
-  review: boolean
-  mustFix: string
-  rounds: number
-  merge: string
-  waitChecks: boolean
+export function coordinatorPrompt(p: { role: 'space' | 'home' | 'main'; name: string; path?: string; machine: string; chat?: string }) {
+  const vars = { ...p, path: String(p.path), chat: p.chat ?? p.name }
+  return [fill('coordinator', vars), ...(p.role === 'space' ? [] : [fill(`coordinator-${p.role}`, vars)])].join('\n\n')
 }
 
-interface Reviewer {
-  kind: string
-  model?: string
-  effort?: string
-}
-
-const REVIEWER_NAME: Record<string, string> = { claude: 'Claude Code', pi: 'pi' }
-function onWords(r: Reviewer, as = (name: string) => name) {
-  const name = as(REVIEWER_NAME[r.kind] ?? r.kind)
-  if (!r.model && !r.effort) return `${name} (its default model and effort)`
-  return `${name} (${[r.model ? `model ${r.model}` : 'its default model', r.effort ? `${r.effort} effort` : 'its default effort'].join(', ')})`
-}
-
-const reviewerWords = (r: Reviewer) => onWords(r, (name) => `a headless ${name} or a ${name} subagent`)
-
-export const SEVERITIES = ['critical', 'major', 'minor', 'trivial']
-
-export type Said = 'review' | 'reviewer' | 'mustFix' | 'rounds' | 'merge' | 'check' | 'agent'
-
-export interface Told {
-  ways: Ways
-  reviewer?: Reviewer
-  agent?: Reviewer
-  by?: Partial<Record<Said, SetBy>>
-}
-
-const plural = (xs: string[]) => (xs.length === 1 ? xs[0] : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}`)
-
-export function settingsLines(id: string, t: Told): { said: Said; text: string }[] {
-  const w = t.ways
-  const fix = SEVERITIES.slice(0, Math.max(1, SEVERITIES.indexOf(w.mustFix) + 1))
-  const merge =
-    w.merge === 'ask me first'
-      ? `ask me first. Ask the human first, and merge (lineclear merge ${id}) once they say yes.`
-      : w.waitChecks
-        ? `after GitHub checks. Merge it yourself once it works and GitHub's checks pass (lineclear checks ${id}, then lineclear merge ${id}).`
-        : `on its own. Merge it yourself once it works (lineclear merge ${id}). Don't wait for GitHub's checks.`
-  const lines: { said: Said; text: string }[] = [
-    {
-      said: 'review',
-      text: w.review
-        ? 'Review: on. Have your change reviewed by fresh eyes before it merges.'
-        : "Review: off. No review; the lines on reviewing below don't apply.",
-    },
-    ...(t.reviewer ? [{ said: 'reviewer' as const, text: `Reviewer: ${reviewerWords(t.reviewer)}.` }] : []),
-    {
-      said: 'mustFix',
-      text: `Must fix: ${w.mustFix}. Findings are tagged ${SEVERITIES.join('/')}; fix ${fix.length === SEVERITIES.length ? 'all of them' : plural(fix)}${w.rounds > 1 ? ', then review again' : ''}.`,
-    },
-    {
-      said: 'rounds',
-      text:
-        w.rounds > 1
-          ? `Review rounds: ${w.rounds}. Stop when a round finds none to fix, at most ${w.rounds} rounds.`
-          : 'Review rounds: 1. One round, no review again.',
-    },
-  ]
-  lines.push({ said: 'merge', text: `Merge: ${merge}` })
-  lines.push({
-    said: 'check',
-    text: 'Checks: GitHub runs the full check. While you work run only the tests of what you changed (lineclear check --changed); lineclear check hands your branch to GitHub and waits for its result.',
-  })
-  if (t.agent) lines.push({ said: 'agent', text: `Agent: ${onWords(t.agent)}. Only so you know what you run on.` })
-  return lines.map((l) => (t.by?.[l.said] ? { ...l, text: `${l.text} (${SET_BY[t.by[l.said]!]})` } : l))
-}
-
-export function splitBrief(desc: string): [work: string, how: string] {
-  const i = desc.lastIndexOf(SETTINGS_HEAD)
-  return i < 0 ? [desc, ''] : [desc.slice(0, i).trimEnd(), desc.slice(i)]
-}
-
-export function settingsBlock(id: string, t: Told) {
-  return `${SETTINGS_HEAD}\n${settingsLines(id, t)
-    .map((l) => `- ${l.text}`)
-    .join('\n')}`
-}
-
-export function coordinatorPrompt(place: { role: 'space' | 'home' | 'main'; name: string; path?: string; machine: string; chat?: string }) {
-  const who = `the coordinator of the space ${place.name} on ${place.machine} (${place.path})`
-  const duties =
-    place.role === 'space'
-      ? ''
-      : place.role === 'home'
-        ? `\n\nThis is ${place.machine}'s home space: you also look after the machine and add spaces on it (lineclear space add).`
-        : `\n\nThis is the home space of the main machine, ${place.machine}: you also look after this machine and you keep the overview of every machine, which alerts reach the phone.`
-  const needs = `\n\nAnswer a task's question from the roadmap and the docs. Only four things need the owner: a login, money, an outward act and a choice they do not make.`
-  return `${base(who, 'lineclear-coordinator')}\n\n${commandLine(place.chat ?? place.name)}${needs}${duties}`
-}
-
-export function taskPrompt(t: { id: string; branch: string; base: string }, times = '') {
-  return [
-    taskBase(t.id),
-    commandLine(`${t.id}/Agent`),
-    `You work in your own git worktree on branch ${t.branch} (from ${t.base}): commit there, and don't switch branches.`,
-    times,
-  ]
-    .filter(Boolean)
-    .join('\n\n')
-}
-
-export function taskFirst(t: { title: string; desc: string }) {
-  return t.desc && t.desc !== t.title ? `${t.title}\n\n${t.desc}` : t.title
-}
+export const taskPrompt = (t: { id: string; branch: string; base: string }, times = '') =>
+  [fill('task', { ...t, chat: `${t.id}/Agent` }), times].filter(Boolean).join('\n\n')
+export const taskFirst = (t: { title: string; desc: string }) => (t.desc && t.desc !== t.title ? `${t.title}\n\n${t.desc}` : t.title)
 
 export function restartLine(o: { from: string; to: string; chat: string; commits?: string; changes?: string }) {
   const task = o.commits !== undefined
-  return [
-    `Restarted: the human restarted this ${task ? 'task' : 'chat'} on ${o.to}. ${o.from} ran it until now; carry on in the same ${task ? 'worktree and branch' : 'folder'}.`,
-    ...(task ? [`Commits on the branch so far:\n${o.commits || 'none'}`, `Uncommitted changes:\n${o.changes || 'none'}`] : []),
-    ...(o.chat ? [`The chat so far, latest last:\n\n${o.chat}`] : []),
-    'If nothing is left, reply in one short line and end your turn.',
-  ].join('\n\n')
+  const work = task ? fill('restart-task', { commits: o.commits || 'none', changes: o.changes || 'none' }) : ''
+  const chat = o.chat ? fill('restart-chat', o) : ''
+  return fill('restart', { ...o, kind: task ? 'task' : 'chat', where: task ? 'worktree and branch' : 'folder', task: work, chat })
 }
 
-export function relaunchedLine() {
-  return `Your agent had stopped: Lineclear started you again, session as it was. Carry on; if nothing is left, reply with only <no-reply>relaunched</no-reply>.`
+export const relaunchedLine = () => fill('relaunched')
+export const resumedLine = (on: string) => fill('resumed', { on })
+
+export function queuedLine(who: string[], when: 'start' | 'later' | 'changed', id = '<id>') {
+  const rest = fill('queued-rest', { them: who.length === 1 ? 'it is' : 'they are', id })
+  return fill(`queued-${when}`, { ...ids(who), rest })
 }
 
-export function resumedLine(on: string) {
-  return `The human restarted you on ${on}, session as it was. Carry on; if idle, reply with only <no-reply>restarted</no-reply>.`
-}
+export const goLine = (who: string[], notes: string[], cleared = false) =>
+  cleared ? fill('go-cleared', ids(who)) : [fill('go', ids(who)), ...notes].join('\n')
 
-export function queuedLine(ids: string[], when: 'start' | 'later' | 'changed', id = '<id>') {
-  const them = ids.length === 1 ? 'it is' : 'they are'
-  const rest = `Lineclear tells you "Go: … start now." once ${them} done. A go from the human or coordinator: run lineclear task queue ${id} --after none and start.`
-  if (when === 'changed') return `You now wait for ${ids.join(', ')} instead. Don't start yet. ${rest}`
-  if (when === 'later') return `Hold on: you are now queued after ${ids.join(', ')}. Stop at a clean point, reply in one line, end your turn. ${rest}`
-  return `Queued: this task waits for ${ids.join(', ')} to be done. Don't start yet: reply in one line that you have the brief, end your turn. ${rest}`
-}
+export const prNewsLine = (id: string, pr: { number: number; url: string }, news: string[]) => fill('pr-news', { id, ...pr, news: news.join('\n') })
 
-export function goLine(ids: string[], notes: string[], cleared = false) {
-  if (cleared) return `Go: you no longer wait for ${ids.join(', ')}, start now.`
-  return [`Go: ${ids.join(', ')} ${ids.length === 1 ? 'is' : 'are'} done, start now.`, ...notes].join('\n')
-}
-
-export function prNewsLine(id: string, pr: { number: number; url: string }, news: string[]) {
-  return [`GitHub news on PR #${pr.number} (${pr.url}), since you reported ${id} ready:`, ...news, 'The lineclear-agent skill says how to handle it.'].join(
-    '\n',
-  )
-}
-
-export function privatePrompt(own: string, reviewer?: string): string {
-  return [
-    'Private instruction snapshot for this start; it replaces earlier ones, even when empty. Follow the repository AGENTS.md, CLAUDE.md and REVIEW.md too. Never write these rules into repo files, git, briefs, reports or GitHub. The human and the brief win over private rules; on a conflict with team rules, explain and ask. Not a secret store.',
-    own,
-    ...(reviewer === undefined
-      ? []
-      : [
-          'Reviewer handoff only: the next block is for reviewers. Give it and the precedence/privacy rules above to every fresh reviewer, never your task-only rules.',
-          reviewer,
-        ]),
-  ].join('\n\n')
-}
+export const privatePrompt = (own: string, reviewer?: string): string =>
+  [fill('private'), own, ...(reviewer === undefined ? [] : [fill('private-reviewer'), reviewer])].join('\n\n')

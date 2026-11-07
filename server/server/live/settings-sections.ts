@@ -1,6 +1,6 @@
 import { cpus } from 'node:os'
 import { NOTIFY, NOTIFY_DEFAULT, NOTIFY_KEY } from '../../shared/alerts.ts'
-import { SEVERITIES } from './prompts.ts'
+import { SEVERITIES } from './settings-block.ts'
 import { agentRows, CLIS, EFFORTS, REVIEWERS } from './settings-catalog.ts'
 import type { Level, LevelKind, Num, Section } from './settings-types.ts'
 
