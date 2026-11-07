@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { chmodSync, existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { LinkBackoff, WorkerHealth } from '../server/live/recovery.ts'
 import { EventEmitter } from 'node:events'

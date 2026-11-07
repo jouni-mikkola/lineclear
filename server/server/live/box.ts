@@ -102,7 +102,7 @@ export function sshArgs(target: string, script: string, opts: { tty?: boolean; e
 }
 
 /** a command line on the box: its PATH (the helper's bin first), in cwd, with env */
-export function script(b: BoxInfo, argv: string[], o: { cwd?: string; env?: Record<string, string> } = {}) {
+function script(b: BoxInfo, argv: string[], o: { cwd?: string; env?: Record<string, string> } = {}) {
   const env = Object.entries({ PATH: b.path, ...o.env })
     .map(([k, v]) => `${k}=${q(v)}`)
     .join(' ')
