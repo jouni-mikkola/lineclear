@@ -67,3 +67,22 @@ test('once main is green again, the held ready tasks land without anyone running
   await w.engine.landReady()
   await until(() => tasks.every((t) => !!t.merged))
 })
+
+test('a failing workflow that is not the required check holds no merge', async () => {
+  const w = world()
+  const g = onGitHub()
+  ;(w.engine as unknown as { redWait: number }).redWait = 20
+  const { t } = await started(w, g.dir, 'installred')
+  writeFileSync(join(t.worktree!, 'x.txt'), 'x\n')
+  sh('git add -A && git commit -qm x', t.worktree!)
+  const head = sh('git rev-parse main', g.bare)
+  const run = (workflowName: string, conclusion: string, n: number) => ({
+    headSha: head,
+    status: 'completed',
+    conclusion,
+    url: `https://github.com/acme/app/actions/runs/${n}`,
+    workflowName,
+  })
+  g.set({ runs: [run('install', 'failure', 6), run('check', 'success', 5)] })
+  expect((await w.engine.merge(t.id, { self: true })).ok).toBe(true)
+})

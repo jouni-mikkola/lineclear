@@ -203,7 +203,16 @@ export async function hasPrWorkflows(wt: string) {
 }
 
 /** a commit's runs of GitHub Actions on a branch, as one verdict: all passed, one failed, or some still run */
-export type BranchRun = { sha: string; state: 'pass' | 'fail' | 'pending'; failed: { name: string; link: string }[] }
+/** the workflow the branch rules require; only its result holds merges */
+export const REQUIRED_WORKFLOW = 'check'
+
+export type BranchRun = {
+  sha: string
+  state: 'pass' | 'fail' | 'pending'
+  /** the same verdict from the required workflow alone; pending when it has no finished run */
+  required: 'pass' | 'fail' | 'pending'
+  failed: { name: string; link: string }[]
+}
 
 /**
  * The verdicts of GitHub Actions' runs on pushes to a branch, its newest commit first; null when GitHub did not
@@ -234,7 +243,13 @@ export async function branchRuns(g: GitHub, cwd: string, branch: string, limit =
     const failed = of
       .filter((x) => x.status === 'completed' && !['success', 'neutral', 'skipped'].includes(x.conclusion))
       .map((x) => ({ name: x.workflowName, link: x.url }))
-    out.push({ sha, failed, state: failed.length ? 'fail' : of.some((x) => x.status !== 'completed') ? 'pending' : 'pass' })
+    const need = of.filter((x) => x.workflowName.toLowerCase() === REQUIRED_WORKFLOW)
+    const required = need.some((x) => x.status === 'completed' && !['success', 'neutral', 'skipped'].includes(x.conclusion))
+      ? 'fail'
+      : need.length && need.every((x) => x.status === 'completed')
+        ? 'pass'
+        : 'pending'
+    out.push({ sha, failed, required, state: failed.length ? 'fail' : of.some((x) => x.status !== 'completed') ? 'pending' : 'pass' })
   }
   return out
 }
