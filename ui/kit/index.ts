@@ -2,6 +2,7 @@
 export * from "./browsers.tsx";
 export * from "./live-picture.tsx";
 export * from "./chat.tsx";
+export { type Attached, Composer, useKeyboardInset } from "./composer.tsx";
 export { Lightbox } from "./chat-files.tsx";
 export * from "./no-dispatcher.tsx";
 export * from "./markdown.tsx";

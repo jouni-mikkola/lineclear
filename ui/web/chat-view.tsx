@@ -1,6 +1,5 @@
 import { type DragEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ChatView } from "../../src/chat.ts";
-import type { PlanCard } from "../../src/web.ts";
 import { ACCEPT, MAX_TEXT } from "../../src/chat-limits.ts";
 import {
   ChatEmpty,
@@ -8,8 +7,6 @@ import {
   Composer,
   DispatcherHead,
   type DispatcherState,
-  Handoff,
-  InboxCard,
   Lightbox,
   NoDispatcher,
   Part,
@@ -17,94 +14,10 @@ import {
   Typing,
   useKeyboardInset,
 } from "../kit/index.ts";
-import { Quote, ReplyButton } from "../kit/chat-reply.tsx";
 import { TaskNote } from "../kit/task-head.tsx";
 import { QUESTIONS } from "./states.ts";
-import type { Pending, useChat } from "./chat.tsx";
-
-const PLAN_SAID: Record<PlanCard["state"], string> = {
-  planning: "The planner writes the steps again, with your note.",
-  approve: "",
-  approved: "Approved. The steps are in the roadmap, and each starts when the steps before it are merged.",
-  rejected: "Rejected. The roadmap stays as it was.",
-  closed: "Closed. The roadmap stays as it was.",
-};
-
-/** A plan you asked for, in the chat: to approve while it waits, then what came of it, with its live link. */
-function PlanInChat({ plan, error, onAnswer }: { plan: PlanCard; error?: string; onAnswer: (choice: string, note?: string) => void }) {
-  const steps = plan.steps.length ? `${plan.steps.length === 1 ? "1 step" : `${plan.steps.length} steps`}: ${plan.steps.join(", ")}. ` : "";
-  return (
-    <div className="grid gap-2" data-plan={plan.task} data-plan-state={plan.state}>
-      {plan.item ? (
-        <InboxCard item={plan.item} onAnswer={onAnswer} error={error} />
-      ) : (
-        <p className="text-fg2">
-          {steps}
-          {PLAN_SAID[plan.state]}
-        </p>
-      )}
-      <Handoff project={plan.project} href={plan.live}>
-        See {plan.goal.length > 48 ? "the steps" : `"${plan.goal}"`} live in <span className="font-medium text-fg">{plan.project}</span>
-      </Handoff>
-    </div>
-  );
-}
-
-/** The thread's rows: the chat, then what you sent that it does not have yet. */
-function rows(
-  view: ChatView,
-  pending: Pending[],
-  retry: (cid: string) => void,
-  chat: Pick<ReturnType<typeof useChat>, "plans" | "planErrors" | "answerPlan" | "choose" | "setReplyTo">,
-  rich: boolean,
-): ThreadItem[] {
-  const out: ThreadItem[] = view.messages.map((m) => ({
-    key: m.id,
-    who: m.who,
-    text: m.text,
-    file: m.file,
-    ...(m.waiting ? { status: "waiting" as const } : {}),
-    ...(m.question ? { question: m.question, onChoose: (i: number) => chat.choose(m.question!.id, i) } : {}),
-    ...(m.reply ? { above: <Quote text={m.reply.text} /> } : {}),
-    ...(rich
-      ? {
-          below: <ReplyButton onReply={() => chat.setReplyTo({ id: m.id, text: m.text ?? m.file?.name ?? "" })} />,
-        }
-      : {}),
-  }));
-  // a plan you asked for shows after the message it came in on: the last one written before it was asked
-  const placed = chat.plans
-    .filter((p) => p.state !== "planning" || p.answer)
-    .map((p, order) => {
-      const since = Date.parse(p.since);
-      let at = view.messages.length;
-      for (let i = view.messages.length - 1; i >= 0; i--) {
-        const m = view.messages[i]!;
-        if (m.at !== undefined && m.at > since) at = i;
-        else break;
-      }
-      return { p, at, order };
-    })
-    // from the end, so each place still counts the messages only; of two at one place the older goes first
-    .sort((a, b) => b.at - a.at || a.order - b.order);
-  for (const { p, at } of placed) {
-    out.splice(at, 0, {
-      key: `plan-${p.task}`,
-      who: "dispatcher",
-      card: <PlanInChat plan={p} error={chat.planErrors[p.task]} onAnswer={(c, note) => void chat.answerPlan(p, c, note)} />,
-    });
-  }
-  for (const p of pending) {
-    const mine: ThreadItem[] = [
-      ...p.files.map((f): ThreadItem => ({ key: `${p.cid}-${f.id}`, who: "you", file: { name: f.name, size: f.size, image: f.image, url: f.url } })),
-      ...(p.text ? [{ key: `${p.cid}-text`, who: "you" as const, text: p.text }] : []),
-    ];
-    const last = mine[mine.length - 1];
-    if (last && p.status !== "sent") Object.assign(last, { status: p.status, error: p.error, onRetry: p.status === "failed" ? () => retry(p.cid) : undefined });
-    out.push(...mine);
-  }
-  return out;
-}
+import { rows } from "./chat-rows.tsx";
+import type { useChat } from "./chat.tsx";
 
 /** The place the thread scrolls in: the page, or the panel's own box. */
 const scrollEnd = (box: HTMLElement | null) => (box ? box.scrollHeight - box.clientHeight : document.documentElement.scrollHeight);
@@ -128,18 +41,13 @@ function composerNotes(chat: ReturnType<typeof useChat>, uploading: boolean, tex
       : view?.state === "offline"
         ? view.reason
         : undefined;
-  const note =
-    view?.state === "none"
-      ? task
-        ? undefined
-        : view.reason
-      : cut
-        ? undefined
-        : uploading
-          ? "Attaching. Send works once the files are in."
-          : text.length > MAX_TEXT
-            ? `A message can be at most ${MAX_TEXT.toLocaleString("en")} characters.`
-            : undefined;
+  if (view?.state === "none") return { cut, note: task ? undefined : view.reason };
+  if (cut) return { cut, note: undefined };
+  const note = uploading
+    ? "Attaching. Send works once the files are in."
+    : text.length > MAX_TEXT
+      ? `A message can be at most ${MAX_TEXT.toLocaleString("en")} characters.`
+      : undefined;
   return { cut, note };
 }
 
@@ -178,7 +86,7 @@ function ThreadBody({
   ready,
 }: {
   view: ChatView | undefined;
-  items: ReturnType<typeof rows>;
+  items: ThreadItem[];
   writing: boolean;
   task?: string;
   onImage: (src: string, alt: string) => void;
