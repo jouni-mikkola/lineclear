@@ -1,17 +1,11 @@
 {
   "plugins": [
-    "places",
-    "coordinators",
-    "tasks",
-    "chat",
     "reactions",
     "artifacts",
-    "terminal",
     "worktree",
     "browser",
     "health",
     "alerts",
-    "keyboard",
     "autopilot"
   ]
 }
