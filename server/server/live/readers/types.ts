@@ -1,16 +1,11 @@
-// What pi's log file says, in the one shape the chat reads. It keeps only what the chat shows: what the human typed,
-// the agent's replies, where a session starts and its errors.
+// What pi's log says, in the shape the chat reads: what the human typed, the agent's replies, session starts, errors.
 import type { AgentRuntime } from '../../../shared/types.ts'
 
-interface CliChoice {
-  label: string
-  description?: string
-}
 /** One question of a CLI's own question tool; allowCustom: a typed answer ("Other") is accepted. */
 interface CliQuestionItem {
   header?: string
   question: string
-  options: CliChoice[]
+  options: { label: string; description?: string }[]
   multiSelect: boolean
   allowCustom: boolean
 }
@@ -35,4 +30,5 @@ export type LogEvent =
 /** Parses complete lines of a log file; ids stay stable across re-reads of the same file. */
 export interface Reader {
   parse(lines: { text: string; offset: number }[], file: string): LogEvent[]
+  reset?(file: string): void
 }

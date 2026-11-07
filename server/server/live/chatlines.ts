@@ -161,16 +161,6 @@ type Quote = { to: string; path?: string }
 const NO_REPLY = /^(`?)(<no-reply>(?:(?!<\/no-reply>)[\s\S])*<\/no-reply>|<no-reply\s*\/>)\1$/i
 const OLD_MARKER = /^(\[\[[^[\]\n]+\]\]|\[noted\])$/
 
-/** the tags an agent's reply may start with, none of them for the chat as words */
-const AGENT_TAGS = ['<no-reply', '<react', '<reply']
-
-/** a reply that is or may become a hidden line as it streams in: one in brackets, or one of those tags or the start of
- *  one */
-export const markerSoFar = (words: string) => {
-  const w = words.replace(/^`/, '').toLowerCase()
-  return w.startsWith('[') || AGENT_TAGS.some((t) => w.startsWith(t) || t.startsWith(w))
-}
-
 /** an agent's <react …/> or <reply …/> line; a reply's tag may also open its words (<reply to="…">words</reply>) */
 const AGENT_TAG = /^<(react|reply)((?:\s+[\w-]+="[^\n]*?")+)\s*(\/?)>(.*)$/u
 

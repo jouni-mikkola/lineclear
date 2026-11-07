@@ -113,5 +113,6 @@ export class LogTail {
     this.pos = 0
     this.carry = []
     this.ino = ino
+    this.reader.reset?.(this.file)
   }
 }

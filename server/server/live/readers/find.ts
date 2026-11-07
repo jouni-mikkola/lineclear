@@ -29,7 +29,9 @@ function newestLog(dir: string, sinceMs = 0): string | undefined {
 
 /** pi names a session folder "--<cwd without its leading slash, / \ and : turned into ->--" */
 export function piSessionDir(cwd: string): string {
-  const name = trimSlash(cwd).replace(/^[/\\]/, '').replace(/[/\\:]/g, '-')
+  const name = trimSlash(cwd)
+    .replace(/^[/\\]/, '')
+    .replace(/[/\\:]/g, '-')
   return join(piHome(), 'sessions', `--${name}--`)
 }
 
