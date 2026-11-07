@@ -37,7 +37,13 @@ export function recordWork(task: string, work: Work, env: Env = process.env, mac
   const now = Date.now();
   // after a restart the memory is empty: the file still knows
   const before =
-    lastWritten.get(key) ?? Math.max(0, ...readWork(env).filter((w) => w.step === task && w.work === work && w.machine === machine).map((w) => Date.parse(w.time)));
+    lastWritten.get(key) ??
+    Math.max(
+      0,
+      ...readWork(env)
+        .filter((w) => w.step === task && w.work === work && w.machine === machine)
+        .map((w) => Date.parse(w.time)),
+    );
   if (now - before < REPEAT_SPAN_MS) {
     lastWritten.set(key, before);
     return;
