@@ -329,7 +329,12 @@ export function InboxView({ sample, ask }: { sample: PageState | undefined; ask?
   return (
     <section aria-label="Inbox" data-view="inbox">
       <h1 className="mb-4 text-xl font-semibold text-fg">Inbox</h1>
-      {items.status !== "loading" && open.length === 0 && !held && (
+      {items.status === "error" && (
+        <p className="rounded-md border border-dashed border-line px-4 py-8 text-center text-fg2" data-inbox-error>
+          The Inbox could not be read.
+        </p>
+      )}
+      {items.status === "ok" && open.length === 0 && !held && (
         <p className="rounded-md border border-dashed border-line px-4 py-8 text-center text-fg2" data-inbox-empty>
           Nothing waits for you.
         </p>
