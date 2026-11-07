@@ -237,8 +237,9 @@ async function passesAlone(step: Step, f: Failure): Promise<boolean> {
 
 /** A failed test step reruns its failures alone: the ones that pass are flakes, tolerated while the quarantine has room (scripts/quarantine.ts). Returns the failures that still fail the step. */
 async function afterRerun(step: Step, failing: Failure[]): Promise<Failure[]> {
+  // one at a time: a load-sensitive flake must not fail its own rerun because the others run beside it
   const alone = new Map<Failure, boolean>();
-  await Promise.all(failing.map(async (f) => alone.set(f, await passesAlone(step, f))));
+  for (const f of failing) alone.set(f, await passesAlone(step, f));
   const folder = step.cwd ?? ".";
   const list = readQuarantine();
   const verdict = judge(folder, failing, (f) => alone.get(f) === true, list);
@@ -269,7 +270,9 @@ async function runStep(step: Step): Promise<boolean> {
   let { failing } = first;
   const isTests = step.name.startsWith("tests");
   let ok = code === 0;
-  if (!ok && failing.length > 0 && (isTests || step.name === "server tests")) {
+  // only when every failure the runner counted is named: a crash or load error that names none stays a failure
+  const counted = [...output.matchAll(/^\s*(\d+) fail$/gm)].reduce((sum, m) => sum + Number(m[1]), 0);
+  if (!ok && failing.length > 0 && failing.length >= counted && (isTests || step.name === "server tests")) {
     failing = await afterRerun(step, failing);
     ok = failing.length === 0;
   }
