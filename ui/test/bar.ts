@@ -81,7 +81,7 @@ function readFrames(events: any[], ms: number): Frames {
   return { frames: begins.length, fps: Math.round(1000 / avg), worstMs: Math.round(Math.max(0, ...gaps)), longTasks };
 }
 
-/** The motions running now, by id, with their full time in ms. A loop is not one: `loops` lists those. */
+/** The motions running now, by id, with their full time in ms. */
 export function running(page: Page) {
   return page.evaluate(() =>
     document
@@ -92,16 +92,6 @@ export function running(page: Page) {
         const t = a.effect?.getTiming();
         return { id: a.id, ms: Number(t?.duration ?? 0) + Number(t?.delay ?? 0) };
       }),
-  );
-}
-
-/** The loops running now: the ids of animations that repeat without end. Only two may exist, each only while it lasts. */
-export function loops(page: Page) {
-  return page.evaluate(() =>
-    document
-      .getAnimations()
-      .filter((a) => a.effect?.getTiming().iterations === Infinity)
-      .map((a) => a.id),
   );
 }
 

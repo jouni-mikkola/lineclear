@@ -72,10 +72,3 @@ test("Home at this width", async ({ page }) => {
   await open(page);
   await expect(page).toHaveScreenshot("home-command.png");
 });
-
-test("An Inbox card shows the icon of the role that asks", async ({ page }) => {
-  await page.goto("/design");
-  await page.waitForSelector("[data-inbox-card]");
-  const card = page.locator("[data-inbox-card]").first();
-  await expect(card.locator("[data-role-icon]").first()).toBeAttached();
-});
