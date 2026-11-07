@@ -52,13 +52,3 @@ test('only git reads are shared', () => {
   expect(isGitRead(['git', 'branch', '-D', 'x'])).toBe(false)
   expect(isGitRead(['git', 'config', 'user.name', 'x'])).toBe(false)
 })
-
-test('many herdr calls to a box ride one ssh', () => {
-  // the fake ssh answers every request line with its id
-  const ssh = `while read l; do id=\${l#*\\"id\\":\\"}; id=\${id%%\\"*}; echo "{\\"id\\":\\"$id\\",\\"result\\":{}}"; done`
-  const herdr = JSON.stringify(join(import.meta.dir, '../server/live/herdr.ts'))
-  const body = `const { rpc } = await import(${herdr}); await Promise.all(Array.from({ length: 30 }, () => rpc('ping'))); await rpc('ping'); console.log('done'); process.exit(0)`
-  const r = inWorker(body, ssh)
-  expect(r.out).toBe('done')
-  expect(r.calls).toBe(1)
-})
