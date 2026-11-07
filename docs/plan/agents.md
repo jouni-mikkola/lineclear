@@ -83,14 +83,7 @@ Each step is in [ROADMAP.md](../ROADMAP.md), or dropped with the step that does 
 - L735 Each agent has a memory cap: in ROADMAP.md.
 - L736 A token budget per session: dropped, L798 does it (ROADMAP.md).
 
-### L737 Idle chat panes close
-Result: A coordinator pane idle for 20 minutes closes and opens again on the next message with its session.
-- why: P2. 10 idle `pi` panes older than 3 h hold 584 MB on one machine today.
-- done when: a test with a fake clock closes a pane idle 20 min and keeps one idle 19 min; the next message to a closed chat starts it with its session id; `pgrep -c pi` of idle panes older than 1 h prints 0 on a machine one hour after the merge.
-- locks: chat-idle, file-server-server-live-restart-ts
-- after: none
-- files: server/server/live/chat-idle.ts, server/server/live/restart.ts, server/test/chat-idle.test.ts
-
+- L737 Idle chat panes close: in ROADMAP.md.
 - L738 One agent host per machine: in ROADMAP.md.
 - L739 Doctor counts leftovers: in ROADMAP.md.
 - L740 Remote agents are RPC: in ROADMAP.md.
@@ -100,14 +93,7 @@ Result: A coordinator pane idle for 20 minutes closes and opens again on the nex
 - L744 The room comes from the host: dropped, L580 did it (merged).
 - L745 Claim and place in one call: dropped, L583 does it (ROADMAP.md).
 
-### L746 The loop starts by the plane
-Result: The rule loop starts a step with one call to the main server; the git ref claim and the copy of other machines' tasks are gone.
-- why: P2. Three ways to know a task and two claims (`src/claims.ts`, `remoteSeen`, per-machine stores).
-- done when: `src/claims.ts` and `test/claims.test.ts` are deleted; `grep -rn "remoteSeen\|machineReads\|serverJson\|SILENT_DROP_MS" src server` prints 0; a tick with 5 ready steps and 3 machines makes 1 HTTP call per start and 0 `spawnSync`.
-- locks: spread, file-src-spread-ts
-- after: L745, L587
-- files: src/spread.ts, src/claims.ts, test/claims.test.ts, test/spread.test.ts
-
+- L746 The loop starts by the plane: in ROADMAP.md.
 - L747 Claims end by lease: dropped, L583 does it (ROADMAP.md).
 - L748 No worker server per machine: dropped, L586 does it (ROADMAP.md).
 - L749 The host carries the agents' CLI: dropped, L589 does it (ROADMAP.md).

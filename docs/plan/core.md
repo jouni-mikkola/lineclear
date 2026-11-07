@@ -83,14 +83,7 @@ Each step is in [ROADMAP.md](../ROADMAP.md), or dropped with the step that does 
 - L705 Ready tasks join a merge queue: in ROADMAP.md.
 - L706 A store copy is one file: dropped, L546 did it (merged).
 
-### L707 One id series in the store
-Result: Task ids come from a table of `store.sqlite`, and `task-ids.sqlite` is gone.
-- why: ids live in a second database file beside the store, so a task and its id never commit together.
-- done when: after one start `ls ~/.lineclear/task-ids.sqlite*` lists nothing and its rows are in `store.sqlite`; two processes take 1000 ids and get 1000 distinct ones. Tests: `server/test/task-ids*.test.ts` kept, on the new table.
-- locks: task-ids, file-server-server-live-task-ids-ts
-- after: none
-- files: server/server/live/task-ids.ts
-
+- L707 One id series in the store: in ROADMAP.md.
 - L708 A step is claimed by a row: dropped, L583 does it (ROADMAP.md).
 - L709 The phase is stored: dropped, L521 keeps the phase across a restart (merged).
 - L710 The start waits for pi's word: in ROADMAP.md, cut to the part L522 (merged) left.
@@ -110,14 +103,7 @@ Result: The core loop test passes on a second small repo with a plain GitHub PR 
 - after: L700, L712
 - files: server/test/core-loop-any.test.ts
 
-### L719 Old record fixes are gone
-Result: The engine no longer rewrites old task shapes at every start; the import of L701 did it once.
-- why: `engine.ts` fixes `stage`, `gist`, `after` strings and `readyNudged` on every start for records long migrated.
-- done when: the loop in the `Engine` constructor is gone; a test imports an old `tasks.json` once and sees the same tasks. Tests: old-shape cases of `engine.test.ts` move to `task-rows.test.ts`.
-- locks: old-shapes, file-server-server-live-engine-engine-ts
-- after: L701, L705
-- files: server/server/live/engine/engine.ts
-
+- L719 Old record fixes are gone: in ROADMAP.md.
 - L720 The engine is composed: dropped, L529 does it (ROADMAP.md).
 
 ## The audit steps this replaces

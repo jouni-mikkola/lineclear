@@ -96,37 +96,10 @@ paths when they open.
 
 ## Steps
 
-### L760 Tests may sit beside code
-Result: A test file next to its module runs in the check, so a step changes one folder, not two.
-- why: `src/` and `test/` are two trees (125 and 127 files); `scripts/changed.ts` picks only `test/*.test.ts`.
-- done when: `src/x/y.test.ts` beside `y.ts` runs in `lineclear check --changed` and in the full check's shards; knip's entry globs cover `src/**/*.test.ts`, `src/cli/words/*.ts`, `server/server/live/words/*.ts` and `src/doctor/*.ts`; `test/changed.test.ts` plants a test beside a module and sees it picked.
-- locks: check-ci, file-scripts-check-ts, file-knip-jsonc
-- after: none
-- files: scripts/changed.ts, scripts/check.ts, scripts/load-map.ts, knip.jsonc, test/changed.test.ts
-
-### L761 Borders live in each folder
-Result: A new module states its own border in its folder; nobody edits a central table to add one.
-- why: `docs/architecture.md` was changed by 17 PRs in 3 days, 2 of them with a conflict, because its table lists every module.
-- done when: `scripts/gates/borders.ts` reads `Owns`, `May import` and `Lines` from the first lines of a folder's `README.md`; architecture.md keeps only the layer rules (0 table rows); a new `test/borders.test.ts` adds a folder with a README and sees a forbidden import fail with no edit to architecture.md.
-- locks: borders, file-docs-architecture-md
-- after: none
-- files: scripts/gates/borders.ts, docs/architecture.md, test/borders.test.ts
-
-### L762 The roadmap reads step files
-Result: A project's steps are read from one file per step, so two plans never edit the same file.
-- why: `docs/ROADMAP.md` is one file for every step; 3 plan tasks write it at once today.
-- done when: `roadmapSource` reads `docs/roadmap/<id>.md` when the folder exists (joined in id order, so the parser is unchanged) and `docs/ROADMAP.md` otherwise; `lineclear roadmap check .` checks the folder; a test reads 3 step files and checks one with a bad title.
-- locks: roadmap-read, file-src-roadmap-source-ts
-- after: none
-- files: src/roadmap-source.ts, src/roadmap-cli.ts, test/roadmap.test.ts
-
-### L763 Plans write step files
-Result: A plan that applies adds or edits one file per step, in any repo, even one with no docs folder.
-- why: a plan apply rewrites the whole roadmap file, which collides with every other plan.
-- done when: plan apply writes `docs/roadmap/<id>.md` per changed step and deletes the file of a dropped step; on a second small repo with no `docs/`, a plan creates the folder; a test applies two plans with disjoint steps and sees no conflict.
-- locks: plan-apply-files, file-src-plan-apply-ts
-- after: L762
-- files: src/plan-apply.ts, src/add-project.ts, test/autoplan-apply.test.ts, test/plan.test.ts
+- L760 Tests may sit beside code: in ROADMAP.md.
+- L761 Borders live in each folder: in ROADMAP.md.
+- L762 The roadmap reads step files: in ROADMAP.md.
+- L763 Plans write step files: in ROADMAP.md.
 
 ### L764 Every roadmap is split
 Result: This repo and every registered project keep their steps as files, and the single-file reader is gone.
@@ -144,55 +117,14 @@ Result: Install, update, uninstall and the store copies live in one folder with 
 - after: L545, L546, L608, L777
 - files: src/install/, src/install-paths.ts, src/builds.ts, src/uninstall.ts, src/store-copies.ts, src/health.ts, src/board.ts, src/serve.ts, src/reaper.ts
 
-### L766 One file per CLI word
-Result: A new `lineclear` word is one new file; `src/cli.ts` no longer changes with every command.
-- why: `src/cli.ts` was changed by 32 PRs in 3 days, 3 with a conflict: one `commands` table and an import of each command.
-- done when: `src/cli/words/<word>.ts` exports `about` and `run`; `src/cli/cli.ts` loads the word's file by name and is at most 80 lines; `lineclear --help` lists the folder; a test adds a word file in a temp copy and sees it in help.
-- locks: cli-words, file-src-cli-ts
-- after: L760
-- files: src/cli.ts, src/cli/, bin/lineclear, test/cli.test.ts
-
-### L767 One file per board word
-Result: A new board word is one new file; the board's word object is gone.
-- why: `source-cli.ts` (278 lines) was changed by 16 PRs, 2 with a conflict.
-- done when: `server/server/live/words/<word>.ts` holds each word; `source-cli.ts` and `source-subcommands.ts` are deleted; the board loads a word by name; `server/test/cli.test.ts` passes unchanged.
-- locks: board-words, file-server-server-live-source-cli-ts
-- after: L760
-- files: server/server/live/source-cli.ts, server/server/live/source-subcommands.ts, server/server/live/words/, server/test/cli.test.ts
-
-### L768 Doctor checks one file each
-Result: A new doctor check is one new file; `src/doctor.ts` only runs them.
-- why: `src/doctor.ts` (422 lines) was changed by 18 PRs, 3 with a conflict.
-- done when: each check is `src/doctor/<check>.ts`; `src/doctor/doctor.ts` runs every file of the folder and is at most 100 lines; `test/doctor.test.ts` passes and adds a check file in a temp copy.
-- locks: doctor, file-src-doctor-ts
-- after: L760, L541
-- files: src/doctor.ts, src/doctor-task-ids.ts, src/doctor/, test/doctor.test.ts
-
+- L766 One file per CLI word: in ROADMAP.md.
+- L767 One file per board word: in ROADMAP.md.
+- L768 Doctor checks one file each: in ROADMAP.md.
 - L769 One prompt file per role: in ROADMAP.md, with the core loop, since L796 edits the prompt files it makes.
 
-### L770 Wire types per domain
-Result: A type change touches its domain's types file, not one shared catalog.
-- why: `types-core.ts` (319 lines) and `types-snapshot.ts` were changed by 19 PRs, 2 with a conflict.
-- done when: `server/shared/types/<domain>.ts` holds each domain's types; `types-core.ts`, `types.ts` and `types-snapshot.ts` are gone; no file in `server/shared/types/` is over 150 lines; `bun run types` is green on GitHub.
-- locks: wire-types
-- after: L521, L541
-- files: server/shared/types-core.ts, server/shared/types.ts, server/shared/types-snapshot.ts, server/shared/types-chat.ts, server/shared/types/
-
-### L771 Source tests by module
-Result: The live source's tests are named by the module they test, so two steps rarely edit one test file.
-- why: 6 lettered files `source-b` to `source-g` plus `source-fixture.ts` collect tests by when they were written.
-- done when: `ls server/test | grep -cE 'source-[b-g]\.test\.ts'` prints 0; each test file names one module; the test count is the same or lower with no case lost (a list of `test(` names before and after).
-- locks: source-tests
-- after: L544
-- files: server/test/source.test.ts, server/test/source-b.test.ts, server/test/source-c.test.ts, server/test/source-d.test.ts, server/test/source-e.test.ts, server/test/source-f.test.ts, server/test/source-g.test.ts, server/test/source-fixture.ts
-
-### L772 Engine tests by module
-Result: The engine's tests are named by module, so engine steps edit their own test file.
-- why: 8 lettered files (`engine-b`, `engine-merge-b` to `-d`, `engine-queue-b`, `-c`, `live-b`, `-c`) split tests by size.
-- done when: `ls server/test | grep -cE '^(engine|live).*-[b-h]\.test\.ts'` prints 0; no case lost (a list of `test(` names before and after).
-- locks: engine-tests
-- after: L521, L522, L523, L525
-- files: server/test/engine-b.test.ts, server/test/engine-c.test.ts, server/test/engine-merge-b.test.ts, server/test/engine-merge-c.test.ts, server/test/engine-merge-d.test.ts, server/test/engine-queue-b.test.ts, server/test/engine-queue-c.test.ts, server/test/live-b.test.ts, server/test/live-c.test.ts
+- L770 Wire types per domain: in ROADMAP.md.
+- L771 Source tests by module: in ROADMAP.md.
+- L772 Engine tests by module: in ROADMAP.md.
 
 ### L773 One file per measure
 Result: Each measure has its own page in `docs/numbers/`, so two measuring steps never edit one file.
@@ -210,21 +142,8 @@ Result: One command prints how many merged PRs hit a rebase conflict and which f
 - after: L773
 - files: scripts/core-baseline.ts, test/core-baseline.test.ts
 
-### L775 The fork's leftovers are gone
-Result: The repo has one set of docs and guidance; the fork's own docs are gone.
-- why: `server/docs/` (9 files, 593 lines), `server/README.md`, `server/AGENTS.md` and `server/CLAUDE.md` describe the fork, not Lineclear.
-- done when: `git ls-files server/docs server/README.md server/AGENTS.md server/CLAUDE.md` lists none; `server/LICENSE` and `server/NOTICE` stay; `git grep -n "server/docs"` lists none.
-- locks: fork-docs
-- after: none
-- files: server/docs/, server/README.md, server/AGENTS.md, server/CLAUDE.md
-
-### L776 One package, one lock file
-Result: The repo has one package, one lock file and one test runner.
-- why: `server/` repeats `package.json`, `bun.lock`, `tsconfig.json` and a 215-line test runner; each conflicted in the last 3 days.
-- done when: `git ls-files server/package.json server/bun.lock server/tsconfig.json server/bunfig.toml server/scripts/test.ts` lists none; the root `bun test` runs the server's tests; the full check on GitHub is green with the same test count.
-- locks: one-package, file-package-json, file-tsconfig-json
-- after: L760
-- files: server/package.json, server/bun.lock, server/tsconfig.json, server/bunfig.toml, server/scripts/test.ts, package.json, tsconfig.json, bun.lock, .github/workflows/check.yml
+- L775 The fork's leftovers are gone: in ROADMAP.md.
+- L776 One package, one lock file: in ROADMAP.md.
 
 ### L777 The base layer
 Result: Code every domain needs lives in `src/base/`, which imports nothing else of Lineclear.

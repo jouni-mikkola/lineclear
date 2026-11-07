@@ -142,29 +142,9 @@ Result: `bun scripts/swarm-measure.ts <swarm-base> <one-base>` prints merged ste
 - L801 The swarm arm is measured: dropped, L609 measures both arms (ROADMAP.md).
 - L803 One agent arm and the verdict: dropped, L609 measures both arms (ROADMAP.md).
 
-### L802 The loop promotes green main
-Result: The rule loop installs the newest green main as stable at set hours, so no outside script promotes or copies an install.
-- why: `watch.sh` and `promote-main.sh` promote main outside Lineclear, and `watch.sh` copies `install.sh` to other machines with `scp`.
-- done when: the loop calls `scripts/promote.ts` for the newest main commit whose `check` is green, at most once in 30 minutes and only while no merge is running; a test with a red, a pending and a green head promotes only the green one; the other machines follow through L591, not through `scp`.
-- locks: loop-promote, file-src-rules-ts
-- after: L608
-- files: src/rules.ts, scripts/promote.ts
-
-### L804 No timer outside Lineclear
-Result: `lineclear doctor` fails while a systemd timer or a cron line runs lineclear, herdr or pi outside the service, and none is left.
-- why: five timers and two cron lines on the owner's machine do the loop's jobs untested, one of them calls a model every few minutes.
-- done when: a new `doctor-timers.ts` lists such units from `systemctl --user list-timers` and `crontab -l` and doctor exits non-zero with their names; a test feeds a fake list with `lc-watch.timer` and sees its line; on the owner's machine doctor passes after `lc-watch`, `lineclear-keeper`, `night-watch` and `lineclear-promote-main` are disabled and the 2 cron lines are removed.
-- locks: doctor-timers, file-src-doctor-ts
-- after: L802, L608
-- files: src/doctor-timers.ts, src/doctor.ts
-
-### L805 Sessions of gone tasks go
-Result: pi session folders of worktrees that no longer exist go after 7 days, so `~/.pi/agent/sessions` stays under 300 MB.
-- why: 1,748 session folders take 2.1 GB on one machine, 1,725 of them for worktrees, most of them retired.
-- done when: the temp sweep deletes a session folder whose worktree path is gone and whose newest file is over 7 days old; a test plants a live, a gone-new and a gone-old folder and sees only the last removed; `du -sm ~/.pi/agent/sessions` prints 300 or less on that machine a day after the merge.
-- locks: session-sweep, file-src-tmpdirs-ts
-- after: none
-- files: src/tmpdirs.ts, test/tmpdirs.test.ts
+- L802 The loop promotes green main: in ROADMAP.md.
+- L804 No timer outside Lineclear: in ROADMAP.md.
+- L805 Sessions of gone tasks go: in ROADMAP.md.
 
 ### L806 Any repo gets a check
 Result: Adding a project with no GitHub check opens its first task: a `lineclear-check.yml` workflow that runs the project's check command.

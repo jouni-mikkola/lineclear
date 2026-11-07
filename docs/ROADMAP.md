@@ -217,6 +217,179 @@ Result: A test runs 45 steps on 3 stand-in machines to the end: each claimed onc
 - after: L581, L583, L586, L750, L797
 - files: server/test/plane-45.test.ts
 
+## Clean-up and layout (P2)
+
+The steps that remove what the core loop left behind and give the code the layout of `docs/plan/layout.md`: the core,
+flow, agents and layout plans of `docs/plan/` in rank 2 of [release.md](release.md).
+
+### L707 One id series in the store
+Result: Task ids come from a table of `store.sqlite`, and `task-ids.sqlite` is gone.
+- why: ids live in a second database file beside the store, so a task and its id never commit together.
+- done when: after one start `ls ~/.lineclear/task-ids.sqlite*` lists nothing and its rows are in `store.sqlite`; two processes take 1000 ids and get 1000 distinct ones. Tests: `task-ids.test.ts`, `task-ids-unique.test.ts` and `task-ids-machine-b.test.ts` are kept, on the new table.
+- locks: none
+- after: none
+- files: server/server/live/task-ids.ts, src/store-copies.ts, src/doctor-task-ids.ts, server/scripts/store-formats.ts, server/test/task-ids.test.ts, server/test/task-ids-unique.test.ts, server/test/task-ids-machine-b.test.ts
+
+### L719 Old record fixes are gone
+Result: The engine no longer rewrites old task shapes at every start; the import of L701 did it once.
+- why: `engine.ts` fixes `stage`, `gist`, `after` strings and `readyNudged` on every start for records long migrated.
+- done when: the loop in the `Engine` constructor is gone; a test imports an old `tasks.json` once and sees the same tasks. Tests: old-shape cases of `engine.test.ts` move to `task-rows.test.ts`.
+- locks: none
+- after: L701, L705, L529
+- files: server/server/live/engine/engine.ts, server/test/engine.test.ts, server/test/task-rows.test.ts
+
+### L802 The loop promotes green main
+Result: The rule loop installs the newest green main as stable at set hours, so no outside script promotes or copies an install.
+- why: `watch.sh` and `promote-main.sh` promote main outside Lineclear, and `watch.sh` copies `install.sh` to other machines with `scp`.
+- done when: the loop calls `scripts/promote.ts` for the newest main commit whose `check` is green, at most once in 30 minutes and only while no merge is running; a test with a red, a pending and a green head promotes only the green one; the other machines follow through L591, not through `scp`. Tests: a case in `test/rules.test.ts`.
+- locks: none
+- after: none
+- files: src/rules.ts, scripts/promote.ts, test/rules.test.ts
+
+### L804 No timer outside Lineclear
+Result: `lineclear doctor` fails while a systemd timer or a cron line runs lineclear, herdr or pi outside the service, and none is left.
+- why: five timers and two cron lines on the owner's machine do the loop's jobs untested, one of them calls a model every few minutes.
+- done when: a new `doctor-timers.ts` lists such units from `systemctl --user list-timers` and `crontab -l` and doctor exits non-zero with their names; a test feeds a fake list with `lc-watch.timer` and sees its line; on the owner's machine doctor passes after `lc-watch`, `lineclear-keeper`, `night-watch` and `lineclear-promote-main` are disabled and the 2 cron lines are removed.
+- locks: none
+- after: L802, L739
+- files: src/doctor-timers.ts, src/doctor.ts, test/doctor-timers.test.ts
+
+### L805 Sessions of gone tasks go
+Result: pi session folders of worktrees that no longer exist go after 7 days, so `~/.pi/agent/sessions` stays under 300 MB.
+- why: 1,748 session folders take 2.1 GB on one machine, 1,725 of them for worktrees, most of them retired.
+- done when: the temp sweep deletes a session folder whose worktree path is gone and whose newest file is over 7 days old; a test plants a live, a gone-new and a gone-old folder and sees only the last removed; `du -sm ~/.pi/agent/sessions` prints 300 or less on that machine a day after the merge.
+- locks: none
+- after: none
+- files: src/tmpdirs.ts, test/tmpdirs.test.ts
+
+### L737 Idle chat panes close
+Result: A coordinator pane idle for 20 minutes closes and opens again on the next message with its session.
+- why: 10 idle `pi` panes older than 3 h hold 584 MB on one machine today.
+- done when: a test with a fake clock closes a pane idle 20 min and keeps one idle 19 min; the next message to a closed chat starts it with its session id; `pgrep -c pi` of idle panes older than 1 h prints 0 on a machine one hour after the merge. Tests: new `chat-idle.test.ts`.
+- locks: none
+- after: none
+- files: server/server/live/chat-idle.ts, server/server/live/restart.ts, server/test/chat-idle.test.ts
+
+### L746 The loop starts by the plane
+Result: The rule loop starts a step with one call to the main server; the git ref claim and the copy of other machines' tasks are gone.
+- why: three ways to know a task and two claims (`src/claims.ts`, `remoteSeen`, per-machine stores).
+- done when: `src/claims.ts` and `test/claims.test.ts` are deleted; `grep -rn "remoteSeen\|machineReads\|serverJson\|SILENT_DROP_MS" src server` prints 0; a tick with 5 ready steps and 3 machines makes 1 HTTP call per start and 0 `spawnSync`. Tests: the cases go in a new `test/spread-plane.test.ts`.
+- locks: none
+- after: L581, L582, L583
+- files: src/spread.ts, src/claims.ts, test/claims.test.ts, test/spread-plane.test.ts
+
+### L760 Tests may sit beside code
+Result: A test file next to its module runs in the check, so a step changes one folder, not two.
+- why: `src/` and `test/` are two trees (125 and 127 files); `scripts/changed.ts` picks only `test/*.test.ts`.
+- done when: `src/x/y.test.ts` beside `y.ts` runs in `lineclear check --changed` and in the full check's shards; knip's entry globs cover `src/**/*.test.ts`, `src/cli/words/*.ts`, `server/server/live/words/*.ts` and `src/doctor/*.ts`; `test/changed.test.ts` plants a test beside a module and sees it picked.
+- locks: none
+- after: L790
+- files: scripts/changed.ts, scripts/check.ts, scripts/load-map.ts, knip.jsonc, .github/workflows/check.yml, test/changed.test.ts
+
+### L761 Borders live in each folder
+Result: A new module states its own border in its folder; nobody edits a central table to add one.
+- why: `docs/architecture.md` was changed by 17 PRs in 3 days, 2 of them with a conflict, because its table lists every module.
+- done when: `scripts/gates/borders.ts` reads `Owns`, `May import` and `Lines` from the first lines of a folder's `README.md`; architecture.md keeps only the layer rules (0 table rows); a new `test/borders.test.ts` adds a folder with a README and sees a forbidden import fail with no edit to architecture.md.
+- locks: none
+- after: none
+- files: scripts/gates/borders.ts, docs/architecture.md, test/borders.test.ts
+
+### L762 The roadmap reads step files
+Result: A project's steps are read from one file per step, so two plans never edit the same file.
+- why: `docs/ROADMAP.md` is one file for every step; 3 plan tasks write it at once today.
+- done when: `roadmapSource` reads `docs/roadmap/<id>.md` when the folder exists (joined in id order, so the parser is unchanged) and `docs/ROADMAP.md` otherwise; `lineclear roadmap check .` checks the folder; a test reads 3 step files and checks one with a bad title.
+- locks: none
+- after: none
+- files: src/roadmap-source.ts, src/roadmap-cli.ts, test/roadmap.test.ts
+
+### L763 Plans write step files
+Result: A plan that applies adds or edits one file per step, in any repo, even one with no docs folder.
+- why: a plan apply rewrites the whole roadmap file, which collides with every other plan.
+- done when: plan apply writes `docs/roadmap/<id>.md` per changed step and deletes the file of a dropped step; on a second small repo with no `docs/`, a plan creates the folder; a test applies two plans with disjoint steps and sees no conflict.
+- locks: none
+- after: L762
+- files: src/plan-apply.ts, src/add-project.ts, test/autoplan-apply.test.ts, test/plan.test.ts
+
+### L766 One file per CLI word
+Result: A new `lineclear` word is one new file; `src/cli.ts` no longer changes with every command.
+- why: `src/cli.ts` was changed by 32 PRs in 3 days, 3 with a conflict: one `commands` table and an import of each command.
+- done when: `src/cli/words/<word>.ts` exports `about` and `run`; `src/cli/cli.ts` loads the word's file by name and is at most 80 lines; `lineclear --help` lists the folder; a test adds a word file in a temp copy and sees it in help.
+- locks: none
+- after: L760
+- files: src/cli.ts, src/cli/, bin/lineclear, test/cli.test.ts
+
+### L767 One file per board word
+Result: A new board word is one new file; the board's word object is gone.
+- why: `source-cli.ts` (278 lines) was changed by 16 PRs, 2 with a conflict.
+- done when: `server/server/live/words/<word>.ts` holds each word; `source-cli.ts` and `source-subcommands.ts` are deleted; the board loads a word by name; `server/test/cli.test.ts` passes unchanged.
+- locks: none
+- after: L760
+- files: server/server/live/source-cli.ts, server/server/live/source-subcommands.ts, server/server/live/words/
+
+### L768 Doctor checks one file each
+Result: A new doctor check is one new file; `src/doctor.ts` only runs them.
+- why: `src/doctor.ts` (422 lines) was changed by 18 PRs, 3 with a conflict.
+- done when: each check is `src/doctor/<check>.ts`; `src/doctor/doctor.ts` runs every file of the folder and is at most 100 lines; `test/doctor.test.ts` passes and adds a check file in a temp copy.
+- locks: none
+- after: L760, L739, L804
+- files: src/doctor.ts, src/doctor-task-ids.ts, src/doctor/, test/doctor.test.ts
+
+### L770 Wire types per domain
+Result: A type change touches its domain's types file, not one shared catalog.
+- why: `types-core.ts` (319 lines) and `types-snapshot.ts` were changed by 19 PRs, 2 with a conflict.
+- done when: `server/shared/types/<domain>.ts` holds each domain's types; `types-core.ts`, `types.ts` and `types-snapshot.ts` are gone; no file in `server/shared/types/` is over 150 lines; `bun run types` is green on GitHub.
+- locks: none
+- after: none
+- files: server/shared/types-core.ts, server/shared/types.ts, server/shared/types-snapshot.ts, server/shared/types-chat.ts, server/shared/types/
+
+### L771 Source tests by module
+Result: The live source's tests are named by the module they test, so two steps rarely edit one test file.
+- why: 6 lettered files `source-b` to `source-g` plus `source-fixture.ts` collect tests by when they were written.
+- done when: `ls server/test | grep -cE 'source-[b-g]\.test\.ts'` prints 0; each test file names one module; the test count is the same or lower with no case lost (a list of `test(` names before and after).
+- locks: none
+- after: L715, L796
+- files: server/test/source.test.ts, server/test/source-b.test.ts, server/test/source-c.test.ts, server/test/source-d.test.ts, server/test/source-e.test.ts, server/test/source-f.test.ts, server/test/source-g.test.ts, server/test/source-fixture.ts
+
+### L772 Engine tests by module
+Result: The engine's tests are named by module, so engine steps edit their own test file.
+- why: 8 lettered files (`engine-b`, `engine-merge-b` to `-d`, `engine-queue-b`, `-c`, `live-b`, `-c`) split tests by size.
+- done when: `ls server/test | grep -cE '^(engine|live).*-[b-h]\.test\.ts'` prints 0; no case lost (a list of `test(` names before and after). The two `live-*` files are L811's.
+- locks: none
+- after: L715, L791, L796
+- files: server/test/engine-b.test.ts, server/test/engine-c.test.ts, server/test/engine-merge-b.test.ts, server/test/engine-merge-c.test.ts, server/test/engine-merge-d.test.ts, server/test/engine-queue-b.test.ts, server/test/engine-queue-c.test.ts
+
+### L811 Live tests by module
+Result: The live server's tests are named by module, not by a letter.
+- why: `live-b.test.ts` and `live-c.test.ts` split tests by size, the same fault as the engine's lettered files.
+- done when: `ls server/test | grep -cE '^live.*-[b-h]\.test\.ts'` prints 0; no case lost (a list of `test(` names before and after).
+- locks: none
+- after: L772
+- files: server/test/live-b.test.ts, server/test/live-c.test.ts
+
+### L775 The fork's leftovers are gone
+Result: The repo has one set of docs and guidance; the fork's own docs are gone.
+- why: `server/docs/` (9 files, 593 lines), `server/README.md`, `server/AGENTS.md` and `server/CLAUDE.md` describe the fork, not Lineclear.
+- done when: `git ls-files server/docs server/README.md server/AGENTS.md server/CLAUDE.md` lists none; `server/LICENSE` and `server/NOTICE` stay; `git grep -n "server/docs"` lists none.
+- locks: none
+- after: none
+- files: server/docs/, server/README.md, server/AGENTS.md, server/CLAUDE.md
+
+### L776 One package, one lock file
+Result: The repo has one package, one lock file and one test runner.
+- why: `server/` repeats `package.json`, `bun.lock`, `tsconfig.json` and a 215-line test runner; each conflicted in the last 3 days.
+- done when: `git ls-files server/package.json server/bun.lock server/tsconfig.json server/bunfig.toml` lists none; the root `bun test` runs the server's tests; the full check on GitHub is green with the same test count. `server/scripts/test.ts` goes with L810.
+- locks: none
+- after: L760, L790
+- files: server/package.json, server/bun.lock, server/tsconfig.json, server/bunfig.toml, package.json, tsconfig.json, bun.lock, .github/workflows/check.yml
+
+### L810 The server test runner is gone
+Result: `server/scripts/test.ts` is deleted, and the root test command is the only runner.
+- why: the 215-line runner repeats what the root `bun test` does once L776 joins the packages.
+- done when: `git ls-files server/scripts/test.ts` lists none and `git grep -n "scripts/test.ts"` lists none; the full check on GitHub is green with the same test count.
+- locks: none
+- after: L776
+- files: server/scripts/test.ts
+
 ## Open steps from the audits
 
 The open steps of the audits of `docs/audit/` and `docs/roles.md`, in the order stores, engine, agents, loop,
