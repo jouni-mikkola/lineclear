@@ -13,7 +13,8 @@ import {
   ROLES,
 } from "../kit/index.ts";
 import { Alerts } from "./alerts.tsx";
-import { type Load, send } from "./data.ts";
+import { type Load, sampleState, send } from "./data.ts";
+import { useSetup } from "./setup.tsx";
 import { Models, SetupChoice } from "./settings-models.tsx";
 import type { SettingsData } from "./settings-empty.ts";
 import { useAccountActions } from "./settings-account.ts";
@@ -44,6 +45,10 @@ export function Settings({ load, sample }: { load: Load<SettingsData>; sample: b
     refresh,
     home: () => client.invalidateQueries({ queryKey: ["home"] }),
   });
+
+  const setup = useSetup(sampleState());
+  // the choice above and the lists below read one answer: with no harness logged in only its card shows
+  const foundHarness = setup.status === "ok" && setup.data.harnesses.length > 0;
 
   if (load.status === "error") return <Part main state="error" label="Settings" empty={{ text: "" }} error={load.error} onRetry={load.retry} />;
   const d = load.status === "ok" ? load.data : undefined;
@@ -80,15 +85,17 @@ export function Settings({ load, sample }: { load: Load<SettingsData>; sample: b
     Models: (
       <div className="space-y-6">
         <SetupChoice />
-        <Part state={of(!projects.length)} label="Models" empty={{ text: "No projects yet." }}>
-          {d && <Models roles={[...ROLES]} data={d} sample={sample} />}
-        </Part>
-        <AccountPrices
-          accounts={(d?.accounts ?? []).map((a) => ({ ...a, retired: retired[a.account] ?? a.retired }))}
-          said={said}
-          onSave={savePrice}
-          onRetire={retire}
-        />
+        {d && foundHarness && (
+          <>
+            <Models roles={[...ROLES]} data={d} sample={sample} />
+            <AccountPrices
+              accounts={(d.accounts ?? []).map((a) => ({ ...a, retired: retired[a.account] ?? a.retired }))}
+              said={said}
+              onSave={savePrice}
+              onRetire={retire}
+            />
+          </>
+        )}
       </div>
     ),
     Projects: (

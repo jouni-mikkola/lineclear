@@ -1,7 +1,7 @@
 import { Input } from "@base-ui/react/input";
 import { useState } from "react";
 
-const inputClass = "min-h-9 w-full min-w-0 rounded-sm border border-line bg-base px-3 font-mono text-sm text-fg placeholder:text-fg3";
+const inputClass = "min-h-9 min-w-0 rounded-sm border border-line bg-base px-3 font-mono text-sm text-fg placeholder:text-fg3";
 
 /** An account with what its subscription costs a month, when the owner set it. */
 export interface AccountSetting {
@@ -51,7 +51,7 @@ export function AccountPrice({
       {paysPerUse || a.kind === "free" ? (
         <span className="text-sm text-fg2">{a.kind === "free" ? "Free" : "Pay as you go"}</span>
       ) : (
-        <span className="flex items-center gap-2">
+        <span className="flex shrink-0 items-center gap-2">
           <Input
             id={id}
             value={shownPrice}
@@ -75,7 +75,7 @@ export function AccountPrice({
             autoComplete="off"
             spellCheck={false}
           />
-          <span className="text-sm text-fg3">/ month</span>
+          <span className="whitespace-nowrap text-sm text-fg3">/ month</span>
         </span>
       )}
       <label className="flex items-center gap-1.5 text-sm text-fg2 max-sm:min-h-11">

@@ -31,7 +31,7 @@ export function Models({ roles, data, sample }: { roles: Role[]; data: SettingsD
   const projects = data.projects.map((p) => ({ ...p, models: orders[p.name] ?? p.models }));
   const project = projects.find((p) => p.name === chosen) ?? projects.find((p) => roles.some((r) => p.models[r].length)) ?? projects[0];
   const served = data.projects.find((p) => p.name === project?.name);
-  if (!project || !served) return <p className="text-sm text-fg2">No projects yet.</p>;
+  if (!project || !served) return null;
   const move = async (role: Role, p: ProjectSettings, from: number, to: number) => {
     const list = [...p.models[role]];
     list.splice(to, 0, ...list.splice(from, 1));
