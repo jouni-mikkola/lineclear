@@ -9,7 +9,7 @@ import { copiesProblem, runByNote } from "./store-copies.ts";
 import { cacheEnvFile, dataDir, extensionFile, INSTALL_URL, type Paths, SERVICE } from "./paths.ts";
 import { diskTrouble, freeBytes } from "./health.ts";
 import { firstModel, readModelFile } from "./models.ts";
-import { readSetup, type Setup, setupRoles } from "./project.ts";
+import { readSetup, type Setup, setupRoles, storeVersion } from "./project.ts";
 import { checkoutPointers } from "./install-paths.ts";
 import { buildNames, buildProblem, buildsDir, installReleaseCommand, type RunFrom, unitCommand } from "./builds.ts";
 import { publishedAddress, serveCommand } from "./published.ts";
@@ -33,6 +33,8 @@ export interface Probe {
   paths: Paths;
   /** The model chosen for each role. Without it the roles are not checked. */
   setup?: Setup;
+  /** The version of this machine's settings file, or what stops it from being read. Without it the file is not checked. */
+  settings?: { version: number } | { problem: string };
   /** Lineclear's data folder. */
   dataDir?: string;
   /** Whether Lineclear's own server runs now. */
@@ -73,7 +75,7 @@ export interface Probe {
 export function realProbe(paths: Paths, env: Record<string, string | undefined> = process.env): Probe {
   const probe: Probe = {
     paths,
-    setup: storedSetup(env),
+    ...storedSettings(env),
     dataDir: dataDir(env),
     running: () => {
       try {
@@ -303,10 +305,24 @@ function newTaskModel(): Check {
   return { name: "model", problem: "", fix: "", info: model ? `a new task with no model set starts on ${model}` : "pi lists no model yet" };
 }
 
-/** The chosen models, or undefined on a machine that has chosen none yet (a fresh install has nothing to lose). */
-function storedSetup(env: Record<string, string | undefined>): Setup | undefined {
-  const setup = readSetup(env);
-  return existsSync(join(configDir(env), "settings.json")) ? setup : undefined;
+/** The chosen models and the file's version, or only the problem when the file is bad. A machine with no file has chosen none yet (a fresh install has nothing to lose). */
+function storedSettings(env: Record<string, string | undefined>): Pick<Probe, "setup" | "settings"> {
+  try {
+    // reading first: it moves a pre-settings.json setup.json into the file
+    const setup = readSetup(env);
+    if (!existsSync(join(configDir(env), "settings.json"))) return {};
+    return { setup, settings: { version: storeVersion(env) } };
+  } catch (e) {
+    return { settings: { problem: (e as Error).message } };
+  }
+}
+
+/** The settings file of this machine: its version, or the reason it cannot be read. */
+function settingsFile(p: Probe): Check[] {
+  if (!p.settings) return [];
+  if ("problem" in p.settings)
+    return [{ name: "settings file", problem: p.settings.problem, fix: "fix or remove the file named, then run 'lineclear doctor'" }];
+  return [{ name: "settings file", problem: "", fix: "", info: `settings version ${p.settings.version}` }];
 }
 
 const ROLE_WORDS: Record<string, string> = { stepChecker: "step checker" };
@@ -368,6 +384,7 @@ export function doctorChecks(probe: Probe): Check[] {
     compileCache(p),
     stableBuild(p),
     newTaskModel(),
+    ...settingsFile(p),
     ...roleModels(p),
     lingering(p),
     disk(p),

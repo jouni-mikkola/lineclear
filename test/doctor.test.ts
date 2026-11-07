@@ -11,6 +11,7 @@ import { setRegistry } from "../src/models.ts";
 import { setupRoles } from "../src/project.ts";
 
 const paths = pathsFor({ HOME: "/nonexistent-home" });
+const realProbeWith = (env: Record<string, string>) => probe({ ...realProbe(paths, env) });
 const realSetup = (env: Record<string, string>) => realProbe(paths, env).setup;
 const probe = (over: Partial<Probe> = {}): Probe => ({
   dataDir: "/nonexistent-home/data",
@@ -295,6 +296,22 @@ test("doctor names each role whose model a settings migration lost, and none whe
     const full = Object.fromEntries(setupRoles.map((r) => [r, `p/${r}`]));
     writeFileSync(join(dir, "settings.json"), JSON.stringify({ setup: full }));
     expect(roleProblems()).toHaveLength(0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("doctor prints the settings version, and fails naming a file it cannot read", () => {
+  const dir = mkdtempSync(join(tmpdir(), "doctor-version-"));
+  const env = { LINECLEAR_CONFIG: dir };
+  const file = join(dir, "settings.json");
+  const settingsCheck = () => doctorChecks(realProbeWith(env)).find((c) => c.name === "settings file");
+  try {
+    writeFileSync(file, JSON.stringify({ setup: {} }));
+    expect(settingsCheck()).toMatchObject({ problem: "", info: "settings version 2" });
+    writeFileSync(file, "{ truncated");
+    expect(settingsCheck()?.problem).toContain(file);
+    expect(readFileSync(file, "utf8")).toBe("{ truncated");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

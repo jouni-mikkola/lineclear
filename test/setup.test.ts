@@ -1,11 +1,12 @@
-import { expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { configDir } from "../pi/config.ts";
 import { main } from "../src/cli.ts";
 import { harnesses, readRegistry } from "../src/models.ts";
 import { changeSettings } from "../src/project-change.ts";
-import { projectsDir, readSettings, readSetup, saveSetup, type Settings, setupGate } from "../src/project.ts";
+import { projectsDir, readSettings, readSetup, saveSetup, type Settings, setupGate, storeVersion } from "../src/project.ts";
 import { saveOffered, setupMain, setupView } from "../src/setup.ts";
 
 function fake(body: string): string {
@@ -92,4 +93,44 @@ test("a role model set in Settings is the next task's model, and setup.json is m
   expect((readSettings("p", env) as Settings).models.worker).toEqual(["a/new"]);
   changeSettings("p", { check: "true2" }, env);
   expect(JSON.parse(readFileSync(join(projectsDir(env), "p", "settings.json"), "utf8")).models.worker).toEqual([]);
+});
+
+describe("the machine settings file", () => {
+  const file = (env: Record<string, string>) => join(configDir(env), "settings.json");
+
+  test("a truncated settings.json stops with a message naming the file and stays unchanged", () => {
+    const env = configEnv();
+    mkdirSync(configDir(env), { recursive: true });
+    writeFileSync(file(env), '{"setup": {"worker": "a/x"');
+    expect(() => readSetup(env)).toThrow(file(env));
+    expect(() => saveSetup({ reviewer: "b/y" }, (m) => m.split("/")[0]!, env)).toThrow(file(env));
+    expect(readFileSync(file(env), "utf8")).toBe('{"setup": {"worker": "a/x"');
+    expect(setupGate(env)).toContain(file(env));
+  });
+
+  test("a v1 file migrates to v2 keeping every role's model and leaving settings.json.v1.bak", () => {
+    const env = configEnv();
+    mkdirSync(configDir(env), { recursive: true });
+    const old = JSON.stringify({ setup: { worker: "a/x", reviewer: "b/y", planner: "a/z", stepChecker: "b/s" } });
+    writeFileSync(file(env), old);
+    expect(readSetup(env)).toEqual({ worker: "a/x", reviewer: "b/y", planner: "a/z", stepChecker: "b/s" });
+    expect(JSON.parse(readFileSync(file(env), "utf8")).version).toBe(2);
+    expect(storeVersion(env)).toBe(2);
+    expect(readFileSync(`${file(env)}.v1.bak`, "utf8")).toBe(old);
+  });
+
+  test("a file from a newer version is refused", () => {
+    const env = configEnv();
+    mkdirSync(configDir(env), { recursive: true });
+    writeFileSync(file(env), JSON.stringify({ version: 9, setup: {} }));
+    expect(() => readSetup(env)).toThrow("newer");
+  });
+});
+
+test("readSettings returns the message of a bad machine settings file instead of throwing", () => {
+  const env = configEnv();
+  mkdirSync(join(projectsDir(env), "p"), { recursive: true });
+  writeFileSync(join(projectsDir(env), "p", "settings.json"), JSON.stringify({ repo: "/r", space: "s", check: "c", models: {} }));
+  writeFileSync(join(configDir(env), "settings.json"), "{ bad");
+  expect(readSettings("p", env)).toContain(join(configDir(env), "settings.json"));
 });
