@@ -40,6 +40,7 @@ import {
 import { fastGates } from "./fast-gates.ts";
 import { describeFailure, type Failure, outsideChange, parseFailures } from "./failures.ts";
 import { changedSince } from "./gates/tools.ts";
+import { bunPassesAlone, judge, QUARANTINE_FILE, readQuarantine, writeQuarantine } from "./quarantine.ts";
 
 // Every step but the server's (below) runs with TMPDIR in a folder of this run, on disk. Each test process clears its own
 // folder inside it (tmp-scope.ts), so anything left in it when the steps end was left by a process that did not get
@@ -226,6 +227,7 @@ let factor = measure();
 const started = performance.now();
 const times: StepTime[] = [];
 const outcome = new Map<string, Promise<boolean>>();
+let quarantine = readQuarantine();
 
 /** Runs one step after the steps it needs. Resolves to whether it passed; a step skipped for a failed need counts as failed. */
 async function runStep(step: Step): Promise<boolean> {
@@ -233,9 +235,22 @@ async function runStep(step: Step): Promise<boolean> {
   await null;
   for (const need of step.needs ?? []) if (!(await outcome.get(need))) return false;
   const at = performance.now();
-  const { code, failing, output } = await run(step);
+  const ran = await run(step);
+  const { code, output } = ran;
+  let failing = ran.failing;
   const isTests = step.name.startsWith("tests");
-  const ok = code === 0;
+  let ok = code === 0;
+  // each failed test runs alone once: one that passes alone is a flake, quarantined or listed, and only the rest fails the step
+  if (!ok && failing.length > 0 && (isTests || step.name === "server tests")) {
+    const prefix = step.cwd ? `${step.cwd}/` : "";
+    const verdict = judge(failing, quarantine, bunPassesAlone(step.cwd ?? ".", step.cwd === "server" ? serverEnv : env), prefix);
+    quarantine = verdict.list;
+    if (verdict.added.length > 0) writeQuarantine(quarantine);
+    for (const q of verdict.added) console.log(`check: flaky, quarantined in ${QUARANTINE_FILE}, file its fix task: ${q.file} > ${q.test}`);
+    for (const f of verdict.ignored) console.log(`check: flaky, already quarantined: ${describeFailure(f)}`);
+    if (verdict.failing.length === 0) ok = true;
+    failing = verdict.failing;
+  }
   times.push({ step: step.name, seconds: (performance.now() - at) / 1000, ok });
   if (!ok) {
     console.error(
