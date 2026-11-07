@@ -84,7 +84,7 @@ describe('the start waits for pi', () => {
     expect(w.sent.filter((x) => x.key === 'PH-1/Agent').length).toBe(1)
   })
 
-  test('a task whose agent is gone is orphaned as soon as herdr has listed, not after hours', async () => {
+  test('a task whose agent exited is orphaned at that event, not after hours', async () => {
     const dir = repo()
     const p = await world().places.add(dir, 'phase-orphan')
     const project = placeId.space(p.name)
@@ -93,8 +93,10 @@ describe('the start waits for pi', () => {
       tasks: [record(project, 1, { told: 'work', worktree: '/nonexistent', branch: 'phase' })],
     })
     const w = world()
-    expect(w.engine.view(w.engine.tasks[0]).orphaned).toBeUndefined()
     w.engine.resumeAfterStart()
+    w.agentIs('PH-1/Agent', 'working')
+    expect(w.engine.view(w.engine.tasks[0]).orphaned).toBeUndefined()
+    w.agentIs('PH-1/Agent', 'gone')
     expect(w.engine.view(w.engine.tasks[0]).orphaned).toBe(true)
   })
 })
