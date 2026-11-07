@@ -27,8 +27,13 @@ export interface WorkLine {
   reason: string;
 }
 
+// the same work for a task on a machine inside this span adds nothing: ticks start it again and again
+const SAME_WORK_MS = 30 * 60_000;
+
 /** One line of work done for `task` on this machine (or `machine` when the server acts for another). */
 export function recordWork(task: string, work: Work, env: Env = process.env, machine = machineOf(env)): void {
+  const now = Date.now();
+  if (readWork(env).some((w) => w.step === task && w.work === work && w.machine === machine && now - Date.parse(w.time) < SAME_WORK_MS)) return;
   const file = decisionsFile(env);
   mkdirSync(dirname(file), { recursive: true });
   const line: WorkLine = { time: new Date().toISOString(), project: "-", step: task, kind: "run", work, machine, reason: `${work} ran on ${machine}` };
