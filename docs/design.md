@@ -10,12 +10,7 @@ a web page cannot point its own name at this machine to read it.
 
 ## The views as they are
 
-`lineclear run --demo` serves the app on fixed demo data. `bun run shots` takes each view from it at 1440 and 390 px
-(the list is `docs/shots/list.md`). The pictures of the states below are the UI bar's own sample states; these two are real.
-
-| Home 1440 px | Home 390 px |
-|---|---|
-| <img src="shots/home-1440.png" alt="Home at 1440 px on the demo data" width="560"> | <img src="shots/home-390.png" alt="Home at 390 px on the demo data" width="200"> |
+`lineclear run --demo` serves the app on fixed demo data. The pictures of the states below are the UI bar's own sample states.
 
 ## The frame
 

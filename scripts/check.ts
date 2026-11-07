@@ -175,7 +175,6 @@ function steps(): Step[] {
   const base = [
     ...(outsideServer && (code || full) ? [{ name: "types", cmd: full || known === undefined ? ["bun", "run", "types"] : TSC_CHANGED }] : []),
     ...testSteps(),
-    { name: "shots", cmd: ["bun", "run", "shots:check"] },
     ...fastGates(ownFolders, code),
     ...serverSteps(),
   ];

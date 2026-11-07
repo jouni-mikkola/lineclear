@@ -227,7 +227,7 @@ All in `ui/brand/`. There is one theme only, the dark graphite one. U2 added siz
 
 ## Pictures
 
-The README shows stills from `bun run shots`. The hand-drawn brand pictures stay in `docs/brand/`.
+The hand-drawn brand pictures are in `docs/brand/`.
 
 ## Home: The line
 
@@ -242,7 +242,7 @@ Three directions were drawn at 1440 px on the U0 tokens, and the prototype that 
 | Signal box | A dial per project reads well, but dials compete with the answer and waste width. |
 | Timetable | Dense and fun, but monospace rows and a block per task turn noisy, and the donut hides small accounts. |
 
-These are drawings of the three directions, not screenshots of the app. The app's own screenshots are in `docs/shots/`.
+These are drawings of the three directions, not screenshots of the app.
 
 ![Direction: The line](brand/home/direction-line.png)
 ![Direction: Signal box](brand/home/direction-box.png)
