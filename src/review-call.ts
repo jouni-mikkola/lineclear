@@ -26,8 +26,8 @@ const CONTEXT_LINES = 8;
 const LIGHT_CONTEXT_LINES = 3;
 /** A diff with fewer changed lines than this, and no deleted test, gets the light form. */
 const LIGHT_MAX_CHANGED = 80;
-/** The light form cuts the rules and the brief to this many characters each. */
-const LIGHT_PART_MAX = 6_000;
+/** The light form cuts the rules to this many characters; the brief stays whole, it carries the owner's direction. */
+const LIGHT_RULES_MAX = 16_000;
 /** The diff and the rules are cut to this many characters each, to keep a review's input small and a huge change from overflowing the model. */
 const PART_MAX = 60_000;
 
@@ -69,7 +69,7 @@ function stepOfBrief(brief: string): string {
 }
 
 function reviewQuestion(brief: string, diff: string, rules: string, light: boolean): string {
-  const max = light ? LIGHT_PART_MAX : PART_MAX;
+  const max = light ? LIGHT_RULES_MAX : PART_MAX;
   return [
     "You review a code change. You have no tools: everything you need is below. Report what this change broke, left undone or added beyond the brief, each with proof from the diff.",
     "Tag each finding critical (breaks or loses users' work), major (a user would hit it, or it proves a claim false), minor (rarely hit) or trivial (style).",
@@ -78,7 +78,7 @@ function reviewQuestion(brief: string, diff: string, rules: string, light: boole
     "No finding: answer the single line NONE.",
     "",
     "BRIEF",
-    light ? cut(stepOfBrief(brief), max) : stepOfBrief(brief),
+    stepOfBrief(brief),
     "",
     "THE REPO'S RULES",
     cut(rules, max) || "(none)",
@@ -180,8 +180,8 @@ export function reviewMain(rest: string[], out: (line: string) => void, env: Nod
     },
     env,
   );
-  if (!r.ok) return (out(`lineclear review: ${r.error}`), 1);
-  if (json) return (out(JSON.stringify({ task, model: r.model, form: r.form, inputTokens: r.inputTokens, findings: r.findings })), 0);
+  if (!r.ok) return (out(json ? JSON.stringify({ error: r.error }) : `lineclear review: ${r.error}`), 1);
+  if (json) return (out(JSON.stringify({ task, model: r.model, note: r.note, form: r.form, inputTokens: r.inputTokens, findings: r.findings })), 0);
   if (r.note) out(`note: ${r.note}`);
   out(`${r.findings.length} finding${r.findings.length === 1 ? "" : "s"} by ${r.model ?? "the default model"}, stored in ${reviewPath(task, env)}`);
   for (const f of r.findings) out(`${f.severity} ${f.file}:${f.line} ${f.why}`);
