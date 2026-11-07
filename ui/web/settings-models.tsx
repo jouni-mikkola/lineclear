@@ -15,9 +15,7 @@ export function SetupChoice() {
   return (
     <div className="space-y-2" data-setup-choice>
       <h3 className="text-sm font-medium text-fg">Model per role</h3>
-      <div className="min-h-48">
-        <SetupPanel />
-      </div>
+      <SetupPanel />
     </div>
   );
 }

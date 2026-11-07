@@ -85,6 +85,7 @@ export function Settings({ load, sample }: { load: Load<SettingsData>; sample: b
     Models: (
       <div className="space-y-6">
         <SetupChoice />
+        {!d && foundHarness && <Part state="loading" label="Models" empty={{ text: "" }} />}
         {d && foundHarness && (
           <>
             <Models roles={[...ROLES]} data={d} sample={sample} />
@@ -106,15 +107,17 @@ export function Settings({ load, sample }: { load: Load<SettingsData>; sample: b
         </Part>
       </div>
     ),
-    Secrets: <SecretNames state={of(!projects.length)} projects={projects} />,
+    Secrets: (
+      <div className="space-y-6">
+        <Alerts sample={sample ? "off" : undefined} />
+        <SecretNames state={of(!projects.length)} projects={projects} />
+      </div>
+    ),
   };
   return (
     <>
       <PageTitle>Settings</PageTitle>
       <Sections open={open} setOpen={setOpen} body={body} />
-      <div className="min-h-14">
-        <Alerts sample={sample ? "off" : undefined} />
-      </div>
     </>
   );
 }

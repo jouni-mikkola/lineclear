@@ -2,7 +2,7 @@
 // the rest reads the project the fixture writes.
 import { expect, type Page, test } from "@playwright/test";
 import { MOTIONS, type Motion } from "../kit/motion.ts";
-import { clickMidMotion, liveMotionTests, type Mid, press, running, shotEveryState } from "./bar.ts";
+import { clickMidMotion, liveMotionTests, type Mid, PAGE_STATES, press, running } from "./bar.ts";
 import { shopSettings, startSettings } from "./fixture.ts";
 
 const order = (role: string) => `[...document.querySelectorAll('[data-models="${role}"] > li')].map((li) => li.dataset.model).join(" ")`;
@@ -27,8 +27,25 @@ async function openWorkers(page: Page) {
   await page.waitForTimeout(300);
 }
 
-test("Settings in every state, at this width", async ({ page }) => {
-  await shotEveryState(page, "/settings", "settings");
+test("each Settings tab in every state, at this width", async ({ page }) => {
+  for (const state of PAGE_STATES) {
+    for (const tab of ["Models", "Projects", "Secrets"]) {
+      await page.goto(`/settings?state=${state}`);
+      await openSection(page, tab);
+      await page.waitForLoadState("networkidle");
+      await page.evaluate(() => document.fonts.ready);
+      await page.waitForFunction(() => document.getAnimations().every((a) => a.id !== "part-change"));
+      await expect(page).toHaveScreenshot(`settings-${tab.toLowerCase()}-${state}.png`, { fullPage: true });
+    }
+  }
+});
+
+test("the notify row is in the Secrets tab and nothing sits under the sections", async ({ page }) => {
+  await page.goto("/settings?state=filled");
+  await openSection(page, "Models");
+  await expect(page.locator("[data-alerts]")).toHaveCount(0);
+  await openSection(page, "Secrets");
+  await expect(page.locator("[data-section-panel] [data-alerts]")).toBeVisible();
 });
 
 test("Settings has three sections and no status: sections at the left on a desktop, 52 px rows on a phone", async ({ page }) => {
