@@ -166,7 +166,7 @@ Result: At 390 px the table head is a labelled sort control and the first row of
 - why: F26: three unlabelled grey boxes and a table 900 px down.
 - done when: The head says "Sort by" with the current key; with `?state=many` at 390 px the first table row starts above 700 px; screenshot at 390 px.
 - locks: table-head
-- after: W13
+- after: W12, W13
 - files: ui/web/home-table.tsx, ui/web/home.tsx, ui/test/home.pw.ts
 
 ### W15 The Dispatcher chat folds repeats and windows
@@ -198,7 +198,7 @@ Result: The Inbox view lists every ask, windowed at 200, with the real count.
 - why: F30: one card and a link for 199 asks, and a "99+" count.
 - done when: `/inbox?state=many` shows a list with the newest first and at most 40 nodes drawn; the count in the rail and bar shows the number up to 999; screenshots at both widths.
 - locks: inbox
-- after: none
+- after: W11
 - files: ui/web/inbox-strip.tsx, ui/web/frame.tsx, ui/test/home-inbox.pw.ts
 
 ### W19 Settings draws loading, empty and error
