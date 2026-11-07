@@ -3,7 +3,7 @@
 // archive/tasks-<month>.jsonl. Each log is renamed `*.imported` afterwards, like tasks.json.
 import { existsSync, readdirSync, readFileSync, renameSync } from 'node:fs'
 import { join } from 'node:path'
-import { HOME, importOnce } from '../../store.ts'
+import { db, HOME, importOnce } from '../../store.ts'
 
 type Rec = {
   id?: unknown
@@ -51,7 +51,7 @@ const archived = () => {
 }
 
 export function importLegacyTasks() {
-  const done = importOnce<Legacy>('tasks.json', (file, store) => {
+  importOnce<Legacy>('tasks.json', (file, store) => {
     const hot = new Map<string, Rec>((file.tasks ?? []).flatMap((t) => (typeof t.id === 'string' ? [[t.id, t] as const] : [])))
     // the hot log belongs to this snapshot only when its first line names the snapshot's gen
     const [head, ...log] = jsonLines(join(HOME, 'tasks-hot.jsonl'))
@@ -81,7 +81,9 @@ export function importLegacyTasks() {
       .query("insert into task_meta (key, value) values ('meta', ?) on conflict(key) do update set value = excluded.value")
       .run(JSON.stringify({ next: file.next ?? {}, red: file.red }))
   })
-  if (!done) return
+  // the logs go aside once tasks.json has been imported, also when a stop came between that and their renames
+  db.exec('create table if not exists imports (name text primary key)')
+  if (!db.query('select 1 from imports where name = ?').get('tasks.json')) return
   for (const f of [join(HOME, 'tasks-hot.jsonl'), join(HOME, 'tasks-cold.jsonl'), join(HOME, 'archive', 'counts.json'), ...archived()]) {
     if (existsSync(f)) renameSync(f, `${f}.imported`)
   }

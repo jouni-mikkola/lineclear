@@ -47,19 +47,20 @@ export class TaskRows<T extends { id: string; desc?: string }> {
 
   /** Writes the rows that changed since the last save; `data.tasks` are the live ones. */
   save(data: StoreData<T>) {
-    const changed: { id: string; json: string; desc: string | undefined }[] = []
+    const changed: { id: string; json: string; desc: string | undefined; briefChanged: boolean }[] = []
     const seen = new Set<string>()
     for (const t of data.tasks) {
       seen.add(t.id)
       const { desc, ...rest } = t
       const json = JSON.stringify(rest)
-      if (this.json.get(t.id) !== json || this.brief.get(t.id) !== desc) changed.push({ id: t.id, json, desc })
+      const briefChanged = this.brief.get(t.id) !== desc
+      if (this.json.get(t.id) !== json || briefChanged) changed.push({ id: t.id, json, desc, briefChanged })
     }
     const gone = [...this.json.keys()].filter((id) => !seen.has(id))
     const meta = JSON.stringify({ next: data.next, red: data.red })
     if (!changed.length && !gone.length && meta === this.meta) return
     tx((s) => {
-      for (const c of changed) this.put(s, c.id, c.json, c.desc, 0)
+      for (const c of changed) this.put(s, c.id, c.json, c.briefChanged ? { desc: c.desc } : undefined, 0)
       for (const id of gone) {
         s.query('delete from tasks where id = ? and retired = 0').run(id)
         s.query('delete from task_briefs where id = ?').run(id)
@@ -85,7 +86,7 @@ export class TaskRows<T extends { id: string; desc?: string }> {
     tx((s) => {
       for (const t of tasks) {
         const { desc, ...rest } = t
-        this.put(s, t.id, JSON.stringify(rest), desc, 1)
+        this.put(s, t.id, JSON.stringify(rest), { desc }, 1)
       }
     })
     for (const t of tasks) {
@@ -95,12 +96,15 @@ export class TaskRows<T extends { id: string; desc?: string }> {
     this.rowWrites += tasks.length
   }
 
-  private put(s: Database, id: string, json: string, desc: string | undefined, retired: number) {
+  /** the task's row, and its brief when `brief` is given: a record that changed alone leaves the brief's pages alone */
+  private put(s: Database, id: string, json: string, brief: { desc: string | undefined } | undefined, retired: number) {
     s.query('insert into tasks (id, json, retired) values (?, ?, ?) on conflict(id) do update set json = excluded.json, retired = excluded.retired').run(
       id,
       json,
       retired,
     )
+    if (!brief) return
+    const desc = brief.desc
     if (desc === undefined) s.query('delete from task_briefs where id = ?').run(id)
     else s.query('insert into task_briefs (id, brief) values (?, ?) on conflict(id) do update set brief = excluded.brief').run(id, desc)
   }

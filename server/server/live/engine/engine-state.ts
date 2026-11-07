@@ -24,7 +24,6 @@ export abstract class EngineState extends Emitter<Events> {
     super()
   }
 
-  /** main: by project path, the failing commit on GitHub's main its coordinator was told of, until main is green */
   protected store = new TaskRows<TaskRec>()
   protected data = this.store.load()
   taskIds!: TaskIds
