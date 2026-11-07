@@ -204,7 +204,7 @@ export async function hasPrWorkflows(wt: string) {
 
 /** a commit's runs of GitHub Actions on a branch, as one verdict: all passed, one failed, or some still run */
 /** the workflow the branch rules require; only its result holds merges */
-export const REQUIRED_WORKFLOW = 'check'
+const REQUIRED_WORKFLOW = 'check'
 
 export type BranchRun = {
   sha: string
