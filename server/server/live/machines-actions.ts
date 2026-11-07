@@ -63,8 +63,8 @@ export class MachinesActions extends MachinesLinks {
         .split('\n')
         .slice(-20)
         .join('\n')
-    } catch (e) {
-      return `Can't read the log: ${(e as Error).message}`
+    } catch {
+      return ''
     }
   }
 }

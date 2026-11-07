@@ -112,14 +112,16 @@ export abstract class LinkPoll extends Emitter<Events> {
   }
 
   /** What waited for the machine goes in now, in order. An action leaves the kept list only once the machine has
-   *  answered, so a restart or a failure never drops or repeats one; a failure shows in the machine's state. */
+   *  answered, so a restart or a failure drops none (a crash between the answer and the save may send one again); a failure shows in the machine's state. */
   protected async flush(l: Link) {
     if (l.flushing) return
     l.flushing = true
     try {
       while (l.waiting.length) {
         try {
-          await this.forward(l, l.waiting[0].action)
+          const r = await this.forward(l, l.waiting[0].action)
+          // a worker that refuses an action is answering: it leaves the list, the refusal shows
+          l.failed = r.ok ? undefined : `A machine refused an action (${r.status})`
         } catch (e) {
           l.failed = `Couldn't deliver an action: ${(e as Error).message}`
           this.emit('snapshot')
@@ -128,9 +130,6 @@ export abstract class LinkPoll extends Emitter<Events> {
         }
         l.waiting.shift()
         saveWaiting(l.saved.label, l.waiting)
-      }
-      if (l.failed) {
-        l.failed = undefined
         this.emit('snapshot')
       }
     } finally {
@@ -227,22 +226,22 @@ export abstract class LinkPoll extends Emitter<Events> {
   }
 
   async act(l: Link, a: Action): Promise<unknown> {
-    if (!l.reachable) {
+    // behind a waiting action, a new one waits too: they go in order
+    if (!l.reachable || l.waiting.length) {
       l.waiting.push({ id: randomUUID(), action: a })
       saveWaiting(l.saved.label, l.waiting)
       return { waiting: true }
     }
-    return this.forward(l, a)
+    return (await this.forward(l, a)).json()
   }
 
   protected async forward(l: Link, a: Action) {
-    const r = await fetch(`${l.rec.url}/api/action`, {
+    return fetch(`${l.rec.url}/api/action`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(a),
       signal: AbortSignal.timeout(20_000),
     })
-    return r.json()
   }
 
   watch(chats: string[], term: string | null) {

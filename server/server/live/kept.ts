@@ -12,7 +12,7 @@ export interface Kept {
 }
 
 /** Older versions ran a machine's worker inside machines/<label>, so its tasks.json sat where a mirror would. The
- *  worker is stopped and everything but last.json moves to workers/<label>: no tasks.json is left under machines/. */
+ *  worker is stopped and everything but last.json and waiting.json moves to workers/<label>: no tasks.json is left under machines/. */
 function moveOldStore(d: string) {
   const from = join(HOME, 'machines', d)
   const to = join(HOME, 'workers', d)
