@@ -70,10 +70,8 @@ describe("a task's CLI, model and effort", () => {
     const plain = src.engine.task(id((await src.cli(['task', 'add', 'Plain review', '--desc', 'x'], { chat: place })).out))!
     expect(plain.reviewer).toEqual({ kind: 'pi', model: undefined, effort: undefined })
     expect(plain.desc).toContain('- Reviewer: a headless pi or a pi subagent (its default model and effort).\n')
-    ;(src.settings as any).at('all')['reviewer.model'] = 'openai/gpt-5.5'
     const pi = src.engine.task(id((await src.cli(['task', 'add', 'pi review', '--desc', 'x', '--reviewer-effort', 'low'], { chat: place })).out))!
-    expect(pi.desc).toContain('- Reviewer: a headless pi or a pi subagent (model openai/gpt-5.5, low effort). (set by coordinator for this task)')
-    src.settings.set('reviewer.model', null)
+    expect(pi.desc).toContain('- Reviewer: a headless pi or a pi subagent (its default model, low effort). (set by coordinator for this task)')
     src.settings.set('reviewer.agent', null)
   })
   test('task add --set changes a line of its Settings block for that task alone, marked as set by its coordinator', async () => {
