@@ -8,7 +8,7 @@ import { failureTail } from "../server/server/live/secrets.ts";
 import { copiesProblem, runByNote } from "./store-copies.ts";
 import { cacheEnvFile, dataDir, extensionFile, INSTALL_URL, type Paths, SERVICE } from "./paths.ts";
 import { diskTrouble, freeBytes } from "./health.ts";
-import { readModelFile } from "./models.ts";
+import { firstModel, readModelFile } from "./models.ts";
 import { checkoutPointers } from "./install-paths.ts";
 import { buildNames, buildProblem, buildsDir, installReleaseCommand, type RunFrom, unitCommand } from "./builds.ts";
 import { publishedAddress, serveCommand } from "./published.ts";
@@ -30,6 +30,8 @@ export interface Check {
 /** What doctor asks of the machine, so a test can answer without one. */
 export interface Probe {
   paths: Paths;
+  /** The model Settings sets for tasks, when one is set. */
+  taskModel?: string;
   /** Lineclear's data folder. */
   dataDir?: string;
   /** Whether Lineclear's own server runs now. */
@@ -301,6 +303,13 @@ function stableBuild(p: Probe): Check {
   return { name: "stable build", problem, fix: installReleaseCommand(), info, skip: !p.runFrom };
 }
 
+/** The model a new task would use: the one set, else the first one pi lists. */
+function taskModelCheck(p: Probe): Check {
+  const first = p.taskModel ? undefined : firstModel("pi");
+  const info = p.taskModel ?? (first ? `${first} (none is set, the first available)` : "pi's own default");
+  return { name: "task model", problem: "", fix: "", info };
+}
+
 export function doctorChecks(probe: Probe): Check[] {
   // a release install has no checkout: its code is builds/current
   const current = join(buildsDir(probe.dataDir ?? dataDir()), "current");
@@ -313,6 +322,7 @@ export function doctorChecks(probe: Probe): Check[] {
     tool(p, "rsync", "sudo apt install rsync"),
     tool(p, "herdr", "curl -fsSL https://herdr.dev/install.sh | sh"),
     tool(p, "pi", "curl -fsSL https://pi.dev/install.sh | sh"),
+    taskModelCheck(p),
     { name: "models.json", problem: readModelFile(p.dataDir ?? dataDir()).problem, fix: "fix or delete models.json in the data folder" },
     {
       name: "lineclear files",

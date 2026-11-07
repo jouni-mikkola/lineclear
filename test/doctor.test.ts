@@ -265,3 +265,9 @@ test("doctor reads the live store and its cold file for a duplicate task id", ()
   writeFileSync(cold, `${JSON.stringify({ id: "OMA-91" })}\n`);
   expect(doctorChecks(probe({ taskIds: () => storedTaskIds(dir) })).find((c) => c.name === "task ids")?.problem).toContain("OMA-91");
 });
+
+test("doctor prints the model a new task would use", () => {
+  const info = (over: Partial<Probe>) => doctorChecks(probe(over)).find((c) => c.name === "task model")?.info;
+  expect(info({ taskModel: "a/x" })).toBe("a/x");
+  expect(info({})).toBe("pi's own default");
+});

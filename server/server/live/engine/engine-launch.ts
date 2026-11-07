@@ -22,6 +22,7 @@ import {
   LATER,
 } from './engine-helpers.ts'
 import { existsSync } from 'node:fs'
+import { firstModel } from '../../../../src/models.ts'
 import { age, ago, clockWithDay } from '../../../shared/time.ts'
 import { EngineStalls } from './stalls.ts'
 
@@ -325,6 +326,8 @@ export class EngineLaunch extends EngineStalls {
     // its project's defaults: its own, else its machine's, else All machines'
     const reviewer = this.harness(o.reviewer, 'reviewer', p.name)
     const agent = this.harness(o.agent, 'task', p.name)
+    const first = firstModel(agent.kind, agent.model)
+    if (first) agent.model = first
     const set = o.set && Object.keys(o.set).length ? o.set : undefined
     // each line that differs from Lineclear's own says who set it: the coordinator's flags, or a level of Settings
     const by = {
@@ -352,6 +355,7 @@ export class EngineLaunch extends EngineStalls {
       agent,
       reviewer,
       waitChecks: ways.waitChecks,
+      ...(first ? { facts: `No model was set for ${agent.kind}: chose the first available, ${first}.` } : {}),
       ...(ways.merge === 'ask me first' ? { askFirst: true } : {}),
     }
     if (after.length) t.after = after
