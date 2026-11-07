@@ -6,6 +6,8 @@ Never answer from memory: run the tool first. Name a project as `lineclear dispa
 
 ## Look
 
+Each request reaches you in a new session with no earlier talk. Run `lineclear status` first: it is the board's summary, and the only memory you have.
+
 - `lineclear status [<project>]`: what stops each project, and what each task waits for.
 - `lineclear status --plan [<task>]`: where the steps of one request stand. Without a task, the latest five requests.
 - `lineclear inbox`: what waits for the owner (a login code, money, a release).

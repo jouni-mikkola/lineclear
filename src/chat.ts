@@ -234,10 +234,13 @@ interface Snapshot {
 interface ChatTarget {
   find: (snap: Snapshot | undefined) => string | undefined;
   none: string;
+  /** Each message starts a new session in the agent, so it carries no earlier message's history. */
+  freshEach?: boolean;
 }
 
 export const DISPATCHER: ChatTarget = {
   none: NONE,
+  freshEach: true,
   find: (snap) => {
     const places = Array.isArray(snap?.places) ? snap.places : [];
     const own = places.filter((p) => p.name === DISPATCHER_SPACE && !p.home && typeof p.chat === "string");
@@ -403,7 +406,14 @@ function lineclearChat(env: Env, target: ChatTarget, retryMs = 3000, sendMs = 12
       if (link.view().state === "none") return { error: target.none, status: 404 };
       const files = ids.map((id) => uploads.get(id)?.path);
       if (files.some((f) => !f)) return { error: GONE, status: 400 };
-      return notReady() ?? act({ type: "send", chat: link.key(), text, attachments: files, ...(cid ? { cid } : {}), ...(reply ? { reply } : {}) });
+      const unready = notReady();
+      if (unready) return unready;
+      // a reply to a card keeps the session: the card's request lives in it
+      if (target.freshEach && !reply) {
+        const reset = await act({ type: "send", chat: link.key(), text: "/new" });
+        if (reset) return reset;
+      }
+      return act({ type: "send", chat: link.key(), text, attachments: files, ...(cid ? { cid } : {}), ...(reply ? { reply } : {}) });
     },
     /** Puts your reaction on a message, or takes it off when it is there already, as Lineclear's own chat does. */
     async react(message: string, emoji: string): Promise<{ error: string; status: number } | undefined> {
