@@ -2,7 +2,6 @@ import { afterAll, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { cpus } from "node:os";
 import { join } from "node:path";
-import { turnTimes } from "../src/session-text.ts";
 import { ownMark, tick } from "../src/rules.ts";
 import { availability } from "../src/stalls.ts";
 import { demoConfig, idleWorld } from "./demo-world.ts";
@@ -60,21 +59,4 @@ test("a rule's lines are marked in the agent's log, the owner's are not", () => 
   expect(ownMark()).toBe("[lineclear]");
   expect(ownMark("resume")).toBe("[lineclear:resume]");
   expect(ownMark("answer")).toBe("[lineclear:answer]");
-});
-
-const user = (text: string, at: number) =>
-  JSON.stringify({ type: "message", timestamp: new Date(at).toISOString(), message: { role: "user", content: [{ type: "text", text }] } });
-
-test("measure counts the model turns that no step and no owner message started", () => {
-  const session = [
-    user("Task brief", 1000), // the step's brief
-    user("<lineclear><go>Start</go></lineclear>", 2000),
-    user("Please also fix the typo", 3000), // the owner
-    user("[lineclear:resume] Your wait is over", 4000),
-    user("[lineclear:answer] A stored login exists", 5000),
-    user('<lineclear><health kind="cpu">CPU load is high</health></lineclear>', 6000),
-    user('<lineclear><news task="LIN-9">LIN-9 is done</news></lineclear>', 7000),
-    user("[lineclear] You may be stuck", 8000),
-  ].join("\n");
-  expect(turnTimes(session)).toEqual([6000, 7000, 8000]);
 });

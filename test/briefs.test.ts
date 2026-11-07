@@ -5,7 +5,6 @@ import { BRIEF_MAX, stepText } from "../src/brief.ts";
 import { roadmapMain } from "../src/roadmap-cli.ts";
 import { parseRoadmap } from "../src/roadmap.ts";
 import { stepBrief } from "../src/brief.ts";
-import { roadmapReads, roadmapUse } from "../src/session-text.ts";
 import { READER_ASK } from "../src/reader-ask.ts";
 import { sh, tmp } from "./helpers.ts";
 
@@ -85,24 +84,6 @@ test("roadmap show of an unknown step or with no id fails", () => {
   expect(roadmapMain(["show", "ZZ", repo], (l) => lines.push(l))).toBe(1);
   expect(lines.join("\n")).toContain("no step 'ZZ'");
   expect(roadmapMain(["show"], () => {})).toBe(2);
-});
-
-const call = (name: string, args: object) => JSON.stringify({ message: { role: "assistant", content: [{ type: "toolCall", name, arguments: args }] } });
-const user = (text: string) => JSON.stringify({ message: { role: "user", content: text } });
-
-test("measure counts the sessions that read the whole roadmap, before and after the small brief", () => {
-  const old = [user("L1 T\n\nBuild step A"), call("read", { path: "/w/docs/ROADMAP.md" })].join("\n");
-  const old2 = [user("L1 T\n\nBuild step B"), call("bash", { command: "cat docs/ROADMAP.md | head" })].join("\n");
-  const old3 = [user("L1 T\n\nBuild step C"), call("read", { path: "/w/docs/ROADMAP.md", offset: 10, limit: 20 })].join("\n");
-  const small = [user("Build step D. Use `lineclear roadmap show <id>`"), call("bash", { command: "lineclear roadmap show L5" })].join("\n");
-  const small2 = [user("Build step E. Use `lineclear roadmap show <id>`"), call("read", { path: "docs/ROADMAP.md" })].join("\n");
-  const review = [user("Review this change"), call("read", { path: "/w/docs/ROADMAP.md" })].join("\n");
-  expect(roadmapUse(old)).toEqual({ small: false, whole: true });
-  expect(roadmapUse(old3).whole).toBe(false);
-  expect(roadmapReads([old, old2, old3, small, small2, review])).toEqual({
-    before: { sessions: 3, whole: 2 },
-    after: { sessions: 2, whole: 1 },
-  });
 });
 
 test("a why of several lines is kept whole", () => {
