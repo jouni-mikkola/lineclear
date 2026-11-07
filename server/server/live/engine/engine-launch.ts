@@ -3,7 +3,7 @@ import { hidden } from '../agents.ts'
 import { placeId } from '../places.ts'
 import { goLine, settingsBlock, queuedLine, taskFirst } from '../prompts.ts'
 import { CLI_NAME } from '../settings.ts'
-import * as G from './git.ts'
+import { validateBase } from './base.ts'
 import type { Made } from './worktrees.ts'
 import {
   type TaskRec,
@@ -402,7 +402,7 @@ export class EngineLaunch extends EngineStalls {
       // Old records without a snapshot keep the existing fallback; new tasks snapshot at add.
       t.base ??= p.base
       this.save()
-      await G.validateBase(p.path, t.base)
+      await validateBase(p.path, t.base)
       let made: Made
       const began = Date.now()
       try {

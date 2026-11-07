@@ -3,6 +3,7 @@ import { hidden } from '../agents.ts'
 import type { Space } from '../places.ts'
 import * as G from './git.ts'
 import * as GH from './github.ts'
+import { landed, mergesCleanly } from './landed.ts'
 import * as Lane from './lane.ts'
 import { type TaskRec, ended, ANSWER_GRACE, CHECKS_EVERY } from './engine-helpers.ts'
 import { EngineHandoff } from './engine-handoff.ts'
@@ -227,7 +228,7 @@ export class EngineLand extends EngineHandoff {
     let note: string | undefined
     // merged already, by hand or as its pull request on GitHub (squashed, or with a merge commit), even with main
     // moved on since: it only needs marking
-    if (await G.landed(wt, 'HEAD', t.base)) note = `it was in ${t.base} already`
+    if (await landed(wt, 'HEAD', t.base)) note = `it was in ${t.base} already`
     else {
       const rb = await G.rebase(wt, t.base)
       if (!rb.ok) return this.conflict(t, self, (await Lane.conflictFiles(wt, t.base)) ?? (await Lane.sharedFiles(wt, t.base)))
@@ -295,7 +296,7 @@ export class EngineLand extends EngineHandoff {
    * commit, then squash-merged on GitHub only while its head is still that commit, its branch there deleted, and main here brought up to GitHub's (which
    * is what Lineclear's own update watches). Failed checks go back to the agent.
    */
-  protected async mergeOnGitHub(t: TaskRec, p: Space, g: G.GitHub, self: boolean): Promise<{ ok: boolean; error?: string; note?: string }> {
+  protected async mergeOnGitHub(t: TaskRec, p: Space, g: GH.GitHub, self: boolean): Promise<{ ok: boolean; error?: string; note?: string }> {
     const wt = t.worktree!
     const base = `origin/${t.base}`
     if (!(await G.git(p.path, 'rev-parse', '--verify', '--quiet', base)).ok)
@@ -322,13 +323,13 @@ export class EngineLand extends EngineHandoff {
     // again (again each time main moves meanwhile). Only a real conflict is rebased here; a clash that merges cleanly
     // but breaks is caught by the checks on main.
     let rebased = false
-    if (!(await G.mergesCleanly(wt, base, 'HEAD'))) {
+    if (!(await mergesCleanly(wt, base, 'HEAD'))) {
       const rb = await G.rebase(wt, base)
       if (!rb.ok) return this.conflict(t, self, (await Lane.conflictFiles(wt, base)) ?? (await Lane.sharedFiles(wt, base)))
       rebased = true
     }
     // main has this work already (merged another way): its pull request would change nothing
-    if (await G.landed(wt, 'HEAD', base)) {
+    if (await landed(wt, 'HEAD', base)) {
       // closed, with its branch there
       const closed = pr ? (await GH.closePr(g, wt, pr.number, `Closed by Lineclear: ${t.base} has this work already.`)).ok : false
       if (closed) await G.git(p.path, 'push', '--quiet', 'origin', '--delete', t.branch!)

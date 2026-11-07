@@ -4,10 +4,13 @@
 // repo space herdr opened only because a task asked for a worktree is closed again with the repo's last task space,
 // unless you have started using it.
 import { boxHome } from '../box.ts'
-import { existsSync, realpathSync } from '../mfs.ts'
-import { readJson, writeJson } from '../../store.ts'
+import { existsSync } from '../mfs.ts'
 import { herdr, type WorkspaceInfo, type WorktreeFrom, type WorktreeSpace } from '../herdr.ts'
 import * as G from './git.ts'
+import { startPoint } from './base.ts'
+import { landed } from './landed.ts'
+import { closeRepoSpace, closeRepoSpaces as closeAll, noteRepoSpace, real, repoSpaces } from './repo-spaces.ts'
+import { copyIncludes, install } from './worktree-setup.ts'
 import { remoteBranch } from './branch-work.ts'
 
 /** what this asks of herdr; tests give a stand-in */
@@ -40,25 +43,10 @@ export interface PutAway {
   busy?: boolean
 }
 
-const real = (p: string) => {
-  try {
-    return realpathSync(p)
-  } catch {
-    return p
-  }
-}
-
 const tilde = (p: string) => (p.startsWith(boxHome()) ? `~${p.slice(boxHome().length)}` : p)
-
-/** the herdr spaces opened for repos, to close with their last task */
-const SPACES = 'repo-spaces.json'
 
 export class Worktrees {
   constructor(private h: HerdrSpaces = herdr) {}
-
-  private repoSpaces(list: WorkspaceInfo[], repo: string) {
-    return list.filter((w) => w.worktree && !w.worktree.is_linked_worktree && real(w.worktree.checkout_path) === real(repo))
-  }
 
   /**
    * A herdr worktree create or open, nested under the project's own space (its coordinator's, which herdr then knows
@@ -70,7 +58,7 @@ export class Worktrees {
     const own = list?.find(
       (w) => w.label === home.name && (!w.worktree || (!w.worktree.is_linked_worktree && real(w.worktree.checkout_path) === real(home.repo))),
     )
-    const known = own ?? (list ? this.repoSpaces(list, home.repo)[0] : undefined)
+    const known = own ?? (list ? repoSpaces(list, home.repo)[0] : undefined)
     if (known) {
       try {
         return await f({ workspace_id: known.workspace_id })
@@ -80,9 +68,9 @@ export class Worktrees {
     }
     const r = await f({ cwd: home.repo })
     if (!list) return r
-    const before = new Set(this.repoSpaces(list, home.repo).map((w) => w.workspace_id))
-    const made = this.repoSpaces(await this.h.workspaces().catch(() => []), home.repo).find((w) => !before.has(w.workspace_id))
-    if (made) writeJson(SPACES, { ...readJson<Record<string, string>>(SPACES, {}), [real(home.repo)]: made.workspace_id })
+    const before = new Set(repoSpaces(list, home.repo).map((w) => w.workspace_id))
+    const made = repoSpaces(await this.h.workspaces().catch(() => []), home.repo).find((w) => !before.has(w.workspace_id))
+    if (made) noteRepoSpace(home.repo, made.workspace_id)
     return r
   }
 
@@ -104,7 +92,7 @@ export class Worktrees {
     }
     const was = await open()
     if (was) return this.installed(home, was)
-    const from = (await remoteBranch(home.repo, branch)) ?? (await G.startPoint(home.repo, base))
+    const from = (await remoteBranch(home.repo, branch)) ?? (await startPoint(home.repo, base))
     let r: WorktreeSpace
     try {
       r = await this.opening(home, (src) => this.h.worktreeCreate(src, branch, from, label, path))
@@ -114,14 +102,14 @@ export class Worktrees {
       throw e
     }
     const made = this.made(r)
-    await G.copyIncludes(home.repo, made.path)
+    await copyIncludes(home.repo, made.path)
     return this.installed(home, made)
   }
 
   /** its install step has run (a failure throws; the worktree stays, and the next start runs the step again) */
   private async installed(home: Home, made: Made) {
     const t0 = Date.now()
-    await G.install(made.path, home.install)
+    await install(made.path, home.install)
     made.installMs = Date.now() - t0
     return made
   }
@@ -240,7 +228,7 @@ export class Worktrees {
       const d = await G.git(o.repo, 'branch', '-D', o.branch!)
       if (!d.ok) kept.push(`branch ${o.branch} (${d.err.split('\n')[0]})`)
     }
-    await this.closeRepoSpace(o.repo)
+    await closeRepoSpace(this.h, o.repo)
     return { kept }
   }
 
@@ -257,7 +245,7 @@ export class Worktrees {
     const there = !!o.wt && existsSync(o.wt)
     const branch = !!o.branch && (await G.branchExists(o.repo, o.branch))
     const unsaved = there && (await G.dirty(o.wt!))
-    const unmerged = branch && !(await G.landed(o.repo, o.branch!, o.base, o.squashes))
+    const unmerged = branch && !(await landed(o.repo, o.branch!, o.base, o.squashes))
     if (!unsaved && !unmerged) return []
     const why = [unsaved && 'uncommitted changes', unmerged && `work on ${o.branch} that ${o.base} lacks`].filter(Boolean).join(', ')
     return [there ? `${tilde(o.wt!)} (${why})` : `branch ${o.branch} (${why})`]
@@ -285,45 +273,12 @@ export class Worktrees {
       const d = await G.git(o.repo, 'branch', '-D', o.branch)
       if (!d.ok) left.push(`branch ${o.branch} (${d.err.split('\n')[0]})`)
     }
-    await this.closeRepoSpace(o.repo)
+    await closeRepoSpace(this.h, o.repo)
     return left
   }
 
-  /**
-   * A repo space herdr opened for a task's worktree closes once no worktree space of the repo is open: unless you are
-   * looking at it or have used it (another tab or pane, an agent, a command at work, another folder).
-   */
-  private async closeRepoSpace(repo: string) {
-    const all = readJson<Record<string, string>>(SPACES, {})
-    const id = all[real(repo)]
-    if (!id) return
-    const forget = () => {
-      const now = readJson<Record<string, string>>(SPACES, {})
-      delete now[real(repo)]
-      writeJson(SPACES, now)
-    }
-    const list = await this.h.workspaces().catch(() => null)
-    if (!list) return
-    const w = list.find((x) => x.workspace_id === id)
-    if (!w?.worktree || w.worktree.is_linked_worktree || real(w.worktree.checkout_path) !== real(repo)) return forget()
-    if (list.some((x) => x.worktree?.is_linked_worktree && real(x.worktree.repo_root) === real(repo))) return
-    if (w.focused) return
-    const [panes, agents] = await Promise.all([this.h.panes(id), this.h.agents()]).catch(() => [null, null])
-    if (!panes || !agents) return
-    const one = panes.length === 1 ? panes[0] : undefined
-    const used =
-      !one ||
-      (w.tab_count ?? 1) > 1 ||
-      agents.some((a) => a.pane_id === one.pane_id) ||
-      real(one.foreground_cwd ?? one.cwd ?? '') !== real(repo) ||
-      !(await this.h.paneIdle(one.pane_id).catch(() => false))
-    if (!used) await this.h.closeWorkspace(id).catch(() => undefined)
-    forget()
-  }
-
-  /** the sweep looks again at repo spaces that could not be closed when their last task ended */
-  async closeRepoSpaces() {
-    for (const repo of Object.keys(readJson<Record<string, string>>(SPACES, {}))) await this.closeRepoSpace(repo)
+  closeRepoSpaces() {
+    return closeAll(this.h)
   }
 
   workspaces() {

@@ -2,7 +2,8 @@
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { aheadCount, git, landed, mergeBase, sh } from './git.ts'
+import { aheadCount, git, mergeBase, sh } from './git.ts'
+import { landed } from './landed.ts'
 
 /**
  * A ready task on its way into main, from the first lineclear merge until it is merged or back at work: what it waits

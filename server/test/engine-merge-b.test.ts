@@ -3,19 +3,20 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { existsSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { sh, repo, world, until, started, G } from './engine-world.ts'
+import { sh, repo, world, until, started } from './engine-world.ts'
+import { github } from '../server/live/engine/github.ts'
 
 describe('on GitHub: a pull request per task', () => {
   test('its origin is read as written and as git rewrites it: github.com mapped to github.localhost talks to github.localhost', async () => {
     const dir = repo()
     sh('git remote add origin https://github.com/acme/app.git && git config url.http://github.localhost/.insteadOf https://github.com/', dir)
-    expect(await G.github(dir)).toEqual({ host: 'github.localhost', repo: 'acme/app' })
+    expect(await github(dir)).toEqual({ host: 'github.localhost', repo: 'acme/app' })
     sh('git remote set-url origin http://github.localhost/eliasstravik/herdr-projects.git && git config --unset url.http://github.localhost/.insteadOf', dir)
-    expect(await G.github(dir)).toEqual({ host: 'github.localhost', repo: 'eliasstravik/herdr-projects' })
+    expect(await github(dir)).toEqual({ host: 'github.localhost', repo: 'eliasstravik/herdr-projects' })
     sh('git remote set-url origin ssh://git@github.com/acme/app.git', dir)
-    expect(await G.github(dir)).toEqual({ host: 'github.com', repo: 'acme/app' })
+    expect(await github(dir)).toEqual({ host: 'github.com', repo: 'acme/app' })
     sh('git remote set-url origin https://gitlab.com/acme/app.git', dir)
-    expect(await G.github(dir)).toBeNull()
+    expect(await github(dir)).toBeNull()
   })
 
   test('a remote-only develop override starts there and merges there, preserving main and the space default', async () => {

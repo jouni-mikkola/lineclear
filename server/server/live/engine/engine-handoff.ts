@@ -7,6 +7,7 @@ import { CLI_NAME } from '../settings.ts'
 import { fitHarness, harnessWords, recentChat } from '../restart.ts'
 import * as G from './git.ts'
 import * as GH from './github.ts'
+import { squashesOf } from './landed.ts'
 import { unmerged } from './branch-work.ts'
 import * as Lane from './lane.ts'
 import { fitStatus } from './status-line.ts'
@@ -259,12 +260,12 @@ export class EngineHandoff extends EngineLaunch {
    * added. Each form of origin is tried (as git rewrites it, as written) for one gh is logged in to. None: the task
    * merges here. Logged in but GitHub not answering throws: that never falls back to merging here.
    */
-  protected async hub(p: Space): Promise<G.GitHub | null> {
+  protected async hub(p: Space): Promise<GH.GitHub | null> {
     const was = p.github
     await this.places.recheckGithub(p)
     if (p.github !== was) this.emit('changed')
     let down: string | undefined
-    for (const g of await G.githubs(p.path)) {
+    for (const g of await GH.githubs(p.path)) {
       const l = await GH.ghLogin(g, p.path)
       if (l.state === 'yes') return g
       if (l.state === 'down') down ??= `${g.host}: ${l.said}`
@@ -292,7 +293,7 @@ export class EngineHandoff extends EngineLaunch {
   }
 
   /** its pull request as GitHub has it now: the one recorded, else the branch's own (one opened by hand) */
-  protected async prOf(t: TaskRec, g: G.GitHub, cwd: string) {
+  protected async prOf(t: TaskRec, g: GH.GitHub, cwd: string) {
     const known = t.pr ? await GH.viewPr(g, cwd, t.pr.number) : null
     // one closed on GitHub is no longer its pull request: the branch may have another
     const pr = known && known.state !== 'CLOSED' ? known : await GH.findPr(g, cwd, t.branch!)
@@ -303,7 +304,7 @@ export class EngineHandoff extends EngineLaunch {
     return pr
   }
 
-  protected async readyForReview(t: TaskRec, hub?: G.GitHub) {
+  protected async readyForReview(t: TaskRec, hub?: GH.GitHub) {
     const p = this.proj(t)
     const g = hub ?? (await this.hub(p))
     if (!g || !t.pr) return
@@ -383,7 +384,7 @@ export class EngineHandoff extends EngineLaunch {
    * it, none is none: the repo's workflows may not run on pull requests). GitHub not answering three times running
    * is said, not waited on.
    */
-  protected async checksOf(t: TaskRec, g: G.GitHub, n: number, waitMs: number): Promise<GH.PrChecks> {
+  protected async checksOf(t: TaskRec, g: GH.GitHub, n: number, waitMs: number): Promise<GH.PrChecks> {
     const t0 = Date.now()
     const head = (await G.git(t.worktree!, 'rev-parse', 'HEAD')).out
     const expect = await GH.hasPrWorkflows(t.worktree!)
@@ -399,7 +400,7 @@ export class EngineHandoff extends EngineLaunch {
   }
 
   /** failed checks with the names of the tests their job logs show as failed */
-  private async withTests(g: G.GitHub, cwd: string, c: GH.PrChecks): Promise<GH.PrChecks> {
+  private async withTests(g: GH.GitHub, cwd: string, c: GH.PrChecks): Promise<GH.PrChecks> {
     if (c.state !== 'fail') return c
     const failed = await Promise.all(c.failed.map(async (f) => (f.link ? { ...f, tests: await GH.failedTestNames(g, cwd, f.link) } : f)))
     return { ...c, failed }
@@ -416,7 +417,7 @@ export class EngineHandoff extends EngineLaunch {
   }
 
   /** when GitHub's checks at `head` should be through: from when it was pushed, as long as they took lately */
-  protected async checksDue(t: TaskRec, p: Space, g: G.GitHub, head: string) {
+  protected async checksDue(t: TaskRec, p: Space, g: GH.GitHub, head: string) {
     let took = this.took.get(p.path)
     if (!took || Date.now() - took.at > 30 * 60_000) {
       took = { ms: await GH.checksTook(g, p.path).catch(() => undefined), at: Date.now() }
@@ -515,6 +516,6 @@ export class EngineHandoff extends EngineLaunch {
   }
 
   protected async squashes(t: TaskRec, repo: string, on: string) {
-    return !t.merged ? [] : t.squash ? [t.squash] : G.squashesOf(repo, on, t.id)
+    return !t.merged ? [] : t.squash ? [t.squash] : squashesOf(repo, on, t.id)
   }
 }
