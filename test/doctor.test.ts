@@ -98,7 +98,7 @@ test("agents are told nothing about herdr-projects 2.0 or its plugin", () => {
   for (const f of files) expect(readFileSync(f, "utf8")).not.toMatch(/herdr-projects/);
   // the skills the brief points to are this repo's own, found beside the code and not in a herdr plugin folder
   const brief = readFileSync(join(root, "server", "live", "prompts.ts"), "utf8");
-  expect(brief).toContain("const SKILLS = join(OWN, 'skill')");
+  expect(brief).toContain("join(OWN, 'skill', name, 'SKILL.md')");
   for (const n of ["lineclear", "lineclear-agent", "lineclear-coordinator"]) expect(existsSync(join(root, "skill", n, "SKILL.md"))).toBe(true);
 });
 
