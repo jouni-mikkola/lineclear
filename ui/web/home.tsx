@@ -97,7 +97,7 @@ export function Home({
             />
           </div>
         )}
-        <section aria-label="The line" className="max-h-[25%] min-h-52 shrink-0 overflow-y-auto overflow-x-hidden lg:min-h-0 lg:max-h-[25dvh]" data-line>
+        <section aria-label="The line" className="shrink-0 overflow-y-auto overflow-x-hidden lg:max-h-[55dvh]" data-line>
           <Part state={d ? "filled" : "loading"} label="The line" empty={{ text: "" }} rows={2}>
             {!!onLine.length && (
               <TheLine

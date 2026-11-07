@@ -191,7 +191,7 @@ function Rails({
     shapes.push(
       ...part.rail(`M${s.spine} ${r.y - 28}Q${s.spine} ${r.y} ${s.spine + 22} ${r.y}H${r.junction - 12}`, paint, clear ? { ...tie, ink: "clear" } : tie),
     );
-    shapes.push(part.at(r.junction, r.y + 8, part.mainLine(paint, { len: w - r.junction, broken: broken.has(r.p.name) && !offline })));
+    shapes.push(part.at(r.junction, r.y + 8, part.mainLine(paint, { len: w - r.junction - 3, broken: broken.has(r.p.name) && !offline })));
     shapes.push(part.at(s.x0 + 12, r.y, part.station(r.done ? "done" : "ahead", paint, 7)));
     shapes.push(part.at(zones.z1, r.y, part.points(paint), { "data-points": r.p.name }));
     for (const st of r.stations) shapes.push(part.at(st.x, r.y, part.station(st.look, paint, 5)));

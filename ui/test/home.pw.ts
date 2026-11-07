@@ -72,3 +72,28 @@ test("Home at this width", async ({ page }) => {
   await open(page);
   await expect(page).toHaveScreenshot("home-command.png");
 });
+
+test("the line shows every project to its main end, and +N names what it opens", async ({ page }) => {
+  await open(page);
+  await page.waitForSelector("[data-line] [data-track]");
+  const line = page.locator("section[data-line]");
+  const tracks = await page.locator("[data-line] [data-track]").count();
+  expect(tracks).toBeGreaterThanOrEqual(2);
+  // nothing of the line is cut off below, and no part of it runs past the right edge of its region
+  const fit = await line.evaluate((el) => {
+    const box = el.getBoundingClientRect();
+    let right = 0;
+    for (const e of el.querySelectorAll("[data-line] *")) {
+      const b = e.getBoundingClientRect();
+      if (b.width > 0 && getComputedStyle(e).visibility !== "hidden") right = Math.max(right, b.right);
+    }
+    const lastTrack = [...el.querySelectorAll("[data-track]")].at(-1)?.getBoundingClientRect().bottom ?? 0;
+    return { hidden: el.scrollHeight - el.clientHeight, right: right - box.right, lastTrack: lastTrack - box.bottom };
+  });
+  expect(fit.hidden).toBeLessThanOrEqual(0);
+  expect(fit.right).toBeLessThanOrEqual(0);
+  expect(fit.lastTrack).toBeLessThanOrEqual(0);
+  const more = page.locator("[data-inbox-more]");
+  await expect(more).toHaveAccessibleName(/^Show \d+ more asks?$/);
+  await expect(line).toHaveScreenshot("home-line-two.png");
+});
