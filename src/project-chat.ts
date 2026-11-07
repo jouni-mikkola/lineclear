@@ -17,7 +17,10 @@ function projectChat(project: string | undefined, env: NodeJS.ProcessEnv): strin
 }
 
 const postCard: CardPoster = (chat, title, choices, env) => {
-  const r = Bun.spawnSync([serverBin(env), "card", title, ...choices.flatMap((c) => ["--choice", c])], { stdin: "ignore", env: { ...env, LINECLEAR_CHAT: chat } });
+  const r = Bun.spawnSync([serverBin(env), "card", title, ...choices.flatMap((c) => ["--choice", c])], {
+    stdin: "ignore",
+    env: { ...env, LINECLEAR_CHAT: chat },
+  });
   return r.exitCode === 0 ? undefined : (r.stderr.toString() || r.stdout.toString()).trim() || `exit ${r.exitCode}`;
 };
 
@@ -26,7 +29,14 @@ const postCard: CardPoster = (chat, title, choices, env) => {
  * finds it: a rule or the Dispatcher answers it, and only an owner matter becomes an Inbox item and a push.
  * False when the project has no chat or the card did not post, so the caller keeps the Inbox item.
  */
-export function askProjectChat(project: string | undefined, task: string, question: string, choices: string[], env: NodeJS.ProcessEnv, post: CardPoster = postCard): boolean {
+export function askProjectChat(
+  project: string | undefined,
+  task: string,
+  question: string,
+  choices: string[],
+  env: NodeJS.ProcessEnv,
+  post: CardPoster = postCard,
+): boolean {
   const chat = projectChat(project, env);
   return chat !== undefined && post(chat, `${task}: ${question}`, choices, env) === undefined;
 }

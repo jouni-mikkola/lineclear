@@ -299,7 +299,14 @@ function preApproved(
 }
 
 /** `lineclear ask`: puts a question in its project's chat (the Inbox when it has none) and declares an owner wait. The phone hears of the new item from the web server (`src/notify.ts`). */
-export function askMain(args: string[], out: (l: string) => void, env = process.env, cwd = process.cwd(), now: () => Date = () => new Date(), post?: CardPoster): number {
+export function askMain(
+  args: string[],
+  out: (l: string) => void,
+  env = process.env,
+  cwd = process.cwd(),
+  now: () => Date = () => new Date(),
+  post?: CardPoster,
+): number {
   const fail = (message: string, code = 1) => {
     out(`lineclear ask: ${message}`);
     return code;
@@ -336,7 +343,9 @@ export function askMain(args: string[], out: (l: string) => void, env = process.
   if (kind === "login") session ??= task;
   const since = now().toISOString();
   const text = kind === "login" ? `${login}_TOTP is not stored. ${question.trim()}` : question.trim();
-  const item = askProjectChat(project, task, text, choices, env, post) ? undefined : addItem({ kind, task, project, question: text, choices, ...(session ? { session } : {}), since }, env);
+  const item = askProjectChat(project, task, text, choices, env, post)
+    ? undefined
+    : addItem({ kind, task, project, question: text, choices, ...(session ? { session } : {}), since }, env);
   writeWait(
     {
       task,
@@ -348,6 +357,10 @@ export function askMain(args: string[], out: (l: string) => void, env = process.
     },
     env,
   );
-  out(item ? `inbox ${item.n}: ${text}. End your turn; the answer comes as a message.` : `asked in ${project}'s chat: ${text}. End your turn; the answer comes as a message.`);
+  out(
+    item
+      ? `inbox ${item.n}: ${text}. End your turn; the answer comes as a message.`
+      : `asked in ${project}'s chat: ${text}. End your turn; the answer comes as a message.`,
+  );
   return 0;
 }

@@ -158,11 +158,16 @@ function routeCoordinator(project: string, space: { name: string; key: string },
   const tasks = spaceTasks(dir, space);
   const ids = tasks.map((t) => String(t.id));
   // a task that declared an owner wait (`lineclear ask`, `wait owner`) asked for the owner, whatever the card's words
-  const ownerWaits = new Set(readWaits(env).filter(waitsForOwner).map((w) => w.task));
+  const ownerWaits = new Set(
+    readWaits(env)
+      .filter(waitsForOwner)
+      .map((w) => w.task),
+  );
   for (const card of coordinatorCards(liveChats(dir, space, true), ids)) {
     const task = tasks.find((t) => t.id === card.task);
     if (r.done.has(card.id) || task === undefined) continue;
-    const keptByOwner = ownerMatter(title(card)) || ownerWaits.has(card.task) || (asksToMerge(title(card)) && /^- Merge: ask me first/m.test(String(task.desc ?? "")));
+    const keptByOwner =
+      ownerMatter(title(card)) || ownerWaits.has(card.task) || (asksToMerge(title(card)) && /^- Merge: ask me first/m.test(String(task.desc ?? "")));
     const action = keptByOwner ? undefined : ruleFor(card, project, r.now, env);
     if (action?.kind === "wait") continue;
     if (r.dryRun) {
