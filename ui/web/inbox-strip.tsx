@@ -1,4 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useAnswer, useInbox } from "./data.ts";
+import type { PageState } from "./samples.ts";
 import { ago, Button, exact, InboxChecks, type InboxItem, ReasonForm, reveal, SignalPic, Toast } from "../kit/index.ts";
 
 // The strip at the top of Home: the first ask that waits for the owner, who asks, in which project and step, its
@@ -312,6 +314,32 @@ export function AskInRow({ item, onChoose }: { item: InboxItem; onChoose: (item:
       <div className="flex flex-wrap gap-2">
         <Answers item={item} onChoose={onChoose} />
       </div>
+    </section>
+  );
+}
+
+/** The Inbox view at `/inbox`: what waits for the owner, or a line saying nothing does. */
+export function InboxView({ sample, ask }: { sample: PageState | undefined; ask?: string }) {
+  const items = useInbox(sample);
+  const { gone, errors, answer } = useAnswer(sample);
+  const { open, held, choose, undo } = useHeldAnswers(
+    items.status === "ok" ? items.data.filter((i) => !gone.has(i.id)) : [],
+    (item, choice, note) => void answer(item, choice, note),
+  );
+  return (
+    <section aria-label="Inbox" data-view="inbox">
+      <h1 className="mb-4 text-xl font-semibold text-fg">Inbox</h1>
+      {items.status === "error" && (
+        <p className="rounded-md border border-dashed border-line px-4 py-8 text-center text-fg2" data-inbox-error>
+          The Inbox could not be read.
+        </p>
+      )}
+      {items.status === "ok" && open.length === 0 && !held && (
+        <p className="rounded-md border border-dashed border-line px-4 py-8 text-center text-fg2" data-inbox-empty>
+          Nothing waits for you.
+        </p>
+      )}
+      <InboxStrip open={open} held={held} onChoose={choose} onUndo={undo} ask={ask} errors={errors} read={items.status !== "loading"} />
     </section>
   );
 }

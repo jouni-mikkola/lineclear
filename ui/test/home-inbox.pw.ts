@@ -54,11 +54,12 @@ test("the only ask leaves with its height and nothing is left", async ({ page })
   await expect(page.locator('[data-inbox-strip="leaving"]')).toHaveCount(0, { timeout: 2000 });
 });
 
-test("/inbox opens Home, and the ask is in its task's open row", async ({ page }) => {
+test("/inbox is its own view with the strip, and the ask is in its task's open row on Home", async ({ page }) => {
   await page.goto("/inbox?state=filled");
+  await expect(page).toHaveURL(/\/inbox/);
+  await expect(page.locator('[data-view="inbox"] [data-inbox-strip]').first()).toBeVisible();
+  await page.goto("/?state=filled");
   await page.waitForSelector("[data-home]");
-  await expect(page).not.toHaveURL(/\/inbox/);
-  await expect(page.locator("[data-inbox-strip]").first()).toBeVisible();
   await page.locator("[data-row-id=w1]:visible").first().click();
   await expect(page.locator("[data-row-ask]:visible").first()).toBeVisible();
 });

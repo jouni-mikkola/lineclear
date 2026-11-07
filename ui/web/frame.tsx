@@ -15,17 +15,44 @@ import { play } from "../kit/motion.ts";
 import { SAMPLE_OFFLINE } from "./data.ts";
 import { useTrouble } from "./health.ts";
 import type { PageState } from "./samples.ts";
-import { PATHS, roadmapPath, type View } from "./routes.ts";
+import { useInbox } from "./data.ts";
+import { InboxView } from "./inbox-strip.tsx";
+import { PATHS, placeOf, roadmapPath, type View, viewOf } from "./routes.ts";
 
 /** The wordmark as index.html has it before the script runs: vite.config.ts puts it in. */
 declare const __WORDMARK__: string;
 
 // The frame every view sits in. From 1024 px a rail on the left holds the mark, the views and a row per project;
-// under it a bar at the bottom (off Home, which has no bar) leads Home, and Settings is a gear at the top right.
+// under it a bar at the bottom leads Home, the Inbox, Browsers and Settings, and Settings is a gear at the top right too.
 // Content runs up to `--lc-content-w` on 12 columns, centred in the room right of the rail. The rail and the bar are
 // links, the view you are on marked with `aria-current`. Home is one page that fills the window: its own columns hold the line, the table and the chat.
 
-const BAR: { id: Exclude<View, "roadmap" | "task" | "settings" | "setup">; label: string }[] = [{ id: "home", label: "Home" }];
+const icon = (paths: string) => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d={paths} />
+  </svg>
+);
+
+const BAR: { id: Exclude<View, "roadmap" | "task" | "setup" | "chat" | "usage">; label: string; icon: React.ReactNode }[] = [
+  { id: "home", label: "Home", icon: icon("M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10") },
+  { id: "inbox", label: "Inbox", icon: icon("M3 13l3-8h12l3 8M3 13v6h18v-6M3 13h5a4 4 0 0 0 8 0h5") },
+  { id: "browsers", label: "Browsers", icon: icon("M3 5h18v14H3zM3 9h18M7 7h.01") },
+  {
+    id: "settings",
+    label: "Settings",
+    icon: icon("M4 7h10M18 7h2M4 17h2M10 17h10M16 5v4M8 15v4"),
+  },
+];
 
 /** From this width the panel stays open on the pages that have one. */
 const WIDE = "(min-width: 1920px)";
@@ -64,7 +91,9 @@ function Content({ view, trouble, children }: { view: View; trouble: ReturnType<
   const home = view === "home";
   return (
     <main
-      className={home ? undefined : `px-5 pt-6 md:px-10 lg:pt-8 ${view === "chat" || view === "task" ? "pb-(--bar-h)" : "pb-[calc(var(--bar-h)+64px)]"}`}
+      className={
+        home ? "pb-(--bar-h) lg:pb-0" : `px-5 pt-6 md:px-10 lg:pt-8 ${view === "chat" || view === "task" ? "pb-(--bar-h)" : "pb-[calc(var(--bar-h)+64px)]"}`
+      }
       data-content={home ? "" : undefined}
     >
       <div className={home ? "contents" : "mx-auto grid max-w-(--lc-content-w) grid-cols-12 gap-x-6"} data-content={home ? undefined : ""}>
@@ -103,7 +132,9 @@ export function Frame({
   children: React.ReactNode;
 }) {
   const trouble = useTrouble(sample === "offline" && view === "home" ? { kind: "stale", since: SAMPLE_OFFLINE } : undefined);
-  const bar: NavItem[] = BAR.map((v) => ({ ...v, href: PATHS[v.id] }));
+  const inbox = useInbox(sample);
+  const waiting = inbox.status === "ok" ? inbox.data.length : 0;
+  const bar: NavItem[] = BAR.map((v) => ({ ...v, href: PATHS[v.id], count: v.id === "inbox" ? waiting : undefined }));
   // a roadmap is a page under its project's row
   const wide = useWideRoom();
   const showPanel = !!panel && hasPanel(view) && (panelOpen || wide);
@@ -114,15 +145,14 @@ export function Frame({
     if (showPanel && !wasOpen.current && aside.current) play("chat-open", aside.current, [{ transform: "translateX(100%)" }, { transform: "none" }]);
     wasOpen.current = showPanel;
   }, [showPanel]);
-  const current = view === "roadmap" ? `project:${project}` : view === "task" ? "inbox" : view;
+  // the address names the view you are on: Browsers and Usage are drawn on Home, but their link is the one marked
+  const at = viewOf(location.pathname);
+  const current = view === "roadmap" ? `project:${project}` : at === "task" ? "inbox" : at === "usage" || at === "chat" ? "home" : at;
+  const shown = view === "inbox" ? <InboxView sample={sample} ask={placeOf(location.pathname).ask} /> : children;
   return (
     <div className={`min-h-dvh lg:pl-(--lc-rail-w) ${showPanel ? "lg:pr-[400px]" : ""}`} data-frame>
       <div className="fixed inset-y-0 left-0 z-20 hidden lg:block">
-        <SideRail
-          items={[...bar, { id: "settings", label: "Settings", href: PATHS.settings }]}
-          current={current}
-          projects={projects.map((p) => ({ name: p.name, href: roadmapPath(p.roadmap ?? p.name), lamp: lamp(p) }))}
-        />
+        <SideRail items={bar} current={current} projects={projects.map((p) => ({ name: p.name, href: roadmapPath(p.roadmap ?? p.name), lamp: lamp(p) }))} />
       </div>
       <header className="flex items-center justify-between gap-4 px-5 pt-6 md:px-10 md:pt-8 lg:hidden">
         <a href={PATHS.home} aria-label="Lineclear, Home" className="flex h-9 items-center rounded-sm hover:opacity-80">
@@ -201,13 +231,11 @@ export function Frame({
         </aside>
       )}
       <Content view={view} trouble={trouble}>
-        {children}
+        {shown}
       </Content>
-      {view !== "home" && (
-        <div className="fixed inset-x-0 bottom-0 z-30 bg-base pb-[env(safe-area-inset-bottom,0px)] lg:hidden" data-bar>
-          <BottomBar items={bar} current={view === "roadmap" ? "home" : view === "task" ? "inbox" : view} />
-        </div>
-      )}
+      <div className="fixed inset-x-0 bottom-0 z-30 bg-base pb-[env(safe-area-inset-bottom,0px)] lg:hidden" data-bar>
+        <BottomBar items={bar} current={current} />
+      </div>
     </div>
   );
 }
