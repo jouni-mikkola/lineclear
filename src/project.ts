@@ -75,14 +75,34 @@ export function projectsDir(env = process.env): string {
 
 const settingsPath = (name: string, env = process.env) => join(projectsDir(env), name, "settings.json");
 
-const setupPath = (env = process.env) => join(configDir(env), "setup.json");
+const storePath = (env = process.env) => join(configDir(env), "settings.json");
 
-export function readSetup(env = process.env): Setup {
+/** The store from before settings.json: read once to migrate, then deleted. */
+const legacySetupPath = (env = process.env) => join(configDir(env), "setup.json");
+
+function readStored(file: string): Setup {
   try {
-    return JSON.parse(readFileSync(setupPath(env), "utf8")) as Setup;
+    return JSON.parse(readFileSync(file, "utf8")) as Setup;
   } catch {
     return {};
   }
+}
+
+/** Writes the role models into the one store, the file Settings writes. */
+export function writeSetup(next: Setup, env = process.env): void {
+  mkdirSync(configDir(env), { recursive: true });
+  writeAtomic(storePath(env), `${JSON.stringify({ setup: next }, null, 2)}\n`);
+}
+
+/** The model chosen for each role: the machine's defaults, which a project's own `models` override. */
+export function readSetup(env = process.env): Setup {
+  const legacy = legacySetupPath(env);
+  const stored = readStored(storePath(env)) as { setup?: Setup };
+  if (!existsSync(legacy)) return stored.setup ?? {};
+  const merged = { ...readStored(legacy), ...stored.setup };
+  writeSetup(merged, env);
+  rmSync(legacy, { force: true });
+  return merged;
 }
 
 /** Saves the chosen models over the earlier ones. A reviewer of the worker's company is refused, and nothing is saved. */
@@ -90,8 +110,7 @@ export function saveSetup(choice: Setup, companyOf: (model: string) => string, e
   const next = { ...readSetup(env), ...choice };
   if (next.worker && next.reviewer && companyOf(next.worker) === companyOf(next.reviewer))
     return `the reviewer ${next.reviewer} is from the worker's company, choose a reviewer from another company`;
-  mkdirSync(configDir(env), { recursive: true });
-  writeAtomic(setupPath(env), `${JSON.stringify(next, null, 2)}\n`);
+  writeSetup(next, env);
   return undefined;
 }
 
@@ -348,7 +367,15 @@ export async function addProject(args: string[], ask: Ask, out: (l: string) => v
   return 0;
 }
 
-export function readSettings(name: string, env = process.env): Settings | string {
+/** A role the project names no model for starts on the machine's chosen one. */
+function withSetupModels(s: Settings, env: NodeJS.ProcessEnv): Settings {
+  const setup = readSetup(env);
+  const models = { ...s.models };
+  for (const role of roles) if (!models[role]?.length && setup[role]) models[role] = [setup[role]];
+  return { ...s, models: models as Settings["models"] };
+}
+
+function readProjectFile(name: string, env: NodeJS.ProcessEnv): Settings | string {
   const file = settingsPath(name, env);
   if (!existsSync(file)) return `no project named '${name}'`;
   try {
@@ -356,6 +383,11 @@ export function readSettings(name: string, env = process.env): Settings | string
   } catch {
     return `settings of '${name}' are not valid JSON: ${file}`;
   }
+}
+
+export function readSettings(name: string, env: NodeJS.ProcessEnv = process.env): Settings | string {
+  const s = readProjectFile(name, env);
+  return typeof s === "string" ? s : withSetupModels(s, env);
 }
 
 export function listProjectNames(env = process.env): string[] {
@@ -463,7 +495,7 @@ function changePaused(next: Settings, paused: boolean | undefined): string | und
 
 /** Changes a project's settings in its settings.json, the file the CLI and the rules read. Returns why it cannot. */
 export function changeSettings(name: string, change: SettingsChange, env = process.env): Settings | string {
-  const s = NAME.test(name) ? readSettings(name, env) : `no project named '${name}'`;
+  const s = NAME.test(name) ? readProjectFile(name, env) : `no project named '${name}'`;
   if (typeof s === "string") return s;
   const next: Settings = { ...s, models: { ...s.models } };
   const problem = applyChange(next, change);

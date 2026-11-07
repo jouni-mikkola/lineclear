@@ -1,11 +1,7 @@
-import { writeAtomic } from "../pi/atomic.ts";
-import { configDir } from "../pi/config.ts";
-import { listProjectNames, readSettings, readSetup, type Setup, setupRoles } from "./project.ts";
-import { mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { listProjectNames, readSettings, readSetup, type Setup, setupRoles, writeSetup } from "./project.ts";
 
 /**
- * An install made before the setup gate has no setup.json, but its projects already name the models they use. The
+ * An install made before the setup gate has no saved setup, but its projects already name the models they use. The
  * gap is filled from them (the first project that names a role wins), so an update never stops such a machine.
  * The step checker has no setting of its own; it takes the reviewer's model, else the worker's.
  */
@@ -22,6 +18,5 @@ export function fillSetup(env = process.env): void {
   const found = Object.entries(named).filter(([, v]) => v);
   const next: Setup = { ...Object.fromEntries(found), ...Object.fromEntries(Object.entries(have).filter(([, v]) => v)) };
   if (Object.keys(next).length === setupRoles.filter((r) => have[r]).length) return;
-  mkdirSync(configDir(env), { recursive: true });
-  writeAtomic(join(configDir(env), "setup.json"), `${JSON.stringify(next, null, 2)}\n`);
+  writeSetup(next, env);
 }

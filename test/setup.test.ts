@@ -1,10 +1,10 @@
 import { expect, test } from "bun:test";
-import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../src/cli.ts";
 import { harnesses, readRegistry } from "../src/models.ts";
-import { readSetup, setupGate } from "../src/project.ts";
+import { changeSettings, projectsDir, readSettings, readSetup, saveSetup, type Settings, setupGate } from "../src/project.ts";
 import { saveOffered, setupMain, setupView } from "../src/setup.ts";
 
 function fake(body: string): string {
@@ -74,4 +74,21 @@ test("the web view lists harnesses and accounts, and saves through the same chec
   expect(saveOffered({ worker: "anthropic/opus-x", reviewer: "anthropic/opus-x" }, registry(), env)).toContain("worker's company");
   expect(saveOffered({ worker: "anthropic/opus-x" }, registry(), env)).toBeUndefined();
   expect(setupView(registry(), env).chosen).toEqual({ worker: "anthropic/opus-x" });
+});
+
+test("a role model set in Settings is the next task's model, and setup.json is migrated once and deleted", () => {
+  const env = { ...process.env, LINECLEAR_CONFIG: mkdtempSync(join(tmpdir(), "lc-store-")) };
+  writeFileSync(join(env.LINECLEAR_CONFIG, "setup.json"), JSON.stringify({ worker: "a/old", reviewer: "b/r", planner: "a/old", stepChecker: "b/r" }));
+  expect(readSetup(env).worker).toBe("a/old");
+  expect(existsSync(join(env.LINECLEAR_CONFIG, "setup.json"))).toBe(false);
+  mkdirSync(join(projectsDir(env), "p"), { recursive: true });
+  writeFileSync(
+    join(projectsDir(env), "p", "settings.json"),
+    JSON.stringify({ repo: "/r", space: "p", check: "true", models: { worker: [], reviewer: [], planner: [] } }),
+  );
+  expect((readSettings("p", env) as Settings).models.worker).toEqual(["a/old"]);
+  expect(saveSetup({ worker: "a/new" }, (m) => m.split("/")[0]!, env)).toBeUndefined();
+  expect((readSettings("p", env) as Settings).models.worker).toEqual(["a/new"]);
+  changeSettings("p", { check: "true2" }, env);
+  expect(JSON.parse(readFileSync(join(projectsDir(env), "p", "settings.json"), "utf8")).models.worker).toEqual([]);
 });
