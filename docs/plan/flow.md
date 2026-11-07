@@ -3,8 +3,8 @@
 The part of v0.2 that takes a step from `ready` to merged: checks, review, the merge lane, token budgets, the measure
 that parallel work pays, and the night watch. Steps L790 to L809. In flight and planned around: L540 L520 L524 L526
 L527 L528 L504 L505 L560 L565 L566 L569 L587 L592 L607. L524, L560, L569, L592, L607 and L504 are merged: their commits are on main, though ROADMAP.md still lists them.
-So are L453, L464, L494 and L601, which makes the open steps L525 and L608 startable now. L803 is not used: L525
-already drops the title gate, and the fix task passes by `by: main-green` (`merge.ts:281`).
+So are L453, L464, L494 and L601, which makes the open steps L525 and L608 startable now. The red-main gate needs no
+step here: L525 drops the title test, and the fix task passes by `by: main-green` (`merge.ts:281`).
 
 ## What is wrong today
 
@@ -66,7 +66,7 @@ The revert of L453 stays the last guard.
 less at p90, and waits for a runner 30 s or less at p90 with 45 agents. The owner's machine runs no suite.
 
 **Review is one call and light for a small diff.** From another company than the worker, on the head the lane will
-merge. Under 80 changed lines it gets the diff with 3 lines of context and REVIEW.md; above that, 8 lines of context and
+merge. Under 80 changed lines it gets the diff with 3 lines of context and the rule files cut to 4 k characters; above that, 8 lines of context and
 the rule files. At most Review rounds (2), then the Dispatcher decides. Targets: new input 15 k median, 50 k p90.
 
 **Budgets by role.** Measured from session usage, per role and per merged step, enforced in the pi extension
@@ -102,7 +102,7 @@ Order: (1) core loop, (2) simple and clean, (3) token budgets, (4) any project, 
 | --- | --- |
 | 1 core loop | L525 (open, now startable), L790, L791, L795, L796, L797, L792 |
 | 2 simple, clean | L793, L805, L608 (open, now startable), L802, L804 |
-| 3 tokens | L794, L798, L799, L800, L801 |
+| 3 tokens | L794, L798, L799, L800, L801, L803 |
 | 4 any project | L806, L807, L808 |
 | 5 theme, in the web | L809 |
 
@@ -145,7 +145,7 @@ Result: Closing or discarding a task closes its pull request and deletes its bra
 - files: server/server/live/engine/engine-handoff.ts, server/server/live/engine/engine-pr.ts
 
 ### L794 One light review call
-Result: `lineclear review <task> --json` reviews a diff under 80 lines with 3 lines of context and REVIEW.md only, in 15 k tokens or less.
+Result: `lineclear review <task> --json` reviews a diff under 80 lines with 3 lines of context and short rules, in 15 k tokens or less.
 - why: the reviewer reads 73 k new input at the median for diffs that are mostly small, and the call has no output a program can read.
 - done when: `review-call.ts` picks the light form for a diff of fewer than 80 changed lines that deletes no test, and the full form otherwise; `--json` prints the findings and the input size; a test reviews a 20-line and a 300-line diff and sees an input of 15 k or less and 50 k or less; `test/review-call.test.ts` keeps its cases for the full form.
 - locks: review-call, file-src-review-call-ts
@@ -200,12 +200,20 @@ Result: `bun scripts/swarm-measure.ts <swarm-base> <one-base>` prints merged ste
 - after: none
 - files: scripts/swarm-measure.ts, test/swarm-measure.test.ts
 
-### L801 Parallel beats one agent
-Result: docs/numbers.md shows both arms of the measure run twice, and each role that does not pay has a step that deletes it.
-- why: v0.2 claims parallel work beats one agent; until both arms run on the same 6 steps it is a goal, not a fact. It replaces L609.
-- done when: `docs/numbers.md` has the 4 rows of `swarm-measure.ts` (2 swarm, 2 one-agent) on 6 steps with disjoint locks from one main commit, and the verdict; every role that fails the rule has a new step in ROADMAP.md.
+### L801 The swarm arm is measured
+Result: docs/numbers.md shows 2 runs of the swarm arm: 6 steps at once on `measure/<date>-swarm`, with steps an hour and tokens per step.
+- why: v0.2 claims parallel work beats one agent; until both arms run on the same 6 steps it is a goal, not a fact. With L803 it replaces L609.
+- done when: `docs/numbers.md` has the 2 swarm rows of `swarm-measure.ts` on 6 steps with disjoint locks from one main commit, and the commit. The agent adds the tasks and waits declared (`lineclear wait`), so it spends minutes, not the arm's hours.
 - locks: swarm-measure, file-docs-numbers-md
 - after: L800, L797, L798
+- files: docs/numbers.md
+
+### L803 One agent arm and the verdict
+Result: docs/numbers.md shows 2 runs of one agent doing the same 6 steps in a row, the verdict, and a delete step for each role that does not pay.
+- why: the swarm's numbers mean nothing without the one-agent arm on the same steps and the same commit.
+- done when: `docs/numbers.md` has the 2 one-agent rows next to L801's and the pass or fail of the rule (3 times the steps an hour, at most 1.2 times the tokens per step); every role that fails has a new step in ROADMAP.md. The agent waits declared, as in L801.
+- locks: swarm-measure, file-docs-numbers-md
+- after: L801
 - files: docs/numbers.md
 
 ### L802 The loop promotes green main
