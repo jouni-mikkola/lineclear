@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { decisionsPath, tick, type Decision, type State } from "../src/rules.ts";
-import { CLASS_INFO, classify, watchStalls, type Observation } from "../src/stall-class.ts";
+import { CLASS_INFO, classify, STALL_CLASSES, watchStalls, type Observation } from "../src/stall-class.ts";
 import { stepStatuses, type Step, type Task } from "../src/roadmap.ts";
 import { recordTaskSteps } from "./helpers.ts";
 import { fakeWorld, scratch } from "./fake-world.ts";
@@ -74,7 +74,7 @@ test("each class is named from its reason, and the owner's waits are no stall", 
   expect(c("no worker model has room: anthropic is full until 12:00")).toBe("account-full");
   expect(c("LIN-5: Lineclear couldn't start it again")).toBe("revive-loop");
   expect(c("the health command failed on main abc")).toBe("main-red");
-  expect(c("lock 'rules' is held by L12")).toBe("lock-held");
+  expect(c("lock 'rules' is held by L12")).toBeUndefined();
   expect(c("no free slot in the space")).toBe("no-room");
   expect(c("the roadmap is broken: L9 has no why")).toBe("roadmap-broken");
   expect(c("the repo folder is not at origin/main")).toBe("repo-off-main");
@@ -86,7 +86,7 @@ test("each class is named from its reason, and the owner's waits are no stall", 
   expect(c("pressed Enter for LIN-5: its agent is idle and never started", "stall")).toBe("brief-unsent");
   expect(c("LIN-5: its agent never answered, but the nudge failed: no pane")).toBe("brief-unsent");
   expect(c("typed its brief nudge into the pane of LIN-5: its agent never answered", "stall")).toBe("brief-unsent");
-  expect(c("something no pattern knows")).toBe("unknown");
+  expect(c("something no pattern knows")).toBeUndefined();
   expect(c("the project is kept off this machine (local: false)")).toBeUndefined();
   expect(c("lock 'ui' is reserved for B5, skipped for locks 3 ticks")).toBeUndefined();
   expect(c("a paid key is not allowed: waits for your answer")).toBe("owner");
@@ -94,23 +94,19 @@ test("each class is named from its reason, and the owner's waits are no stall", 
   expect(c("would start A", "start")).toBeUndefined();
 });
 
-test("a stall is recorded once past its limit, its remedy with the minutes from it, its end with the minutes it cost", () => {
+test("a lock wait is no stall: it records nothing and its skip line stays for Home", () => {
   const state = { last: {}, roadmapErrors: [] } as unknown as State;
-  const at = (m: number) => new Date(Date.UTC(2026, 5, 1, 10, m));
   const lock: Decision = { time: "", project: "p", step: "L2", kind: "skip", reason: "lock 'rules' is held by L1" };
-  const remedy = () => "reminded LIN-1";
-  // the lock limit is 240 minutes: before it, nothing is recorded
-  expect(watchStalls("p", state, [{ ...lock }], [], at(0), remedy)).toEqual([]);
-  expect(watchStalls("p", state, [{ ...lock }], [], at(239), remedy)).toEqual([]);
-  const past = watchStalls("p", state, [{ ...lock }], [], at(240 + 1), remedy);
-  expect(past.map((d) => [d.event, d.class, d.minutes])).toEqual([
-    ["stall", "lock-held", undefined],
-    ["remedy", "lock-held", 241],
-  ]);
-  expect(watchStalls("p", state, [{ ...lock }], [], at(250), remedy)).toEqual([]);
-  const end = watchStalls("p", state, [], [], at(260), remedy);
-  expect(end.map((d) => [d.event, d.minutes])).toEqual([["end", 260]]);
+  for (const m of [0, 241, 600]) expect(watchStalls("p", state, [lock], [], new Date(Date.UTC(2026, 5, 1, 10, m)), () => "reminded")).toEqual([]);
+  expect(lock).toEqual({ time: "", project: "p", step: "L2", kind: "skip", reason: "lock 'rules' is held by L1" });
   expect(state.stalls).toEqual({});
+});
+
+test("STALL_CLASSES names no lock wait and no unknown, and each class has one remedy", () => {
+  expect(STALL_CLASSES.map(String)).not.toContain("lock-held");
+  expect(STALL_CLASSES.map(String)).not.toContain("unknown");
+  expect(Object.keys(CLASS_INFO).sort()).toEqual([...STALL_CLASSES].sort());
+  for (const c of STALL_CLASSES) expect(CLASS_INFO[c].remedy).not.toBe("");
 });
 
 test("every class is planted: recorded past its limit, remedied with minutes, ended with the minutes it cost", () => {
