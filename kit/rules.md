@@ -16,3 +16,6 @@ Lineclear started you on a task. These rules hold on every machine Lineclear run
 - Waiting: never poll with `sleep`. Wait inside one command that blocks until done, or declare the wait with
   `lineclear wait` and end your turn.
 - Read only what you need: `grep -n` first, then the lines around it. Make independent reads in one turn.
+- Files: read with the read tool (offset and limit for a part), change with edit (several `edits[]` in one call), create
+  with write. Not `cat`, `sed -n`, `sed -i`, `cat > file <<EOF` or a `python - <<EOF` rewrite: those cost more tokens
+  and give no clean diff. Bash is for running things and for `grep`, `rg`, `find`, `ls`.
