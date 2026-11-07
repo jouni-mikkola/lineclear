@@ -146,6 +146,7 @@ export class EngineLaunch extends EngineStalls {
    */
   resumeQueue() {
     this.endPhases()
+    for (const t of this.tasks) if (this.inPhase(t, 'briefing')) this.waitForBrief(t)
     for (const t of this.tasks.filter((t) => t.going && !ended(t) && !t.stopped && this.agents.status(this.key(t)) !== 'working'))
       this.agents.send(this.key(t), hidden(t.going!, 'go'), { ensure: () => this.launch(t) }).catch(() => undefined)
     this.recheck()
@@ -395,7 +396,7 @@ export class EngineLaunch extends EngineStalls {
   }
 
   private async startTaskHere(t: TaskRec) {
-    move(t, 'start')
+    if (!move(t, 'start')) throw new Error(`${t.id} is busy: try again in a moment`)
     t.trouble = t.stuck = undefined
     this.emit('changed')
     try {
@@ -433,16 +434,7 @@ export class EngineLaunch extends EngineStalls {
       t.startMs = { worktree: madeAt - began - install, install, session: Date.now() - madeAt }
       this.save()
       move(t, 'launched')
-      clearTimeout(this.later.get(`${t.id}:brief`))
-      const x = setTimeout(() => {
-        this.later.delete(`${t.id}:brief`)
-        if (move(t, 'brief-over')) {
-          this.briefLate(t)
-          this.settle(t)
-        }
-      }, BRIEF_WAIT)
-      x.unref?.()
-      this.later.set(`${t.id}:brief`, x)
+      this.waitForBrief(t)
     } catch (e) {
       // went wrong before its worktree was there: it shows so
       t.trouble = troubleOf(e)
@@ -452,6 +444,20 @@ export class EngineLaunch extends EngineStalls {
       this.begun(t)
       this.settle(t)
     }
+  }
+
+  /** a brief not taken up in BRIEF_WAIT is sent again (briefLate) and the task is no longer To do */
+  protected waitForBrief(t: TaskRec) {
+    clearTimeout(this.later.get(`${t.id}:brief`))
+    const x = setTimeout(() => {
+      this.later.delete(`${t.id}:brief`)
+      if (move(t, 'brief-over')) {
+        this.briefLate(t)
+        this.settle(t)
+      }
+    }, BRIEF_WAIT)
+    x.unref?.()
+    this.later.set(`${t.id}:brief`, x)
   }
 
   /** its agent works and its brief has gone in: it is at work on it, no longer To do */

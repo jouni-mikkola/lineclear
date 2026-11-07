@@ -17,7 +17,7 @@ export type PhaseEvent =
   | 'handoff'
   /** its place is put away */
   | 'clean'
-  /** the engine started again: whatever it was doing is gone */
+  /** the engine started again: the start, handoff or clean-up it was doing is gone */
   | 'interrupted'
 
 export const PHASES: readonly Phase[] = ['idle', 'starting', 'briefing', 'handing', 'cleaning']
@@ -26,7 +26,7 @@ export const EVENTS: readonly PhaseEvent[] = ['start', 'launched', 'over', 'brie
 export const transitions: Record<Phase, Partial<Record<PhaseEvent, Phase>>> = {
   idle: { start: 'starting', handoff: 'handing', clean: 'cleaning' },
   starting: { launched: 'briefing', over: 'idle', interrupted: 'idle' },
-  briefing: { start: 'starting', 'brief-over': 'idle', handoff: 'handing', clean: 'cleaning', interrupted: 'idle' },
+  briefing: { start: 'starting', 'brief-over': 'idle', handoff: 'handing', clean: 'cleaning' },
   handing: { over: 'idle', interrupted: 'idle' },
   cleaning: { over: 'idle', interrupted: 'idle' },
 }

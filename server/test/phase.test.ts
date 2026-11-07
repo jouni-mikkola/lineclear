@@ -63,16 +63,19 @@ describe('phase across a restart', () => {
     })
   }
 
-  test('the engine ending its phases on start leaves none behind', async () => {
+  test('once the engine is up, a start, handoff or clean-up the last run was in is over and a brief phase stays', async () => {
     const dir = repo()
     const p = await world().places.add(dir, 'phase-ended')
+    const project = placeId.space(p.name)
+    const own = { told: 'work', worktree: '/tmp/phase-wt', branch: 'phase' }
     writeJson('tasks.json', {
-      next: { [p.key]: 2 },
-      tasks: [record(placeId.space(p.name), 1, { phase: 'handing', told: 'work' })],
+      next: { [p.key]: 5 },
+      tasks: ['handing', 'cleaning', 'briefing'].map((phase, i) => record(project, i + 1, { ...own, phase })),
     })
     const w = world()
     w.engine.resumeQueue()
-    expect(w.engine.tasks[0].phase).toBeUndefined()
+    expect(w.engine.tasks.map((t) => t.phase)).toEqual([undefined, undefined, 'briefing'])
+    expect(w.engine.statusOf(w.engine.tasks[2])).toBe('todo')
   })
 })
 
@@ -94,7 +97,7 @@ describe('settling one task', () => {
     const statusOf = w.engine.statusOf.bind(w.engine)
     w.engine.statusOf = (t) => (seen.push(t.id), statusOf(t))
     const one = w.engine.tasks[0]
-    w.engine.view(one)
+    ;(w.engine as unknown as { settle(t: unknown): void }).settle(one)
     expect(seen.filter((id) => id !== one.id)).toEqual([])
   })
 })

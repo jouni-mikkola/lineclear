@@ -159,9 +159,10 @@ export abstract class EngineState extends Emitter<Events> {
     return (t.phase ?? 'idle') === phase
   }
 
-  /** after a start of the engine: what it was doing for a task is gone, so the phase is too */
+  /** once the engine is up: a start, a handoff or a clean-up it was in the middle of is gone, so its phase is too.
+   *  A brief phase stays: its agent may still take the brief up, and resumeQueue arms its timer again */
   protected endPhases() {
-    for (const t of this.tasks) if (t.phase) move(t, 'interrupted')
+    for (const t of this.tasks) if (!this.inPhase(t, 'briefing')) move(t, 'interrupted')
   }
 
   protected key(t: TaskRec) {
