@@ -10,7 +10,6 @@ import { join } from "node:path";
 import { compileCacheDir, diskTmpRoot, trimCache } from "../src/tmpdirs.ts";
 import { testsFor } from "./changed.ts";
 import { buildMap, readMap, saveMap } from "./load-map.ts";
-import { recordPassed, splitCached } from "./result-cache.ts";
 import {
   junitSlowestCase,
   junitTimes,
@@ -19,7 +18,6 @@ import {
   overBudget,
   readSlowBaseline,
   readTimes,
-  recordSteps,
   slowFails,
   slowFaults,
   split,
@@ -49,7 +47,7 @@ mkdirSync(reports);
 // the repo's bin/lineclear refuses the stable config, data folders and ports (src/paths.ts), and a lane's shell may carry
 // the stable ports; these commands listen on none
 const ownFolders = [`LINECLEAR_CONFIG=${join(reports, "config")}`, `LINECLEAR_HOME=${join(reports, "home")}`, "LINECLEAR_PORT=0", "LINECLEAR_WEB_PORT=0"];
-const finish = (code: number, record?: (ok: boolean) => void): never => {
+const finish = (code: number): never => {
   trimCache(compileCacheDir());
   // jiti is the code gates' own transpile cache and playwright-daemon the browser sessions': not a test's folders
   // the UI suite's fixture is removed on its next start, and a browser killed by a failed spec never clears its profile: a failed run leaves both
@@ -62,7 +60,6 @@ const finish = (code: number, record?: (ok: boolean) => void): never => {
       n !== "reports",
   );
   rmSync(runTmp, { recursive: true, force: true });
-  record?.(code === 0 && left.length === 0);
   if (left.length > 0) {
     console.error(`check: the tests left ${left.length} folder${left.length === 1 ? "" : "s"} behind: ${left.slice(0, 10).join(" ")}`);
     process.exit(1);
@@ -74,7 +71,6 @@ const finish = (code: number, record?: (ok: boolean) => void): never => {
 type Step = { name: string; cmd: string[]; cwd?: string; needs?: string[] };
 
 const full = process.argv.includes("--full");
-const noCache = process.argv.includes("--no-cache");
 const onlyChanged = process.argv.includes("--changed");
 // the release run: load decides a test file's time there, not the code, so the times are recorded and not judged
 const untimed = process.argv.includes("--untimed");
@@ -87,7 +83,7 @@ const changed = known ?? [];
 const isDoc = (f: string) => f.startsWith("docs/") || f.endsWith(".md");
 // a change of docs alone reaches the doc checks and the tests that name the doc, and nothing else
 const code = known === undefined || changed.some((f) => !isDoc(f));
-// the server imports the check log of src/check-runs.ts (docs/architecture.md, check-line)
+// the server imports src/check-runs.ts (docs/architecture.md)
 const inServer = known === undefined || changed.some((f) => (f.startsWith("server/") && !isDoc(f)) || f === "src/check-runs.ts");
 const outsideServer = known === undefined || changed.some((f) => !f.startsWith("server/") && !isDoc(f));
 // the incremental build is kept between runs: the second run of the types takes a fraction of the first
@@ -113,10 +109,6 @@ const SERVER_INSTALL: Step = { name: "server install", cmd: ["bun", "install", "
 const loadDir = join(reports, "loads");
 let recording = false;
 
-// test files whose key (scripts/result-cache.ts) passed before are not run again; the keys of the others are recorded on a pass
-let passedKeys: Record<string, string> = {};
-let ran: string[] = [];
-
 function testSteps(): Step[] {
   const map = known ? readMap(".") : undefined;
   const reachedFiles = known
@@ -124,15 +116,8 @@ function testSteps(): Step[] {
         ?.filter((f) => existsSync(f) && !(onlyChanged && BUILDING_TESTS.includes(f)))
         .map((f) => `./${f}`)
     : undefined;
-  let files = reachedFiles;
-  if (files && map && !noCache) {
-    const split = splitCached(".", files, map.tests, Bun.version);
-    passedKeys = split.keys;
-    if (split.cached.length > 0) console.log(`check: ${split.cached.length} test file(s) passed before with the same files, not run again`);
-    files = split.run;
-  }
+  const files = reachedFiles;
   if (files?.length === 0) return [];
-  ran = files ?? [];
   const list = files ?? allTests();
   if (files === undefined) {
     recording = true;
@@ -306,13 +291,6 @@ if (slow) {
   console.error(`check: ${slow}`);
   failed ||= 1;
 }
-const record = (ok: boolean) => recordSteps(times, full ? "full" : onlyChanged ? "changed" : "lane", wall, factor, ok);
-if (failed !== 0) {
-  // EVERY_STEP_RAN of src/check-runs.ts: lineclear check reads it to know no step went unrun, so a failure of
-  // quarantined tests alone may pass
-  console.error("check: every step ran");
-  finish(failed, record);
-}
-if (!recording && !sharded) recordPassed(".", passedKeys, ran);
+if (failed !== 0) finish(failed);
 console.log(`check: passed in ${wall.toFixed(0)} s (budget 180 s on a machine that is not busy)`);
-finish(0, record);
+finish(0);

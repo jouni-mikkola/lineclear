@@ -4,7 +4,6 @@ import { writeAtomic } from "../pi/atomic.ts";
 import { configDir } from "../pi/config.ts";
 import { toolRun } from "../pi/heavy-tool.ts";
 import { basename, join, resolve } from "node:path";
-import type { Tier } from "./check-runs.ts";
 
 export const roles = ["worker", "reviewer", "planner"] as const;
 export type Role = (typeof roles)[number];
@@ -39,6 +38,8 @@ export type Settings = {
 };
 
 /** One tier of checks: its commands, run in turn, and the seconds they may take together on an idle machine. */
+export type Tier = "inner" | "merge" | "heavy";
+
 interface TierSpec {
   commands: string[];
   budgetS: number;
