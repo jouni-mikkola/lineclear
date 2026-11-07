@@ -1,7 +1,7 @@
 // A chat agent idle this long holds its pane for nothing: it is closed, and the next message starts it again with its session.
 
 /** how long a chat agent may sit idle before its pane closes */
-export const IDLE_CLOSE_MS = 20 * 60_000
+const IDLE_CLOSE_MS = 20 * 60_000
 
 export class ChatIdle {
   private since = new Map<string, number>()
