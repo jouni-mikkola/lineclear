@@ -1,23 +1,11 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { toolRun } from "../pi/heavy-tool.ts";
-import { serverBin } from "./paths.ts";
+import { boardSpaces } from "./board-store.ts";
 
-/** The space whose folder is this repo, from `lineclear space list`, or undefined. */
+/** The space whose folder is this repo, from the board's store, or undefined. */
 export function detectSpace(repo: string, env = process.env): string | undefined {
-  let listing: string;
-  try {
-    const p = Bun.spawnSync([serverBin(env), "space", "list"], { stderr: "ignore" });
-    if (p.exitCode !== 0) return undefined;
-    listing = p.stdout.toString();
-  } catch {
-    return undefined; // no lineclear to ask
-  }
-  for (const line of listing.split("\n")) {
-    const cols = line.trim().split(/\s{2,}/);
-    if (cols.length >= 2 && cols.includes(repo)) return cols[0];
-  }
-  return undefined;
+  return boardSpaces(env).find((s) => s.path === repo)?.name;
 }
 
 /**

@@ -1,8 +1,8 @@
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { writeAtomic } from "../pi/atomic.ts";
 import { startHerdr } from "./board.ts";
-import { dataDir, serverBin } from "./paths.ts";
+import { defaultEverywhere } from "./board-store.ts";
+import { serverBin } from "./paths.ts";
 import { realPush } from "./notify.ts";
 import { WEB_DIST } from "./web-files.ts";
 import { webHandler } from "./web.ts";
@@ -17,10 +17,7 @@ const PI_ROLES = ["task.agent", "coordinator.agent", "reviewer.agent"];
  * role; a board that has settings keeps them, so an update never swaps the agent that runs someone's tasks.
  */
 export function piByDefault(env: NodeJS.ProcessEnv = process.env): void {
-  const file = join(dataDir(env), "settings.json");
-  if (existsSync(file)) return;
-  mkdirSync(dataDir(env), { recursive: true });
-  writeAtomic(file, `${JSON.stringify({ machine: {}, spaces: {}, everywhere: Object.fromEntries(PI_ROLES.map((k) => [k, "pi"])) }, null, 2)}\n`);
+  defaultEverywhere(env, Object.fromEntries(PI_ROLES.map((k) => [k, "pi"])));
 }
 
 /**

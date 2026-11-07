@@ -1,5 +1,6 @@
+import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -11,16 +12,20 @@ beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "lineclear-project-"));
   repo = join(root, "myrepo");
   mkdirSync(repo);
-  const fake = join(root, "lineclear");
-  writeFileSync(fake, `#!/bin/sh\nprintf 'home  (home space)  /root\\nmyspace  MYR  ${repo}  github:x/y\\n'\n`);
-  chmodSync(fake, 0o755);
+  mkdirSync(join(root, "home"));
+  const store = new Database(join(root, "home", "store.sqlite"), { create: true });
+  store.exec("create table spaces (position integer primary key, data text not null)");
+  store
+    .query("insert into spaces (position, data) values (0, ?), (1, ?)")
+    .run(JSON.stringify({ name: "home", path: "/root" }), JSON.stringify({ name: "myspace", path: repo }));
+  store.close();
   env = {
     ...process.env,
     LINECLEAR_CONFIG: join(root, "config"),
     LINECLEAR_MAIN_HOME: join(root, "data"),
     LINECLEAR_PORT: "0",
     LINECLEAR_WEB_PORT: "0",
-    LINECLEAR_SERVER_BIN: fake,
+    LINECLEAR_HOME: join(root, "home"),
   };
 });
 beforeEach(() => chooseModels(join(root, "config")));
@@ -162,8 +167,8 @@ test("bin/lineclear project add writes projects/<name>/settings.json with every 
   expect(s.check).toContain("run check");
 });
 
-test("add works when lineclear is not installed, and rejects an empty model list", async () => {
-  env.LINECLEAR_SERVER_BIN = join(root, "no-such-lineclear");
+test("add works when the board has no store yet, and rejects an empty model list", async () => {
+  env.LINECLEAR_HOME = join(root, "no-board");
   const asked: string[] = [];
   const r = await run(["project", "add", repo, "--check", "true", "--worker", ",", "--reviewer", "b/z"], async (q) => {
     asked.push(q);

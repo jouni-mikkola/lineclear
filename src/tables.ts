@@ -11,6 +11,7 @@ const schema = `
 create table if not exists inbox (n integer primary key autoincrement, open integer not null, shelved integer not null, rev integer not null default 0, item text not null);
 create table if not exists waits (task text primary key, wait text not null);
 create table if not exists requests (task text primary key, since text not null, request text not null);
+create table if not exists setup (role text primary key, model text not null);
 `;
 
 const stores = new Map<string, Database>();
@@ -30,6 +31,7 @@ export function tables(env: Record<string, string | undefined> = process.env): D
     stores.set(file, store);
   }
   importFolders(store, config);
+  importSetupFiles(store, config);
   return store;
 }
 
@@ -44,6 +46,34 @@ function importFolders(store: Database, config: string): void {
     store.transaction(() => load(store, dir)).immediate();
     try {
       renameSync(dir, `${dir}.imported-${Date.now()}-${process.pid}`);
+    } catch {
+      // another process renamed it first
+    }
+  }
+}
+
+/** The role models of the files from before the table: `settings.json` (`setup` in it) and `setup.json`. The first of them to name a role wins. */
+function importSetupFiles(store: Database, config: string): void {
+  for (const name of ["settings.json", "setup.json"]) {
+    const file = join(config, name);
+    if (!existsSync(file)) continue;
+    let value: unknown;
+    try {
+      value = JSON.parse(readFileSync(file, "utf8"));
+    } catch (e) {
+      throw new Error(`${file} cannot be read as JSON (${(e as Error).message}); fix or remove the file, it is left unchanged`);
+    }
+    if (typeof value !== "object" || value === null || Array.isArray(value))
+      throw new Error(`${file} is not a JSON object; fix or remove the file, it is left unchanged`);
+    const roles = (name === "settings.json" ? (value as { setup?: unknown }).setup : value) ?? {};
+    store
+      .transaction(() => {
+        const put = store.query("insert or ignore into setup (role, model) values (?, ?)");
+        for (const [role, model] of Object.entries(roles as Record<string, unknown>)) if (typeof model === "string") put.run(role, model);
+      })
+      .immediate();
+    try {
+      renameSync(file, `${file}.imported-${Date.now()}-${process.pid}`);
     } catch {
       // another process renamed it first
     }
