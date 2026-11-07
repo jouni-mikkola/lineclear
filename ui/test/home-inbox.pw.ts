@@ -24,7 +24,7 @@ test("the strip names the project, the step, who asks and how long ago", async (
 
 test("the count opens the rest in place, grouped by project", async ({ page }) => {
   await open(page, "many");
-  await expect(page.locator("[data-inbox-more]")).toHaveText("+199");
+  await expect(page.locator("[data-inbox-more]")).toHaveText("+199 more asks");
   await page.locator("[data-inbox-more]").click();
   const groups = page.locator("[data-inbox-group]");
   await expect(groups).toHaveCount(3);

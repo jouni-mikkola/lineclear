@@ -95,6 +95,7 @@ test("the line shows every project to its main end, and +N names what it opens",
   expect(fit.lastTrack).toBeLessThanOrEqual(0);
   const more = page.locator("[data-inbox-more]");
   await expect(more).toHaveAccessibleName(/^Show \d+ more asks?$/);
+  await expect(more).toHaveText(/^\+\d+ more asks?$/);
   await expect(line).toHaveScreenshot("home-line-two.png");
 });
 
