@@ -27,6 +27,8 @@ export type Settings = {
   machines?: string[];
   /** False keeps the project off this machine: it starts only on its `machines`. True if unset. */
   local?: boolean;
+  /** False: this machine's loop starts no step for the repo and only runs what it is given. True if unset. */
+  starts?: boolean;
   /** What waits for the owner. Missing means the default: plans off, releases and spending on. */
   askBefore?: Partial<AskBefore>;
   /** Paused: the rules start none of its steps. Missing means Running. */

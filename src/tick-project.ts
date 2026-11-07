@@ -352,8 +352,15 @@ function startStep(s: Starting, step: Step): boolean {
       note("skip", stale, step.id);
       return false;
     }
+    // One claim per repo, taken before the task: the space names differ per machine, the repo's refs do not.
+    const claim = world.claimStep?.(settings.repo, step.id);
+    if (claim) {
+      note("skip", claim === "held" ? "another loop holds this step's claim on the repo" : `its claim cannot be made: ${claim}`, step.id);
+      return false;
+    }
     const err = addStepTask(s, step, host, worker, reviewer);
     if (err) {
+      world.releaseStep?.(settings.repo, step.id);
       note("skip", `task add failed: ${err}`, step.id, host ?? THIS_MACHINE);
       return false;
     }
@@ -458,6 +465,14 @@ export function tickProject(
 
   if (settings.paused) {
     note("skip", "the project is paused, no step starts");
+    return out;
+  }
+  if (!dryRun) {
+    const claimed = world.claimedSteps?.(settings.repo) ?? [];
+    for (const st of status) if (st.state === "done" && claimed.includes(st.id)) world.releaseStep?.(settings.repo, st.id);
+  }
+  if (settings.starts === false) {
+    note("skip", "this machine does not start steps for the repo (starts: false), it only runs what it is given");
     return out;
   }
   const cap = capacityOf(t, tasks, waits, rooms, overloaded, limit);

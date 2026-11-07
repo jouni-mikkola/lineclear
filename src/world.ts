@@ -1,6 +1,7 @@
 import { statSync } from "node:fs";
 import { loadavg } from "node:os";
 import { join } from "node:path";
+import { claimWorld } from "./claims.ts";
 import { sessionFolderPath } from "./harness-pi.ts";
 import { gitLimited as git } from "./git.ts";
 import { mainRefs, revertOnMain } from "./main-branch.ts";
@@ -40,6 +41,15 @@ export interface World {
   /** Reverts a commit on origin/main and pushes the revert, as a plain push. Returns an error text, or undefined. */
   revert(repo: string, commit: string): string | undefined;
   addTask(space: string, title: string, brief: string, extra: string[]): string | undefined;
+  /**
+   * Claims a step on the GitHub repo, once for every machine and space. Returns undefined when it is ours now,
+   * "held" when another loop has it, or an error text. A world with no claims lets every start through.
+   */
+  claimStep?(repo: string, step: string): string | undefined;
+  /** The steps claimed on the repo. */
+  claimedSteps?(repo: string): string[];
+  /** Deletes a step's claim. */
+  releaseStep?(repo: string, step: string): void;
   /** What another machine of the project says about its room and its tasks, or why it cannot be reached. */
   room?(host: string, space: string): Room | string;
   /** Makes a task on another machine (cloning the repo there once). */
@@ -238,6 +248,7 @@ export function realWorld(env = process.env): World {
     load: () => loadavg()[0] ?? 0,
     room: (host, space) => readRoom(host, space, env),
     ...gitWorld(refsOf),
+    ...claimWorld(run, (repo) => refsOf(repo)[0]),
     ...taskWorld(serverBin(env), io, env),
     stallCards: (space, repo) => io.memo(`stall\0${space}\0${repo}`, () => realStallCards(space, repo, env)),
     chatCards: (space, repo) => io.memo(`chat\0${space}\0${repo}`, () => realChatCards(space, repo, env)),

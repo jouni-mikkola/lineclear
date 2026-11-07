@@ -361,6 +361,31 @@ export async function failedLog(g: GitHub, cwd: string, link: string, lines = 15
   return tail.length > 1500 ? `…${tail.slice(-1500)}` : tail
 }
 
+const PERMISSION_TTL_MS = 60 * 60_000
+const RATE_LIMIT_BACKOFF_MS = 10 * 60_000
+const permissions = new Map<string, { at: number; ok: boolean; backoff?: boolean }>()
+
+/**
+ * Write permission on the GitHub repo, from the REST API (its own, larger limit; GraphQL's secondary limit failed every
+ * task add). Read once an hour per repo. On a rate limit the last answer, or yes, holds for a while: the push itself
+ * still fails when the permission is really missing.
+ */
+async function canWrite(g: GitHub, repo: string): Promise<boolean> {
+  const now = Date.now()
+  const key = `${g.host}/${g.repo}`
+  const known = permissions.get(key)
+  if (known && now - known.at < (known.backoff ? RATE_LIMIT_BACKOFF_MS : PERMISSION_TTL_MS)) return known.ok
+  const r = await gh(g, repo, 'api', `repos/${g.repo}`, '--jq', '.permissions | (.push or .maintain or .admin)')
+  if (!r.ok && /rate limit|abuse|secondary|HTTP 429/i.test(`${r.err}\n${r.out}`)) {
+    const ok = known?.ok ?? true
+    permissions.set(key, { at: now, ok, backoff: true })
+    return ok
+  }
+  const ok = r.ok && r.out.trim() === 'true'
+  permissions.set(key, { at: now, ok })
+  return ok
+}
+
 /** Check a named destination before a task gets a worktree. Never change origin/HEAD. */
 export async function validateBase(repo: string, base: string) {
   if (!base || base.startsWith('-') || !(await git(repo, 'check-ref-format', `refs/heads/${base}`)).ok)
@@ -373,9 +398,7 @@ export async function validateBase(repo: string, base: string) {
     if (!fetched.ok) throw new Error(`Cannot fetch branch ${base} from origin: ${(fetched.err || fetched.out).split('\n')[0]}`)
     const g = await github(repo)
     if (g) {
-      const r = await gh(g, repo, 'repo', 'view', `${g.host}/${g.repo}`, '--json', 'viewerPermission', '--jq', '.viewerPermission')
-      if (!r.ok || !['WRITE', 'MAINTAIN', 'ADMIN'].includes(r.out.trim()))
-        throw new Error(`Cannot confirm permission to merge into ${base} on GitHub. Sign in with repository write access first.`)
+      if (!(await canWrite(g, repo))) throw new Error(`Cannot confirm permission to merge into ${base} on GitHub. Sign in with repository write access first.`)
     } else {
       const r = await git(repo, 'push', '--dry-run', 'origin', `refs/remotes/origin/${base}:refs/heads/${base}`)
       if (!r.ok) throw new Error(`Cannot confirm permission to push ${base} to origin: ${(r.err || r.out).split('\n')[0]}`)

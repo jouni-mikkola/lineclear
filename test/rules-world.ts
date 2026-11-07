@@ -29,6 +29,10 @@ interface Opts {
   rounds?: number;
   load?: number;
   machine?: object;
+  /** The machine's own name for the project's space. "demo" if unset. */
+  space?: string;
+  /** Settings of the project beyond these. */
+  settings?: object;
 }
 
 /** A project in a temp folder, with a fake lineclear and a fake pi that only read and log files. */
@@ -91,8 +95,9 @@ esac`,
     join(config, "projects", "demo", "settings.json"),
     JSON.stringify({
       repo,
-      space: "demo",
+      space: o.space ?? "demo",
       check: "bun run check",
+      ...o.settings,
       ...(o.health ? { health: o.health } : {}),
       ...(o.rounds ? { reviewRounds: o.rounds } : {}),
       models: {
