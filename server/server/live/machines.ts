@@ -3,9 +3,10 @@ import { join } from 'node:path'
 import { HOME } from '../store.ts'
 import { machineStatus, savedMachines, type Saved } from './install.ts'
 import { MachinesActions } from './machines-actions.ts'
-import { kept } from './machines-helpers.ts'
+import { kept } from './kept.ts'
 export type { MachineRec } from './machines-helpers.ts'
-export { codeVersion, machineHome } from './machines-helpers.ts'
+export { machineHome } from './machines-helpers.ts'
+export { codeVersion } from './worker-process.ts'
 
 export class Machines extends MachinesActions {
   /** saved: herdr's list of machines; none (tests) runs only the workers adopt() names */

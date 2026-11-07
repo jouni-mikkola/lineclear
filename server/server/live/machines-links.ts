@@ -1,29 +1,17 @@
 import { WorkerHealth } from './recovery.ts'
 import { mkdirSync, openSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
-import type { Action, Chat, Snapshot } from '../../shared/types.ts'
-import { clock } from '../../shared/time.ts'
-import { Emitter } from '../source.ts'
-import { HOME, readJson, writeJson } from '../store.ts'
+import type { Chat } from '../../shared/types.ts'
+import { HOME, writeJson } from '../store.ts'
 import { boxInfo, helperVersion, installHelper, lacks, machineStatus, probe, savedMachines, type Probe, type Saved } from './install.ts'
-import { tellRunBy, type BoxInfo } from './box.ts'
+import { tellRunBy } from './box.ts'
 import { MERGE_DEADLINE } from './engine/engine.ts'
-import {
-  type Events,
-  type Link,
-  type Worker,
-  type Kept,
-  CONNECTING_FOR,
-  codeVersion,
-  running,
-  machineHome,
-  workerHome,
-  dirOf,
-  fits,
-  sameBox,
-} from './machines-helpers.ts'
+import type { Kept } from './kept.ts'
+import { LinkPoll, workerRecord } from './link-poll.ts'
+import { CONNECTING_FOR, type Link, dirOf, fits, machineHome, sameBox, workerHome } from './machines-helpers.ts'
+import { codeVersion, running, type Worker } from './worker-process.ts'
 
-export class MachinesLinks extends Emitter<Events> {
+export class MachinesLinks extends LinkPoll {
   constructor(
     protected saved: (() => Promise<Saved[]>) | null = savedMachines,
     protected status: typeof machineStatus = machineStatus,
@@ -31,10 +19,7 @@ export class MachinesLinks extends Emitter<Events> {
     super()
   }
 
-  protected links = new Map<string, Link>()
   protected timers: ReturnType<typeof setInterval>[] = []
-  protected stopped = false
-  protected pendingResume = new Map<string, Kept>()
 
   /** this server stops: the workers go on (the next start takes them back), and what each machine showed is kept */
   stop() {
@@ -52,9 +37,10 @@ export class MachinesLinks extends Emitter<Events> {
     const l = this.links.get(k.saved.label) ?? this.link(k.saved)
     l.probe = k.probe
     for (const c of k.chats ?? []) l.chats.set(c.key, c)
-    const was = readJson<{ port?: number; pid?: number; code?: string }>(join('workers', dirOf(k.saved.label), 'server.json'), {})
+    const was = workerRecord(k.saved.label)
     const w = running(was.pid)
-    if (w && was.port && was.code === codeVersion()) {
+    if (!w) return
+    if (was.port && was.code === codeVersion()) {
       this.own(l, w)
       l.rec.url = `http://127.0.0.1:${was.port}`
       l.state = 'Connecting…'
@@ -63,7 +49,6 @@ export class MachinesLinks extends Emitter<Events> {
       void this.refresh(l)
       return
     }
-    if (!w) return
     // its old worker finishes a merge on its way first (main.ts): the new one starts once it is gone, never beside it
     l.busy = true
     w.kill()
@@ -117,34 +102,6 @@ export class MachinesLinks extends Emitter<Events> {
     if (!t) this.keepTimers.set(l.rec.machine, setTimeout(write, 5000))
   }
 
-  protected own(l: Link, w: Worker) {
-    l.worker = w
-    w.exited.then(() => {
-      if (l.worker !== w) return
-      l.worker = undefined
-      l.ws?.close()
-      l.ws = undefined
-      l.reachable = false
-      l.rec.url = ''
-      l.state = 'Its worker stopped; starting it again'
-      this.emit('snapshot')
-    })
-  }
-
-  list() {
-    return [...this.links.values()]
-  }
-
-  /** whether herdr has this machine saved and enabled, looked at yet or not */
-  knows(label: string) {
-    return this.links.has(label)
-  }
-
-  /** the machines that have been looked at, as a worker is told of them (box.ts): where tasks may be placed */
-  boxes(): BoxInfo[] {
-    return [...this.links.values()].flatMap((l) => (l.probe ? [boxInfo(l.saved, l.probe)] : []))
-  }
-
   protected syncing = false
 
   /** the machines herdr has saved: a new one is set up and started, a removed one stopped */
@@ -179,11 +136,10 @@ export class MachinesLinks extends Emitter<Events> {
       for (const [label, l] of this.links)
         if (!saved.some((m) => m.label === label && m.enabled !== false)) {
           this.pendingResume.delete(label)
-          const pending = this.keepTimers.get(label)
-          if (pending) clearTimeout(pending)
+          clearTimeout(this.keepTimers.get(label))
           this.keepTimers.delete(label)
           l.ws?.close()
-          const worker = l.worker ?? running(readJson<{ pid?: number }>(join('workers', dirOf(label), 'server.json'), {}).pid)
+          const worker = l.worker ?? running(workerRecord(label).pid)
           worker?.kill()
           this.links.delete(label)
           rmSync(join(machineHome(label), 'last.json'), { force: true })
@@ -271,15 +227,11 @@ export class MachinesLinks extends Emitter<Events> {
     return p
   }
 
-  protected active(l: Link) {
-    return !this.stopped && !this.pendingResume.has(l.saved.label) && l.saved.enabled !== false && this.links.get(l.saved.label) === l
-  }
-
   protected async spawn(l: Link, p: Probe, home: string) {
     if (!this.active(l)) return
     const box = boxInfo(l.saved, p)
     // a worker left from before (another version of the code): one worker per machine
-    const prior = running(readJson<{ pid?: number }>(join('workers', dirOf(l.saved.label), 'server.json'), {}).pid)
+    const prior = running(workerRecord(l.saved.label).pid)
     if (prior) {
       prior.kill()
       await prior.exited
@@ -304,199 +256,12 @@ export class MachinesLinks extends Emitter<Events> {
     this.own(l, w)
     // its address, once it serves
     const look = setInterval(() => {
-      const port = readJson<{ port?: number }>(join('workers', dirOf(l.saved.label), 'server.json'), {}).port
+      const port = workerRecord(l.saved.label).port
       if (!port || l.worker !== w) return
       clearInterval(look)
       l.rec.url = `http://127.0.0.1:${port}`
       void this.poll(l)
     }, 300)
     setTimeout(() => clearInterval(look), 60_000)
-  }
-
-  protected async pollAll() {
-    await Promise.all([...this.links.values()].map((l) => this.poll(l)))
-  }
-
-  protected async poll(l: Link): Promise<void> {
-    if (!this.active(l) || l.polling) return
-    if (!l.rec.url && !this.moved(l)) {
-      l.health.observe(false)
-      if (l.worker && !l.busy && l.health.restartDue()) void this.restartUnhealthy(l)
-      return
-    }
-    l.polling = true
-    try {
-      const r = await fetch(`${l.rec.url}/api/snapshot`, { signal: AbortSignal.timeout(4000) })
-      if (!r.ok) throw new Error(String(r.status))
-      const snap = (await r.json()) as Snapshot
-      if (!this.active(l)) return
-      l.snap = snap
-      l.rec.lastSeen = Date.now()
-      const herdrUp = !!l.snap.machines?.length && !l.snap.machines.some((m) => m.status === 'off')
-      l.health.observe(herdrUp)
-      l.state = herdrUp ? 'Ready' : "Its herdr isn't answering"
-      l.connecting = false
-      this.keep(l)
-      if (!herdrUp) {
-        l.reachable = false
-        l.down ??= Date.now()
-        this.emit('snapshot')
-        return
-      }
-      // a worker started again: the live link is made again
-      if (!l.reachable || !l.ws) {
-        l.reachable = true
-        l.down = undefined
-        this.connect(l)
-        // what waited goes in now
-        const queued = l.waiting.splice(0)
-        for (const a of queued) await this.forward(l, a).catch(() => l.waiting.push(a))
-      }
-      this.emit('snapshot')
-    } catch {
-      if (!this.active(l)) return
-      l.health.observe(false)
-      if (this.moved(l)) return
-      if (l.reachable || l.down === undefined) {
-        l.reachable = false
-        l.down = l.down ?? Date.now()
-        this.emit('snapshot')
-      }
-    } finally {
-      l.polling = false
-      if (this.active(l) && l.worker && !l.busy && l.health.restartDue()) void this.restartUnhealthy(l)
-    }
-  }
-
-  /** Replace only our local worker; never stop remote herdr, panes or agents. */
-  protected async restartUnhealthy(l: Link) {
-    if (!this.active(l) || l.busy || !l.worker) return
-    l.busy = true
-    l.health.restarting()
-    console.info(`lineclear: ${l.rec.machine}: link unhealthy for 3 minutes; replacing worker`)
-    const w = l.worker
-    l.ws?.close()
-    l.ws = undefined
-    l.reachable = false
-    try {
-      w.kill()
-      // Do not spawn beside a draining worker, even if it takes longer than expected.
-      const force = setTimeout(() => {
-        if (l.worker === w) w.kill('SIGKILL')
-      }, MERGE_DEADLINE + 30_000)
-      try {
-        await w.exited
-      } finally {
-        clearTimeout(force)
-      }
-      if (l.worker === w) l.worker = undefined
-    } finally {
-      l.busy = false
-    }
-    if (this.active(l)) await this.start(l)
-  }
-
-  /** Its worker was started again out of this server's hands (lineclear doctor while another server ran, by hand)
-   *  and serves at another address: its server.json says where, and that worker is taken as this machine's. */
-  protected moved(l: Link): boolean {
-    if (l.busy) return false
-    const s = readJson<{ port?: number; pid?: number }>(join('workers', dirOf(l.saved.label), 'server.json'), {})
-    const url = s.port ? `http://127.0.0.1:${s.port}` : ''
-    if (!url || url === l.rec.url) return false
-    const w = s.pid === l.worker?.pid ? l.worker : running(s.pid)
-    if (!w) return false
-    if (w !== l.worker) this.own(l, w)
-    l.rec.url = url
-    // the live link is made again at the new address on its first answer
-    l.reachable = false
-    return true
-  }
-
-  protected connect(l: Link) {
-    l.ws?.close()
-    const url = new URL(`${l.rec.url}/api/ws`)
-    url.protocol = url.protocol.replace('http', 'ws')
-    const ws = new WebSocket(url)
-    l.ws = ws
-    ws.onopen = () => {
-      if (this.active(l) && l.ws === ws) ws.send(JSON.stringify({ type: 'watch', ...l.watching, link: true }))
-    }
-    ws.onmessage = (e) => {
-      if (!this.active(l) || l.ws !== ws) return
-      const m = JSON.parse(String(e.data))
-      if (m.type === 'chat') {
-        l.chats.set(m.chat.key, m.chat)
-        this.keep(l)
-        this.emit('chat', m.chat.key, m.chat)
-      } else if (m.type === 'terminal') this.emit('terminal', m.chat, { ansi: m.ansi, cols: m.cols, rows: m.rows })
-      else if (m.type === 'snapshot') {
-        l.snap = m.snapshot
-        this.keep(l)
-        this.emit('snapshot')
-      } else if (m.type === 'alert') this.emit('alert', m.alert)
-      else if (m.type === 'news') this.emit('news', l.rec.machine, m.news)
-    }
-    ws.onclose = () => {
-      if (l.ws === ws) l.ws = undefined
-    }
-  }
-
-  /** a machine's tasks as it last showed them over the link; out of reach they stay, marked, and nothing is written */
-  tasksOf(l: Link) {
-    const tasks = l.snap?.tasks ?? []
-    return l.reachable || l.connecting ? tasks : tasks.map((t) => ({ ...t, unreachableSince: clock(l.down ?? l.rec.lastSeen) }))
-  }
-
-  /* ---------- who owns what ---------- */
-
-  /** the machine a place, task or chat key belongs to */
-  owner(key: string): Link | undefined {
-    const m = key.match(/^[mp]:([^:]+)/)
-    if (m) return this.links.get(m[1])
-    const task = key.split('/')[0]
-    for (const l of this.links.values())
-      if (l.snap?.tasks.some((t) => t.id.toUpperCase() === task.toUpperCase() || t.aliases?.some((a) => a.toUpperCase() === task.toUpperCase()))) return l
-    return undefined
-  }
-
-  ownerOfAction(a: Action): Link | undefined {
-    const k = 'chat' in a ? a.chat : 'place' in a ? a.place : undefined
-    return k ? this.owner(k) : undefined
-  }
-
-  byName(machine: string) {
-    return [...this.links.values()].find((l) => l.rec.machine.toLowerCase() === machine.toLowerCase())
-  }
-
-  async act(l: Link, a: Action): Promise<unknown> {
-    if (!l.reachable) {
-      l.waiting.push(a)
-      return { waiting: true }
-    }
-    return this.forward(l, a)
-  }
-
-  protected async forward(l: Link, a: Action) {
-    const r = await fetch(`${l.rec.url}/api/action`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(a),
-      signal: AbortSignal.timeout(20_000),
-    })
-    return r.json()
-  }
-
-  protected screenWatch: { chats: string[]; term: string | null } = { chats: [], term: null }
-
-  watch(chats: string[], term: string | null) {
-    this.screenWatch = { chats, term }
-    for (const l of this.links.values()) {
-      const mine = chats.filter((k) => this.owner(k) === l)
-      const t = term && this.owner(term) === l ? term : null
-      const next = { chats: mine, term: t }
-      if (JSON.stringify(next) === JSON.stringify(l.watching)) continue
-      l.watching = next
-      if (l.ws?.readyState === WebSocket.OPEN) l.ws.send(JSON.stringify({ type: 'watch', ...next, link: true }))
-    }
   }
 }
