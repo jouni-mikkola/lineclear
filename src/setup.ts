@@ -2,7 +2,7 @@ import { company } from "./company.ts";
 import { type ModelEntry, readRegistry } from "./models.ts";
 import { type Ask, readSetup, saveSetup, type Setup, type SetupRole, setupRoles } from "./project.ts";
 
-const roleLabel: Record<SetupRole, string> = { worker: "worker", reviewer: "reviewer", planner: "planner", stepChecker: "step checker" };
+const roleLabel: Record<SetupRole, string> = { worker: "worker", reviewer: "reviewer", stepChecker: "step checker" };
 const flagOf = (r: SetupRole) => (r === "stepChecker" ? "step-checker" : r);
 
 /** Each harness with the accounts (providers) logged in on it and how many models they offer. */
@@ -43,7 +43,7 @@ export function saveOffered(choice: Setup, registry: ModelEntry[], env = process
   return saveSetup(choice, company, env);
 }
 
-/** `lineclear setup [--worker M --reviewer M --planner M --step-checker M]`: asks for each role not given, as `provider/name`. */
+/** `lineclear setup [--worker M --reviewer M --step-checker M]`: asks for each role not given, as `provider/name`. */
 export async function setupMain(
   args: string[],
   out: (l: string) => void,

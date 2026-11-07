@@ -12,7 +12,7 @@ const fresh = () => {
   mkdirSync(join(root, "config", "projects", "alpha"), { recursive: true });
   writeFileSync(
     join(root, "config", "projects", "alpha", "settings.json"),
-    JSON.stringify({ repo: join(root, "alpha"), space: "alpha-space", check: "true", models: { worker: ["a"], reviewer: ["b"], planner: ["c"] } }),
+    JSON.stringify({ repo: join(root, "alpha"), space: "alpha-space", check: "true", models: { worker: ["a"], reviewer: ["b"] } }),
   );
   return env;
 };

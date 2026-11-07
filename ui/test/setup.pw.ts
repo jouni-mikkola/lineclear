@@ -39,7 +39,7 @@ test("the first run lists what is found, preselects nothing, saves, and Settings
   startSetup(MODELS);
   await page.goto("/setup");
   await expect(page.locator('[data-harness="pi"]')).toContainText("anthropic (2 models), openai-codex (1 model)");
-  for (const role of ["worker", "reviewer", "planner", "stepChecker"]) await expect(page.locator(`[data-role-pick="${role}"]`)).toHaveValue("");
+  for (const role of ["worker", "reviewer", "stepChecker"]) await expect(page.locator(`[data-role-pick="${role}"]`)).toHaveValue("");
 
   await pick(page, "worker", "anthropic/claude-sonnet-4");
   await pick(page, "reviewer", "anthropic/claude-opus-4");
@@ -47,7 +47,6 @@ test("the first run lists what is found, preselects nothing, saves, and Settings
   await expect(page.locator("[data-setup-status]")).toContainText("worker's company");
 
   await pick(page, "reviewer", "openai-codex/gpt-6.1-sol");
-  await pick(page, "planner", "anthropic/claude-opus-4");
   await pick(page, "stepChecker", "openrouter/kimi-k2");
   await page.getByTestId("save-setup").click();
   await expect(page.locator("[data-setup-status]")).toHaveText("Saved.");
@@ -60,9 +59,7 @@ test("the first run lists what is found, preselects nothing, saves, and Settings
   await page.goto("/settings");
   await page.locator('[data-section="Models"]').click();
   await expect(page.locator('[data-setup-choice] [data-role-pick="worker"]')).toHaveValue("anthropic/claude-sonnet-4");
-  await pick(page, "planner", "anthropic/claude-sonnet-4");
   await page.getByTestId("save-setup").click();
   await expect(page.locator("[data-setup-status]")).toHaveText("Saved.");
   await page.goto("/setup");
-  await expect(page.locator('[data-role-pick="planner"]')).toHaveValue("anthropic/claude-sonnet-4");
 });

@@ -6,7 +6,7 @@ import { nearest } from "./resolve.ts";
 import { roadmapData } from "./roadmap-view.ts";
 import { tables } from "./tables.ts";
 
-// A request is one goal handed to the planner with `lineclear plan`. It is kept by its planning task, so the steps
+// A request is one goal handed to the Dispatcher with `lineclear plan`. It is kept by its plan id (PLAN-n), so the steps
 // that plan adds can be followed: on the roadmap view at its live link, and with `lineclear status --plan <task>`.
 
 export interface PlanRequest {
@@ -23,7 +23,7 @@ type PlanState = "planning" | "approve" | "approved" | "rejected" | "closed";
 
 export interface PlanView extends PlanRequest {
   state: PlanState;
-  /** The steps the plan adds, by id, from its diff. None until the planner sends it. */
+  /** The steps the plan adds, by id, from its diff. None until the Dispatcher sends it. */
   steps: string[];
   /** The plan's Inbox item, the latest when it was sent back once. */
   item?: Item;
@@ -61,7 +61,7 @@ function planView(r: PlanRequest, items: Item[] = readItems(process.env)): PlanV
   let state: PlanState = "planning";
   if (item?.closed !== undefined) state = "closed";
   else if (item?.answer === "Approve") state = "approved";
-  // a first rejection goes back to the planner with your note
+  // a first rejection goes back to the Dispatcher with your note
   else if (item?.answer !== undefined) state = (item.round ?? 1) < 2 ? "planning" : "rejected";
   else if (item) state = "approve";
   return { ...r, state, steps: item?.diff ? addedSteps(item.diff) : [], ...(item ? { item } : {}), live: liveLink(r.project, r.task) };
@@ -76,7 +76,7 @@ export const planViews = (env: Env = process.env) => {
 };
 
 const SAID: Record<PlanState, string> = {
-  planning: "the planner writes the steps",
+  planning: "the Dispatcher writes the steps",
   approve: "the steps wait for your approval",
   approved: "approved, the steps are in the roadmap",
   rejected: "rejected",
@@ -125,6 +125,7 @@ export function planStatus(out: (l: string) => void, env: Env = process.env, tas
   for (const v of shown) {
     const item = v.state === "approve" && v.item ? ` (Inbox ${v.item.n})` : "";
     out(`${v.task}  ${v.project}  "${v.goal}": ${SAID[v.state]}${item}. Live: ${v.live}`);
+    if (v.state === "planning" && v.item?.note) out(`  the owner sent it back: ${v.item.note}`);
     if (v.steps.length === 0) continue;
     if (v.state !== "approved") {
       out(`  steps: ${v.steps.join(", ")}`);

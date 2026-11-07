@@ -44,7 +44,7 @@ function setup(projects = ["demo"], withRepos = true) {
     mkdirSync(join(config, "projects", name), { recursive: true });
     writeFileSync(
       join(config, "projects", name, "settings.json"),
-      JSON.stringify({ repo, space: name, check: "true", askBefore: { plans: true }, models: { worker: [], reviewer: [], planner: [] } }),
+      JSON.stringify({ repo, space: name, check: "true", askBefore: { plans: true }, models: { worker: [], reviewer: [] } }),
     );
   }
   const calls = () =>
@@ -120,10 +120,9 @@ test("setup makes a regular-mode space with pi, and plans go to the project's sp
     ["set", "coordinator.agent", "pi", "--space", "dispatcher"],
     ["set", "coordinator.model", DISPATCHER_MODEL, "--space", "dispatcher"],
   ]);
-  // A plan started from the Dispatcher puts its task in the project's space.
+  // A plan started from the Dispatcher is its own and starts no task.
   expect(planMain(["demo", "Ship it"], () => {}, t.env, dispatcherDir(t.env))).toBe(0);
-  const add = t.calls().find((c) => c[0] === "task")!;
-  expect(add[add.indexOf("--space") + 1]).toBe("demo");
+  expect(t.calls().find((c) => c[0] === "task")).toBeUndefined();
   expect(t.run((o) => dispatcherMain([], o, t.env)).code).toBe(2);
 });
 
@@ -177,7 +176,7 @@ test("nothing the rule loop or a project add does names the Dispatcher's space, 
   const { project } = await import("../src/project-cli.ts");
   const lines: string[] = [];
   const code = await project(
-    ["add", t.repos.demo!, "--name", "again", "--space", "dispatcher", "--check", "true", "--worker", "a/b", "--reviewer", "a/b", "--planner", "a/b"],
+    ["add", t.repos.demo!, "--name", "again", "--space", "dispatcher", "--check", "true", "--worker", "a/b", "--reviewer", "a/b"],
     null,
     (l) => lines.push(l),
     t.env,

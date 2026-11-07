@@ -28,7 +28,7 @@ afterEach(() => rmSync(root, { recursive: true, force: true }));
 
 import { chooseModels, keepSecret, runCli } from "./helpers.ts";
 
-const models = ["--worker", "a/x,a/y", "--reviewer", "b/z", "--planner", "c/w"];
+const models = ["--worker", "a/x,a/y", "--reviewer", "b/z"];
 const settingsFile = (name = "myrepo") => join(root, "config", "projects", name, "settings.json");
 
 const run = (args: string[], ask: ((q: string) => Promise<string>) | null = null) => runCli(env, args, ask);
@@ -44,7 +44,7 @@ test("add detects the space and a package.json check script", async () => {
     check: "bun run check",
     heavy: ["bun run check"],
     askBefore: { plans: false, releases: true, spending: true },
-    models: { worker: ["a/x", "a/y"], reviewer: ["b/z"], planner: ["c/w"] },
+    models: { worker: ["a/x", "a/y"], reviewer: ["b/z"] },
   });
 });
 
@@ -70,7 +70,7 @@ test("add writes every field of the settings file: repo, space, check, health an
   expect(s.space).toBe("myspace");
   expect(s.check).toBe("make check");
   expect(s.health).toBe("curl x");
-  expect(s.models).toEqual({ worker: ["a/x", "a/y"], reviewer: ["b/z"], planner: ["c/w"] });
+  expect(s.models).toEqual({ worker: ["a/x", "a/y"], reviewer: ["b/z"] });
 });
 
 test("add asks only for what is missing", async () => {
@@ -81,10 +81,9 @@ test("add asks only for what is missing", async () => {
     return q.includes("reviewer") ? "r/1, r/2" : "p/1";
   });
   expect(r.code).toBe(0);
-  expect(asked).toHaveLength(2);
+  expect(asked).toHaveLength(1);
   expect(asked[0]).toContain("reviewer");
-  expect(asked[1]).toContain("planner");
-  expect(JSON.parse(readFileSync(settingsFile(), "utf8")).models).toEqual({ worker: ["a/x"], reviewer: ["r/1", "r/2"], planner: ["p/1"] });
+  expect(JSON.parse(readFileSync(settingsFile(), "utf8")).models).toEqual({ worker: ["a/x"], reviewer: ["r/1", "r/2"] });
 });
 
 test("add without a way to ask names what is missing and writes nothing", async () => {
@@ -92,7 +91,6 @@ test("add without a way to ask names what is missing and writes nothing", async 
   expect(r.code).toBe(1);
   expect(r.out).toContain("--check");
   expect(r.out).toContain("--reviewer");
-  expect(r.out).toContain("--planner");
   expect(existsSync(settingsFile())).toBe(false);
 });
 
@@ -160,14 +158,14 @@ test("bin/lineclear project add writes projects/<name>/settings.json with every 
   });
   expect(p.exitCode).toBe(0);
   const s = JSON.parse(readFileSync(settingsFile(), "utf8"));
-  expect(s).toMatchObject({ repo, space: "myspace", health: "curl x", models: { worker: ["a/x", "a/y"], reviewer: ["b/z"], planner: ["c/w"] } });
+  expect(s).toMatchObject({ repo, space: "myspace", health: "curl x", models: { worker: ["a/x", "a/y"], reviewer: ["b/z"] } });
   expect(s.check).toContain("run check");
 });
 
 test("add works when lineclear is not installed, and rejects an empty model list", async () => {
   env.LINECLEAR_SERVER_BIN = join(root, "no-such-lineclear");
   const asked: string[] = [];
-  const r = await run(["project", "add", repo, "--check", "true", "--worker", ",", "--reviewer", "b/z", "--planner", "c/w"], async (q) => {
+  const r = await run(["project", "add", repo, "--check", "true", "--worker", ",", "--reviewer", "b/z"], async (q) => {
     asked.push(q);
     return q.includes("space") ? "typed" : "a/x";
   });

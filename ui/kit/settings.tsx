@@ -7,7 +7,7 @@ import type { Reason } from "./model-list.tsx";
 // Settings: the model list of each role, and each project's commands and
 // secret names. The spec is docs/design.md.
 
-export const ROLES = ["worker", "reviewer", "planner"] as const;
+export const ROLES = ["worker", "reviewer"] as const;
 export type Role = (typeof ROLES)[number];
 
 export interface ProjectSettings {

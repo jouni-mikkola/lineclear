@@ -32,7 +32,7 @@ export const commands: Record<string, string> = {
   doctor: "Check each part and name the command that fixes a problem (--here checks only this machine)",
   project: "Add, list, change, remove and check projects",
   roadmap: "Check or show the roadmap (roadmap show <id> prints one step)",
-  setup: "Choose a model for the worker, reviewer, planner and step checker from the logged-in harnesses (the reviewer from another company than the worker)",
+  setup: "Choose a model for the worker, reviewer and step checker from the logged-in harnesses (the reviewer from another company than the worker)",
   run: "Run Lineclear's one server: the same as serve. One tick of the rules: --once (--dry-run shows it)",
   serve: "Run Lineclear's one server: the rule loop, the web pages and the board on one port: serve --port <port>",
   space: "The board's spaces: space add <path> --name <name>, space list, space rename, space remove",

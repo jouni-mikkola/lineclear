@@ -13,10 +13,7 @@ function config(names: Record<string, string>) {
   temps.push(dir);
   for (const [name, repo] of Object.entries(names)) {
     mkdirSync(join(dir, "projects", name), { recursive: true });
-    writeFileSync(
-      join(dir, "projects", name, "settings.json"),
-      JSON.stringify({ repo, space: name, check: "true", models: { worker: [], reviewer: [], planner: [] } }),
-    );
+    writeFileSync(join(dir, "projects", name, "settings.json"), JSON.stringify({ repo, space: name, check: "true", models: { worker: [], reviewer: [] } }));
   }
   return { ...process.env, LINECLEAR_CONFIG: dir };
 }

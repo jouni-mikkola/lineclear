@@ -18,7 +18,7 @@ function fake(body: string): string {
 
 const registry = () => readRegistry(harnesses({ PI_BIN: fake(`printf 'provider model\\nanthropic opus-x\\nopenai-codex gpt-y\\n'`) }));
 const configEnv = () => ({ ...process.env, LINECLEAR_CONFIG: mkdtempSync(join(tmpdir(), "setup-cfg-")) });
-const flags = ["--worker", "anthropic/opus-x", "--reviewer", "openai-codex/gpt-y", "--planner", "anthropic/opus-x", "--step-checker", "openai-codex/gpt-y"];
+const flags = ["--worker", "anthropic/opus-x", "--reviewer", "openai-codex/gpt-y", "--step-checker", "openai-codex/gpt-y"];
 
 test("a fake harness: a choice is saved and read back", async () => {
   const env = configEnv();
@@ -28,7 +28,6 @@ test("a fake harness: a choice is saved and read back", async () => {
   expect(readSetup(env)).toEqual({
     worker: "anthropic/opus-x",
     reviewer: "openai-codex/gpt-y",
-    planner: "anthropic/opus-x",
     stepChecker: "openai-codex/gpt-y",
   });
   expect(setupGate(env)).toBeUndefined();
@@ -80,14 +79,11 @@ test("the web view lists harnesses and accounts, and saves through the same chec
 
 test("a role model set in Settings is the next task's model, and setup.json is migrated once and deleted", () => {
   const env = { ...process.env, LINECLEAR_CONFIG: mkdtempSync(join(tmpdir(), "lc-store-")) };
-  writeFileSync(join(env.LINECLEAR_CONFIG, "setup.json"), JSON.stringify({ worker: "a/old", reviewer: "b/r", planner: "a/old", stepChecker: "b/r" }));
+  writeFileSync(join(env.LINECLEAR_CONFIG, "setup.json"), JSON.stringify({ worker: "a/old", reviewer: "b/r", stepChecker: "b/r" }));
   expect(readSetup(env).worker).toBe("a/old");
   expect(existsSync(join(env.LINECLEAR_CONFIG, "setup.json"))).toBe(false);
   mkdirSync(join(projectsDir(env), "p"), { recursive: true });
-  writeFileSync(
-    join(projectsDir(env), "p", "settings.json"),
-    JSON.stringify({ repo: "/r", space: "p", check: "true", models: { worker: [], reviewer: [], planner: [] } }),
-  );
+  writeFileSync(join(projectsDir(env), "p", "settings.json"), JSON.stringify({ repo: "/r", space: "p", check: "true", models: { worker: [], reviewer: [] } }));
   expect((readSettings("p", env) as Settings).models.worker).toEqual(["a/old"]);
   expect(saveSetup({ worker: "a/new" }, (m) => m.split("/")[0]!, env)).toBeUndefined();
   expect((readSettings("p", env) as Settings).models.worker).toEqual(["a/new"]);
@@ -111,9 +107,9 @@ describe("the machine settings file", () => {
   test("a v1 file migrates to v2 keeping every role's model and leaving settings.json.v1.bak", () => {
     const env = configEnv();
     mkdirSync(configDir(env), { recursive: true });
-    const old = JSON.stringify({ setup: { worker: "a/x", reviewer: "b/y", planner: "a/z", stepChecker: "b/s" } });
+    const old = JSON.stringify({ setup: { worker: "a/x", reviewer: "b/y", stepChecker: "b/s" } });
     writeFileSync(file(env), old);
-    expect(readSetup(env)).toEqual({ worker: "a/x", reviewer: "b/y", planner: "a/z", stepChecker: "b/s" });
+    expect(readSetup(env)).toEqual({ worker: "a/x", reviewer: "b/y", stepChecker: "b/s" });
     expect(JSON.parse(readFileSync(file(env), "utf8")).version).toBe(2);
     expect(storeVersion(env)).toBe(2);
     expect(readFileSync(`${file(env)}.v1.bak`, "utf8")).toBe(old);

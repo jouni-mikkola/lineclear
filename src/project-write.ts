@@ -73,7 +73,7 @@ export async function addProject(args: string[], ask: Ask, out: (l: string) => v
   if (rest.length !== 1)
     return fail(
       out,
-      "usage: lineclear project add <repo> [--name N] [--space S] [--check CMD] [--health CMD] [--heavy CMD]... [--worker M,M] [--reviewer M,M] [--planner M,M]",
+      "usage: lineclear project add <repo> [--name N] [--space S] [--check CMD] [--health CMD] [--heavy CMD]... [--worker M,M] [--reviewer M,M]",
     );
   const tierFlag = Object.keys(flags).find((f) => tierFlagNames.includes(f.replace(/-budget$/, "")));
   if (tierFlag) return fail(out, `add proposes the tiers from the repo; change them after with 'lineclear project set <name> --${tierFlag} ...'`);
@@ -147,7 +147,7 @@ export function setProject(args: string[], out: (l: string) => void, env = proce
   if (rest.length !== 1 || flags.name || flags.space || Object.keys(flags).length === 0) {
     return fail(
       out,
-      "usage: lineclear project set <name> [--check CMD] [--health CMD] [--heavy CMD]... [--worker M,M] [--reviewer M,M] [--planner M,M] [--ask-plans on|off] [--ask-releases on|off] [--ask-spending on|off] [--inner CMD]... [--merge CMD]... [--after-merge CMD]... [--inner-budget S] [--merge-budget S] [--after-merge-budget S] [--paused on|off] [--step-check on|off]",
+      "usage: lineclear project set <name> [--check CMD] [--health CMD] [--heavy CMD]... [--worker M,M] [--reviewer M,M] [--ask-plans on|off] [--ask-releases on|off] [--ask-spending on|off] [--inner CMD]... [--merge CMD]... [--after-merge CMD]... [--inner-budget S] [--merge-budget S] [--after-merge-budget S] [--paused on|off] [--step-check on|off]",
     );
   }
   const paused = flags.paused;

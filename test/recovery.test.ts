@@ -67,7 +67,7 @@ esac`,
       repo,
       space: "demo",
       check: "bun run check",
-      models: { worker: ["anthropic/claude-sonnet-5-5"], reviewer: ["openai-codex/gpt-6.1-sol"], planner: ["anthropic/claude-opus-5-5"] },
+      models: { worker: ["anthropic/claude-sonnet-5-5"], reviewer: ["openai-codex/gpt-6.1-sol"] },
     }),
   );
   writeFileSync(join(config, "machine.json"), JSON.stringify({ loadPerCore: 1e6 }));

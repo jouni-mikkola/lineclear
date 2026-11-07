@@ -53,7 +53,7 @@ test("Settings has three sections and no status: sections at the left on a deskt
   }
   await page.goto("/settings?state=filled");
   await openSection(page, "Models");
-  for (const role of ["worker", "reviewer", "planner"]) await expect(page.locator(`[data-models="${role}"]`)).toBeVisible();
+  for (const role of ["worker", "reviewer"]) await expect(page.locator(`[data-models="${role}"]`)).toBeVisible();
   await expect(page.locator("[data-machine], [role=meter]")).toHaveCount(0);
 });
 

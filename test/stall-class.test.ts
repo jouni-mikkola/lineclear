@@ -29,7 +29,7 @@ function setup(list: T[] = [{ id: "LIN-5", title: "A Alpha", status: "work" }], 
   const dir = scratchDir("stall-class");
   const config = join(dir, "config");
   mkdirSync(join(config, "projects", "demo"), { recursive: true });
-  const models = { worker: ["anthropic/claude-sonnet-5-5"], reviewer: ["anthropic/claude-opus-5-5"], planner: ["anthropic/claude-opus-5-5"] };
+  const models = { worker: ["anthropic/claude-sonnet-5-5"], reviewer: ["anthropic/claude-opus-5-5"] };
   writeFileSync(join(config, "projects", "demo", "settings.json"), JSON.stringify({ repo: dir, space: "demo", check: "true", self: true, models }));
   writeFileSync(join(config, "machine.json"), JSON.stringify({ loadLimit: 1e6 }));
   recordTaskSteps(config, Object.fromEntries(list.filter((t) => t.id !== "LIN-198").map((t) => [t.id, t.title.split(" ")[0] as string])));

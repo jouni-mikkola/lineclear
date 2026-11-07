@@ -8,7 +8,6 @@ import type { SetupView } from "../../../src/setup.ts";
 const MODELS = {
   worker: ["vendor-a/model-mid", "vendor-b/model-code", "vendor-c/model-pro"],
   reviewer: ["vendor-b/model-code", "vendor-a/model-top"],
-  planner: ["vendor-a/model-top", "vendor-c/model-pro"],
 };
 
 const R = {
@@ -21,7 +20,6 @@ const R = {
 const REASONS = {
   worker: [R.full, R.use, R.next],
   reviewer: [R.unreported, R.next],
-  planner: [R.use, R.next],
 };
 
 function filled(): SettingsData {
@@ -68,7 +66,6 @@ function long(): SettingsData {
         models: {
           worker: ["openrouter/some-provider/a-model-with-a-really-long-name-and-version-2026-10-01-preview", ...MODELS.worker],
           reviewer: MODELS.reviewer,
-          planner: MODELS.planner,
         },
         reasons: { ...REASONS, worker: [R.use, ...REASONS.worker.map((r) => (r === R.use ? R.next : r))] },
         secrets: ["A_SECRET_WITH_A_LONG_NAME_FOR_THE_STAGING_PAYMENT_PROVIDER_TOKEN", "SENTRY_DSN"],

@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
+import { sendToDispatcher } from "./chat.ts";
 import { serverBin } from "./paths.ts";
 import { currentModelFile } from "./company.ts";
 import { companyOfModel, describeOne, type ModelFile, tierRank } from "./models.ts";
@@ -163,9 +164,13 @@ function spaceFor(repo: string, name: string, env: Env): string | { error: strin
 
 /**
  * Starts a project as Home's Start does: its space made when it has none, saved where `lineclear project add` saves,
- * and, without a roadmap, a planning task that writes the first one. Returns the name, or why not in plain words.
+ * and, without a roadmap, the Dispatcher is handed the plan for the first one. Returns the name, or why not in plain words.
  */
-export async function saveProject(body: NewProject, env: Env): Promise<{ name: string; planning?: boolean } | { error: string; status: number }> {
+export async function saveProject(
+  body: NewProject,
+  env: Env,
+  send: (text: string, env: Env) => Promise<string | undefined> = sendToDispatcher,
+): Promise<{ name: string; planning?: boolean } | { error: string; status: number }> {
   const text = (v: unknown) => (typeof v === "string" ? v.trim() : "");
   const repo = repoFolder(text(body.repo), env);
   if (typeof repo !== "string") return { error: repo.error, status: 400 };
@@ -179,7 +184,7 @@ export async function saveProject(body: NewProject, env: Env): Promise<{ name: s
   const said: string[] = [];
   const list = models.join(",");
   const code = await addProject(
-    [repo, "--name", name, "--space", space, "--check", text(body.check), "--worker", list, "--reviewer", list, "--planner", list],
+    [repo, "--name", name, "--space", space, "--check", text(body.check), "--worker", list, "--reviewer", list],
     null,
     (l) => said.push(l),
     env as NodeJS.ProcessEnv,
@@ -188,16 +193,19 @@ export async function saveProject(body: NewProject, env: Env): Promise<{ name: s
     const why = said.join(" ");
     return { error: sentence(why), status: why.includes("already exists") ? 409 : 400 };
   }
-  // own processes, as the commands: the planner leans on the loop, whose web pages call this
+  // own processes, as the commands: the Dispatcher leans on the loop, whose web pages call this
   const lineclear = (...args: string[]) =>
     Bun.spawnSync([process.execPath, join(import.meta.dir, "..", "bin", "lineclear"), ...args], { env: env as NodeJS.ProcessEnv, stdin: "ignore" });
+  // the plan runs as the Dispatcher's own: the command prints its instructions and this function sends them to the chat
   // the chat's Dispatcher comes with the first project; setting it up again changes nothing
   lineclear("dispatcher", "setup");
   if (existsSync(join(repo, "docs", "ROADMAP.md"))) return { name };
-  const plan = lineclear("plan", name, FIRST_ROADMAP);
-  if (plan.exitCode !== 0) {
-    const said = `${plan.stdout.toString()} ${plan.stderr.toString()}`.replace(/\s+/g, " ").trim();
-    return { error: `${name} is added, but its first roadmap did not start. ${sentence(said)}`, status: 502 };
-  }
+  const plan = Bun.spawnSync([process.execPath, join(import.meta.dir, "..", "bin", "lineclear"), "plan", name, FIRST_ROADMAP], {
+    env: { ...env, LINECLEAR_ROLE: "dispatcher" } as NodeJS.ProcessEnv,
+    stdin: "ignore",
+  });
+  // the Dispatcher writes the plan: hand it the instructions `lineclear plan` printed
+  const failed = plan.exitCode === 0 ? await send(plan.stdout.toString(), env) : `${plan.stdout.toString()} ${plan.stderr.toString()}`;
+  if (failed) return { error: `${name} is added, but its first roadmap did not start. ${sentence(failed.replace(/\s+/g, " ").trim())}`, status: 502 };
   return { name, planning: true };
 }

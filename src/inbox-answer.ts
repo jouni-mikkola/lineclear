@@ -1,4 +1,4 @@
-import { undoApplied } from "./plan-apply.ts";
+import { isPlanId, mergeTask, planRef, undoApplied } from "./plan-apply.ts";
 import { applyMove } from "./dispatcher.ts";
 import { answerCard, isOpen, type Item, KIND_LABEL, readAllItems, lineclear, saveItem, usage, waitReason } from "./inbox.ts";
 import { readSettings } from "./project.ts";
@@ -67,7 +67,13 @@ function deliverAnswer(item: Item, choice: string, note: string | undefined, res
   if (item.kind === "plan" && choice === "Approve") {
     const stale = staleBranch(item, env);
     if (stale) return stale;
-    p = run("merge", item.task);
+    if (isPlanId(item.task)) {
+      const repo = item.project ? readSettings(item.project, env) : "no project";
+      const merged = typeof repo === "object" ? mergeTask(item.task, repo.repo, env) : repo;
+      if (typeof merged === "string") return `lineclear inbox: failed: ${merged}`;
+    } else p = run("merge", item.task);
+  } else if (item.kind === "plan" && isPlanId(item.task)) {
+    // the Dispatcher wrote it and has no task to tell or close: it reads the answer from the plan's status
   } else if (item.kind === "plan") {
     if (resend) message = `The owner rejected the plan: ${note}. Change docs/ROADMAP.md as the note says, commit, and run \`lineclear plan submit\` once more.`;
     else p = run("task", "close", item.task);
@@ -78,7 +84,7 @@ function deliverAnswer(item: Item, choice: string, note: string | undefined, res
   const cardError = p.exitCode === 0 && item.card ? answerCard(item.card, choice, env) : undefined;
   if (cardError) return `lineclear inbox: failed: ${cardError}`;
   if (p.exitCode !== 0) return `lineclear inbox: failed: ${said(p)}`;
-  if (resend) {
+  if (resend && !isPlanId(item.task)) {
     p = run("task", "tell", item.task, message);
     if (p.exitCode !== 0) return `lineclear inbox: task tell failed: ${said(p)}`;
   }
@@ -89,14 +95,15 @@ function deliverAnswer(item: Item, choice: string, note: string | undefined, res
 function answeredLine(item: Item, choice: string, resend: boolean): string {
   if (item.kind !== "plan") return item.task === "-" ? `answered: ${choice}` : `${item.task} was told: ${choice}`;
   if (choice === "Approve") return `${item.task} was merged`;
+  if (isPlanId(item.task)) return `${item.task} was rejected, the Dispatcher reads the note in its status`;
   return resend ? `${item.task} was told to change the plan` : `${item.task} was closed`;
 }
 
 /** Approving a plan merges it only if the branch is still what the owner saw: the line to say when it is not. */
 function staleBranch(item: Item, env: NodeJS.ProcessEnv): string | undefined {
   const repo = item.project ? readSettings(item.project, env) : undefined;
-  const n = /-(\d+)$/.exec(item.task)?.[1];
-  if (!item.head || typeof repo !== "object" || !n) return undefined;
-  const now = gitText(repo.repo, "for-each-ref", "--format=%(objectname)", `refs/heads/work/${n}-*`) ?? "";
-  return now === item.head ? undefined : "lineclear inbox: the branch changed after the plan was sent, ask the planner to run 'lineclear plan submit' again";
+  const ref = planRef(item.task);
+  if (!item.head || typeof repo !== "object" || !ref) return undefined;
+  const now = gitText(repo.repo, "for-each-ref", "--format=%(objectname)", ref) ?? "";
+  return now === item.head ? undefined : "lineclear inbox: the branch changed after the plan was sent, ask the Dispatcher to run 'lineclear plan submit' again";
 }

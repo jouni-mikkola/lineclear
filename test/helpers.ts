@@ -16,7 +16,7 @@ export function keepSecret(env: Record<string, string | undefined>, level: strin
 /** Chooses a model for every role in a config folder, so `run` and `project add` are not stopped by the first-run setup. */
 export function chooseModels(configFolder: string): void {
   mkdirSync(configFolder, { recursive: true });
-  writeFileSync(join(configFolder, "setup.json"), JSON.stringify({ worker: "a/x", reviewer: "b/z", planner: "c/w", stepChecker: "c/w" }));
+  writeFileSync(join(configFolder, "setup.json"), JSON.stringify({ worker: "a/x", reviewer: "b/z", stepChecker: "c/w" }));
 }
 
 /** Records, as the rules do when they start a task, the step of each task by id (project "demo"). */

@@ -169,7 +169,8 @@ export interface StepCheckInput {
   root: string;
   before: string;
   after: string;
-  planner: string | undefined;
+  /** The model that wrote the plan: the checker is from another company when one has room. */
+  planner?: string;
   reviewers: string[];
   env: NodeJS.ProcessEnv;
 }

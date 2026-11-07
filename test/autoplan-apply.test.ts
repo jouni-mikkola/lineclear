@@ -48,7 +48,7 @@ function world(askPlans: boolean) {
         space: "s",
         check: "true",
         heavy: [],
-        models: { worker: [], reviewer: [], planner: [] },
+        models: { worker: [], reviewer: [] },
         askBefore: { plans, releases: true, spending: true },
       }),
     );

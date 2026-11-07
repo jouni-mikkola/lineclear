@@ -44,7 +44,7 @@ function setup() {
       space: "demo",
       check: "true",
       askBefore: { plans: true },
-      models: { worker: [], reviewer: ["anthropic/claude-sonnet-5-5", "opencode-go/glm-5.3"], planner: ["anthropic/claude-opus-5-5"] },
+      models: { worker: [], reviewer: ["anthropic/claude-sonnet-5-5", "opencode-go/glm-5.3"] },
     }),
   );
   // the fake checking model: logs each question and the model asked, and answers with the contents of `answer`
@@ -58,6 +58,7 @@ function setup() {
     LINECLEAR_CONFIG: config,
     LINECLEAR_SERVER_BIN: join(bin, "lineclear"),
     LINECLEAR_TASK: "LIN-5",
+    LINECLEAR_ROLE: "dispatcher",
     LINECLEAR_STEPCHECK: join(bin, "model"),
   };
   const says = (text: string) => writeFileSync(answer, text);
@@ -94,16 +95,16 @@ function setup() {
   return { work, env, calls, plan, inbox, edit, says, questions };
 }
 
-test("plan starts a task with the brief from the template", () => {
+test("plan hands the goal to the Dispatcher with the template and starts no task", () => {
   const t = setup();
-  expect(t.plan(["demo", "Ship the thing"]).code).toBe(0);
-  const [add] = t.calls();
-  expect(add!.slice(0, 4)).toEqual(["task", "add", "Plan: Ship the thing", "--brief"]);
-  expect(add![4]).toContain("Goal: Ship the thing");
-  expect(add![4]).toContain("lineclear plan submit");
+  const r = t.plan(["demo", "Ship the thing"]);
+  expect(r.code).toBe(0);
+  expect(r.text).toContain("Goal: Ship the thing");
+  expect(r.text).toContain("lineclear plan submit");
   const template = readFileSync(join(import.meta.dir, "..", "templates", "plan.md"), "utf8");
-  expect(add![4]).toContain(template.split("{{")[0]!.trim());
-  expect(add).toContain("--space");
+  expect(r.text).toContain(template.split("{{")[0]!.trim());
+  expect(r.text).toContain("live: /demo/roadmap/track?plan=PLAN-1");
+  expect(t.calls()).toEqual([]);
   expect(t.plan(["nope", "x"]).code).toBe(1);
   expect(t.plan(["demo"]).code).toBe(2);
 });
@@ -119,7 +120,7 @@ test("submit refuses a roadmap that fails the check or has no change", () => {
   expect(readItems(t.env)).toHaveLength(0);
 });
 
-test("submit sends an incomplete step back to the planner, logs it and adds nothing to the Inbox", () => {
+test("submit sends an incomplete step back to the Dispatcher, logs it and adds nothing to the Inbox", () => {
   const t = setup();
   const f = join(t.work, "docs", "ROADMAP.md");
   writeFileSync(f, `${readFileSync(f, "utf8")}\n### B Title B\n- why: because\n- locks: none\n- after: Z9\n`);
@@ -225,7 +226,7 @@ test("a go keeps the answer with its model and tokens and sends it with the Inbo
   expect(kept.answers[0]).toMatchObject({ step: "B", go: true });
 });
 
-test("a no-go goes back to the planner, and the fixed step is asked again and passes", () => {
+test("a no-go goes back to the Dispatcher, and the fixed step is asked again and passes", () => {
   const t = setup();
   t.says("SAID: B does something.\nNO-GO: it never says where the page is");
   t.edit("B");
@@ -260,7 +261,7 @@ test("3 rounds with a no-go end the task with a report and no Inbox item", () =>
   expect(readItems(t.env)).toHaveLength(0);
 });
 
-test("a planner and a checker from the same company are not refused when no other company has room", () => {
+test("the Dispatcher and a checker from the same company are not refused when no other company has room", () => {
   const t = setup();
   const file = join(String(t.env.LINECLEAR_CONFIG), "projects", "demo", "settings.json");
   const settings = JSON.parse(readFileSync(file, "utf8"));
@@ -303,7 +304,7 @@ test("a long answer is kept cut to the answer size", () => {
 test("the plan template says a fresh model reads each step cold and a no-go is fixed before the owner sees anything", () => {
   const text = readFileSync(join(import.meta.dir, "..", "templates", "plan.md"), "utf8");
   expect(text).toContain("fresh model that knows only the step and the repo's map");
-  expect(text).toContain("A no-go comes back to you as a message");
+  expect(text).toContain("A no-go comes back as the output of `plan submit`");
   expect(text).toContain("before anything reaches the owner");
 });
 
@@ -361,7 +362,7 @@ test("plan with no server running says so in one line and names the command that
   probe.stop(true);
   writeFileSync(join(home, "server.json"), JSON.stringify({ port, pid: 1 }));
   const env = { ...serverEnv(home, s.env), LINECLEAR_TASK: "LIN-5" };
-  for (const args of [["submit"], ["demo", "a goal"]]) {
+  for (const args of [["submit"]]) {
     const lines: string[] = [];
     expect(planMain(args, (l) => lines.push(l), env, s.work)).toBe(1);
     expect(lines).toEqual(["lineclear plan: no Lineclear server is running here; start it with: lineclear serve"]);
@@ -412,40 +413,5 @@ test("plan takes the server from the flag, then the environment, then the data f
     expect(asked(2)).toBe(true);
   } finally {
     logs.forEach((x) => x.child.kill());
-  }
-});
-
-test('plan <project> "<goal>" starts its task on the server the data folder records, with no flag', async () => {
-  const s = setup();
-  const home = mkdtempSync(join(tmpdir(), "lc-plan-home-"));
-  temps.push(home);
-  const port = freePort();
-  writeFileSync(join(home, "server.json"), JSON.stringify({ port, pid: process.pid }));
-  const { child, log } = fakeServer(home, port);
-  try {
-    await listening(port);
-    const lines: string[] = [];
-    expect(planMain(["demo", "Add a thing"], (l) => lines.push(l), serverEnv(home, s.env), s.work)).toBe(0);
-    expect(readFileSync(log, "utf8")).toContain('"task","add"');
-    expect(lines.join("\n")).not.toContain("no Lineclear server");
-  } finally {
-    child.kill();
-  }
-});
-
-test("plan takes the port in LINECLEAR_PORT over the data folder's record", async () => {
-  const s = setup();
-  const home = mkdtempSync(join(tmpdir(), "lc-plan-home-"));
-  temps.push(home);
-  const [envPort, recordPort] = [freePort(), freePort()];
-  writeFileSync(join(home, "server.json"), JSON.stringify({ port: recordPort, pid: process.pid }));
-  const { child, log } = fakeServer(home, envPort);
-  try {
-    await listening(envPort);
-    const env = { ...serverEnv(home, s.env), LINECLEAR_PORT: String(envPort) };
-    expect(planMain(["demo", "Add a thing"], () => {}, env, s.work)).toBe(0);
-    expect(readFileSync(log, "utf8")).toContain('"task","add"');
-  } finally {
-    child.kill();
   }
 });

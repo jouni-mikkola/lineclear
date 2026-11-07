@@ -12,7 +12,7 @@ export function fillSetup(env = process.env): void {
   for (const name of listProjectNames(env)) {
     const s = readSettings(name, env);
     if (typeof s === "string") continue;
-    for (const role of ["worker", "reviewer", "planner"] as const) named[role] ??= s.models?.[role]?.[0];
+    for (const role of ["worker", "reviewer"] as const) named[role] ??= s.models?.[role]?.[0];
   }
   named.stepChecker ??= named.reviewer ?? named.worker;
   const found = Object.entries(named).filter(([, v]) => v);
