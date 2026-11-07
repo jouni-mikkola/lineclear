@@ -6,6 +6,7 @@ import * as GH from './github.ts'
 import * as Lane from './lane.ts'
 import { type TaskRec, ended, ANSWER_GRACE, CHECKS_EVERY } from './engine-helpers.ts'
 import { EngineHandoff } from './engine-handoff.ts'
+import { MergeGate } from './lane-watch.ts'
 
 /** how long a merge waits for a merge queue to run its check and merge the pull request */
 const QUEUE_WAIT_MS = 15 * 60_000
@@ -13,6 +14,9 @@ const QUEUE_WAIT_MS = 15 * 60_000
 const TURN_END_WAIT_MS = 2 * 60_000
 
 export class EngineLand extends EngineHandoff {
+  /** while a repo's main is red, one merge goes through (it may be the fix) and the rest wait for a green run */
+  protected mergeGate = new MergeGate()
+
   /**
    * On its way into main, its agent at rest with nothing left running to wake it, and GitHub's checks through: it is
    * told once to merge, so it never shows Merging while nothing happens.
@@ -65,6 +69,7 @@ export class EngineLand extends EngineHandoff {
     if (!run) {
       const repo = this.places.space(t.project)?.path ?? ''
       const now = (this.merging.get(repo) ?? Promise.resolve())
+        .then(() => this.mergeGate.pass(repo, () => !!this.data.red?.[repo]))
         .then(() => this.head(t, repo, !!opts.self))
         // stopped short with nothing more to wait for (failed checks, GitHub refused): Ready again, or back at work
         .then(async (r) => {

@@ -140,6 +140,7 @@ export class EngineMerge extends EngineLand {
     if (now.state === 'pass') {
       if (red) delete this.data.red![p.path]
       if (red) this.save()
+      this.mergeGate.release(p.path)
       return
     }
     // told once while it stays red, whatever else merges meanwhile

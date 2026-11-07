@@ -79,6 +79,25 @@ export interface RedMainActions {
   fixTask: (sha: string, reverted: boolean) => Promise<void>
 }
 
+/** While a repo's main is red, one merge goes through and the others wait until a green run releases them. */
+export class MergeGate {
+  private probed = new Set<string>()
+  private waiting = new Map<string, Array<() => void>>()
+
+  async pass(repo: string, red: () => boolean): Promise<void> {
+    while (red()) {
+      if (!this.probed.has(repo)) return void this.probed.add(repo)
+      await new Promise<void>((go) => this.waiting.set(repo, [...(this.waiting.get(repo) ?? []), go]))
+    }
+  }
+
+  release(repo: string) {
+    this.probed.delete(repo)
+    for (const go of this.waiting.get(repo) ?? []) go()
+    this.waiting.delete(repo)
+  }
+}
+
 /** A red main is reverted and gets a fix task once per commit; a failed attempt is tried again on the next look. */
 export class RedMainWatch {
   private handled = new Set<string>()
