@@ -246,6 +246,18 @@ export class EngineLand extends EngineHandoff {
    * commit, then squash-merged on GitHub only while its head is still that commit, its branch there deleted, and main here brought up to GitHub's (which
    * is what Lineclear's own update watches). Failed checks go back to the agent.
    */
+  /** a red main stops the merges: one waits for a green run, so a burst of failures stays one. The fix task goes in. */
+  protected async holdWhileRed(t: TaskRec, p: Space, g: G.GitHub) {
+    if (t.by === 'main-green') return
+    const red = async () => {
+      const runs = await GH.branchRuns(g, p.path, p.base)
+      return runs?.find((r) => r.state !== 'pending')?.state === 'fail'
+    }
+    while (!this.closing && (await red())) await Bun.sleep(this.redWait)
+  }
+
+  protected redWait = CHECKS_EVERY
+
   protected async mergeOnGitHub(t: TaskRec, p: Space, g: G.GitHub, self: boolean): Promise<{ ok: boolean; error?: string; note?: string }> {
     const wt = t.worktree!
     const base = `origin/${t.base}`
@@ -258,6 +270,7 @@ export class EngineLand extends EngineHandoff {
         ok: false,
         error: `${t.base} here has ${ahead} commit${ahead === 1 ? '' : 's'} GitHub lacks: push ${t.base} (git push origin ${t.base}) or move them off it, then merge ${t.id} again. Nothing was merged.`,
       }
+    await this.holdWhileRed(t, p, g)
     const pr = await this.prOf(t, g, wt)
     if (pr && pr.baseRefName !== t.base)
       return {
