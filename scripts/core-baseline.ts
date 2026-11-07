@@ -99,6 +99,13 @@ function start(n: number): void {
   console.log(`tasks whose brief was sent again: ${resent}`);
 }
 
+/** A `lineclear review` is one call with no session; it stores the size of its question (`inputTokens`) beside the findings. */
+function reviewCallTokens(task: string): number | undefined {
+  const file = join(BOARD, "reviews", `${task}.json`);
+  if (!existsSync(file)) return undefined;
+  return (JSON.parse(readFileSync(file, "utf8")) as { inputTokens?: number }).inputTokens;
+}
+
 function tokens(n: number): void {
   const tasks = doneTasks(n);
   for (const role of ["agent", "reviewer"] as const) {
@@ -107,11 +114,12 @@ function tokens(n: number): void {
         const u = sessionsOf(t)
           .filter((s) => s.role === role)
           .map((s) => s.usage);
+        const call = role === "reviewer" ? reviewCallTokens(t.id) : undefined;
         return {
-          fresh: u.reduce((a, x) => a + x.input + x.cacheWrite, 0),
+          fresh: u.reduce((a, x) => a + x.input + x.cacheWrite, 0) + (call ?? 0),
           cached: u.reduce((a, x) => a + x.cacheRead, 0),
           out: u.reduce((a, x) => a + x.output, 0),
-          has: u.length > 0,
+          has: u.length > 0 || call !== undefined,
         };
       })
       .filter((p) => p.has);
