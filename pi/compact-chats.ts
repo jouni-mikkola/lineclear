@@ -7,7 +7,7 @@ type Env = Record<string, string | undefined>;
 type Pi = { on: (event: string, handler: (event: Raw, ctx: Raw) => unknown) => void };
 
 /** The context size, in tokens, at which a coordinator's session is compacted. */
-export const COORDINATOR_LIMIT = 120_000;
+export const COORDINATOR_LIMIT = 60_000;
 /** The same for the Dispatcher, whose requests are short. */
 export const DISPATCHER_LIMIT = 60_000;
 
