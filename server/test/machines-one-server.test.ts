@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test'
 import { existsSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { sh, repo, world, until, fakeHerdr } from './engine-world.ts'
+import { sh, repo, world, until } from './engine-world.ts'
 import { Worktrees } from '../server/live/engine/worktrees.ts'
 import type { BoxInfo } from '../server/live/box.ts'
 
@@ -20,8 +20,7 @@ const vm: BoxInfo = {
 
 test('a task on another machine starts there, is reviewed and merged by the one server, with one id series and one store', async () => {
   const w = world()
-  const there = fakeHerdr()
-  w.engine.addMachine(vm, new Worktrees(there.h as never))
+  w.engine.addMachine(vm, new Worktrees())
   const dir = repo()
   const p = await w.places.add(dir, 'one-server')
   const local = w.engine.add({ project: p.name, title: 'Here', desc: 'x', by: 'test' })
@@ -32,9 +31,6 @@ test('a task on another machine starts there, is reviewed and merged by the one 
   expect(far.machine).toBe('vm2')
   expect(w.engine.view(far).machine).toBe('vm2')
   await until(() => !!far.worktree && w.started.some((s) => s.key === `${far.id}/Agent`))
-  // its workspace was made through that machine's herdr, not the server's
-  expect((await there.h.workspaces()).some((s) => s.worktree?.checkout_path === far.worktree)).toBe(true)
-  expect((await w.herdr.h.workspaces()).some((s) => s.worktree?.checkout_path === far.worktree)).toBe(false)
   writeFileSync(join(far.worktree!, 'there.txt'), 'there\n')
   sh('git add -A && git commit -qm "add there"', far.worktree!)
   await w.engine.done(far.id, 'Added there.txt.')

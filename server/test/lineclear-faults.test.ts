@@ -1,10 +1,7 @@
 // Faults seen in herdr-projects 2.0 (ebb17d5) that the fork fixes, each with a test that fails on the base's behaviour. The
 // Each is named for the fault it plants.
-import { describe, expect, spyOn, test } from 'bun:test'
-import { Engine, fakeHerdr, repo, started, world } from './engine-world.ts'
-
-const { Worktrees } = await import('../server/live/engine/worktrees.ts')
-void Engine
+import { describe, expect, test } from 'bun:test'
+import { repo, started, world } from './engine-world.ts'
 
 describe('(d) Ready with no review and no merge', () => {
   test('its agent is told once, and its coordinator hears, after 20 minutes', async () => {
@@ -40,54 +37,6 @@ describe('(e) a working agent never shows as waiting for your reply', () => {
     expect(w.engine.statusOf(t)).toBe('need')
     w.agentIs(key, 'working')
     expect(w.engine.statusOf(t)).toBe('work')
-  })
-})
-
-describe('(f) two panes for one worktree', () => {
-  test('an agent started in a space that holds only an idle shell leaves one pane, not two', async () => {
-    const fake = fakeHerdr()
-    const dir = repo()
-    const wt = new Worktrees(fake.h as never)
-    const made = await fake.h.worktreeCreate({ cwd: dir }, 'b', 'main', 'lab')
-    const ws = made.workspace.workspace_id
-    const path = made.worktree.path
-    const pane = await wt.agentPane({ home: { cwd: dir } as never, wt: path, label: 'lab', tab: 'Agent', env: {} })
-    const panes = await fake.h.panes(ws)
-    expect(panes.map((p) => p.pane_id)).toEqual([pane])
-    // again, its agent's CLI gone and its shell idle: still one pane
-    const again = await wt.agentPane({ home: { cwd: dir } as never, wt: path, label: 'lab', tab: 'Agent', env: {} })
-    expect((await fake.h.panes(ws)).map((p) => p.pane_id)).toEqual([again])
-  })
-
-  test('a space herdr restored with several idle shells is left with the agent pane only', async () => {
-    const fake = fakeHerdr()
-    const dir = repo()
-    const wt = new Worktrees(fake.h as never)
-    const made = await fake.h.worktreeCreate({ cwd: dir }, 'b', 'main', 'lab')
-    const ws = made.workspace.workspace_id
-    const path = made.worktree.path
-    // the first agent's tab, then two restarts: each left one more agentless shell in an Agent tab
-    await wt.agentPane({ home: { cwd: dir } as never, wt: path, label: 'lab', tab: 'Agent', env: {} })
-    await fake.h.createTab(ws, 'Agent', path)
-    expect((await fake.h.panes(ws)).length).toBe(2)
-    const pane = await wt.agentPane({ home: { cwd: dir } as never, wt: path, label: 'lab', tab: 'Agent', env: {} })
-    expect((await fake.h.panes(ws)).map((p) => p.pane_id)).toEqual([pane])
-  })
-
-  test("the human's own shell in a tab of another name stays", async () => {
-    const fake = fakeHerdr()
-    const dir = repo()
-    const wt = new Worktrees(fake.h as never)
-    const made = await fake.h.worktreeCreate({ cwd: dir }, 'b', 'main', 'lab')
-    const ws = made.workspace.workspace_id
-    const path = made.worktree.path
-    const first = await wt.agentPane({ home: { cwd: dir } as never, wt: path, label: 'lab', tab: 'Agent', env: {} })
-    const mine = (await fake.h.createTab(ws, 'git log', path)).root_pane.pane_id
-    const again = await wt.agentPane({ home: { cwd: dir } as never, wt: path, label: 'lab', tab: 'Agent', env: {} })
-    const left = (await fake.h.panes(ws)).map((p) => p.pane_id)
-    expect(left).toContain(mine)
-    expect(left).toContain(again)
-    expect(left).not.toContain(first)
   })
 })
 
@@ -129,4 +78,3 @@ describe("(g) a turn ends by pi's word", () => {
   })
 })
 
-void spyOn

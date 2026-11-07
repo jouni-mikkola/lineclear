@@ -10,8 +10,6 @@ process.env.HERDR_SOCKET_PATH = join(process.env.LINECLEAR_HOME, 'no-herdr.sock'
 delete process.env.LINECLEAR_MAIN
 const { LiveSource } = await import('../server/live/source.ts')
 const { startApp } = await import('../server/app.ts')
-const { fakeHerdr } = await import('./fake-herdr.ts')
-const { Worktrees } = await import('../server/live/engine/worktrees.ts')
 import type { TaskRec } from '../server/live/engine/engine.ts'
 import type { AgentRecord } from '../server/live/agents-helpers.ts'
 
@@ -20,7 +18,6 @@ const BOARD = { tasks: 400, agents: 10, clients: 4 }
 /** A server on a board of BOARD.tasks tasks, BOARD.agents of them with an agent at work, and BOARD.clients sockets open. */
 export async function startBoard() {
   const src = new LiveSource()
-  Object.assign(src.engine, { wt: new Worktrees(fakeHerdr().h as never) })
   const repo = mkdtempSync(join(tmpdir(), 'loop-board-repo-'))
   execSync('git init -q -b main && git config user.email t@t && git config user.name T && echo hi > README.md && git add -A && git commit -qm init', {
     cwd: repo,

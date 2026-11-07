@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 process.env.LINECLEAR_HOME = mkdtempSync(join(tmpdir(), 'shep-source-'))
+// no agent CLI is there either: an agent's start fails at once instead of running a real one
+process.env.LINECLEAR_PI = '/nonexistent/pi'
 process.env.HERDR_SOCKET_PATH = join(process.env.LINECLEAR_HOME, 'no-herdr.sock')
 delete process.env.LINECLEAR_MAIN
 const { LiveSource } = await import('../server/live/source.ts')
@@ -12,16 +14,12 @@ export const { HOST, NAME, placeId, Places } = await import('../server/live/plac
 export const { herdr } = await import('../server/live/herdr.ts')
 export const { hidden } = await import('../server/live/agents.ts')
 const { isAgentProcess } = await import('../server/live/agent-process.ts')
-const { Worktrees } = await import('../server/live/engine/worktrees.ts')
-const { fakeHerdr } = await import('./fake-herdr.ts')
 
 export const src = new LiveSource()
-// herdr makes task worktrees: a stand-in on real git; no terminal opens for their agents (no herdr is there)
-const fake = fakeHerdr()
-fake.h.createTab = async () => {
+// no herdr is there: the terminal an agent would start in is refused at once, so no start waits on a socket
+herdr.workspaces = async () => {
   throw new Error('herdr is not here')
 }
-Object.assign(src.engine, { wt: new Worktrees(fake.h as never) })
 // --rerun-each runs the file's afterAll after every run, and the next run still needs the source: it ends with the process then
 export const stopSource = () => process.env.LINECLEAR_TEST_RERUN || src.stop()
 

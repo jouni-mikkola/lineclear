@@ -2,13 +2,12 @@ import { describe, expect, test } from 'bun:test'
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { sh, repo, world, until, started, placeId, writeJson, fakeHerdr } from './engine-world.ts'
+import { sh, repo, world, until, started, placeId, writeJson } from './engine-world.ts'
 
-describe("a task's place in herdr", () => {
-  const linked = (w: ReturnType<typeof world>, label: string) => w.herdr.spaces.find((x) => x.label === label && x.worktree?.is_linked_worktree)
+describe("a task's place", () => {
   const branches = (dir: string) => sh('git branch --list "work/*" --format="%(refname:short)"', dir)
 
-  test("its worktree is made through herdr, nested under the project's space, with .worktreeinclude's files copied in", async () => {
+  test("its worktree is made by git, with .worktreeinclude's files copied in", async () => {
     const w = world()
     const dir = repo()
     writeFileSync(join(dir, '.gitignore'), '.env\nbuild/\n')
@@ -17,58 +16,29 @@ describe("a task's place in herdr", () => {
     writeFileSync(join(dir, '.env'), 'KEY=1\n')
     sh('mkdir build && touch build/big', dir)
     const { t, key } = await started(w, dir, 'nested')
-    const ws = linked(w, `${t.id} Say hello`)!
-    expect(ws.worktree).toEqual({ checkout_path: t.worktree!, is_linked_worktree: true, repo_root: dir })
-    // herdr opened the repo's own space to nest it under, since none was open
-    expect(w.herdr.spaces.some((x) => x.worktree?.checkout_path === dir && !x.worktree.is_linked_worktree)).toBe(true)
-    // the agent runs in a tab of its own there (it has the agent's environment); the shell herdr opened is closed
-    const s = w.started.find((x) => x.key === key)!
-    expect(ws.panes).toEqual([s.pane!])
-    expect(w.herdr.cwd.get(s.pane!)).toBe(t.worktree!)
+    expect(w.started.some((x) => x.key === key)).toBe(true)
+    expect(sh('git worktree list --porcelain', dir)).toContain(t.worktree!)
     expect(sh('git branch --show-current', t.worktree!)).toBe('work/1-say-hello')
     expect(readFileSync(join(t.worktree!, '.env'), 'utf8')).toBe('KEY=1\n')
     expect(existsSync(join(t.worktree!, 'build'))).toBe(false)
   })
 
-  test('after the merge herdr removes its worktree and space, its branch goes, and the repo space herdr opened closes', async () => {
+  test('after the merge git removes its worktree even with herdr stopped, and its branch goes', async () => {
     const w = world()
     const dir = repo()
     const { t, key } = await started(w, dir, 'tidy')
     writeFileSync(join(t.worktree!, 'hello.txt'), 'hello\n')
     w.agentIs(key, 'idle')
+    w.herdr.down(true)
     expect((await w.engine.merge(t.id)).ok).toBe(true)
     await until(() => !!t.cleaned)
     expect(existsSync(t.worktree!)).toBe(false)
     expect(branches(dir)).toBe('')
-    expect(w.herdr.spaces).toEqual([])
     expect(t.kept).toBeUndefined()
     expect(w.engine.keptLeftovers()).toEqual([])
   })
 
-  test('a repo space you were already using stays open', async () => {
-    const herdr = fakeHerdr()
-    const w = world(herdr)
-    const dir = repo()
-    const p = await w.places.add(dir, 'yours')
-    // yours, open before any task, with an agent of yours in it
-    herdr.spaces.push({
-      workspace_id: 'mine',
-      label: 'yours',
-      tab_count: 1,
-      worktree: { checkout_path: dir, is_linked_worktree: false, repo_root: dir },
-      panes: ['mine:p1'],
-    })
-    herdr.agentPanes.add('mine:p1')
-    const t = w.engine.add({ project: p.name, title: 'Say hello', by: 'test' })
-    await until(() => w.started.some((s) => s.key === `${t.id}/Agent`))
-    writeFileSync(join(t.worktree!, 'hello.txt'), 'hello\n')
-    w.agentIs(`${t.id}/Agent`, 'idle')
-    expect((await w.engine.merge(t.id)).ok).toBe(true)
-    await until(() => !!t.cleaned)
-    expect(herdr.spaces.map((x) => x.workspace_id)).toEqual(['mine'])
-  })
-
-  test('unsaved or unmerged work is kept and said so; its space and agent close all the same', async () => {
+  test('unsaved or unmerged work is kept and said so; its agent closes all the same', async () => {
     const w = world()
     const dir = repo()
     const { t, key } = await started(w, dir, 'keeps')
@@ -82,7 +52,6 @@ describe("a task's place in herdr", () => {
     expect(t.kept).toEqual([`${t.worktree!.replace(homedir(), '~')} (uncommitted changes)`])
     expect(w.news.some((n) => n.startsWith(`${t.id} was merged; kept `) && n.endsWith('(uncommitted changes)'))).toBe(true)
     expect(w.engine.keptLeftovers()[0]).toStartWith(`${t.id} `)
-    expect(linked(w, `${t.id} Say hello`)).toBeUndefined()
     expect(w.records[key].finished).toBe(true)
     sh('git add -A && git commit -qm late', t.worktree!)
     await w.engine.sweep()
@@ -90,30 +59,7 @@ describe("a task's place in herdr", () => {
     expect(branches(dir)).toBe(t.branch!)
   })
 
-  test('something still running in its space puts it off; it is tried again later', async () => {
-    const w = world()
-    const dir = repo()
-    const { t, key } = await started(w, dir, 'running')
-    const ws = linked(w, `${t.id} Say hello`)!
-    // a dev server you started in a pane of its own there
-    const { root_pane } = await w.herdr.h.createTab(ws.workspace_id, 'Server', t.worktree!)
-    w.herdr.busy.add(root_pane.pane_id)
-    writeFileSync(join(t.worktree!, 'hello.txt'), 'hello\n')
-    w.agentIs(key, 'idle')
-    expect((await w.engine.merge(t.id)).ok).toBe(true)
-    expect(existsSync(t.worktree!)).toBe(true)
-    expect(t.cleaned).toBeFalsy()
-    w.herdr.busy.delete(root_pane.pane_id)
-    // a clean-up already running (it saw the pane busy) makes a sweep skip the task: sweep until one lands
-    await until(async () => {
-      await w.engine.sweep()
-      return !!t.cleaned
-    }, 'the task to be cleaned up')
-    expect(t.cleaned).toBe(true)
-    expect(existsSync(t.worktree!)).toBe(false)
-  })
-
-  test('stopped with no work: agent, space, worktree and branch go; writing to it makes them again', async () => {
+  test('stopped with no work: agent, worktree and branch go; writing to it makes them again', async () => {
     const w = world()
     const dir = repo()
     const { t, key } = await started(w, dir, 'stopnone')
@@ -121,17 +67,14 @@ describe("a task's place in herdr", () => {
     expect(await w.engine.stopTask(t.id)).toEqual([])
     expect(existsSync(wt)).toBe(false)
     expect(branches(dir)).toBe('')
-    expect(w.herdr.spaces.some((x) => x.label === `${t.id} Say hello`)).toBe(false)
     expect(w.records[key].finished).toBe(true)
-    // resumed: the worktree is made again through herdr, nested as before, in the same folder (its agent's session
-    // is kept by folder)
+    // resumed: the worktree is made again by git, in the same folder (its agent's session is kept by folder)
     await (w.engine as unknown as { launch(t: unknown): Promise<unknown> }).launch(t)
     expect(t.worktree).toBe(wt)
     expect(existsSync(t.worktree!)).toBe(true)
-    expect(linked(w, `${t.id} Say hello`)).toBeTruthy()
   })
 
-  test('stopped with work: its worktree and branch stay; resuming opens its space again through herdr', async () => {
+  test('stopped with work: its worktree and branch stay; resuming goes on in the same folder', async () => {
     const w = world()
     const dir = repo()
     const { t, key } = await started(w, dir, 'stopwork')
@@ -140,12 +83,9 @@ describe("a task's place in herdr", () => {
     expect(kept).toHaveLength(1)
     expect(kept[0]).toEndWith('(uncommitted changes)')
     expect(existsSync(join(t.worktree!, 'wip.txt'))).toBe(true)
-    expect(w.herdr.spaces.some((x) => x.label === `${t.id} Say hello`)).toBe(false)
     w.status[key] = 'gone'
     await (w.engine as unknown as { launch(t: unknown): Promise<unknown> }).launch(t)
-    const ws = linked(w, `${t.id} Say hello`)!
-    expect(ws.worktree?.checkout_path).toBe(t.worktree!)
-    expect(ws.panes).toEqual([w.started.at(-1)!.pane!])
+    expect(w.started.at(-1)!.key).toBe(key)
   })
 
   test('deleted with no work: agent, space, worktree, branch, chat and record all go, and nothing is posted', async () => {
@@ -199,7 +139,7 @@ describe("a task's place in herdr", () => {
     expect(existsSync(join(dir, 'hello.txt'))).toBe(true)
   })
 
-  test("the sweep puts away merged tasks' leftovers only: never a running task's, nor yours, nor while herdr is away", async () => {
+  test("the sweep puts away merged tasks' leftovers only: never a running task's, nor yours", async () => {
     const dir = repo()
     const p = await world().places.add(dir, 'sweep')
     const old = mkdtempSync(join(tmpdir(), 'shep-old-'))
@@ -241,9 +181,6 @@ describe("a task's place in herdr", () => {
     })
     const w = world()
     w.herdr.down(true)
-    await w.engine.sweep()
-    expect(existsSync(merged)).toBe(true)
-    w.herdr.down(false)
     await w.engine.sweep()
     expect(existsSync(merged)).toBe(false)
     expect(branches(dir).split('\n')).toEqual(['work/2-x', 'work/3-x', 'work/4-x'])
@@ -318,40 +255,6 @@ describe("a task's place in herdr", () => {
     for (const n of [3, 4, 5]) expect(w.engine.task(`${p.key}-${n}`)!.kept![0]).toBe(`branch work/${n}-x (work on work/${n}-x that main lacks)`)
   })
 
-  test("it nests under the project's own space (its coordinator's), which stays open after", async () => {
-    const herdr = fakeHerdr()
-    const w = world(herdr)
-    const dir = repo()
-    const p = await w.places.add(dir, 'ownspace')
-    // the project's space as Lineclear opens it for its coordinator: a plain workspace in the repo
-    herdr.spaces.push({ workspace_id: 'proj', label: p.name, tab_count: 1, panes: ['proj:p1'] })
-    herdr.cwd.set('proj:p1', dir)
-    herdr.agentPanes.add('proj:p1')
-    const t = w.engine.add({ project: p.name, title: 'Say hello', by: 'test' })
-    await until(() => w.started.some((s) => s.key === `${t.id}/Agent`))
-    expect(herdr.spaces.map((x) => x.workspace_id)[0]).toBe('proj')
-    expect(herdr.spaces.find((x) => x.workspace_id === 'proj')!.worktree).toEqual({ checkout_path: dir, is_linked_worktree: false, repo_root: dir })
-    expect(herdr.spaces.filter((x) => !x.worktree?.is_linked_worktree)).toHaveLength(1)
-    writeFileSync(join(t.worktree!, 'hello.txt'), 'hello\n')
-    w.agentIs(`${t.id}/Agent`, 'idle')
-    expect((await w.engine.merge(t.id)).ok).toBe(true)
-    await until(() => !!t.cleaned)
-    expect(herdr.spaces.map((x) => x.workspace_id)).toEqual(['proj'])
-  })
-
-  test('a start herdr finished but whose answer was lost: its worktree is opened, not made twice', async () => {
-    const herdr = fakeHerdr()
-    const create = herdr.h.worktreeCreate
-    herdr.h.worktreeCreate = (async (...a: Parameters<typeof create>) => {
-      await create(...a)
-      throw new Error('herdr worktree.create timed out')
-    }) as typeof create
-    const w = world(herdr)
-    const { t } = await started(w, repo(), 'lost')
-    expect(t.trouble).toBeUndefined()
-    expect(linked(w, `${t.id} Say hello`)!.worktree!.checkout_path).toBe(t.worktree!)
-  })
-
   test("the sweep leaves a merged task's agent alone while it works, and after you talk to it again", async () => {
     const w = world()
     const dir = repo()
@@ -366,47 +269,8 @@ describe("a task's place in herdr", () => {
     await (w.engine as unknown as { launch(t: unknown): Promise<unknown> }).launch(t)
     expect(existsSync(t.worktree!)).toBe(false)
     w.status[key] = 'idle'
-    const n = w.herdr.spaces.length
     await w.engine.sweep()
     expect(w.status[key]).toBe('idle')
-    expect(w.herdr.spaces.length).toBe(n)
-  })
-
-  test('a task started before keeps its plain space: it is closed by its name, and git removes its worktree', async () => {
-    const herdr = fakeHerdr()
-    const dir = repo()
-    const p = await world(herdr).places.add(dir, 'plain')
-    const wt = join(mkdtempSync(join(tmpdir(), 'shep-plain-')), 'work-1')
-    sh(`git worktree add -q -b work/1-x ${wt} main`, dir)
-    writeFileSync(join(wt, 'x.txt'), 'x\n')
-    sh('git add -A && git commit -qm x', wt)
-    sh('git merge -q --squash work/1-x && git commit -qm "P-1: x"', dir)
-    herdr.spaces.push({ workspace_id: 'old', label: `${p.key}-1 x`, tab_count: 1, panes: ['old:p1'] })
-    herdr.cwd.set('old:p1', wt)
-    writeJson('tasks.json', {
-      next: { [p.key]: 1 },
-      tasks: [
-        {
-          id: `${p.key}-1`,
-          n: 1,
-          project: placeId.space(p.name),
-          title: 'x',
-          desc: '',
-          by: 'x',
-          created: 1,
-          updated: 1,
-          branch: 'work/1-x',
-          worktree: wt,
-          base: 'main',
-          merged: true,
-        },
-      ],
-    })
-    const w = world(herdr)
-    await w.engine.sweep()
-    expect(existsSync(wt)).toBe(false)
-    expect(herdr.spaces).toEqual([])
-    expect(w.engine.task(`${p.key}-1`)!.cleaned).toBe(true)
   })
 })
 

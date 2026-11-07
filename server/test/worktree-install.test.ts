@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { lstatSync, readFileSync, readlinkSync } from 'node:fs'
 import { execSync } from 'node:child_process'
-import { fakeHerdr, repo, until, world } from './engine-world.ts'
+import { repo, until, world } from './engine-world.ts'
 import { install, installDirs, storeKey, storePath } from '../server/live/engine/install.ts'
 const { Worktrees } = await import('../server/live/engine/worktrees.ts')
 
@@ -99,8 +99,8 @@ describe('a task worktree made for a project', () => {
     await bunProject(dir)
     await bunProject(join(dir, 'server'))
     execSync('git add -A && git commit -qm deps', { cwd: dir })
-    const wt = new Worktrees(fakeHerdr().h as never)
-    const made = await wt.create({ repo: dir, name: 'p' }, 'work/1-x', 'main', 'lab')
+    const wt = new Worktrees()
+    const made = await wt.create({ repo: dir }, 'work/1-x', 'main')
     expect(existsSync(join(made.path, 'node_modules/dep/package.json'))).toBe(true)
     expect(existsSync(join(made.path, 'server/node_modules/dep/package.json'))).toBe(true)
     expect(execSync('git status --short', { cwd: made.path }).toString()).toBe('')
@@ -108,8 +108,8 @@ describe('a task worktree made for a project', () => {
 
   test('a failed install step fails the start, saying so', async () => {
     const dir = repo()
-    const wt = new Worktrees(fakeHerdr().h as never)
-    await expect(wt.create({ repo: dir, name: 'p', install: 'exit 1' }, 'work/2-x', 'main', 'lab')).rejects.toThrow('Install failed')
+    const wt = new Worktrees()
+    await expect(wt.create({ repo: dir, install: 'exit 1' }, 'work/2-x', 'main')).rejects.toThrow('Install failed')
   })
 })
 

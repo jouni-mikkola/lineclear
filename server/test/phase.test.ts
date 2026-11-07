@@ -53,7 +53,7 @@ describe('phase across a restart', () => {
     })
   }
 
-  test('once the engine is up, a start, handoff or clean-up the last run was in is over and a brief phase stays', async () => {
+  test('once the engine is up, a start, handoff or clean-up the last run was in is over, and so is a brief phase with nothing left to deliver', async () => {
     const dir = repo()
     const p = await world().places.add(dir, 'phase-ended')
     const project = placeId.space(p.name)
@@ -64,8 +64,7 @@ describe('phase across a restart', () => {
     })
     const w = world()
     w.engine.resumeQueue()
-    expect(w.engine.tasks.map((t) => t.phase)).toEqual([undefined, undefined, 'briefing'])
-    expect(w.engine.statusOf(w.engine.tasks[2])).toBe('todo')
+    expect(w.engine.tasks.map((t) => t.phase)).toEqual([undefined, undefined, undefined])
   })
 })
 

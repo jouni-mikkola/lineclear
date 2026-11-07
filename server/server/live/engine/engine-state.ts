@@ -32,7 +32,6 @@ export abstract class EngineState extends Emitter<Events> {
   protected heard = new Map<string, number>()
   /** the last heartbeat of an agent in a tool call (lineclear alive): pi writes its log only when a call ends */
   protected beat = new Map<string, number>()
-  protected later = new Map<string, ReturnType<typeof setTimeout>>()
   /** one merge at a time per repo: each one's main checkout is shared */
   protected merging = new Map<string, Promise<unknown>>()
   /** merges past the deadline: their caller may be gone, so an error not sent back yet goes to the chat */
@@ -159,7 +158,6 @@ export abstract class EngineState extends Emitter<Events> {
 
   stop() {
     this.taskIds.close()
-    for (const x of this.later.values()) clearTimeout(x)
   }
 
   /* ---------- status: from the agent alone (status.ts) ---------- */
