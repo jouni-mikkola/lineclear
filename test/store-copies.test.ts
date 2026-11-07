@@ -79,19 +79,33 @@ test("a copy is one small file, holds the store at one moment, and leaves out se
   const store = new Database(join(data, "store.sqlite"));
   store.exec("PRAGMA journal_mode=WAL; CREATE TABLE t (v TEXT); INSERT INTO t VALUES ('one')");
   writeFileSync(join(data, "agents-cold.jsonl"), '{"id":"a","note":"x"}\n'.repeat(200_000));
+  const ids = new Database(join(data, "task-ids.sqlite"));
+  ids.exec("CREATE TABLE s (n INTEGER); INSERT INTO s VALUES (7)");
+  ids.close();
   writeFileSync(join(data, "vault.json"), "TOPSECRET");
   writeFileSync(join(data, "vapid.json"), "TOPSECRET");
   writeFileSync(join(data, "push.json"), "TOPSECRET");
   const name = copyStore("hourly", at(0), env);
   const file = join(env.LINECLEAR_STORE_COPIES, `${name}.sqlite`);
   expect(statSync(file).size).toBeLessThan(5_000_000);
-  expect(readFileSync(file).includes("TOPSECRET")).toBe(false);
+  const held = new Database(file).query("SELECT path, body FROM copy_files").all() as { path: string; body: Uint8Array<ArrayBuffer> }[];
+  expect(held.map((r) => r.path)).toContain("tasks.json");
+  expect(held.map((r) => r.path)).toContain("task-ids.sqlite");
+  expect(held.filter((r) => new TextDecoder().decode(Bun.gunzipSync(r.body)).includes("TOPSECRET"))).toEqual([]);
   store.exec("INSERT INTO t VALUES ('two')");
   restoreCopy(name, env);
   const back = new Database(join(data, "store.sqlite"));
   expect(back.query("SELECT v FROM t").all()).toEqual([{ v: "one" }]);
   expect(back.query("SELECT name FROM sqlite_master WHERE name LIKE 'copy_%'").all()).toEqual([]);
   expect(readFileSync(join(data, "vault.json"), "utf8")).toBe("TOPSECRET");
+});
+
+test("an old folder copy is removed once a file copy exists", () => {
+  const { env, fill } = world();
+  fill(1);
+  mkdirSync(join(env.LINECLEAR_STORE_COPIES, "hourly-2026-01-01T00-00-00"), { recursive: true });
+  copyStore("hourly", at(0), env);
+  expect(readdirSync(env.LINECLEAR_STORE_COPIES)).toEqual(["hourly-2026-11-03T00-00-00.sqlite"]);
 });
 
 test("a failed copy is not swallowed: doctor names it, and a good copy clears it", () => {
