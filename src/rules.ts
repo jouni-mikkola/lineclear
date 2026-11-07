@@ -10,7 +10,6 @@ import { freshDecisions } from "./decision-dedupe.ts";
 import { answerCard, closeItem, closeSettledUpdates, isOpen, type Item, readItems } from "./inbox.ts";
 import { listProjectNames, projectsDir, readSettings, type Settings } from "./project.ts";
 import { realWorld } from "./real-world.ts";
-import { startReleaseIfDue } from "./release.ts";
 import type { Task } from "./roadmap.ts";
 import { cutDecisionsDaily, type StallEntry } from "./stall-class.ts";
 import type { StartRecord } from "./starts.ts";
@@ -129,7 +128,7 @@ export function tick(world: World, dryRun: boolean, env = process.env): Decision
   world.newTick?.();
   // plans that wait from before their project let plans apply by themselves are settled under the rule
   if (!dryRun) {
-    for (const start of [copyStoreQuietly, startReleaseIfDue]) start(env, world.now());
+    for (const start of [copyStoreQuietly]) start(env, world.now());
     all.push(
       ...logDecisions(
         [...settlePlans(world.now(), env), ...closeSettledUpdates(world.now(), env), ...sweepOldTemp(world.now(), env)].map(

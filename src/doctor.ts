@@ -6,7 +6,6 @@ import { delimiter, dirname, join } from "node:path";
 import { readJson } from "../pi/config.ts";
 import { failureTail } from "./secrets.ts";
 import { copiesProblem, runByNote } from "./store-copies.ts";
-import { follows, type ReleaseState, readRelease, releaseLines } from "./release.ts";
 import { cacheEnvFile, dataDir, extensionFile, INSTALL_URL, type Paths, SERVICE } from "./paths.ts";
 import { diskTrouble, freeBytes } from "./health.ts";
 import { readModelFile } from "./models.ts";
@@ -59,10 +58,6 @@ export interface Probe {
   store?: string;
   /** What the service and the `lineclear` on PATH run from. Without it the build is not checked. */
   runFrom?: RunFrom;
-  /** The stable and next builds, the last promotion and why next is held. */
-  release?: ReleaseState;
-  /** The machine whose promotions this one takes, when another machine installed it. */
-  follows?: string;
   /** Every id and alias in the live task store. Without it the ids are not checked. */
   taskIds?: () => string[];
   /** A CI runner: its checkout has no origin main to read. */
@@ -87,8 +82,6 @@ export function realProbe(paths: Paths, env: Record<string, string | undefined> 
     runBy: runByNote(env),
     store: copiesProblem(env),
     runFrom: runFrom(paths, env),
-    release: readRelease(env),
-    follows: follows(env),
     taskIds: () => storedTaskIds(dataDir(env)),
     ci: env.CI === "true",
     user: env.USER ?? userInfo().username,
@@ -357,22 +350,7 @@ export function doctorChecks(probe: Probe): Check[] {
       skip: !p.runBy,
     },
     taskIdsUnique(p),
-    release(p),
   ];
-}
-
-/** The builds, as a fine part: a held next is the promotion doing its job. Only main that cannot be read is a problem. */
-function release(p: Probe): Check {
-  const s = p.release ?? {};
-  const fix = "lineclear release (it names what holds next); lineclear release run";
-  if (p.follows) return { name: "release", problem: "", fix, info: `follows ${p.follows}, which promotes for it` };
-  if (!s.checked) return { name: "release", problem: "", fix, skip: true };
-  return {
-    name: "release",
-    problem: s.held?.startsWith("cannot read main") && !p.ci ? s.held : "",
-    fix,
-    info: releaseLines(s).join("; ").replace(/ {2,}/g, " "),
-  };
 }
 
 /** Prints each part and returns 0 only when all are well. */

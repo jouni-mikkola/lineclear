@@ -1,7 +1,6 @@
 import { readJson } from "../pi/config.ts";
 import { IDLE_TEXT, questionIn } from "./cards.ts";
 import { dataDir } from "./paths.ts";
-import type { ReleaseState } from "./release.ts";
 import { existsSync, readdirSync } from "node:fs";
 import { hostname } from "node:os";
 import { join } from "node:path";
@@ -35,8 +34,6 @@ export interface HomeData {
   planning?: number;
   /** The Dispatcher works on an answer now: its signal box shows writing dots. */
   dispatcher?: { writing: boolean };
-  /** Stable and next, once the rule loop has looked at main (`lineclear release`). */
-  release?: ReleaseState;
   /** What `lineclear doctor` finds wrong on this machine, each as "problem: fix command". */
   doctor?: string[];
 }

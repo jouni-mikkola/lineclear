@@ -6,8 +6,5 @@
 /** The command for one herdr call, here or, with `machine`, on a machine saved in herdr. */
 export const herdrArgv = (args: string[], machine?: string): string[] => ["herdr", ...(machine ? ["--machine", machine] : []), ...args];
 
-/** The variables a detached child keeps: the path, the home, and where herdr and Lineclear live. */
-export const KEPT_ENV = /^(PATH|HOME|XDG_.*|LINECLEAR_.*|HERDR_SOCKET_PATH)$/;
-
 /** The version a herdr prints for `--version` or `status server`. */
 export const herdrVersionOf = (text: string | null): string | null => text?.match(/^(?:herdr\s+|version:\s*)(\S+)/m)?.[1] ?? null;

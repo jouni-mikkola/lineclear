@@ -48,7 +48,7 @@ Delete-only, per the owner's rule of 7 Nov: remove code, tests, docs and every c
 | Candidate | Lines in `src/` | Importers | Why no rival has it |
 | --- | --- | --- | --- |
 | `docs/ROADMAP.md`, `src/roadmap*.ts`, `ui/web/roadmap/`, `src/step*.ts` | about 1,800 plus docs and UI | `roadmap.ts` has 31, so cut the views and import first (`roadmap-import` 1, `roadmap-view` 7) | Rivals have a task list, not a steps tree with done-when proofs. |
-| `src/release.ts`, `promote*.ts`, `rollback.ts`, `scripts/canary.ts`, `release-*.ts` | about 900 | `release` 9, `promote` 2, `rollback` 2 | Rivals ship by their own release process, not inside the tool. |
+| `promote*.ts`, `rollback.ts`, `scripts/canary.ts`, `release-*.ts` | about 900 | `release` 9, `promote` 2, `rollback` 2 | Rivals ship by their own release process, not inside the tool. |
 | `src/try-instance.ts` | 444 | 3 | A second Lineclear to try a build. No rival self-hosts its own upgrades. |
 | `src/machines.ts`, `machine-list.ts`, `machine-alerts.ts`, `ssh.ts` | about 500 | `machines` 4, `ssh` 7 | Rivals run local or in their cloud. Multi-machine control is not in claude-squad, Crystal or Vibe Kanban. Check the server engine first. |
 | `src/autoplan.ts`, `plan*.ts`, `company.ts`, `direction.ts`, `routine.ts` | about 700 | `autoplan` 6, `company` 8 | Automatic planning from the owner's direction. Jules has a per-task plan; nobody has a standing company direction. |
