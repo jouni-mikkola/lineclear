@@ -73,7 +73,7 @@ export function fit(p: Parsed, flag: '' | 'reviewer-', kind: string, model?: str
   const name = CLI_NAME[kind] ?? kind
   const c = modelsOf(kind)
   if (((m && m !== 'default') || (e && e !== 'default')) && !c)
-    throw new Error(`Lineclear passes a model and effort to Claude Code, Codex and pi only; ${name} runs on its own`)
+    throw new Error(`Lineclear passes a model and effort to Claude Code and pi only; ${name} runs on its own`)
   if (m !== undefined && refuse(`task.model`, m)) throw new Error(`--${flag}model ${m}: ${refuse('task.model', m)}`)
   const found = m && m !== 'default' ? findModel(kind, m) : undefined
   if (m && m !== 'default' && knowsModels(kind) && !found)
