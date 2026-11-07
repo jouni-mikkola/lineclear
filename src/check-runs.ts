@@ -214,8 +214,8 @@ const HEAL_AFTER = 10;
 /** Failures since the quarantine, with no clean run between, that show a test broken, not flaky. */
 const BROKEN_AFTER = 3;
 
-/** A test as the log names it (`<file>: <name>`, or the name alone where the output named no file): the key `scripts/flaky.ts` records by file and name. */
-export const testKey = (file: string, name: string) => (file ? `${file}: ${name}` : name);
+/** A test as the log names it (`<file>: <name>`, or the name alone where the output named no file): the key a quarantine records by file and name. */
+const testKey = (file: string, name: string) => (file ? `${file}: ${name}` : name);
 
 /** The file and name of a key; the file is empty where the key has none. */
 export function splitKey(key: string): { file: string; test: string } {

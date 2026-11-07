@@ -50,7 +50,7 @@ Result: A test that flakes on GitHub stops blocking merges within one run and ge
 - parts: checks, server, rules
 - locks: quarantine
 - after: none
-- files: scripts/check.ts, scripts/flaky.ts, src/check-runs.ts, src/check-tier.ts, test/quarantine.json, test/check-runs.test.ts
+- files: scripts/check.ts, scripts/failures.ts, src/check-runs.ts, src/check-tier.ts, test/quarantine.json, test/check-runs.test.ts
 
 ### L438 Tests hold under parallel load
 Result: Every test shard passes with 4 copies running at once on one GitHub runner, each test in its own folder and ports.
