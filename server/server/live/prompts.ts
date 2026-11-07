@@ -1,4 +1,4 @@
-// What each agent is told at start, and the Settings block that ends every new task's brief.
+// What each agent is told at start, and the Settings block of a task's brief.
 import { join } from 'node:path'
 import { SET_BY, SETTINGS_HEAD, type SetBy } from '../../shared/brief.ts'
 import { ROOT } from '../root.ts'
@@ -6,6 +6,7 @@ import { BOX, helperDir } from './box.ts'
 
 const OWN = BOX ? helperDir(BOX.home) : ROOT
 
+// the helper's copy on another machine
 const SKILLS = join(OWN, 'skill')
 const skill = (name: string) => join(SKILLS, name, 'SKILL.md')
 
@@ -100,7 +101,6 @@ export function splitBrief(desc: string): [work: string, how: string] {
   return i < 0 ? [desc, ''] : [desc.slice(0, i).trimEnd(), desc.slice(i)]
 }
 
-/** The Settings block that ends a brief; the coordinator's words win where they differ. */
 export function settingsBlock(id: string, t: Told) {
   return `${SETTINGS_HEAD}\n${settingsLines(id, t)
     .map((l) => `- ${l.text}`)
@@ -164,7 +164,6 @@ export function goLine(ids: string[], notes: string[], cleared = false) {
   return [`Go: ${ids.join(', ')} ${ids.length === 1 ? 'is' : 'are'} done, start now.`, ...notes].join('\n')
 }
 
-/** GitHub news on a done task's pull request: what happened, never what to do */
 export function prNewsLine(id: string, pr: { number: number; url: string }, news: string[]) {
   return [`GitHub news on PR #${pr.number} (${pr.url}), since you reported ${id} ready:`, ...news, 'The lineclear-agent skill says how to handle it.'].join(
     '\n',
