@@ -9,6 +9,7 @@ import { FORK_PATH } from "../ui/test/chain-path.ts";
 import { roadmapSample } from "../ui/test/samples/roadmap-samples.ts";
 import { stepFiles, stepParts } from "../src/parts.ts";
 import { roadmapMain } from "../src/roadmap-cli.ts";
+import { roadmapFolderText } from "../src/roadmap-source.ts";
 import {
   checkRoadmap,
   closedSteps,
@@ -314,4 +315,34 @@ test("`roadmap check <repo>` prints the exact file line of each error kind", () 
   expect(has(at("- after: D"), "circular")).toBe(true);
   expect(has(at("### E"), "no 'done when' field")).toBe(true);
   expect(has(at("- colour"), "unknown field 'colour'")).toBe(true);
+});
+
+function stepFolder(files: Record<string, string>): string {
+  const dir = mkdtempSync(join(tmpdir(), "lc-roadmap-steps-"));
+  temps.push(dir);
+  mkdirSync(join(dir, "docs", "roadmap"), { recursive: true });
+  for (const [name, text] of Object.entries(files)) writeFileSync(join(dir, "docs", "roadmap", name), text);
+  return dir;
+}
+
+const stepFile = (id: string, title = `Title ${id}`) => `## Phase 0: Base\n\n${step(id, "none").replace(`Title ${id}`, title)}`;
+
+test("the roadmap reads step files in id order and the check passes", () => {
+  const dir = stepFolder({ "L10.md": stepFile("L10"), "L2.md": stepFile("L2"), "L3.md": stepFile("L3") });
+  writeFileSync(join(dir, "docs", "ROADMAP.md"), "ignored");
+  const lines: string[] = [];
+  expect(roadmapMain(["check", dir], (l) => lines.push(l))).toBe(0);
+  expect(lines).toEqual(["ok: 3 steps"]);
+  const ids = parseRoadmap(roadmapFolderText(dir)?.text ?? "").steps.map((s) => s.id);
+  expect(ids).toEqual(["L2", "L3", "L10"]);
+  const shown: string[] = [];
+  expect(roadmapMain(["show", "L3", dir], (l) => shown.push(l))).toBe(0);
+  expect(shown.join("\n")).toContain("### L3 Title L3");
+});
+
+test("the check names a step file with a bad title", () => {
+  const dir = stepFolder({ "L2.md": stepFile("L2"), "L3.md": stepFile("L3", "T".repeat(TITLE_MAX + 1)), "L4.md": stepFile("L4") });
+  const lines: string[] = [];
+  expect(roadmapMain(["check", dir], (l) => lines.push(l))).toBe(1);
+  expect(lines.join("\n")).toContain("docs/roadmap/L3.md:3: step L3 has a title");
 });

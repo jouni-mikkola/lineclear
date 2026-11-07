@@ -1,7 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { lineOfRoadmap } from "./roadmap-view.ts";
-import { lineclearTasks } from "./roadmap-source.ts";
+import { lineclearTasks, roadmapFolderText } from "./roadmap-source.ts";
 import { statusesOf } from "./task-steps.ts";
 import { stepText } from "./brief.ts";
 import { checkRoadmap, formErrors, resultOf, type RoadmapError, type Step, type StepStatus, type Task } from "./roadmap.ts";
@@ -18,13 +16,10 @@ const USAGE = [
   "       lineclear roadmap locks <repo> --space <name>",
 ];
 
-function readRoadmap(repo: string, out: Out): { text: string; file: string } | undefined {
-  const file = join(repo, "docs", "ROADMAP.md");
-  if (!existsSync(file)) {
-    out(`${file}: no such file`);
-    return undefined;
-  }
-  return { text: readFileSync(file, "utf8"), file };
+function readRoadmap(repo: string, out: Out): { text: string; place: (line: number) => string } | undefined {
+  const road = roadmapFolderText(repo);
+  if (!road) out(`${repo}: no docs/ROADMAP.md and no step files in docs/roadmap`);
+  return road;
 }
 
 function mainCommits(repo: string, ref = mainRefs(repo)[0]): { subject: string; body: string }[] | string {
@@ -79,7 +74,7 @@ export function roadmapMain(
   // the form (a short title, a result line) is checked by `check`; the views and the rule loop read older files too
   const errors = sub === "check" ? withFormErrors(checked.errors, parsed.steps) : checked.errors;
   if (errors.length > 0) {
-    for (const e of errors) out(`${road.file}:${e.line}: ${e.message}`);
+    for (const e of errors) out(`${road.place(e.line)}: ${e.message}`);
     return 1;
   }
   if (sub === "check") {
@@ -128,7 +123,7 @@ function showMain(args: string[], out: Out): number {
   const road = readRoadmap(repo, out);
   if (!road) return 1;
   const step = checkRoadmap(road.text).parsed.steps.find((s) => s.id.toLowerCase() === id.toLowerCase());
-  if (!step) return fail(out, `no step '${id}' in ${road.file}`);
+  if (!step) return fail(out, `no step '${id}' in the roadmap of ${repo}`);
   out(stepText(road.text, step));
   return 0;
 }

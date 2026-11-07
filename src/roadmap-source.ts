@@ -1,5 +1,5 @@
 import { machineTasksShown, readTasks } from "./task-read.ts";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { keptBy, refsKey } from "./kept-read.ts";
 import type { Task } from "./roadmap.ts";
@@ -30,15 +30,64 @@ export function roadmapSource(repo: string): Source | undefined {
   return key === undefined ? readSource(repo) : keptBy(`roadmap:${repo}`, key, () => readSource(repo));
 }
 
-function readSource(repo: string): Source | undefined {
+const byId = (a: string, b: string) => a.localeCompare(b, "en", { numeric: true });
+
+/** Step files joined in id order, so the parser reads them as one roadmap. Undefined when there are none. */
+function joinSteps(files: { name: string; text: string }[]): string | undefined {
+  const md = files.filter((f) => f.name.endsWith(".md"));
+  if (md.length === 0) return undefined;
+  return `${md
+    .sort((a, b) => byId(a.name, b.name))
+    .map((f) => f.text.trimEnd())
+    .join("\n\n")}\n`;
+}
+
+/** The step file and its own line for a line of the joined text, as `docs/roadmap/L3.md:5`. */
+function placeInSteps(files: { name: string; text: string }[], line: number): string {
+  let start = 1;
+  for (const f of files.filter((x) => x.name.endsWith(".md")).sort((a, b) => byId(a.name, b.name))) {
+    const lines = f.text.trimEnd().split("\n").length;
+    if (line < start + lines + 1) return `docs/roadmap/${f.name}:${Math.max(1, line - start + 1)}`;
+    start += lines + 1;
+  }
+  return `docs/roadmap:${line}`;
+}
+
+/** The roadmap's text in the working folder: `docs/roadmap/<id>.md` joined when the folder exists, else `docs/ROADMAP.md`. */
+export function roadmapFolderText(repo: string): { text: string; place: (line: number) => string } | undefined {
+  const folder = join(repo, "docs", "roadmap");
+  if (existsSync(folder)) {
+    const files = readdirSync(folder)
+      .filter((name) => name.endsWith(".md"))
+      .map((name) => ({ name, text: readFileSync(join(folder, name), "utf8") }));
+    const text = joinSteps(files);
+    if (text !== undefined) return { text, place: (line) => placeInSteps(files, line) };
+  }
   const file = join(repo, "docs", "ROADMAP.md");
-  const [origin, main] = mainRefs(repo);
+  return existsSync(file) ? { text: readFileSync(file, "utf8"), place: (line) => `docs/ROADMAP.md:${line}` } : undefined;
+}
+
+function originText(repo: string, origin: string): string | undefined {
+  const listed = git(repo, "ls-tree", "--name-only", origin, "docs/roadmap/");
+  if (listed.ok) {
+    const names = listed.out.split("\n").filter((n) => n.endsWith(".md"));
+    const files = names.map((path) => ({ name: path.slice(path.lastIndexOf("/") + 1), shown: git(repo, "show", `${origin}:${path}`) }));
+    const text = joinSteps(files.filter((f) => f.shown.ok).map((f) => ({ name: f.name, text: f.shown.out })));
+    if (text !== undefined) return text;
+  }
   const shown = git(repo, "show", `${origin}:docs/ROADMAP.md`);
-  const text = shown.ok ? shown.out : existsSync(file) ? readFileSync(file, "utf8") : undefined;
+  return shown.ok ? shown.out : undefined;
+}
+
+function readSource(repo: string): Source | undefined {
+  const [origin, main] = mainRefs(repo);
+  const fromOrigin = originText(repo, origin);
+  const shown = fromOrigin !== undefined;
+  const text = fromOrigin ?? roadmapFolderText(repo)?.text;
   if (text === undefined) return undefined;
   const format = "--format=%H%x01%ct%x01%s%x01%b";
-  const fromOrigin = git(repo, "log", origin, "-z", format);
-  const log = shown.ok || fromOrigin.ok ? fromOrigin : git(repo, "log", main, "-z", format);
+  const originLog = git(repo, "log", origin, "-z", format);
+  const log = shown || originLog.ok ? originLog : git(repo, "log", main, "-z", format);
   const commits = log.ok
     ? log.out
         .split("\0")
