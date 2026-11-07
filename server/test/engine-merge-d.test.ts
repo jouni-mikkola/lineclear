@@ -247,9 +247,12 @@ describe('on GitHub: news, checks and the default way in', () => {
     ;(w.engine as unknown as { data: { red?: object } }).data.red = {}
     await w.engine.watchMains()
     expect(fixes().length).toBe(1)
-    // main is green again: the older red's fix task closes itself
+    // main is green again: a reverted red's task stays (its change is to come back), one fixed forward closes itself
     g.set({ runs: [run('d'.repeat(40), 'success', 5), run(red, 'failure', 3)] })
+    const reverted = fixes()[0].desc
+    fixes()[0].desc = 'The revert failed; fix it forward.'
     await w.engine.watchMains()
+    expect(reverted).toContain('reverted')
     expect(fixes()[0].closed).toBe(true)
     expect(fixes()[0].said).toBe('nothing to merge: main is green')
   })
