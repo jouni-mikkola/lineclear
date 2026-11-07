@@ -1,3 +1,6 @@
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { existsSync } from '../mfs.ts'
 import { hidden } from '../agents.ts'
 import { placeId, type Space } from '../places.ts'
@@ -6,6 +9,7 @@ import * as G from './git.ts'
 import * as GH from './github.ts'
 import { type TaskRec, ended, labelOf, CHECKS_WAIT, MAIN_WATCH, failKey, quote, COMMENT, ghNow } from './engine-helpers.ts'
 import { EngineLand } from './merge.ts'
+import { RedMainWatch } from './lane-watch.ts'
 
 export class EngineMerge extends EngineLand {
   /** lineclear checks: wait for GitHub's checks on the task's pull request, at the commit this machine has */
@@ -97,6 +101,21 @@ export class EngineMerge extends EngineLand {
     }
   }
 
+  protected redMain = new RedMainWatch()
+
+  /** A revert commit of the sha pushed to the base, made in a scratch worktree so no checkout is touched. */
+  private async revertOnBase(p: Space, sha: string): Promise<boolean> {
+    const dir = mkdtempSync(join(tmpdir(), 'red-main-'))
+    try {
+      if (!(await G.git(p.path, 'worktree', 'add', '--detach', dir, `origin/${p.base}`)).ok) return false
+      const done = (await G.git(dir, 'revert', '--no-edit', sha)).ok && (await G.git(dir, 'push', 'origin', `HEAD:${p.base}`)).ok
+      if (!done) await G.git(dir, 'revert', '--abort')
+      return done
+    } finally {
+      await G.git(p.path, 'worktree', 'remove', '--force', dir)
+    }
+  }
+
   protected async watchMain(p: Space) {
     const red = this.data.red?.[p.path]
     const lately = Date.now() - MAIN_WATCH
@@ -123,6 +142,22 @@ export class EngineMerge extends EngineLand {
     const f = now.failed[0]
     const tail = await GH.failedLog(g, p.path, f.link)
     const ids = merged.map((m) => m.match(/^([A-Z][A-Z0-9]*-\d+):/)?.[1]).filter((x): x is string => !!x)
+    await this.redMain.look(
+      { sha: now.sha, conclusion: 'failure' },
+      {
+        revert: (sha) => this.revertOnBase(p, sha),
+        fixTask: async (sha, reverted) => {
+          const failing = now.failed.map((x) => `${x.name} (${x.link})`).join(', ')
+          this.add({
+            project: p.name,
+            base: p.base,
+            by: 'main-green',
+            title: `Fix ${p.base} red at ${sha.slice(0, 7)}`,
+            desc: `${p.base} went red at ${sha}: ${failing}. ${reverted ? 'Lineclear reverted that commit; bring its change back, fixed.' : 'The revert failed; fix it forward.'} Merged since it was last green: ${merged.join('; ') || 'unknown'}.`,
+          })
+        },
+      },
+    )
     this.emit(
       'news',
       placeId.space(p.name),
@@ -130,7 +165,7 @@ export class EngineMerge extends EngineLand {
         `${p.base} went red on GitHub at ${now.sha.slice(0, 7)}: ${now.failed.map((x) => `${x.name} failed (${x.link})`).join(', ')}.`,
         `Merged since it was last green${green ? ` (${green.slice(0, 7)})` : ''}: ${merged.length ? merged.join('; ') : 'none Lineclear can tell'}.`,
         tail ? `Its log ends:\n${quote(tail)}` : '',
-        'A fix-forward task follows if you decide so: its brief names the failing run and these merges',
+        'A revert of that commit was tried and a fix-forward task opened: its brief names the failing run and these merges',
       ]
         .filter(Boolean)
         .join('\n'),
