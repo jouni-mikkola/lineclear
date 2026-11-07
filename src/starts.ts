@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { createAtomic } from "../pi/atomic.ts";
 import { herdrArgv } from "./herdr.ts";
 import { join } from "node:path";
 import { fileClash, stepHeld, stepNeeds } from "./parts.ts";
@@ -104,7 +105,7 @@ export function claimStart(dir: string, step: string, now: Date): string | undef
   const file = join(dir, `${step}.claim`);
   for (let tries = 0; tries < 2; tries++) {
     try {
-      writeFileSync(file, String(now.getTime()), { flag: "wx" });
+      createAtomic(file, String(now.getTime()));
       return undefined;
     } catch {
       const at = Number(readFileSync(file, "utf8"));
