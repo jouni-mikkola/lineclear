@@ -40,6 +40,7 @@ import {
 import { fastGates } from "./fast-gates.ts";
 import { describeFailure, type Failure, outsideChange, parseFailures } from "./failures.ts";
 import { changedSince } from "./gates/tools.ts";
+import { failureKey, judge, readQuarantine } from "./quarantine.ts";
 
 // Every step but the server's (below) runs with TMPDIR in a folder of this run, on disk. Each test process clears its own
 // folder inside it (tmp-scope.ts), so anything left in it when the steps end was left by a process that did not get
@@ -220,6 +221,21 @@ async function run(step: Step): Promise<{ code: number; failing: Failure[]; outp
   return { code: await p.exited, failing: [...parseFailures(out), ...parseFailures(err)], output: out + err };
 }
 
+/** Reruns each failure of a step alone. The keys of the ones that passed: a flake, not a break. */
+async function rerunAlone(step: Step, failing: Failure[], prefix: string): Promise<Set<string>> {
+  const passed = new Set<string>();
+  await Promise.all(
+    failing.slice(0, 20).map(async (f) => {
+      if (!f.file) return;
+      const name = f.test.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const cmd = ["bun", "test", "--timeout", "120000", `./${f.file.replace(/^\.\//, "")}`, "-t", name];
+      const p = Bun.spawn(cmd, { cwd: step.cwd, stdin: "ignore", stdout: "ignore", stderr: "ignore", env: step.cwd === "server" ? serverEnv : env });
+      if ((await p.exited) === 0) passed.add(failureKey(f, prefix));
+    }),
+  );
+  return passed;
+}
+
 // read again once the steps are through: the machine may have got busy while they ran
 const measure = loadFactorMeter();
 let factor = measure();
@@ -235,7 +251,19 @@ async function runStep(step: Step): Promise<boolean> {
   const at = performance.now();
   const { code, failing, output } = await run(step);
   const isTests = step.name.startsWith("tests");
-  const ok = code === 0;
+  let ok = code === 0;
+  if (!ok && failing.length > 0 && (isTests || step.name === "server tests")) {
+    const prefix = step.cwd === "server" ? "server/" : "";
+    const verdict = judge(failing, await rerunAlone(step, failing, prefix), readQuarantine(), prefix);
+    for (const f of verdict.tolerated) console.log(`check: quarantined flake failed in the run, passed alone: ${describeFailure(f)}`);
+    for (const f of verdict.flaky) {
+      const file = `${prefix}${f.file.replace(/^\.\//, "")}`;
+      console.error(
+        `check: new flake, passed alone: ${describeFailure(f)}\ncheck: list it with its fix task: bun scripts/quarantine.ts add ${file} "${f.test}" <task>`,
+      );
+    }
+    ok = verdict.broken.length === 0 && verdict.flaky.length === 0 && verdict.tolerated.length === failing.length;
+  }
   times.push({ step: step.name, seconds: (performance.now() - at) / 1000, ok });
   if (!ok) {
     console.error(
