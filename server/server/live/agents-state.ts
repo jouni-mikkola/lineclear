@@ -76,9 +76,9 @@ export class AgentsState extends Emitter<Events> {
   backoff = new Map<string, { until: number; n: number }>()
   backoffMs = 2000
   backoffMax = 60_000
-  /** an agent herdr won't take a prompt for this long gets the text typed into its pane instead. pi listens within a
-   *  second, so a longer wait was dead time in every start */
-  paneAfter = 1000
+  /** an agent herdr won't take a prompt for this long gets the text typed into its pane instead. pi takes input
+   *  within a second of its start, so this is a floor under every start where herdr's agent never reports ready */
+  paneAfter = 2000
   /** a message without a screen's id (the brief) still not in after this long is given up on */
   briefFor = 300_000
   /** the pane each agent was last started in, to find it again when herdr lists it without its name */

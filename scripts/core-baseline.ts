@@ -1,6 +1,6 @@
 // Core speed baseline numbers (docs/numbers.md, "Core baseline"): one mode per measure, each prints median, p90 and worst.
 // Usage: bun scripts/core-baseline.ts <start|tokens|stalls|gh|time|snapshot|chat-tokens> [args]
-//   start  [n=20]       task add to the agent's first tool call, from the last n done tasks' session files
+//   start  [n=20]       task add to the agent's first tool call, and the time of each start phase, from the last n done tasks' session files
 //   tokens [n=20]       tokens per task by role (agent, reviewer), from the last n done tasks' session files
 //   stalls              stalls per hour and failed starts per machine, from the board's task history
 //   gh     [n=20]       GitHub check time on main per job, from the last n runs of check.yml
@@ -8,7 +8,7 @@
 //   snapshot <url> [n=7]  wall time and size of GET <url>/api/snapshot, n runs
 //   chat-tokens [n=20]  tokens per session of the coordinator and the Dispatcher, from their last n session files
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -80,10 +80,11 @@ function sessionsOf(task: Task): Session[] {
     });
 }
 
-/** A worktree folder and its linked node_modules are born in order, so their birth times bound the worktree and install phases. */
+/** A worktree folder and its node_modules link are born in order, so their birth times bound the worktree and install phases.
+ *  lstat, so the link's own birth counts, not the shared store it points to. */
 function birth(path: string): number | undefined {
   try {
-    return statSync(path).birthtimeMs;
+    return lstatSync(path).birthtimeMs;
   } catch {
     return undefined;
   }
@@ -91,7 +92,7 @@ function birth(path: string): number | undefined {
 
 function start(n: number): void {
   const secs: number[] = [];
-  const phases: Record<string, number[]> = { worktree: [], install: [], session: [], "first call": [] };
+  const phases: Record<string, number[]> = { worktree: [], install: [], "worktree and install": [], session: [], "first call": [] };
   let resent = 0;
   for (const t of doneTasks(n)) {
     const s = sessionsOf(t).find((x) => x.role === "agent");
@@ -107,11 +108,16 @@ function start(n: number): void {
     if (t.briefResent) resent++;
     const wt = birth(t.worktree);
     const modules = birth(join(t.worktree, "node_modules"));
-    if (!first || !s?.startedAt || !wt) continue;
-    const installed = Math.max(wt, modules ?? wt);
-    phases.worktree?.push((wt - t.created) / 1000);
-    phases.install?.push((installed - wt) / 1000);
-    phases.session?.push(Math.max(0, s.startedAt - installed) / 1000);
+    if (!first || !s?.startedAt) continue;
+    // a merged task's folder is gone: its two phases are then one, up to the session's start
+    if (wt) {
+      const installed = Math.max(wt, modules ?? wt);
+      phases.worktree?.push((wt - t.created) / 1000);
+      phases.install?.push((installed - wt) / 1000);
+      phases.session?.push((s.startedAt - installed) / 1000);
+    } else {
+      phases["worktree and install"]?.push((s.startedAt - t.created) / 1000);
+    }
     phases["first call"]?.push((first - s.startedAt) / 1000);
   }
   line("task add to first tool call", secs, "s");
