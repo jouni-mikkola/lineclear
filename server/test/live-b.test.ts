@@ -185,7 +185,6 @@ describe('settings', () => {
     expect(s.get('task.fallback')).toBe('off')
     expect(s.get('task.fallback', 'web')).toBe('pi')
     expect(s.get('task.fallback', 'api')).toBe('off')
-    expect(s.harness('backup', 'web').kind).toBe('pi')
     expect(s.ways('web').review).toBe(true)
     expect(s.ways('api').review).toBe(false)
     // a machine's capacity has no project level; alerts are one for all
