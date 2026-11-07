@@ -103,7 +103,7 @@ test("two loops starting one step at once: the second is refused by the claim", 
   expect(claimStart(claims, "A", Date.now() + CLAIM_MS + 1000)).toBe(true);
   releaseStart(claims, "A");
   mkdirSync(claims, { recursive: true });
-  writeFileSync(join(claims, "A"), "x");
+  mkdirSync(join(claims, "A"));
   t.doTick();
   expect(t.adds()).toEqual([]);
   expect(t.decisions().some((x) => x.step === "A" && x.reason.includes("another loop"))).toBe(true);

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { herdrArgv } from "./herdr.ts";
 import { join } from "node:path";
 import { fileClash, stepHeld, stepNeeds } from "./parts.ts";
@@ -135,19 +135,20 @@ export function settleLockWaits(state: State, skipped: Set<string>): void {
 /** A claim outlives the time a new task needs to show in the lists, so a second loop sees the step as taken. */
 export const CLAIM_MS = 120_000;
 
-/** Takes the step's start in `dir` for one loop at a time, whichever process it runs in. False when another holds it. */
+/** Takes the step's start in `dir` for one loop at a time, whichever process it runs in (a folder is made once). False when another holds it. */
 export function claimStart(dir: string, step: string, now = Date.now()): boolean {
   mkdirSync(dir, { recursive: true });
-  const file = join(dir, step);
+  const claim = join(dir, step);
   try {
-    writeFileSync(file, String(now), { flag: "wx" });
+    mkdirSync(claim);
     return true;
   } catch {
-    if (now - statSync(file).mtimeMs < CLAIM_MS) return false;
-    writeFileSync(file, String(now));
+    if (now - statSync(claim).mtimeMs < CLAIM_MS) return false;
+    rmSync(claim, { recursive: true, force: true });
+    mkdirSync(claim);
     return true;
   }
 }
 
 /** Gives the claim back when the task was not made. */
-export const releaseStart = (dir: string, step: string) => rmSync(join(dir, step), { force: true });
+export const releaseStart = (dir: string, step: string) => rmSync(join(dir, step), { recursive: true, force: true });
