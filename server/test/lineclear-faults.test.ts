@@ -4,80 +4,13 @@ import { describe, expect, spyOn, test } from 'bun:test'
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Engine, fakeHerdr, repo, started, until, world } from './engine-world.ts'
+import { Engine, fakeHerdr, repo, started, world } from './engine-world.ts'
 
 process.env.CLAUDE_CONFIG_DIR = mkdtempSync(join(tmpdir(), 'shep-claude-'))
 const { canResume } = await import('../server/live/agent-start.ts')
 const { claudeLogPath } = await import('../server/live/readers/find.ts')
-const { cutCardId, isAllowance, resetAt, Retries, wakePlan } = await import('../server/live/retry.ts')
-const { writeJson } = await import('../server/store.ts')
 const { Worktrees } = await import('../server/live/engine/worktrees.ts')
 void Engine
-
-describe('(a) out of allowance is not final', () => {
-  const hooks = () => {
-    const woke: string[] = []
-    const over: string[] = []
-    return { woke, over, h: { nudge: () => undefined, over: (k: string) => over.push(k), wake: (k: string) => woke.push(k), changed: () => undefined } }
-  }
-  const limit = { id: 'e1', at: Date.now(), text: "You've hit your session limit · resets 5pm", status: 429 }
-
-  test('it says when the account is back and the chat is woken then; the human hears once', () => {
-    const w = hooks()
-    const r = new Retries(w.h)
-    r.seen('A', limit)
-    expect(r.get('A')).toMatchObject({ over: true, certain: true })
-    expect(r.get('A')!.back!).toBeGreaterThan(Date.now())
-    expect(r.get('A')!.back!).toBeLessThanOrEqual(Date.now() + 24 * 3_600_000)
-    // no reset time said: looked at again in half an hour, then later each time
-    r.seen('B', { ...limit, id: 'e2', text: 'Usage limit reached' })
-    const b = r.get('B')!
-    expect(b.certain).toBe(false)
-    expect(b.back! - Date.now()).toBeGreaterThan(29 * 60_000)
-    r.seen('B', { ...limit, id: 'e3', text: 'Usage limit reached' })
-    expect(r.get('B')!.back! - Date.now()).toBeGreaterThan(59 * 60_000)
-    // a failure again of the same stop is not another message to the human
-    expect(w.over).toEqual(['A', 'B'])
-    r.stop()
-  })
-
-  test('it survives a restart: the wake-up is armed again from what was kept', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'shep-wake-'))
-    process.env.LINECLEAR_HOME = dir
-    writeJson('retries.json', {
-      A: { cut: 'e1', tries: 1, reason: 'Out of allowance until 5pm', words: '', over: true, back: Date.now() + 100, certain: true },
-    })
-    const w = hooks()
-    const r = new Retries(w.h, undefined, 0)
-    await until(() => w.woke.length > 0)
-    expect(w.woke).toEqual(['A'])
-    expect(r.get('A')!.back).toBeUndefined()
-    r.stop()
-  })
-
-  test('reset times as providers say them', () => {
-    const now = Date.parse('2026-11-01T10:00:00Z')
-    expect(resetAt('resets in 3 hours', now)).toBe(now + 3 * 3_600_000)
-    const at = resetAt("You've hit your limit · resets 5pm (UTC)", now)!
-    expect(new Date(at).toISOString()).toBe('2026-11-01T17:00:00.000Z')
-    expect(new Date(resetAt('resets 9am (UTC)', now)!).toISOString()).toBe('2026-11-02T09:00:00.000Z')
-    expect(resetAt('Usage limit reached', now)).toBeUndefined()
-    expect(isAllowance('Out of allowance until 5pm')).toBe(true)
-  })
-})
-
-describe('(b) the wake-up never writes carry on to a chat whose model is out', () => {
-  test('with no reset time said, a chat that has a backup account moves to it first', () => {
-    expect(wakePlan({ certain: false }, true)).toBe('switch')
-    expect(wakePlan({ certain: true }, true)).toBe('carry-on')
-    expect(wakePlan({ certain: false }, false)).toBe('carry-on')
-  })
-
-  test('every failure of a chat is one card, not a new one each time', () => {
-    expect(cutCardId('p:1', 'Out of allowance until 5pm')).toBe(cutCardId('p:1', 'Out of allowance'))
-    expect(cutCardId('p:1', 'Out of allowance')).not.toBe(cutCardId('p:2', 'Out of allowance'))
-  })
-})
 
 describe('(c) a restart that would resume a session Claude Code does not have', () => {
   test('starts a session of its own instead of failing with "No conversation found"', () => {
@@ -199,13 +132,6 @@ describe('(g) an agent idle at 0% context', () => {
     const before = w.sent.length
     w.engine.briefLate(w.engine.task(t.id)!)
     expect(w.sent.length).toBe(before)
-  })
-})
-
-describe('incidents: "This operation was aborted" is a dropped connection, waited out', () => {
-  test('it passes by itself instead of going straight to the human (59 times in October)', () => {
-    const { providerError } = require('../server/live/retry.ts')
-    expect(providerError('This operation was aborted')).toEqual({ passing: true, reason: 'Connection dropped' })
   })
 })
 

@@ -23,7 +23,6 @@ import { HOST, NAME, placeId, Places } from './places.ts'
 import { privatePrompt, coordinatorPrompt } from './prompts.ts'
 import type { Harness } from './restart.ts'
 import { Revivals } from './revive.ts'
-import { carryOn, cutCardId, Retries, type Retry, wakePlan } from './retry.ts'
 import { Settings, type Level } from './settings.ts'
 import { Vault } from './secrets.ts'
 import { RequestedNewsMailbox } from './requested-news.ts'
@@ -54,29 +53,6 @@ export class LiveSourceState extends Emitter<SourceEvents> {
     (args) => sh(['agent-browser', ...args], HOME, { timeoutMs: 45_000, here: true }),
     (html, data) => wrapPage(html, { check: true, phone: true, data }),
   )
-  /** turns the model's provider cut off: waited out and tried again, then a task's backup agent or the human (retry.ts) */
-  retries = new Retries({
-    nudge: (key, text) => {
-      // a task stopped, paused or finished meanwhile is left as it is
-      if (key.includes('/') && !this.engine.mayRetry(key)) return this.retries.clear(key)
-      this.agents.send(key, text, { ensure: key.includes('/') ? () => this.resumeTaskAgent(key) : () => this.coordinator(key) }).catch(() => undefined)
-    },
-    over: (key, r) => this.cannotGoOn(key, r),
-    // its account may be back: a chat is never written 'carry on' while its model may still be out, so a task moves to
-    // its backup agent first, unless the provider said when the account is back
-    wake: (key, r) => {
-      if (key.includes('/') && !this.engine.mayRetry(key)) return this.retries.clear(key)
-      const id = key.split('/')[0]
-      if (key.includes('/') && wakePlan(r, this.engine.canSwitch(id)) === 'switch') return void this.engine.cantGoOn(id, r.reason).catch(() => undefined)
-      this.agents
-        .send(key, carryOn(r.reason), { ensure: key.includes('/') ? () => this.resumeTaskAgent(key) : () => this.coordinator(key) })
-        .catch(() => undefined)
-    },
-    changed: (key) => {
-      if (key.includes('/')) this.engine.retried(key)
-      this.emit('snapshot')
-    },
-  })
   /** this machine's load, memory, disks and herdr, sampled every 30 seconds; its coordinator hears when one is past
    *  its limit (Settings → the machine). Tests never measure the machine they run on: they tick it themselves */
   health = new Monitor(
@@ -288,16 +264,6 @@ export class LiveSourceState extends Emitter<SourceEvents> {
   protected stoppedAlert(key: string, id: string, body: string, tag: string) {
     if (this.watched.includes(key)) this.emit('chat', key)
     this.alert({ id: randomUUID(), from: 'Lineclear', title: `${this.chatName(key)} stopped`, body, go: { place: key, focus: id }, tag })
-  }
-
-  /** an agent can't go on by itself: a task's backup agent takes over, or it waits for you; a coordinator tells you in
-   *  its chat, with an alert */
-  protected cannotGoOn(key: string, r: Retry) {
-    if (key.includes('/')) return void this.engine.cantGoOn(key.split('/')[0], r.reason).catch(() => undefined)
-    // one card per chat and reason: a failure again updates it, never posts another
-    const id = cutCardId(key, r.reason)
-    this.chats.post(key, { id, card: { id, text: `Cut off by its provider: ${r.reason.charAt(0).toLowerCase()}${r.reason.slice(1)}. Write to carry on.` } })
-    this.stoppedAlert(key, id, `${r.reason}. ${r.words}`.slice(0, 200), `cut:${key}`)
   }
 
   /* ---------- spaces ---------- */

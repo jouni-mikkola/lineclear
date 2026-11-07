@@ -13,7 +13,7 @@ export class EngineStalls extends EngineStatus {
     for (const t of this.tasks) this.checkReady(t, now)
     for (const t of this.tasks) this.checkSilentNeed(t, now)
     for (const t of this.tasks) {
-      if (t.archived || t.paused || this.statusOf(t) !== 'work' || this.retrying(t) || this.handing.has(t.id)) continue
+      if (t.archived || t.paused || this.statusOf(t) !== 'work' || this.handing.has(t.id)) continue
       const life = this.lifeOf(t)
       const r = t.report
       // shown life since: its next stall is news again

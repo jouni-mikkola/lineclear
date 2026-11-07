@@ -2,15 +2,15 @@ import { existsSync } from '../mfs.ts'
 import type { Question } from '../../../shared/types.ts'
 import { hidden } from '../agents.ts'
 import type { Space } from '../places.ts'
-import { handOverLine, restartLine, resumedLine, taskFirst } from '../prompts.ts'
-import { CLI_NAME, kindOf } from '../settings.ts'
+import { restartLine, resumedLine, taskFirst } from '../prompts.ts'
+import { CLI_NAME } from '../settings.ts'
 import { fitHarness, harnessWords, recentChat } from '../restart.ts'
 import * as G from './git.ts'
 import * as GH from './github.ts'
 import { unmerged } from './branch-work.ts'
 import * as Lane from './lane.ts'
 import { fitStatus } from './status-line.ts'
-import { type TaskRec, type Harness, ended, labelOf, CHECKS_EVERY, CHECKS_SHOW, failKey, ghNow, troubleOf } from './engine-helpers.ts'
+import { type TaskRec, type Harness, ended, labelOf, CHECKS_EVERY, CHECKS_SHOW, failKey, ghNow } from './engine-helpers.ts'
 import { EngineLaunch } from './engine-launch.ts'
 
 export class EngineHandoff extends EngineLaunch {
@@ -71,54 +71,6 @@ export class EngineHandoff extends EngineLaunch {
     if (!t || !this.briefing.has(t.id)) return
     this.begun(t)
     this.settle(t)
-  }
-
-  /** a backup agent could take this task over now: one is set, installed, different, and has not had its turn */
-  canSwitch(id: string): boolean {
-    const t = this.task(id)
-    if (!t?.worktree || t.tookOver) return false
-    const from = this.agents.record(this.key(t))?.kind ?? t.agent?.kind ?? ''
-    const to = kindOf(this.settings.get('task.fallback', this.nameOf(t)))
-    return !!to && to !== from && this.installed(to)
-  }
-
-  /**
-   * Its agent can't go on (retry.ts): out of allowance, signed out, or its provider still down after the last try. The
-   * backup agent (Settings' task.fallback) takes over once, in the same worktree and branch, with the brief and what
-   * was done so far; else, or when that one can't go on either, it waits for you.
-   */
-  async cantGoOn(id: string, why: string) {
-    const t = this.task(id)
-    if (!t || !this.mayRetry(this.key(t)) || this.handing.has(t.id)) return
-    const key = this.key(t)
-    const from = this.agents.record(key)?.kind ?? t.agent?.kind ?? ''
-    const to = kindOf(this.settings.get('task.fallback', this.nameOf(t)))
-    if (!to || to === from || t.tookOver || !t.worktree || !this.installed(to)) return this.settle(t)
-    const name = (k: string) => CLI_NAME[k] ?? k
-    this.handing.add(t.id)
-    t.tookOver = { from, to, why: why.charAt(0).toLowerCase() + why.slice(1), at: Date.now() }
-    this.settle(t)
-    try {
-      const first = `${taskFirst(t)}\n\n${handOverLine({ from: name(from), why: t.tookOver.why, ...(await this.soFar(t, key, name(from))) })}`
-      await this.agents.finish(key)
-      // Settings' Backup model and effort (its project's), or else the task's own effort, as near as the backup's
-      // model takes it
-      const own = this.settings.modelOf('backup', to, this.nameOf(t))
-      await this.launch(t, first, undefined, {
-        kind: to,
-        model: own.model,
-        effort: own.effort ?? (t.agent ?? this.settings.harness('task', this.nameOf(t))).effort,
-      })
-      const card = `takeover:${t.id}:${t.tookOver.at}`
-      this.chats.post(key, { id: card, card: { id: card, text: `${name(to)} took over from ${name(from)}: ${t.tookOver.why}` } })
-    } catch (e) {
-      // the backup didn't start: it went wrong, and a later hand-over may try again
-      t.trouble = troubleOf(e)
-      t.tookOver = undefined
-    } finally {
-      this.handing.delete(t.id)
-      this.settle(t)
-    }
   }
 
   /** what a backup agent is told was done: the branch's commits, what lies uncommitted, the chat's last messages */

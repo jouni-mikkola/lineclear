@@ -90,11 +90,6 @@ export class LiveSourceUpkeep extends LiveSourceCli {
     this.stoppedAlert(key, id, `Its agent stopped, and Lineclear couldn't start it again.`, `revive:${key}`)
   }
 
-  /** what cut off an agent's last turn, if its log says the provider did */
-  protected checkCut(key: string) {
-    if (this.agents.record(key) && !this.peers?.owner(key)) this.retries.seen(key, this.chats.cutOff(key))
-  }
-
   /** news for coordinators: they act on it when the human asked them to. News the human
    *  sees as a card in the space's chat gets its coordinator's short reply after it, so a card never ends the chat. The
    *  space's own coordinator hears it. The main

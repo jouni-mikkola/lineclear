@@ -43,7 +43,6 @@ export class LiveSourceViews extends LiveSourceState {
     this.timers.forEach(clearInterval)
     this.agents.stop()
     this.engine.stop()
-    this.retries.stop()
   }
 
   /* ---------- unread ---------- */

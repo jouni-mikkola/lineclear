@@ -5,7 +5,6 @@ import { HOME } from '../store.ts'
 import { BOX } from './box.ts'
 import { followCommand } from './commands.ts'
 import { HOME_SPACE, placeId } from './places.ts'
-import { carryOn } from './retry.ts'
 import { has } from '../plugins.ts'
 import { LiveSourceUpkeep } from './source-upkeep.ts'
 import { held } from './loop-lag.ts'
@@ -55,12 +54,7 @@ export class LiveSource extends LiveSourceUpkeep implements Source {
       this.revivals.status(key, st)
       this.engine.agentStatus(key)
       this.fresh(key)
-      // its turn ended: maybe its provider cut it off (its log may say so a moment later)
-      if (st !== 'working' && st !== 'blocked') {
-        this.checkCut(key)
-        setTimeout(() => this.checkCut(key), 2000)
-        this.reseat(key)
-      }
+      if (st !== 'working' && st !== 'blocked') this.reseat(key)
       this.emit('snapshot')
       this.chats
         .readMenu(key)
@@ -70,8 +64,6 @@ export class LiveSource extends LiveSourceUpkeep implements Source {
     this.agents.on('logs', (key) => this.watched.includes(key) && this.emit('chat', key))
     this.agents.on('sent', (item) => {
       if (item.command) void followCommand(this.agents, this.chats, item, (key) => this.emit('chat', key))
-      // anything else that goes in wakes it: the count of tries starts again
-      if (item.text !== carryOn(this.retries.get(item.key)?.reason ?? '')) this.retries.clear(item.key)
       this.engine.sent(item.key)
       this.emit('chat', item.key)
     })
@@ -81,7 +73,6 @@ export class LiveSource extends LiveSourceUpkeep implements Source {
       if (this.terms.includes(key)) this.emit('terminal', key, screen)
     })
     this.engine.on('changed', () => this.emit('snapshot'))
-    this.engine.retry = (key) => this.retries.get(key)
     // a turn cut short (Esc, a prompt turned down) runs no hook: its log says it is over
     this.agents.endedSince = (key, at) => this.chats.endedSince(key, at)
     this.agents.beforeInput = async (key) => {
@@ -99,8 +90,6 @@ export class LiveSource extends LiveSourceUpkeep implements Source {
     })
     this.engine.on('news', (project, text, kind, about, card) => this.news(project, text, kind, about, card))
     this.engine.on('gone', (t, forget) => {
-      // stopped, closed or deleted: no try is due any more
-      this.retries.clear(`${t.id}/Agent`)
       void this.browsers?.close(t.id, forget).catch(() => undefined)
     })
     if (this.browsers && process.env.NODE_ENV !== 'test') {

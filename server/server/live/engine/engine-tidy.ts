@@ -277,12 +277,6 @@ export class EngineTidy extends EngineMerge {
     } else this.settleSoon(t)
   }
 
-  /** what the provider did to its agent's turn changed (retry.ts): waiting, trying again, or given up */
-  retried(key: string) {
-    const t = this.task(key.split('/')[0])
-    if (t && key === this.key(t)) this.settle(t)
-  }
-
   /** automations: tasks of a project, by status (archived ones left out) */
   count(project: string, status: TaskStatus) {
     return this.tasks.filter((t) => t.project === project && !t.archived && this.statusOf(t) === status).length

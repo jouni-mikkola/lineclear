@@ -1,5 +1,4 @@
 import type { TaskStatus } from '../../../shared/types.ts'
-import { inMins } from '../retry.ts'
 import { CLI_NAME } from '../settings.ts'
 import * as Lane from './lane.ts'
 import { askOf, fitStatus } from './status-line.ts'
@@ -35,7 +34,6 @@ export class EngineStatus extends EngineState {
     if (st === 'working' || this.handing.has(t.id)) return 'work'
     if (this.agents.waiting(key).length || Date.now() - (this.wrote.get(t.id) ?? 0) < ANSWER_GRACE) return 'work'
     if (t.reported) return 'ready'
-    if (this.retrying(t)) return 'work'
     // its turn ended while work it started in the background (a subagent, a shell, a monitor) still runs and will wake
     // it: a pause, not a question, unless what it said last asks you something
     if (this.agents.background(key) && !this.asks(key)) return 'work'
@@ -63,8 +61,6 @@ export class EngineStatus extends EngineState {
       if (status === 'ready') return 'Ready to merge'
       if (status === 'merging') return Lane.landingLine(t.landing!, t.base)
       if (this.handing.has(t.id) && t.tookOver) return fitStatus(`${CLI_NAME[t.tookOver.to] ?? t.tookOver.to} takes over: ${t.tookOver.why}`)
-      const r = this.retry?.(key)
-      if (r?.due) return `${r.reason} · retry in ${inMins(r.due)}`
       return 'Working'
     })()
     return s.length > 90 ? `${s.slice(0, 89).trimEnd()}…` : s
@@ -75,8 +71,6 @@ export class EngineStatus extends EngineState {
    * reports (its hooks, its log, its cards), never a model's reading of it.
    */
   protected reasonOf(key: string): string | undefined {
-    const cut = this.retry?.(key)
-    if (cut?.over) return fitStatus(cut.reason)
     const said = this.agents.said(key)
     if (this.agents.status(key) === 'blocked') {
       if (said?.state === 'blocked')
