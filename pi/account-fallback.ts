@@ -1,8 +1,7 @@
 // When an account is full, the run goes on at once on the next model of the project's list, in the same pi process.
 // One virtual model per role (lineclear/worker, lineclear/reviewer, lineclear/planner) routes over the ordered list in the
 // project's settings (docs/virtual-models.md in pi). A paid API key stays off because only listed models are ever used.
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { configDir } from "./config.ts";
 
@@ -19,16 +18,19 @@ const ROLES = ["worker", "reviewer", "planner"];
 
 export const isQuotaError = (text: unknown): boolean => typeof text === "string" && QUOTA.test(text);
 
-/** The git root a folder belongs to, the main checkout when it is a worktree. Undefined outside git. */
+/** The main checkout a folder belongs to: its own `.git` folder, or the one a worktree's `.git` file points to. Undefined outside git. */
 function repoOf(cwd: string): string | undefined {
-  try {
-    const common = execFileSync("git", ["-C", cwd, "rev-parse", "--path-format=absolute", "--git-common-dir"], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    }).trim();
-    return dirname(common);
-  } catch {
-    return undefined;
+  for (let dir = resolve(cwd); ; dir = dirname(dir)) {
+    const dot = join(dir, ".git");
+    try {
+      if (statSync(dot).isDirectory()) return dir;
+      const target = /^gitdir:\s*(.+)$/m.exec(readFileSync(dot, "utf8"))?.[1];
+      // <repo>/.git/worktrees/<name>
+      return target ? dirname(dirname(dirname(resolve(dir, target.trim())))) : undefined;
+    } catch {
+      // no .git here: look in the parent
+    }
+    if (dirname(dir) === dir) return undefined;
   }
 }
 
