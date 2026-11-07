@@ -1,5 +1,6 @@
 import { type ReactNode, useMemo, useState } from "react";
 import { count } from "./format.ts";
+import { useArrivals } from "./hooks.ts";
 
 // The one table part. Use it for many rows of the same figures to compare or sort. Where a picture says it better (a
 // track, a bar, a lamp) draw that instead: docs/design.md says when.
@@ -77,6 +78,7 @@ export function DataTable<R extends { id: string }>({
     setOpen(next);
     onOpen?.(next);
   };
+  const arrivals = useArrivals<HTMLDivElement>(rows.map((r) => r.id));
   const fill = height === "fill";
   const cap = fill ? undefined : height;
   const head = (c: Column<R>) => (c.unit ? `${c.label} (${c.unit})` : c.label);
@@ -89,7 +91,7 @@ export function DataTable<R extends { id: string }>({
   const ariaSort = (c: Column<R>) => (sort?.key === c.key ? (sort.down ? "descending" : "ascending") : sortable ? "none" : undefined);
 
   return (
-    <div data-table={label} data-rows={rows.length} className={fill ? "flex h-full min-h-0 flex-col" : undefined}>
+    <div ref={arrivals} data-table={label} data-rows={rows.length} className={fill ? "flex h-full min-h-0 flex-col" : undefined}>
       {sortable && (
         <div className="mb-2 flex items-center gap-2 text-sm text-fg2 sm:hidden" role="group" aria-label={`Sort ${label}`}>
           <label htmlFor={`sort-${label}`}>Sort by</label>
