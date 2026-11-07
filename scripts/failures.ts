@@ -77,7 +77,13 @@ export function judge(failures: Failure[], quarantine: Quarantined[], passesAlon
   }
   const next = [...quarantine, ...flaky.map((f) => ({ file: f.file.replace(/^\.\//, ""), test: f.test, fix: "unfiled" }))];
   if (next.length > QUARANTINE_MAX) {
-    return { broken: [...broken, ...flaky], quarantined, flaky: [], next: quarantine, error: `quarantine is full (${QUARANTINE_MAX} tests): fix a flaky test first` };
+    return {
+      broken: [...broken, ...flaky],
+      quarantined,
+      flaky: [],
+      next: quarantine,
+      error: `quarantine is full (${QUARANTINE_MAX} tests): fix a flaky test first`,
+    };
   }
   return { broken, quarantined, flaky, next };
 }
