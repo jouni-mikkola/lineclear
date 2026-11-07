@@ -1,0 +1,80 @@
+name: check
+
+# Checks are light and run here, never on an owner's machine (test/light-checks.test.ts keeps it so).
+# A pull request runs the tests of what it changed (scripts/check.ts --changed). The merge queue and main run the full
+# check in 8 jobs that each take an equal-time share of the test files and steps (--shard). Require the job "check" in the branch rules.
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Tests that commit into a scratch repo need a git identity, which a runner has none of.
+env:
+  GIT_AUTHOR_NAME: ci
+  GIT_AUTHOR_EMAIL: ci@localhost
+  GIT_COMMITTER_NAME: ci
+  GIT_COMMITTER_EMAIL: ci@localhost
+
+concurrency:
+  group: check-${{ github.event.pull_request.number || github.sha }}
+  # a newer push to a pull request replaces its run; every commit on main keeps its own result
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  changed:
+    name: changed tests
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: git fetch --no-tags origin main:main
+        if: github.base_ref == 'main'
+      # Tests commit in fresh repos, which need an identity and a default branch the runner lacks
+      - run: |
+          git config --global user.name ci
+          git config --global user.email ci@localhost
+          git config --global init.defaultBranch main
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', 'server/bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+      - run: bun install --frozen-lockfile
+      # --untimed: a shared runner's speed decides a test's time, not the code
+      - run: bun scripts/check.ts --changed --untimed
+
+  full:
+    name: full check (${{ matrix.shard }}/8)
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', 'server/bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+      - run: bun install --frozen-lockfile
+      - run: bun scripts/check.ts --full --no-cache --untimed --shard=${{ matrix.shard }}/8
+
+  check:
+    name: check
+    if: always()
+    needs: [changed, full]
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = false
