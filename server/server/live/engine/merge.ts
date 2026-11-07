@@ -241,23 +241,30 @@ export class EngineLand extends EngineHandoff {
   }
 
   /**
+   * A red main stops the merges: one waits for a green run, so a burst of failures stays one. A fix (its task is made by
+   * main-green, or its title starts with Fix) goes in, as only it can turn main green. False when Lineclear is stopping.
+   */
+  protected async holdWhileRed(t: TaskRec, g: G.GitHub, cwd: string): Promise<boolean> {
+    if (t.by === 'main-green' || /^fix\b/i.test(t.title)) return true
+    const red = async () => {
+      const runs = await GH.branchRuns(g, cwd, t.base!)
+      return runs?.find((r) => r.state !== 'pending')?.state === 'fail'
+    }
+    while (!this.closing && (await red())) {
+      t.mergeStopped = `Held: ${t.base} is red on GitHub, the merge goes on once a run is green.`
+      await Bun.sleep(this.redWait)
+    }
+    return !this.closing
+  }
+
+  protected redWait = CHECKS_EVERY
+
+  /**
    * Through the pull request, as herdr-projects lands one: the branch pushed as it is, rebased on GitHub's main only
    * when it conflicts with it (its pull request opened if the agent didn't), GitHub's checks passed at exactly that
    * commit, then squash-merged on GitHub only while its head is still that commit, its branch there deleted, and main here brought up to GitHub's (which
    * is what Lineclear's own update watches). Failed checks go back to the agent.
    */
-  /** a red main stops the merges: one waits for a green run, so a burst of failures stays one. The fix task goes in. */
-  protected async holdWhileRed(t: TaskRec, p: Space, g: G.GitHub) {
-    if (t.by === 'main-green') return
-    const red = async () => {
-      const runs = await GH.branchRuns(g, p.path, p.base)
-      return runs?.find((r) => r.state !== 'pending')?.state === 'fail'
-    }
-    while (!this.closing && (await red())) await Bun.sleep(this.redWait)
-  }
-
-  protected redWait = CHECKS_EVERY
-
   protected async mergeOnGitHub(t: TaskRec, p: Space, g: G.GitHub, self: boolean): Promise<{ ok: boolean; error?: string; note?: string }> {
     const wt = t.worktree!
     const base = `origin/${t.base}`
@@ -270,7 +277,6 @@ export class EngineLand extends EngineHandoff {
         ok: false,
         error: `${t.base} here has ${ahead} commit${ahead === 1 ? '' : 's'} GitHub lacks: push ${t.base} (git push origin ${t.base}) or move them off it, then merge ${t.id} again. Nothing was merged.`,
       }
-    await this.holdWhileRed(t, p, g)
     const pr = await this.prOf(t, g, wt)
     if (pr && pr.baseRefName !== t.base)
       return {
@@ -300,6 +306,8 @@ export class EngineLand extends EngineHandoff {
         `it was in ${t.base} already${pr ? (closed ? `; closed PR #${pr.number}` : `; could not close PR #${pr.number}: close it on GitHub`) : ''}`,
       )
     }
+    if (!(await this.holdWhileRed(t, g, p.path)))
+      return { ok: false, error: `Lineclear is restarting: nothing was merged. Run lineclear merge ${t.id} again in a minute.` }
     const head = (await G.git(wt, 'rev-parse', 'HEAD')).out
     const pushing = !pr || pr.headRefOid !== head
     if (pushing) {

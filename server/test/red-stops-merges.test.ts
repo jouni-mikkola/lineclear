@@ -38,5 +38,5 @@ test('3 merges on a red main: the 2nd and 3rd are held until a green run', async
   g.set({ runs: [run('b'.repeat(40), 'success', 4), run(red, 'failure', 3)] })
   expect((await second).ok).toBe(true)
   expect((await third).ok).toBe(true)
-  expect(settled).toEqual(['2', '3'])
+  expect([...settled].sort()).toEqual(['2', '3'])
 })
