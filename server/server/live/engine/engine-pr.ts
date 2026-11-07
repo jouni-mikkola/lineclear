@@ -61,6 +61,31 @@ export class EnginePr extends EngineLaunch {
     return pr
   }
 
+  /**
+   * A finished task leaves no open pull request: it is closed with a comment and its remote branch deleted, once. Run
+   * after the local branch is put away, and only when nothing was kept (kept work may still be wanted on GitHub).
+   */
+  protected async dropPr(t: TaskRec) {
+    if (t.prDropped || !t.branch || !t.cleaned || t.kept?.length || !this.places.space(t.project)) return
+    try {
+      const p = this.proj(t)
+      const g = await this.hub(p)
+      if (g) {
+        const pr = await GH.findPr(g, p.path, t.branch)
+        if (pr?.state === 'OPEN') {
+          const closed = await GH.closePr(g, p.path, pr.number, `Closed by Lineclear: ${t.id} is Done and its branch is deleted.`)
+          if (!closed.ok) return
+        }
+        if (pr?.state === 'OPEN' || (t.closed && t.pushed)) await G.git(p.path, 'push', '--quiet', 'origin', '--delete', t.branch)
+      }
+      t.prDropped = true
+      this.save()
+    } catch (e) {
+      // GitHub not answering: the next sweep tries again
+      console.error(`closing the pull request of ${t.id}:`, (e as Error).message)
+    }
+  }
+
   protected async readyForReview(t: TaskRec, hub?: GH.GitHub) {
     const p = this.proj(t)
     const g = hub ?? (await this.hub(p))

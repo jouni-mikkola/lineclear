@@ -63,6 +63,8 @@ export interface TaskRec {
   readyNudged?: number
   /** its place was put away once done: agent, space, worktree and branch (what lost nothing) */
   cleaned?: boolean
+  /** its open pull request was closed and its remote branch deleted, once (or it had none) */
+  prDropped?: boolean
   /** what putting it away kept, and why ("~/x (uncommitted changes)") */
   kept?: string[]
   /** starting it went wrong */
