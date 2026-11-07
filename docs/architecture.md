@@ -26,7 +26,7 @@ imports count for the borders but not for cycles, since they are gone when the c
 
 ## Layers
 
-From the bottom up. A module imports downward, never up, and the README of each says exactly which.
+Mostly from the bottom up. The README of each module says exactly what it may import.
 
 1. Leaves that import nothing of ours: `brand`, `pi`, `shared`, `registry`, `store`, `check-line`.
 2. The CLI and the server on top of them: `cli`, `server`, `helper`, `secrets`, `project-models`.
