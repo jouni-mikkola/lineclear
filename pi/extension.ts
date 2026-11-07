@@ -104,38 +104,50 @@ export function beatDuringCalls(
   });
 }
 
-/** A tool result longer than this many lines is cut before the next turn: every later turn re-reads it from the cache. */
+/** A tool result longer than this many lines or characters is cut once the model has read it. */
 export const MAX_RESULT_LINES = 100;
+const MAX_RESULT_CHARS = 8000;
 /** Lines kept from the start and from the end of a cut tool result. */
 const KEPT_LINES = 40;
+const KEPT_CHARS = 3000;
 
 type Block = { type?: string; text?: string };
+type Message = { role?: string; content?: unknown };
 
-/** The result with its middle cut when it has more than MAX_RESULT_LINES lines; the same block when it is short. */
+/** The result with its middle cut when it is long; the same block when it is short. */
 export function cutLongResult(block: Block): Block {
   if (block?.type !== "text" || typeof block.text !== "string") return block;
-  const lines = block.text.split("\n");
-  if (lines.length <= MAX_RESULT_LINES) return block;
-  const cut = lines.length - 2 * KEPT_LINES;
-  const note = `[${cut} lines cut to save tokens: read the file or rerun with grep or tail for the part you need]`;
-  return { ...block, text: [...lines.slice(0, KEPT_LINES), note, ...lines.slice(-KEPT_LINES)].join("\n") };
+  const text = block.text;
+  const lines = text.split("\n");
+  const note = (what: string) => `[${what} cut to save tokens: rerun with offset, grep or tail for the part you need]`;
+  if (lines.length > MAX_RESULT_LINES) {
+    const cut = lines.length - 2 * KEPT_LINES;
+    return { ...block, text: [...lines.slice(0, KEPT_LINES), note(`${cut} lines`), ...lines.slice(-KEPT_LINES)].join("\n") };
+  }
+  if (text.length <= MAX_RESULT_CHARS) return block;
+  const cut = text.length - 2 * KEPT_CHARS;
+  return { ...block, text: `${text.slice(0, KEPT_CHARS)}\n${note(`${cut} characters`)}\n${text.slice(-KEPT_CHARS)}` };
 }
 
-/** Cuts the long tool results in a task agent's session before each call, so they are not re-sent on every later turn. */
+/**
+ * Cuts the long tool results a task agent has already read, before each call: the model sees a result whole once, and
+ * the cache does not re-send it on every later turn.
+ */
 export function cutLongResults(pi: Pi, env: Env = process.env): void {
-  if (!lineclearAgent(env)) return;
   pi.on("context", (event) => {
     try {
-      if (!Array.isArray(event?.messages)) return undefined;
+      if (!taskAgent(env) || !Array.isArray(event?.messages)) return undefined;
+      const messages: Message[] = event.messages;
+      const seen = messages.findLastIndex((m) => m?.role === "assistant");
       let changed = false;
-      const messages = event.messages.map((m: any) => {
-        if (m?.role !== "toolResult" || !Array.isArray(m.content)) return m;
-        const content = m.content.map(cutLongResult);
-        if (content.every((b: Block, i: number) => b === m.content[i])) return m;
+      const cut = messages.map((m, at) => {
+        if (at > seen || m?.role !== "toolResult" || !Array.isArray(m.content)) return m;
+        const content = (m.content as Block[]).map(cutLongResult);
+        if (content.every((b, i) => b === (m.content as Block[])[i])) return m;
         changed = true;
         return { ...m, content };
       });
-      return changed ? { messages } : undefined;
+      return changed ? { messages: cut } : undefined;
     } catch {
       return undefined; // cutting must never get in the way of a call
     }
