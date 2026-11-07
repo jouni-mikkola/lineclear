@@ -146,6 +146,25 @@ export class EngineLand extends EngineHandoff {
     return this.onMachineOf(t, () => this.mergeOnMachine(t, self))
   }
 
+  /** merges that already landed on a red main, by the red commit: one may (it can be the fix), the rest wait */
+  private redLanded = new Set<string>()
+
+  /**
+   * One red on main stops the merges: the first task to merge while main is red goes through (it may be the fix, as a
+   * fix task always does), the rest wait for a green run, so a burst of failures is one failure.
+   */
+  private heldByRedMain(t: TaskRec): string | undefined {
+    const p = this.proj(t)
+    const red = this.data.red?.[p.path]
+    if (!red || t.by === 'main-green') return
+    const key = `${p.path}@${red}`
+    if (!this.redLanded.has(key)) {
+      this.redLanded.add(key)
+      return
+    }
+    return `${p.base} is red at ${red.slice(0, 7)}: ${t.id} waits for a green run on it, then merge again.`
+  }
+
   private async mergeOnMachine(t: TaskRec, self: boolean): Promise<{ ok: boolean; error?: string; note?: string }> {
     // asked again after its first answer was lost: the merge is the answer
     if (t.merged) return { ok: true, note: `${t.id} is merged already` }
@@ -167,6 +186,8 @@ export class EngineLand extends EngineHandoff {
       t.reported = true
       t.reportedAt ??= Date.now()
     }
+    const held = this.heldByRedMain(t)
+    if (held) return { ok: false, error: held }
     this.land(t, 'merge')
     const p = this.proj(t)
     const wt = t.worktree
