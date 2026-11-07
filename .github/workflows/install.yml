@@ -3,6 +3,13 @@ name: install
 on:
   push:
     branches: [main]
+    paths:
+      - install.sh
+      - pi/kit.json
+      - src/install-paths.ts
+      - src/uninstall.ts
+      - src/builds.ts
+      - .github/workflows/install.yml
   schedule:
     - cron: "17 3 * * *"
   workflow_dispatch:
