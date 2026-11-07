@@ -7,15 +7,15 @@ describe('L146: task status', () => {
     expect(Object.values(NEED)).toEqual(['Plan to approve', 'Asks permission', 'Signed out', 'Question for you', 'Waits for your reply'])
   })
 
-  test('a working agent is Working, an idle one with no report waits for your reply', async () => {
+  test('a working agent is Working, an idle one with no report that asks something waits for your reply', async () => {
     const w = world()
     const { t, key } = await started(w, repo(), 'status')
     w.agentIs(key, 'working')
     expect(w.engine.statusOf(t)).toBe('work')
     expect(w.engine.subOf(t)).toBe('Working')
-    w.chat.reply = 'Done for now.'
+    w.chat.reply = 'Done for now. Should I go on?'
     w.agentIs(key, 'idle')
     expect(w.engine.statusOf(t)).toBe('need')
-    expect(w.engine.subOf(t)).toBe(NEED.reply)
+    expect(w.engine.subOf(t)).toBe('Should I go on?')
   })
 })
