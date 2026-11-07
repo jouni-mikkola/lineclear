@@ -5,9 +5,9 @@ const lines = (n: number) => Array.from({ length: n }, (_, i) => `line ${i + 1}`
 const result = (text: string) => ({ role: "toolResult", content: [{ type: "text", text }] });
 
 function context(messages: unknown[], env: Record<string, string> = { LINECLEAR_CHAT: "LE-1/Agent" }) {
-  let handler: ((ev: unknown) => any) | undefined;
+  let handler: ((ev: unknown, ctx: unknown) => any) | undefined;
   cutLongResults({ on: (name, fn) => name === "context" && (handler = fn) }, env);
-  return handler?.({ messages });
+  return handler?.({ messages }, {});
 }
 
 test("a 200-line tool result is cut before the next turn", () => {
