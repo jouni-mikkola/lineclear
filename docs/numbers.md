@@ -111,7 +111,7 @@ Measured on the one machine with this repo's history, under light load. The Spee
 | Dispatcher new input per session | 38 k | 2773 k | last 11 sessions | `chat-tokens` |
 | Stall-kind lines per hour in `decisions.jsonl` | 15.5 | | 169 hours | `stalls` |
 
-The reviewer ran in 2 of the last 20 done tasks' session folders, so its tokens have too few runs to set a target.
+A review is one call without a session. Its input is counted from the question's size (a quarter of its characters) and stored in the review file, which `tokens` reads for the reviewer rows. Goal: 40 k new input at the median, 80 k at p90.
 
 Runs of `check.yml` on main, the last 50: 21 success, 16 failure, 13 cancelled
 (`gh run list --workflow check.yml --branch main --limit 50`). The cancelled runs are from before the workflow's

@@ -104,6 +104,12 @@ function tokens(n: number): void {
   for (const role of ["agent", "reviewer"] as const) {
     const per = tasks
       .map((t) => {
+        // a review is one call without a session: its size is stored with its findings
+        if (role === "reviewer") {
+          const file = join(BOARD, "reviews", `${t.id}.json`);
+          const tokensIn = existsSync(file) ? (JSON.parse(readFileSync(file, "utf8")) as { inputTokens?: number }).inputTokens : undefined;
+          return { fresh: tokensIn ?? 0, cached: 0, out: 0, has: tokensIn !== undefined };
+        }
         const u = sessionsOf(t)
           .filter((s) => s.role === role)
           .map((s) => s.usage);

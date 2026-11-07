@@ -26,6 +26,9 @@ const CONTEXT_LINES = 8;
 /** The diff and the rules are cut to this many characters each, so a huge change cannot overflow the model. */
 const PART_MAX = 60_000;
 
+/** A review has no session file, so its input is counted from the question's size. */
+const CHARS_PER_TOKEN = 4;
+
 /** The repo's own rules, each file under its name. */
 function repoRules(repo: string): string {
   return RULE_FILES.filter((f) => existsSync(join(repo, f)))
@@ -124,10 +127,7 @@ export function review(i: ReviewInput, env: NodeJS.ProcessEnv = process.env): Re
   recordWork(i.task, "review", env);
   const path = reviewPath(i.task, env);
   mkdirSync(dirname(path), { recursive: true });
-  writeAtomic(
-    path,
-    `${JSON.stringify({ task: i.task, model, time: new Date().toISOString(), inputTokens: Math.ceil(question.length / 4), findings }, null, 2)}\n`,
-  );
+  writeAtomic(path, `${JSON.stringify({ task: i.task, model, time: new Date().toISOString(), inputTokens: Math.ceil(question.length / CHARS_PER_TOKEN), findings }, null, 2)}\n`);
   return { ok: true, findings, model, note };
 }
 
