@@ -158,6 +158,11 @@ export class AgentsState extends Emitter<Events> {
     return this.info(key)?.agent_status ?? 'gone'
   }
 
+  /** its last turn was stopped (pi's agent_settled said aborted), not finished */
+  aborted(key: string): boolean {
+    return this.rpcs.get(key)?.aborted ?? false
+  }
+
   /** what a screen sent that waits for this agent fails: the screen says why and offers Retry */
   protected fail(key: string, error: string) {
     const mine = this.outbox.filter((o) => o.key === key && o.cid && !isNews(o.cid))

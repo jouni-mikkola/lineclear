@@ -153,9 +153,9 @@ export class EngineHandoff extends EnginePr {
     }
     this.save()
     // told once its turn ends: an agent that merges right after never shows as waiting
-    this.settleSoon(t)
+    this.settle(t)
     // its pull request gets the summary and is ready for review; GitHub away changes nothing here
-    if (t.pr && !t.merged) this.readyForReview(t).catch(() => undefined)
+    if (t.pr && !t.merged) this.readyForReview(t).catch((e) => this.troubled(t, e))
     return 'ready'
   }
 
@@ -205,7 +205,7 @@ export class EngineHandoff extends EnginePr {
     const left = !discard && p && t.branch ? await this.onMachineOf(t, () => unmerged(p.path, t.branch!, t.base ?? p.base, t.id)) : 0
     if (left) {
       const why = `${t.branch} has ${left} commit${left === 1 ? '' : 's'} ${t.base ?? p?.base} lacks, so ${t.id} is not Done with nothing to merge: finish it with ready, and merge it.`
-      await this.agents.send(key, why, { ensure: () => this.launch(t) }).catch(() => undefined)
+      await this.agents.send(key, why, { ensure: () => this.launch(t) }).catch((e) => this.troubled(t, e))
       throw new Error(why)
     }
     if (this.agents.status(key) === 'working') await this.agents.interrupt(key)

@@ -5,22 +5,7 @@ import { goLine, settingsBlock, queuedLine, taskFirst } from '../prompts.ts'
 import { CLI_NAME } from '../settings.ts'
 import * as GH from './github.ts'
 import type { Made } from './worktrees.ts'
-import {
-  type TaskRec,
-  type Harness,
-  reportOf,
-  ended,
-  STATE,
-  splitRef,
-  START_GAP,
-  branchFor,
-  labelOf,
-  troubleOf,
-  short,
-  ANSWER_GRACE,
-  BRIEF_WAIT,
-  LATER,
-} from './engine-helpers.ts'
+import { type TaskRec, type Harness, reportOf, ended, STATE, splitRef, START_GAP, branchFor, labelOf, troubleOf, short, LATER } from './engine-helpers.ts'
 import { existsSync } from 'node:fs'
 import { age, ago, clockWithDay } from '../../../shared/time.ts'
 import { move } from './phase.ts'
@@ -35,19 +20,6 @@ export class EngineLaunch extends EngineStalls {
     this.recheck()
     // what it did may free room for a held one
     this.release()
-  }
-
-  /** a turn that ends may be followed at once by the next: wait a moment before telling anyone it waits */
-  protected settleSoon(t: TaskRec, ms = 4000) {
-    clearTimeout(this.later.get(t.id))
-    this.later.set(
-      t.id,
-      setTimeout(() => {
-        this.later.delete(t.id)
-        const t2 = this.task(t.id)
-        if (t2) this.settle(t2)
-      }, ms),
-    )
   }
 
   /* ---------- the view the screen draws ---------- */
@@ -146,9 +118,8 @@ export class EngineLaunch extends EngineStalls {
    */
   resumeQueue() {
     this.endPhases()
-    for (const t of this.tasks) if (this.inPhase(t, 'briefing')) this.waitForBrief(t)
     for (const t of this.tasks.filter((t) => t.going && !ended(t) && !t.stopped && this.agents.status(this.key(t)) !== 'working'))
-      this.agents.send(this.key(t), hidden(t.going!, 'go'), { ensure: () => this.launch(t) }).catch(() => undefined)
+      this.agents.send(this.key(t), hidden(t.going!, 'go'), { ensure: () => this.launch(t) }).catch((e) => this.troubled(t, e))
     this.recheck()
   }
 
@@ -164,13 +135,13 @@ export class EngineLaunch extends EngineStalls {
     // a coordinator's own words go in as they are, and are not sent again after a restart
     t.going = plain ? undefined : text
     this.wrote.set(t.id, Date.now())
+    this.answering.add(t.id)
     const key = this.key(t)
     const id = `go:${t.id}:${Date.now()}`
     this.chats.post(key, { id, card: { id, task: t.id, status: 'work', text: `started: ${why}` } })
     this.save()
-    this.agents.send(key, plain ? text : hidden(text, 'go'), { ensure: () => this.launch(t) }).catch(() => undefined)
+    this.agents.send(key, plain ? text : hidden(text, 'go'), { ensure: () => this.launch(t) }).catch((e) => this.troubled(t, e))
     this.settleOne(t)
-    this.settleSoon(t, ANSWER_GRACE + 500)
   }
 
   /**
@@ -242,7 +213,9 @@ export class EngineLaunch extends EngineStalls {
     this.chats.post(key, { id: cid, card: { id: cid, task: t.id, status: 'queued', text: `queued after ${open.join(', ')}` } })
     this.save()
     if (!opts.self && this.agents.status(key) !== 'gone')
-      this.agents.send(key, hidden(queuedLine(open, was.length ? 'changed' : 'later', t.id), 'queue'), { ensure: () => this.launch(t) }).catch(() => undefined)
+      this.agents
+        .send(key, hidden(queuedLine(open, was.length ? 'changed' : 'later', t.id), 'queue'), { ensure: () => this.launch(t) })
+        .catch((e) => this.troubled(t, e))
     this.settleOne(t)
     return { queued: open }
   }
@@ -434,7 +407,6 @@ export class EngineLaunch extends EngineStalls {
       t.startMs = { worktree: madeAt - began - install, install, session: Date.now() - madeAt }
       this.save()
       move(t, 'launched')
-      this.waitForBrief(t)
     } catch (e) {
       // went wrong before its worktree was there: it shows so
       t.trouble = troubleOf(e)
@@ -446,30 +418,15 @@ export class EngineLaunch extends EngineStalls {
     }
   }
 
-  /** a brief not taken up in BRIEF_WAIT is sent again (briefLate) and the task is no longer To do */
-  protected waitForBrief(t: TaskRec) {
-    clearTimeout(this.later.get(`${t.id}:brief`))
-    const x = setTimeout(() => {
-      this.later.delete(`${t.id}:brief`)
-      if (move(t, 'brief-over')) {
-        this.briefLate(t)
-        this.settle(t)
-      }
-    }, BRIEF_WAIT)
-    x.unref?.()
-    this.later.set(`${t.id}:brief`, x)
-  }
-
   /** its agent works and its brief has gone in: it is at work on it, no longer To do */
   protected begun(t: TaskRec) {
     const key = this.key(t)
     if (!this.inPhase(t, 'briefing') || this.agents.status(key) !== 'working' || this.agents.waiting(key).length) return
     move(t, 'brief-over')
-    clearTimeout(this.later.get(`${t.id}:brief`))
-    this.later.delete(`${t.id}:brief`)
   }
 
   protected troubled(t: TaskRec, e: unknown) {
+    this.answering.delete(t.id)
     t.trouble = troubleOf(e)
     this.settle(t)
   }

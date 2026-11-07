@@ -4,7 +4,7 @@ import type { Space } from '../places.ts'
 import * as G from './git.ts'
 import * as GH from './github.ts'
 import * as Lane from './lane.ts'
-import { type TaskRec, ended, ANSWER_GRACE, CHECKS_EVERY, LAND_RETRY } from './engine-helpers.ts'
+import { type TaskRec, ended, CHECKS_EVERY, LAND_RETRY } from './engine-helpers.ts'
 import { EngineHandoff } from './engine-handoff.ts'
 
 /** how long a merge waits for a merge queue to run its check and merge the pull request */
@@ -448,7 +448,7 @@ export class EngineLand extends EngineHandoff {
     // what it was held with is said already, or overtaken by what you wrote
     if (go) t.held = undefined
     this.wrote.set(t.id, Date.now())
+    this.answering.add(t.id)
     this.settle(t)
-    this.settleSoon(t, ANSWER_GRACE + 500)
   }
 }
