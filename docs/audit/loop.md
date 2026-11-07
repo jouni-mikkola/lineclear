@@ -327,8 +327,8 @@ No step.
 The ids are L560 to L569. Locks are disjoint inside each parallel group; steps that share a file or a lock with an
 open step of ROADMAP.md name it in `after`. The groups that run at once:
 
-- A, in a chain: L560, L561, L562, L563, L567.
-- B: L564. C: L565. D: L566. E: L568. F: L569.
+- A, in a chain: L560, L561, L562, L563, L564, L567.
+- B: L565. C: L566. D: L568. E: L569.
 
 ### L560 One loop process, no survivors
 Result: The rule loop runs in one process that crashes loudly, and a corrupt state file stops its project with a line that names it.
@@ -349,7 +349,7 @@ Result: A tick reads main and the tasks once, never runs the project's tests, an
 ### L562 The world's reads are exact
 Result: Every read of the world is bounded, typed and cached by what changed, and no tool's text output is parsed with a regex.
 - why: `run` waits 600 s for every command, `git log` reads all of main every tick, `maxTasks`, `reviewerSetting` and the model list are cut from text, and an unreadable list means "every model is offered".
-- done when: `grep -c "HEALTH_TIMEOUT_MS" src/real-world.ts` prints 1 (the detached merge only; 3 today); a test with a `git` that never answers sees the tick end its read in 10 s or less and note a timeout; a test with refs unchanged between ticks counts 0 `git log` spawns on the second tick (1 per tick today); `grep -n 'machine\.maxTasks\|reviewer\.model' src/real-world.ts` lists nothing; `pi --list-models` runs 0 times in a 20 tick test with a pi RPC double that answers `get_available_models`.
+- done when: `grep -c "HEALTH_TIMEOUT_MS" src/real-world.ts` prints 2 (the constant and the detached merge only; 3 today); a test with a `git` that never answers sees the tick end its read in 10 s or less and note a timeout; a test with refs unchanged between ticks counts 0 `git log` spawns on the second tick (1 per tick today); `grep -n 'machine\.maxTasks\|reviewer\.model' src/real-world.ts` lists nothing; `pi --list-models` runs 0 times in a 20 tick test with a pi RPC double that answers `get_available_models`.
 - locks: world
 - after: L497, L561
 - files: src/world.ts, src/real-world.ts, src/task-read.ts
@@ -366,9 +366,9 @@ Result: A skip is one line when it starts and one when it ends, written from a c
 Result: A plan applies once, at the moment its project allows it, and `lineclear plan` never reads the whole task list to learn the board is up.
 - why: `settlePlans` runs a model and a merge inside the tick before any project's lock, a second path to what `autoApply` already does; `plan.ts` spawns a 123 KB task list as a ping.
 - done when: `settlePlans` is deleted and a test with a waiting plan sees the tick make 0 model calls (1 today); `grep -c "serverIsDown\|startsWith(\"Cannot" src/plan.ts` prints 0 (4 today); `mergeTask` spawns 3 git processes or fewer for a 40 commit merge (42 today); `grep -n "Bun.spawnSync" src/plan.ts src/autoplan.ts` lists only calls with a `timeout`.
-- locks: autoplan
-- after: L496
-- files: src/autoplan.ts, src/plan.ts
+- locks: autoplan, slots
+- after: L496, L560, L563
+- files: src/autoplan.ts, src/plan.ts, src/rules.ts
 
 ### L565 The Inbox is read by change
 Result: Pushes, asks and the tick read only the Inbox items and chats that changed, and an answered card is recorded on the card.
