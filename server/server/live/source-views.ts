@@ -11,10 +11,8 @@ import { BOX } from './box.ts'
 import { HOST, NAME, placeId } from './places.ts'
 import { restartHint, type Harness } from './restart.ts'
 import { room } from './herdr-forward.ts'
-import { has } from '../plugins.ts'
 import { repositorySection } from './settings.ts'
 import { secretPages } from './secrets.ts'
-import { pluginSection } from '../plugins.ts'
 import { LiveSourceState } from './source-state.ts'
 
 export class LiveSourceViews extends LiveSourceState {
@@ -31,7 +29,7 @@ export class LiveSourceViews extends LiveSourceState {
   /** the load of each machine tasks run on besides this one, read at most once a minute; held tasks look again when it is in */
   protected readBoxes(now: number) {
     // only while a task waits for room: each look opens a tab on that machine
-    if (!has('health') || !this.engine.heldTasks().length) return
+    if (!this.engine.heldTasks().length) return
     const { startLoad, startMemory } = this.settings.machine()
     for (const label of this.engine.machines.keys()) {
       const had = this.boxes.get(label)
@@ -170,7 +168,6 @@ export class LiveSourceViews extends LiveSourceState {
             },
             ...(this.peers?.rows() ?? []),
           ],
-          pluginSection(),
           HOST,
           ['~', ...this.places.spaces.map((p) => p.name)],
           NAME,

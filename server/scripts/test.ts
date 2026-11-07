@@ -14,7 +14,6 @@
 // wants, so herdr, Lineclear's server and the agents stay quick while several tasks test at once.
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
-import { writeRegistries } from './build-plugins.ts'
 
 const root = join(import.meta.dir, '..')
 const cache = join(root, 'node_modules', '.cache', 'lineclear-test')
@@ -112,8 +111,6 @@ for (let i = 0; i < args.length; i++) {
 }
 
 let files: string[] | null = null
-// the plugin registries first: the server's plugins are reached through them
-if (changed) writeRegistries()
 if (changed) {
   const touched = changedFiles(since)
   if (touched.some((f) => EVERYTHING.includes(f))) files = null

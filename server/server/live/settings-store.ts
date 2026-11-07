@@ -304,7 +304,6 @@ export class Settings {
   sections(
     devices: string[],
     machines: { name: string; state: string }[],
-    plugins: SettingSection | null,
     host = 'this machine',
     spaces: string[] = [],
     name = host,
@@ -379,7 +378,6 @@ export class Settings {
           ...(l === 'all' ? {} : { machine: host }),
         })),
       ),
-      ...(plugins ? [plugins] : []),
       {
         name: 'Machines',
         about: 'Every machine Lineclear reaches, and how it is now.',

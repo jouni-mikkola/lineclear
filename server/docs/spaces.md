@@ -1,6 +1,6 @@
 # Spaces
 
-Run many coding agents across machines from a phone, tablet or desktop. Lineclear is a herdr plugin: one private web
+Run many coding agents across machines from a phone, tablet or desktop. Lineclear is one private web
 app on your tailnet (installable on a phone) with your spaces in a sidebar, as herdr has them: a space is a folder on
 a machine plus a name, with its own coordinator. Each machine is a section, as Slack's: its emoji (a server icon without
 one) and its name, both set in its ⋯ menu's Rename machine and kept for every device, with its spaces under it, its

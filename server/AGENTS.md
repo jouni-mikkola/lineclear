@@ -18,14 +18,6 @@ How to run, build and lay out the code: [docs/develop.md](docs/develop.md).
   topic (setup in `test/layout.ts`); split a file that grows past about 20 s.
 - If someone runs tests here by hand anyway, they run at the lowest priority and never touch `~/.lineclear`.
 
-## Plugins
-
-- `definePlugin` (`src/kernel.ts`, `server/plugin-api.ts`) and the slots of `Registry` (`src/kernel.ts`) are a public
-  contract: the human's own plugins in `~/.lineclear/plugins` rely on them ([docs/plugins.md](docs/plugins.md), Your
-  own plugins). Change them with care, keep old names working where you can, update that page's list, and say so in
-  your done summary.
-- A plugin the human asks you to make for them goes in `~/.lineclear/plugins/<name>/`, never in the repo.
-
 ## Releases
 
 - Never cut a new release (version bump, tag, GitHub release, publish) without asking the human first and getting a

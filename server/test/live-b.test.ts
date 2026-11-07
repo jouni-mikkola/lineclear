@@ -26,7 +26,7 @@ describe('settings', () => {
   test("the worker, reviewer and backup models are Lineclear's lists: read-only here, and refused when set", () => {
     const s = new Settings()
     const rows = s
-      .sections([], [], null)
+      .sections([], [])
       .filter((x) => x.name === 'Agents' || x.name === 'How tasks work')
       .flatMap((x) => x.rows)
     for (const key of ['task.model', 'reviewer.model', 'backup.model']) {
@@ -92,7 +92,7 @@ describe('settings', () => {
     expect(s.harness('reviewer')).toEqual({ kind: 'pi', model: undefined, effort: undefined })
     s.set('reviewer.effort', 'high')
     expect(s.harness('reviewer')).toEqual({ kind: 'pi', model: undefined, effort: 'high' })
-    expect(s.sections([], [], null).find((x) => x.name === 'How tasks work')!.note).toContain(
+    expect(s.sections([], []).find((x) => x.name === 'How tasks work')!.note).toContain(
       '- Reviewer: a headless pi or a pi subagent (its default model, high effort). (your setting for every machine)',
     )
     for (const k of ['reviewer.agent', 'reviewer.effort']) s.set(k, null)
@@ -108,7 +108,7 @@ describe('settings', () => {
     // the Reviewer's rows sit in How tasks work (its Settings block), the rest in Agents
     const rows = () =>
       s
-        .sections([], [], null)
+        .sections([], [])
         .filter((x) => x.name === 'Agents' || x.name === 'How tasks work')
         .flatMap((x) => x.rows)
     const row = (group: string, label: string) => rows().find((r) => r.group === group && r.label === label)!
@@ -153,7 +153,7 @@ describe('settings', () => {
     s = new Settings()
     expect(s.get('task.agent')).toBe('pi')
     expect(s.get('watcher.effort')).toBe('')
-    expect(s.sections([], [], null).some((x) => x.rows.some((r) => r.key.startsWith('watcher.')))).toBe(false)
+    expect(s.sections([], []).some((x) => x.rows.some((r) => r.key.startsWith('watcher.')))).toBe(false)
     s.set('task.agent', null)
     s.set('coordinator.agent', null)
   })
@@ -196,18 +196,18 @@ describe('settings', () => {
       spaces: { web: { 'task.fallback': 'pi', 'brief.review': 'on' } },
     })
     // the screen's rows say where an inherited value comes from, and what a reset goes back to
-    const rows = (level: string, name: string) => s.sections([], [], null, 'vm', ['web']).find((x) => x.level === level && x.name === name)!.rows
+    const rows = (level: string, name: string) => s.sections([], [], 'vm', ['web']).find((x) => x.level === level && x.name === name)!.rows
     const agent = (level: string) => rows(level, 'Agents').find((r) => r.key === 'task.fallback')!
     expect(agent('p:vm:web')).toMatchObject({ value: 'pi', inherits: { value: 'off', from: 'vm' } })
     expect(agent('m:vm')).toMatchObject({ value: 'off', inherits: { value: 'pi', from: 'Everywhere' } })
     expect(agent('all')).toMatchObject({ value: 'pi' })
     expect(agent('all').from).toBeUndefined()
     // a machine shown by a name of its own: the rows say that name, its levels keep the key
-    const named = s.sections([], [], null, 'vm', ['web'], 'VM box').find((x) => x.level === 'p:vm:web' && x.name === 'Agents')!
+    const named = s.sections([], [], 'vm', ['web'], 'VM box').find((x) => x.level === 'p:vm:web' && x.name === 'Agents')!
     expect(named.rows.find((r) => r.key === 'task.fallback')).toMatchObject({ inherits: { value: 'off', from: 'VM box' } })
     expect(named.machine).toBe('vm')
     expect(rows('p:vm:web', 'How tasks work').find((r) => r.key === 'brief.merge')).toMatchObject({ value: 'on its own', from: 'Everywhere' })
-    expect(s.sections([], [], null, 'vm', ['web']).some((x) => x.level === 'p:vm:web' && x.name === 'Machine')).toBe(false)
+    expect(s.sections([], [], 'vm', ['web']).some((x) => x.level === 'p:vm:web' && x.name === 'Machine')).toBe(false)
     // unset drops a level's own: the one above counts again
     s.set('task.fallback', null, { space: 'web' })
     expect(s.pick('task.fallback', { space: 'web' })).toEqual({ value: 'off', from: 'machine' })
@@ -227,10 +227,10 @@ describe('settings', () => {
   })
   test('the Settings screen shows what every new brief ends with, as it is now', () => {
     const s = new Settings()
-    const note = () => s.sections([], [], null).find((x) => x.name === 'How tasks work')!.note!
+    const note = () => s.sections([], []).find((x) => x.name === 'How tasks work')!.note!
     expect(note()).toContain('- Reviewer: a headless pi or a pi subagent (its default model and effort).')
     // planning, what to fix and what proof to show are the agent's judgment, not settings
-    const section = () => s.sections([], [], null).find((x) => x.name === 'How tasks work')!
+    const section = () => s.sections([], []).find((x) => x.name === 'How tasks work')!
     expect(section().rows.map((r) => r.key)).toEqual([
       'brief.review',
       'review.mustFix',
@@ -242,7 +242,7 @@ describe('settings', () => {
     ])
     // only words in prompts: What agents are told, each row with the line it adds
     expect(section().told).toBe(true)
-    expect(s.sections([], [], null).find((x) => x.name === 'Agents')!.told).toBeUndefined()
+    expect(s.sections([], []).find((x) => x.name === 'Agents')!.told).toBeUndefined()
     expect(section().rows.find((r) => r.key === 'review.rounds')!.line).toBe('Review rounds: 3. Stop when a round finds none to fix, at most 3 rounds.')
     s.set('review.mustFix', 'minor')
     s.set('review.rounds', '1')
@@ -257,7 +257,7 @@ describe('settings', () => {
     s.set('brief.review', null)
     expect(
       s
-        .sections([], [], null)
+        .sections([], [])
         .find((x) => x.name === 'Agents')!
         .rows.map((r) => r.group),
     ).toEqual(['Tasks', 'Tasks', 'Tasks', 'Coordinators', 'Coordinators', 'Coordinators', 'Backup', 'Backup', 'Backup'])

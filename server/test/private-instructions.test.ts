@@ -42,7 +42,7 @@ describe('private instructions', () => {
     const s = settings()
     s.set('task.instructions', 'Personal rule.')
     s.set('task.instructions', '', { space: 'one' })
-    const pages = s.sections([], [], null, 'box', ['one'])
+    const pages = s.sections([], [], 'box', ['one'])
     const p = pages.find((p) => p.name === 'Private instructions' && p.level === 'p:box:one')!
     expect(p.told).toBe(true)
     expect(p.rows).toHaveLength(3)

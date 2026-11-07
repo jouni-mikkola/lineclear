@@ -4,10 +4,6 @@ ui/web/dist/
 test-results/
 playwright-report/
 dist/
-generated/
-.releases/
-server/user-plugins/
-server/user-plugins.json
 server/.env
 ui/test/real-shots/
 .coverage/

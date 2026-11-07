@@ -10,7 +10,7 @@ import { box } from './box.ts'
 export const HERDR_TESTED = { version: '0.9.5', protocol: 22 }
 
 /** the variable that points a child at one herdr socket */
-export const HERDR_SOCKET_ENV = 'HERDR_SOCKET_PATH'
+const HERDR_SOCKET_ENV = 'HERDR_SOCKET_PATH'
 
 /** the herdr socket of the machine the code works for: a machine with a session of its own names its socket */
 function socketPath() {

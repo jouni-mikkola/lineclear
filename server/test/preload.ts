@@ -1,10 +1,9 @@
 // Run before the tests in every checkout (bunfig.toml): a fresh worktree, or one whose lockfile moved since its last
-// install, gets its dependencies and plugin registries first, and plain bun test goes the fast way (scripts/test.ts).
+// install, gets its dependencies first, and plain bun test goes the fast way (scripts/test.ts).
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { writeRegistries } from '../scripts/build-plugins.ts'
 import { once } from './once.ts'
 import './tmp-scope.ts'
 
@@ -41,8 +40,6 @@ await once(
     writeFileSync(stamp, want)
   },
 )
-
-writeRegistries()
 
 /** how this bun was started: bun test runs the preload in the process the command started */
 function command(): string[] {

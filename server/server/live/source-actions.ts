@@ -7,7 +7,6 @@ import { BOX } from './box.ts'
 import { NAME, placeId } from './places.ts'
 import { restartInfo } from './restart.ts'
 import { CLI_NAME, kindOf } from './settings.ts'
-import { PLUGIN_KEY, setPluginOn } from '../plugins.ts'
 import { heldWords } from './source-helpers.ts'
 import { LiveSourceRestarts } from './source-restarts.ts'
 
@@ -91,12 +90,6 @@ export class LiveSourceActions extends LiveSourceRestarts {
           return place ? this.shown(() => this.places.setInstall(place, a.value ?? null)) : { ok: false, error: 'Choose a repository space.' }
         if (a.key === 'space.base')
           return place && branch ? this.shown(() => this.places.setBase(place, branch)) : { ok: false, error: 'Choose a repository space and branch.' }
-        // a plugin's switch: the human's own list, on the main machine
-        if (a.key.startsWith(PLUGIN_KEY)) {
-          const r = setPluginOn(a.key.slice(PLUGIN_KEY.length), a.value !== 'off')
-          if (r.ok) this.emit('snapshot')
-          return r
-        }
         // its level: Everywhere (all, or none), this machine (its m: id), or one of its spaces
         const pr = a.place?.startsWith('p:') ? this.spaceKey(a.place) : undefined
         if (a.place?.startsWith('p:') && !pr) return { ok: false, error: 'No such space.' }

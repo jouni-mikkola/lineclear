@@ -1,11 +1,8 @@
 // The web server lets only this app's own pages (and local programs) act: another website can't.
 import { afterAll, describe, expect, test } from 'bun:test'
-import { mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { startApp } from '../server/app.ts'
 import type { Push } from '../server/push.ts'
-import type { Alert, UpdateStatus } from '../shared/types.ts'
+import type { Alert } from '../shared/types.ts'
 import { Emitter, type Source, type SourceEvents } from '../server/source.ts'
 
 const acted: unknown[] = []
@@ -146,42 +143,24 @@ describe('no page is served', () => {
   })
 })
 
-describe('updates', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'shep-app-'))
-  const updates = join(dir, 'home', 'update.json')
-  const app = startApp({ source: source as unknown as Source, port: 0, updates })
+describe('the live link', () => {
+  const app = startApp({ source: source as unknown as Source, port: 0 })
   afterAll(() => app.stop(true))
   const open = async () => {
     const ws = new WebSocket(`ws://127.0.0.1:${app.port}/api/ws`)
-    const got: { type: string; id?: string; update?: UpdateStatus | null }[] = []
+    const got: { type: string }[] = []
     ws.onmessage = (e) => got.push(JSON.parse(String(e.data)))
     await new Promise((r) => (ws.onopen = r))
     await new Promise((r) => setTimeout(r, 50))
     return { ws, got }
   }
 
-  test('every screen hears the update status', async () => {
-    const { ws, got } = await open()
-    expect(got.find((m) => m.type === 'update')?.update).toBeNull()
-    ws.close()
-  })
   test('a screen back on view pings its link, and a live one answers at once', async () => {
     const { ws, got } = await open()
     ws.send(JSON.stringify({ type: 'ping' }))
     for (let i = 0; i < 40 && !got.some((m) => m.type === 'pong'); i++) await new Promise((r) => setTimeout(r, 25))
     expect(got.at(-1)).toEqual({ type: 'pong' })
     ws.close()
-  })
-  test('a failed update reaches every open screen, and the ones that open later', async () => {
-    const { ws, got } = await open()
-    const failed: UpdateStatus = { state: 'failed', commit: 'abc1234', subject: 'SHE-9: x', built: 'def5678', error: 'the build failed:\nboom', at: 1 }
-    writeFileSync(updates, JSON.stringify(failed))
-    for (let i = 0; i < 40 && !got.some((m) => m.update?.state === 'failed'); i++) await new Promise((r) => setTimeout(r, 50))
-    expect(got.at(-1)).toEqual({ type: 'update', update: failed })
-    ws.close()
-    const later = await open()
-    expect(later.got.find((m) => m.type === 'update')?.update).toEqual(failed)
-    later.ws.close()
   })
 })
 

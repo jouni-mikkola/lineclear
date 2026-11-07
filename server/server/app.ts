@@ -1,11 +1,10 @@
 // The web server: the screen (built files), the API and the live link. Served on 127.0.0.1 only; it is shared
 // privately over the tailnet (tailscale serve), never on a public address.
 import type { ServerWebSocket } from 'bun'
-import { mkdirSync, readFileSync, watch } from 'node:fs'
-import { basename, dirname, join } from 'node:path'
+import { basename } from 'node:path'
 import { notifies, waiting } from '../shared/alerts.ts'
 import { fileType } from '../shared/files.ts'
-import type { Action, AddSpace, ServerEvent, UpdateStatus, WorktreeAsk } from '../shared/types.ts'
+import type { Action, AddSpace, ServerEvent, WorktreeAsk } from '../shared/types.ts'
 import type { Source } from './source.ts'
 import type { Push } from './push.ts'
 
@@ -17,27 +16,11 @@ export interface AppOptions {
   push?: Push
   port: number
   host?: string
-  /** update.json: how the last update of Lineclear went, shown on every screen */
-  updates?: string
 }
 
-export function startApp({ source, push, port, host = '127.0.0.1', updates }: AppOptions) {
+export function startApp({ source, push, port, host = '127.0.0.1' }: AppOptions) {
   const live = new Set<ServerWebSocket<Sock>>()
   const send = (ws: ServerWebSocket<Sock>, e: ServerEvent) => ws.send(JSON.stringify(e))
-
-  let update = updates ? readUpdate(updates) : null
-  if (updates) {
-    mkdirSync(dirname(updates), { recursive: true })
-    // the folder, not the file: the file may not be there yet, and it is replaced whole when written
-    const w = watch(dirname(updates), (_, name) => {
-      if (name !== basename(updates)) return
-      const next = readUpdate(updates)
-      if (JSON.stringify(next) === JSON.stringify(update)) return
-      update = next
-      for (const ws of live) send(ws, { type: 'update', update })
-    })
-    w.unref?.()
-  }
 
   const rewatch = () => {
     const chats = new Set<string>()
@@ -112,8 +95,6 @@ export function startApp({ source, push, port, host = '127.0.0.1', updates }: Ap
           return json({ chat: source.chat(key) ?? null, status: source.chatStatus?.(key) })
         }
         if (path === '/api/snapshot') return json(source.snapshot())
-        // which Lineclear answers: a start from another plugin folder or version stops it (scripts/plugin.ts)
-        if (path === '/api/version') return json(running())
         if (path === '/api/folders') {
           if (!source.folders) return json({ error: 'Adding spaces is not possible here.' }, 404)
           return json(await source.folders(q.get('machine') ?? '', q.get('path') ?? '~'))
@@ -205,7 +186,6 @@ export function startApp({ source, push, port, host = '127.0.0.1', updates }: Ap
       open(ws) {
         live.add(ws)
         send(ws, { type: 'snapshot', snapshot: source.snapshot() })
-        send(ws, { type: 'update', update })
       },
       message(ws, msg) {
         const d = ws.data
@@ -236,26 +216,6 @@ export function startApp({ source, push, port, host = '127.0.0.1', updates }: Ap
   })
 
   return server
-}
-
-function readUpdate(f: string): UpdateStatus | null {
-  try {
-    return JSON.parse(readFileSync(f, 'utf8')) as UpdateStatus
-  } catch {
-    return null
-  }
-}
-
-/** the checkout herdr installed (or linked), its version, and the supervisor that keeps this server (none: started by
- *  hand) */
-function running() {
-  const root = process.env.LINECLEAR_ROOT ?? join(import.meta.dir, '..')
-  let version = ''
-  try {
-    version = (JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { version?: string }).version ?? ''
-  } catch {}
-  const sup = Number(process.env.LINECLEAR_SUPERVISOR)
-  return { root, version, supervisor: sup > 0 ? sup : null }
 }
 
 /**

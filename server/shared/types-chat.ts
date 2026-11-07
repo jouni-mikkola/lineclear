@@ -240,11 +240,11 @@ interface SettingRow {
   text?: boolean
   /** private instruction text, saved explicitly without a repository file */
   multiline?: boolean
-  /** read-only row (plugins, machines) */
+  /** read-only row (machines) */
   fixed?: boolean
   /** a page of Lineclear this row's value is set on (its path); the row is read-only here */
   lineclear?: string
-  /** a line under the row's label (a plugin of yours replaces the built-in one) */
+  /** a line under the row's label */
   hint?: string
   /** a refusal or a fault shown under the row */
   warn?: string
