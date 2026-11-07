@@ -1,0 +1,232 @@
+#!/usr/bin/perl
+# The lineclear command, the one client on every machine (perl is on each; bun is not). It sends its words to the
+# server and prints the answer: over LINECLEAR_URL or the server's port where the server runs, else through the SSH
+# tunnel the main machine keeps open to this folder (main.sock).
+use strict;
+use warnings;
+use Cwd ();
+use File::Basename ();
+use Fcntl qw(O_WRONLY O_CREAT O_EXCL O_TRUNC);
+use Socket ();
+use JSON::PP;
+
+my $dir = File::Basename::dirname(Cwd::abs_path($0));
+my $home = $ENV{LINECLEAR_HOME} || "$ENV{HOME}/.lineclear";
+# route.pl, when it started this (a repo checkout), has set the chat and the capability already
+my ($routing) = grep { -e } "$dir/../route.pl", "$dir/route.pl";
+if (delete $ENV{LINECLEAR_ROUTED} || !$routing) {
+  $ENV{LINECLEAR_SECRET_CAPABILITY} //= '';
+} else {
+  require $routing;
+  my $route = session_route();
+  $ENV{LINECLEAR_CHAT} = routed_chat($route) if $route;
+  $ENV{LINECLEAR_SECRET_CAPABILITY} = $route ? ($route->{capability} // '') : '';
+}
+# Where the server is: the address in LINECLEAR_URL, else the port in LINECLEAR_PORT or server.json (the server runs
+# here), else a socket (a machine whose server runs elsewhere keeps a tunnel to it there), else the default port
+my ($host, $port, $sock, $url);
+my $server_port = $ENV{LINECLEAR_PORT};
+if (!$server_port && open(my $sj, '<', "$home/server.json")) {
+  my $c = eval { JSON::PP->new->decode(do { local $/; <$sj> }) };
+  $server_port = $c->{port} if ref $c eq 'HASH';
+}
+if (-S "$dir/../main.sock" || -e "$dir/../route.pl") {
+  $sock = "$dir/../main.sock";   # the installed helper: its own tunnel, whatever URL the caller inherited
+} elsif (length($ENV{LINECLEAR_URL} // '')) {
+  ($host, $port) = $ENV{LINECLEAR_URL} =~ m{^https?://([^/:]+)(?::(\d+))?} ? ($1, $2 // 80) : ('127.0.0.1', 7421);
+} elsif ($server_port) {
+  ($host, $port) = ('127.0.0.1', $server_port);
+} elsif (-S "$home/helper/main.sock") {
+  $sock = "$home/helper/main.sock";
+} else {
+  ($host, $port) = ('127.0.0.1', 7421);
+}
+$url = "http://$host:$port" unless $sock;
+
+my $proof = $ENV{LINECLEAR_SECRET_CAPABILITY} // '';
+delete $ENV{LINECLEAR_SECRET_CAPABILITY};
+my $authorization = $proof =~ /^[a-f0-9]{64}$/ ? "Authorization: Bearer $proof\r\n" : '';
+my $stdin;
+# lineclear secret run NAME … -- <command>: only the names go to Lineclear; the command runs here, with the values in
+# its environment. lineclear secret env writes them to a file here. Neither prints a value
+my $secret = @ARGV && $ARGV[0] eq 'secret' ? ($ARGV[1] // '') : '';
+my @args = @ARGV;
+$args[0] = 'ask' if @args && $args[0] eq 'card';   # `lineclear card` is the chat card: `ask` is the Inbox's name in the full command
+my @command;
+if ($secret eq 'run') {
+  my ($cut) = grep { $ARGV[$_] eq '--' } 0 .. $#ARGV;
+  if (defined $cut && $cut > 0) { @args = @ARGV[0 .. $cut - 1]; @command = @ARGV[$cut + 1 .. $#ARGV]; }
+  unless (@command) { print STDERR "Put the command after --: lineclear secret run NAME [NAME …] -- <command> [its words]\n"; exit 1; }
+}
+# the words that take a text on stdin: a secret to keep (never secret run's: that is its command's)
+if (@args && ($secret eq 'set') && !-t STDIN) { local $/; $stdin = <STDIN>; }
+# Encode costs 20 ms to load: only text that is not valid UTF-8 needs it
+my $u = sub { my $t = $_[0]; return $t if utf8::decode($t); require Encode; Encode::decode('UTF-8', $_[0]) };
+# one connection with the core Socket module: IO::Socket costs another 20 ms per call
+my $connect = sub {
+  socket(my $c, $sock ? Socket::AF_UNIX() : Socket::AF_INET(), Socket::SOCK_STREAM(), 0) or return;
+  my $addr = $sock ? Socket::pack_sockaddr_un($sock) : do { my $ip = Socket::inet_aton($host) or return; Socket::pack_sockaddr_in($port, $ip) };
+  connect($c, $addr) or return;
+  select((select($c), $| = 1)[0]);
+  return $c;
+};
+my %body = (args => [map { $u->($_) } @args], cwd => $u->(Cwd::getcwd()));
+$body{chat} = $u->($ENV{LINECLEAR_CHAT}) if $ENV{LINECLEAR_CHAT};
+$body{stdin} = $u->($stdin) if defined $stdin;
+my $json = JSON::PP->new->utf8->canonical->encode(\%body);
+# lineclear merge waits for its merge to end, merged or stopped with a reason, however long the check line is. A call
+# with no answer (Lineclear restarted, or the tunnel dropped and left this end open) is sent again: it joins the same
+# merge, or says it is merged already. After MERGE_TOTAL without an answer it stops, and says so.
+my $merge = @ARGV && ($ARGV[0] eq 'merge' || ($ARGV[0] eq 'task' && ($ARGV[1] // '') eq 'merge'));
+my $wait = $merge ? ($ENV{LINECLEAR_MERGE_WAIT} // 30 * 60000) : 0;
+my $total = ($ENV{LINECLEAR_MERGE_TOTAL} // 3 * 3600000) / 1000;
+my $began = time;
+my $down = 0;   # since when it could not connect: a Lineclear that restarts is waited for 120 s, no longer
+my $res;
+while (1) {
+  my $s = $connect->();
+  if ($s) {
+    $down = 0;
+    print $s "POST /api/cli HTTP/1.0\r\nHost: lineclear\r\n${authorization}Content-Type: application/json\r\nContent-Length: " . length($json) . "\r\n\r\n$json";
+    $res = eval {
+      local $SIG{ALRM} = sub { die "no answer\n" };
+      alarm(int(($wait + 999) / 1000)) if $wait;
+      my $r = do { local $/; <$s> };
+      alarm(0);
+      $r;
+    };
+    alarm(0);
+    close $s;
+    last if defined $res && length $res && !($merge && $res =~ /Lineclear is restarting/ && time - $began < 120);
+  }
+  if (!$merge) {
+    unless ($s) {
+      print STDERR $sock
+        ? "Lineclear can't be reached from this machine right now (its link from the main machine is down). Check the machine in Lineclear, or run lineclear doctor on the main machine.\n"
+        : "Cannot reach the lineclear command at $url. Check the target URL or use this session's installed helper. Do not start another server to repair routing.\n";
+      exit 2;
+    }
+    last;
+  }
+  $down ||= time unless $s;
+  if (time - $began >= $total || ($down && time - $down >= 120)) {
+    my $id = ($ARGV[0] eq 'merge' ? $ARGV[1] : $ARGV[2]) // '<id>';
+    my $secs = time - $began;
+    print STDERR "lineclear merge $id got no answer from Lineclear in $secs s (it may have restarted). Its merge may still finish: lineclear task show $id says Merged, or what stopped it.\n";
+    exit 1;
+  }
+  select(undef, undef, undef, $wait && $wait < 5000 ? $wait / 1000 : 5);
+}
+my ($head, $resp) = split /\r\n\r\n/, $res // '', 2;
+my $j = eval { JSON::PP->new->utf8->decode($resp // '') };
+unless ($j) {
+  print STDERR "Lineclear gave no answer.\n";
+  exit 2;
+}
+exit(run_masked($j->{secrets})) if $j->{secrets} && $secret eq 'run';
+if ($j->{secrets} && $secret eq 'env') {
+  my ($out, $code) = env_file($j->{secrets});
+  print $out;
+  exit $code;
+}
+binmode STDOUT, ':utf8';
+print $j->{out} // '';
+exit($j->{code} // 0);
+
+# lineclear secret run: the command, with the values in its environment; what it prints comes through with each value
+# masked, as 1Password's op run does (values under 4 characters aren't: they would garble the rest)
+sub run_masked {
+  require Encode;
+  require IO::Select;
+  my ($secrets) = @_;
+  my @values = sort { length($b) <=> length($a) } grep { length($_) >= 4 } map { Encode::encode('UTF-8', $_) } values %$secrets;
+  pipe(my $or, my $ow) or die "pipe: $!";
+  pipe(my $er, my $ew) or die "pipe: $!";
+  my $pid = fork() // die "fork: $!";
+  unless ($pid) {
+    close $or; close $er;
+    $ENV{$_} = Encode::encode('UTF-8', $secrets->{$_}) for keys %$secrets;
+    open(STDOUT, '>&', $ow); open(STDERR, '>&', $ew);
+    exec { $command[0] } @command or do { print STDERR "Couldn't run $command[0]: $!\n"; exit 127; };
+  }
+  close $ow; close $ew;
+  my $mask = sub { my $s = shift; $s =~ s/\Q$_\E/********/g for @values; $s };
+  # how much of the end could begin a value
+  my $held = sub {
+    my $s = shift;
+    my $top = @values ? length($values[0]) - 1 : 0;
+    $top = length($s) if length($s) < $top;
+    for my $k (reverse 1 .. $top) { for (@values) { return $k if length($_) > $k && substr($s, -$k) eq substr($_, 0, $k) } }
+    return 0;
+  };
+  my %to = (fileno($or) => \*STDOUT, fileno($er) => \*STDERR);
+  my %buf = (fileno($or) => '', fileno($er) => '');
+  my $sel = IO::Select->new($or, $er);
+  while (my @ready = $sel->can_read) {
+    for my $fh (@ready) {
+      my $f = fileno($fh);
+      my $n = sysread($fh, my $chunk, 65536);
+      if (!$n) { syswrite($to{$f}, $mask->($buf{$f})); $sel->remove($fh); close $fh; next; }
+      my $s = $mask->($buf{$f} . $chunk);
+      my $keep = $held->($s);
+      syswrite($to{$f}, substr($s, 0, length($s) - $keep));
+      $buf{$f} = substr($s, length($s) - $keep);
+    }
+  }
+  waitpid($pid, 0);
+  return $? & 127 ? 128 + ($? & 127) : $? >> 8;
+}
+
+# lineclear secret env: each NAME=value in the file (--file, .env by default), in place of its old line, the file
+# readable by you only; refused where git would keep it
+sub env_file {
+  my ($secrets) = @_;
+  my $name = '.env';
+  for my $i (0 .. $#args) {
+    if ($args[$i] =~ /^--file=(.*)$/) { $name = $1 }
+    elsif ($args[$i] eq '--file') { $name = $args[$i + 1] // '' }
+  }
+  return ("lineclear secret env NAME [NAME …] [--file .env]\n", 1) unless length $name;
+  require File::Spec;
+  my $file = File::Spec->rel2abs($name);
+  my $dir = File::Basename::dirname($file);
+  # git, quietly: its exit code (127: no git here)
+  my $git = sub {
+    my $pid = fork() // return 127;
+    unless ($pid) { open(STDOUT, '>', '/dev/null'); open(STDERR, '>', '/dev/null'); exec('git', '-C', $dir, @_) or exit 127; }
+    waitpid($pid, 0);
+    return $? >> 8;
+  };
+  my $repo = $git->('rev-parse', '--is-inside-work-tree');
+  return ("git isn't here to check that it ignores $name: nothing written.\n", 1) if $repo == 127;
+  return ("$name is not ignored by git: add it to .gitignore first, so the secret never lands in git.\n", 1) if $repo == 0 && $git->('check-ignore', '-q', $file) != 0;
+  # a link (or a second name of another file) would carry it into that file
+  return ("$name is a link: name a plain file, so the secret lands nowhere else.\n", 1) if -l $file || (-e $file && (lstat $file)[3] > 1);
+  my @names = sort keys %$secrets;
+  my @old;
+  if (open(my $in, '<', $file)) {
+    for my $l (<$in>) {
+      chomp $l;
+      push @old, $l unless grep { $l =~ /^\s*(export\s+)?\Q$_\E\s*=/ } @names;
+    }
+    close $in;
+  }
+  # readable by you only before a value goes in: a new file from the start, an old one first
+  my $out;
+  if (-e $file) { chmod(0600, $file) or return ("Couldn't write $name: $!\n", 1); sysopen($out, $file, O_WRONLY | O_TRUNC) }
+  else { sysopen($out, $file, O_WRONLY | O_CREAT | O_EXCL, 0600) }
+  $out or return ("Couldn't write $name: $!\n", 1);
+  binmode $out, ':utf8';
+  print $out join("\n", @old, map { "$_=" . env_value($secrets->{$_}) } @names) . "\n";
+  close $out;
+  return ("Wrote " . join(', ', @names) . " to $name (readable by you only; git ignores it). Never print or commit it.\n", 0);
+}
+
+# a value as a .env file holds it: as it is, in single quotes (nothing in it is read), or in double quotes
+sub env_value {
+  my ($v) = @_;
+  return $v if $v =~ /^[\w@%+:,.\/-]*$/;
+  return "'$v'" unless $v =~ /['\n\r]/;
+  $v =~ s/\\/\\\\/g; $v =~ s/"/\\"/g; $v =~ s/\$/\\\$/g; $v =~ s/\n/\\n/g; $v =~ s/\r/\\r/g;
+  return "\"$v\"";
+}
