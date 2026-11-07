@@ -219,6 +219,41 @@ describe('on GitHub: news, checks and the default way in', () => {
     expect(reds()).toBe(before + 2)
   })
 
+  test('two loops on two machines see one red main: one fix task is made, and it closes when main is green', async () => {
+    const w = world()
+    const g = onGitHub()
+    const { t } = await started(w, g.dir, 'ghredone')
+    writeFileSync(join(t.worktree!, 'x.txt'), 'x\n')
+    sh('git add -A && git commit -qm x', t.worktree!)
+    const green = sh('git rev-parse main', g.bare)
+    for (const x of w.engine.tasks) x.doneAt = 0
+    expect((await w.engine.merge(t.id, { self: true })).ok).toBe(true)
+    const red = sh('git rev-parse main', g.bare)
+    const run = (headSha: string, conclusion: string, n: number) => ({
+      headSha,
+      status: 'completed',
+      conclusion,
+      url: `https://github.com/acme/app/actions/runs/${n}`,
+      workflowName: 'Check',
+    })
+    const fixes = () => w.engine.tasks.filter((x) => x.title === `Fix main red at ${red.slice(0, 7)}`)
+    // the other machine's loop claimed this red first
+    g.set({ runs: [run(red, 'failure', 3), run(green, 'success', 2)], refs: [`refs/lineclear/claims/red-${red}`] })
+    await w.engine.watchMains()
+    expect(fixes().length).toBe(0)
+    expect(w.news.some((n) => n.includes('red, fixed by'))).toBe(true)
+    // this loop claims a red nobody else has: one task, and a second look adds none
+    g.set({ refs: [] })
+    ;(w.engine as unknown as { data: { red?: object } }).data.red = {}
+    await w.engine.watchMains()
+    expect(fixes().length).toBe(1)
+    // main is green again: the older red's fix task closes itself
+    g.set({ runs: [run('d'.repeat(40), 'success', 5), run(red, 'failure', 3)] })
+    await w.engine.watchMains()
+    expect(fixes()[0].closed).toBe(true)
+    expect(fixes()[0].said).toBe('nothing to merge: main is green')
+  })
+
   test('GitHub slow on the merge: one lineclear merge waits for its result, and asked again while it runs joins the same merge', async () => {
     const w = world()
     const g = onGitHub()
