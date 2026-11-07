@@ -5,7 +5,9 @@ import { findModel } from '../../../src/models.ts'
 import { sessionRuntime } from './runtime.ts'
 import { launchHarness } from './restart.ts'
 import { CLI_NAME } from './settings.ts'
-import { shownAs, withAnswer, menuId, words, replied, hostFor } from './chats-helpers.ts'
+import { shownAs, words, replied, hostFor } from './chats-helpers.ts'
+import { menuId } from './chat-menu.ts'
+import { withAnswer } from './chat-store.ts'
 import { ChatsLogs } from './chats-logs.ts'
 
 export class ChatsReplies extends ChatsLogs {
