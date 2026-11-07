@@ -135,7 +135,7 @@ Each step is in [ROADMAP.md](../ROADMAP.md), or dropped with the step that does 
 
 - L806 Any repo gets a check: in ROADMAP.md.
 - L807 The lane reads the repo's check: in ROADMAP.md.
-- L808 The flow runs on a second repo: in ROADMAP.md, writing its own page of `docs/numbers/` (L773).
+- L808 The flow runs on a second repo: in ROADMAP.md, writing its own page of `docs/numbers/` (L773's folder).
 
 - L809 Usage shows tokens per step: dropped, W118 of the web plan does it.
 

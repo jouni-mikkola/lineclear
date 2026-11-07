@@ -392,11 +392,27 @@ Result: `server/scripts/test.ts` is deleted, and the root test command is the on
 
 ### L773 One file per measure
 Result: Each measure has its own page in `docs/numbers/`, so two measuring steps never edit one file.
-- why: `docs/numbers.md` was changed by 11 PRs in 3 days, 1 with a conflict.
-- done when: each section of `docs/numbers.md` is a page `docs/numbers/<measure>.md`; `docs/numbers.md` keeps only a pointer to the folder (10 lines or fewer), so every link to it still holds; `core-baseline.ts`, `check-speed.ts` and `check.ts` name the page they write.
+- why: `docs/numbers.md` is one file for every measure; 11 PRs changed it, 1 with a conflict.
+- done when: each section of `docs/numbers.md` is a page `docs/numbers/<measure>.md`; `docs/numbers.md` keeps only a pointer to the folder (10 lines or fewer), so every link to it still holds; `core-baseline.ts`, `check-speed.ts` and `check.ts` name the page they write; the brief of a reopened step (`src/brief.ts`) sends its proof to a page of `docs/numbers/`. It runs after the open steps that write `docs/numbers.md` (L609, L586).
 - locks: none
-- after: L760, L609
-- files: docs/numbers.md, docs/numbers/, scripts/check-speed.ts, scripts/core-baseline.ts, scripts/check.ts
+- after: L760, L609, L586
+- files: docs/numbers.md, docs/numbers/, scripts/check-speed.ts, scripts/core-baseline.ts, scripts/check.ts, src/brief.ts
+
+### L774 Collisions can be measured
+Result: One command prints how many merged PRs hit a rebase conflict and which files many PRs touch.
+- why: the collision numbers of the layout plan were taken by hand; the layout's goal needs a number anyone can rerun.
+- done when: `bun scripts/core-baseline.ts collisions <n>` replays the force pushes of the last n merged PRs with `git merge-tree` and prints conflicting PRs per 100 and files touched by more than 10 PRs; a test replays a planted conflict and sees it counted.
+- locks: none
+- after: L773
+- files: scripts/core-baseline.ts, test/core-baseline.test.ts
+
+### L764 Every roadmap is split
+Result: This repo and every registered project keep their steps as files, and the single-file reader is gone.
+- why: two formats are two ways to do one job; L762 reads both only until every project is split.
+- done when: `lineclear roadmap split <project>` writes one file per open step and a short `docs/roadmap/README.md`; it ran on every project of `lineclear project list`; `roadmapSource` reads only the folder and `git grep -n "ROADMAP.md" src/roadmap-source.ts src/roadmap-cli.ts` lists none; `lineclear roadmap check .` passes.
+- locks: none
+- after: L762, L763
+- files: src/roadmap-source.ts, src/roadmap-cli.ts, docs/ROADMAP.md, docs/roadmap/
 
 ## Open steps from the audits
 
@@ -604,7 +620,7 @@ Result: A small second repo with no special setup goes through 3 steps: add, bui
 - done when: `docs/numbers/second-repo.md` lists the repo, its 3 tasks and their times from add to merge, with 0 hand steps and 0 red runs on its main.
   - Owner only: create the second small repo on GitHub (it leaves the machine).
 - locks: none
-- after: L806, L807, L791, L795, L773
+- after: L806, L807, L791, L795
 - files: docs/numbers/second-repo.md
 
 ## The web (P5)
@@ -638,7 +654,7 @@ Result: An open page updates only from the live stream, with no poll beside it, 
 
 ### W103 One project key in links
 Result: The rail opens a project's roadmap by its key, so a project whose name differs from its key still opens.
-- why: owner priority 4: the rail links `/lineclear/roadmap` while the API knows the project as `lineclear-eb`.
+- why: owner priority 4: the rail links a project's roadmap by its name while the API knows the project by another key.
 - done when: with a fixture project named `shop` whose key is `shop-2` (`/api/home` already sends it as `project`), the rail's link and Home's line label open `/shop-2/roadmap` and show `shop`; `ui/test/one-name.pw.ts` checks both at 1440 and 390 px.
 - locks: none
 - after: none
@@ -671,7 +687,7 @@ Result: A train at work is white on the line, as brand.md draws it, so orange ne
 ### W102 Chat and box marks not orange
 Result: The Dispatcher box and the chat's icons are grey at rest, amber only when something waits for you.
 - why: owner priority 5: brand.md keeps orange for the mark, the focus ring and the selected tab.
-- done when: the 3 icons of `ui/kit/chat.tsx` (lines 51, 68, 271 today) use no accent and `line-labels.tsx` inks the box `fg2` or `caution`.
+- done when: the Dispatcher and worker icons of `ui/kit/chat.tsx` (lines 54, 71 and 288 today) use no accent and `line-labels.tsx` inks the box `fg2` or `caution`.
 - locks: none
 - after: none
 - files: ui/kit/chat.tsx, ui/kit/line-labels.tsx
