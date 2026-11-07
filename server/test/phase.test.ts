@@ -1,17 +1,7 @@
 // A task is in one phase, moves only by `transitions`, and keeps its phase across a restart (L521).
 import { describe, expect, test } from 'bun:test'
 import { type Phase, type PhaseEvent, PHASES, EVENTS, move, transitions } from '../server/live/engine/phase.ts'
-import { rmSync } from 'node:fs'
-import { join } from 'node:path'
-import { HOME } from '../server/store.ts'
-import { LOG_FILE } from '../server/live/engine/task-store.ts'
-import { placeId, repo, writeJson as write, world } from './engine-world.ts'
-
-/** the stored tasks, whole: lines an earlier engine appended to the hot log go */
-const writeJson = (name: string, value: unknown) => {
-  rmSync(join(HOME, LOG_FILE), { force: true })
-  write(name, value)
-}
+import { placeId, repo, writeJson, world } from './engine-world.ts'
 
 describe('phase transitions', () => {
   test('every pair of (phase, event) gives the listed next phase or a refusal', () => {

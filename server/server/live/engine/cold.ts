@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path'
 import { HOME } from '../../store.ts'
 import { durableWrite } from './durable.ts'
 
-const COLD_AGENTS = 'agents-cold.jsonl'
+export const COLD_AGENTS = 'agents-cold.jsonl'
 
 type Rec = Record<string, unknown>
 
