@@ -104,6 +104,9 @@ export function writeItem(
   n: number,
   item: { question: string; choices: string[]; kind?: string; task?: string; project?: string; diff?: string; session?: string; answer?: string },
 ) {
+  // an item with this number already in the store is replaced: the store keeps what it has over a file it imports
+  const store = join(FIXTURE, "config", "store.sqlite");
+  if (existsSync(store)) execFileSync("bun", ["-e", `new (require("bun:sqlite").Database)(${JSON.stringify(store)}).run("delete from inbox where n = ${n}")`]);
   write(join(FIXTURE, "config", "inbox", `${n}.json`), { n, kind: "step", task: "WEB-1", project: "web-shop", since: "2026-01-05T09:12:00.000Z", ...item });
 }
 
