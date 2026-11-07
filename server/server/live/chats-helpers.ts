@@ -1,8 +1,6 @@
 import type { Message, Question, SecretAsk, UpdateCard } from '../../shared/types.ts'
-import { agentLines, markerSoFar } from './agentlines.ts'
 import type { Parsed } from './chatlines.ts'
 import type { LogEvent } from './readers/types.ts'
-import type { Shown } from './chats-turns.ts'
 
 /** a chat line of yours that shows as words: an answer, a secret you gave */
 export function shownAs(p: Parsed): { title?: string; text: string } | undefined {
@@ -102,14 +100,6 @@ export function hostFor(msgs: Message[], at: number, p: { question?: unknown }):
     if (m.text && !m.card && !(p.question && m.question)) return m
   }
   return undefined
-}
-
-/** one more read of the screen: the reply counts once it grew since the last read and, past its reply
- *  line, starts with two letters or more that aren't a hidden marker (<no-reply>, an older [[...]]), whole or still coming */
-export function sawReply(s: Pick<Shown, 'last' | 'on'>, text: string | undefined): Pick<Shown, 'last' | 'on'> {
-  const words = text === undefined ? '' : agentLines(text).text
-  const ok = words.length >= 2 && !markerSoFar(words)
-  return { on: s.on || (ok && s.last !== undefined && text !== s.last), last: ok ? text : undefined }
 }
 
 /** how much of a chat's logs one pull reads: the rest is read in the background a piece at a time, so a log of a
