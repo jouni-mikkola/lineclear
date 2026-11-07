@@ -10,13 +10,12 @@ import { MIN } from "./time.ts";
 
 /** Every decision of the rule loop, one JSON line each. */
 
-const STALL_CLASSES = [
+export const STALL_CLASSES = [
   "signed-out",
   "account-full",
   "revive-loop",
   "idle-after-done",
   "main-red",
-  "lock-held",
   "no-room",
   "no-sign-of-life",
   "late",
@@ -29,7 +28,6 @@ const STALL_CLASSES = [
   "merge-lost",
   "coordinator-gone",
   "fix-loop",
-  "unknown",
 ] as const;
 export type StallClass = (typeof STALL_CLASSES)[number];
 
@@ -49,7 +47,6 @@ export const CLASS_INFO: Record<StallClass, ClassInfo> = {
   "revive-loop": { label: "revive loop", limit: 0, remedy: "tell the agent to carry on once, instead of reviving it again" },
   "idle-after-done": { label: "idle after done", limit: 30, remedy: "close the task: its step is merged" },
   "main-red": { label: "main red", limit: 0, remedy: "start a fix task, and revert the merge after a second failure" },
-  "lock-held": { label: "lock held too long", limit: 240, remedy: "remind the task that holds the lock" },
   "no-room": { label: "no room", limit: 120, remedy: "start on another machine of the project that has room (L44)" },
   "no-sign-of-life": { label: "no sign of life", limit: 0, remedy: "the ladder: a reminder, a restart, the next model, the Inbox" },
   late: { label: "late", limit: 0, remedy: "ask the agent for a new estimate once; the ladder climbs only if no status comes" },
@@ -66,7 +63,6 @@ export const CLASS_INFO: Record<StallClass, ClassInfo> = {
   "merge-lost": { label: "merge result lost", limit: 0, remedy: "tell the task to bring its branch up to date and merge again" },
   "coordinator-gone": { label: "coordinator gone", limit: 30, remedy: "file a fix: the project's coordinator does not run" },
   "fix-loop": { label: "fix loop", limit: 0, remedy: "file a fix: a step's last two fix tasks ended with no merge, so no third is filed" },
-  unknown: { label: "unknown", limit: 60, remedy: "file a fix: no class names it" },
 };
 
 /** A reason that waits for the owner, a dry run, or a declared wait: not a stall of the system. */
@@ -74,6 +70,9 @@ const OWNER = /paid key|waits for your answer|declared wait|is paused|^would |^r
 
 /** Not a stop: another machine of the project starts the step, or an aged ready step goes first and is watched itself. */
 const NOT_BLOCKED = /^the project is kept off this machine|^lock '.*' is reserved for /;
+
+/** A step waiting for a lock is the rule loop's design, not a stall: the wait stays a `skip` line and Home lists it. */
+const LOCK_WAIT = /^lock '.*' is held by/;
 
 const PATTERNS: [RegExp, StallClass][] = [
   [/no \w+ fix task started: fix loop: /, "fix-loop"],
@@ -87,7 +86,6 @@ const PATTERNS: [RegExp, StallClass][] = [
   [/past its time left/, "late"],
   [/may be stuck|no sign of life|rung [123]:/, "no-sign-of-life"],
   [/health command failed|health failed|new starts are stopped/, "main-red"],
-  [/lock '.*' is held by/, "lock-held"],
   [/no free slot|load average is above|cannot read the space's slots/, "no-room"],
   [/roadmap is broken/, "roadmap-broken"],
   [/not at origin\/main/, "repo-off-main"],
@@ -103,10 +101,11 @@ export function classify(d: Pick<Decision, "kind" | "reason">): StallClass | "ow
   // the item after the colon is the roadmap's done-when text, not Lineclear's words
   if (/^\S+ is merged, unproven:/.test(d.reason)) return undefined;
   if (OWNER.test(d.reason)) return "owner";
-  if (NOT_BLOCKED.test(d.reason)) return undefined;
+  if (NOT_BLOCKED.test(d.reason) || LOCK_WAIT.test(d.reason)) return undefined;
   if (/is back: its limit has reset|^stall |^remedy /.test(d.reason)) return undefined;
   for (const [re, c] of PATTERNS) if (re.test(d.reason)) return c;
-  return d.kind === "skip" ? "unknown" : undefined;
+  // a skip no pattern names is a step's own wait, not a stop to restart
+  return undefined;
 }
 
 /** A stall decision that is the ladder acting on the stall, not only seeing it. */
