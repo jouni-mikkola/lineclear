@@ -6,7 +6,7 @@ import { testOf } from "./doneproof.ts";
 import { ownerStepItem } from "./owner-steps.ts";
 import { stepHeld } from "./parts.ts";
 import { company } from "./company.ts";
-import type { Settings } from "./project.ts";
+import { projectsDir, type Settings } from "./project.ts";
 import { checkRoadmap, closedSteps, doneIds, isFrozen, resultFlag, type StepStatus, type Task } from "./roadmap.ts";
 import { statusesFrom, stepInputs } from "./task-steps.ts";
 import type { Decision, State } from "./rules.ts";
@@ -14,7 +14,7 @@ import { askMachines, type Candidate, mostRoom, type Room, roomLack } from "./sp
 import { routineWorker } from "./routine.ts";
 import { askKey, availability, climbStalls, revertLast, reviewerFor, serviceAccounts } from "./stalls.ts";
 import { THIS_MACHINE } from "./start-failures.ts";
-import { bindStarts, liveSteps, recordStart, lockWhy, reservedLocks, settleLockWaits } from "./starts.ts";
+import { bindStarts, claimStart, liveSteps, releaseStart, recordStart, lockWhy, reservedLocks, settleLockWaits } from "./starts.ts";
 import type { Wait } from "./waits.ts";
 import type { World } from "./world.ts";
 
@@ -341,8 +341,15 @@ function startStep(s: Starting, step: Step): boolean {
       note("skip", stale, step.id);
       return false;
     }
+    const claims = join(projectsDir(env), t.name, "claims");
+    const refused = claimStart(claims, step.id, world.now().getTime());
+    if (refused) {
+      note("skip", refused, step.id);
+      return false;
+    }
     const err = addStepTask(s, step, host, worker, reviewer);
     if (err) {
+      releaseStart(claims, step.id);
       note("skip", `task add failed: ${err}`, step.id, host ?? THIS_MACHINE);
       return false;
     }

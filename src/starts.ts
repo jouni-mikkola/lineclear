@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { herdrArgv } from "./herdr.ts";
 import { join } from "node:path";
 import { fileClash, stepHeld, stepNeeds } from "./parts.ts";
@@ -100,6 +100,33 @@ export function liveSteps(steps: Step[], tasks: Task[], remote: Task[], taskStep
     if (id !== undefined) live.add(id);
   }
   return live;
+}
+
+/** A claim on a step outlives the gap between a task add and the task showing in the list. */
+const CLAIM_MS = 10 * 60_000;
+
+/**
+ * Takes the one start of a step before its task is added. Two ticks, or two machines' rules, that reach the same step
+ * at once cannot both take it: the file is created exclusively. Returns the refusal, or undefined when this call holds it.
+ */
+export function claimStart(dir: string, step: string, now: number): string | undefined {
+  const file = join(dir, `${step}.claim`);
+  mkdirSync(dir, { recursive: true });
+  try {
+    if (now - Number(readFileSync(file, "utf8")) < CLAIM_MS) return "a start for this step was claimed a short while ago, so it does not start twice";
+    rmSync(file, { force: true });
+  } catch {}
+  try {
+    writeFileSync(file, String(now), { flag: "wx" });
+    return undefined;
+  } catch {
+    return "another start for this step claimed it just now, so it does not start twice";
+  }
+}
+
+/** Gives the claim back when the task could not be added. */
+export function releaseStart(dir: string, step: string): void {
+  rmSync(join(dir, `${step}.claim`), { force: true });
 }
 
 /** A ready step skipped for locks this many ticks in a row reserves what it needs. */
