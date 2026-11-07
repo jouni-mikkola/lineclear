@@ -116,6 +116,8 @@ export function world(herdr = fakeHerdr(), o: { boot?: string } = {}) {
   }
   const places = new Places()
   const settings = new Settings()
+  // the default is the machine's cores minus 2: a 4-core runner would queue the third task of a test
+  settings.set('machine.maxTasks', '50')
   const engine = new Engine(agents as never, chats as never, places, settings, herdr.h as never)
   engines.push(engine)
   const news: string[] = []
