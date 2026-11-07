@@ -85,6 +85,15 @@ test("a step whose task appeared since the tick read its list is not started aga
   expect(t.decisions().some((x) => x.step === "A" && x.reason.includes("does not start twice"))).toBe(true);
 });
 
+test("the same step added twice starts once and is refused once, and a landed step starts nothing", () => {
+  const t = setup({ steps: [step("A", "none"), step("B", "none")], commits: ["start", "LIN-1: B Title B"] });
+  t.doTick();
+  t.doTick();
+  expect(t.adds().length).toBe(1);
+  expect(t.adds().some((a) => a.join(" ").includes("B Title B"))).toBe(false);
+  expect(t.decisions().some((x) => x.step === "A" && x.reason.includes("does not start twice"))).toBe(true);
+});
+
 test("a step merged on origin/main since the tick read it is not started", () => {
   const t = setup({ steps: [step("A", "none")] });
   const real = realWorld(t.env);
