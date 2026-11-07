@@ -23,16 +23,6 @@ export function readAside(env: Env): Aside {
   };
 }
 
-if (import.meta.main) {
-  const [what, arg] = process.argv.slice(2);
-  const read = what === "roadmap" && arg ? roadmapData(arg) : undefined;
-  if (read === undefined) {
-    console.error("usage: bun src/read-aside.ts spend|roadmap <project>");
-    process.exit(2);
-  }
-  console.log(JSON.stringify(read));
-}
-
 export interface Kept<T> {
   /** The last value at once, undefined before the first; a new read starts when it is old. */
   now(): T | undefined;
@@ -60,4 +50,14 @@ export function keptAside<T>(read: () => Promise<T>, ms: number, now: () => numb
     return value;
   };
   return { now: get, ready: async (wait = Infinity) => (value === undefined || now() - at > wait ? refresh() : get()) };
+}
+
+if (import.meta.main) {
+  const [what, arg] = process.argv.slice(2);
+  const read = what === "roadmap" && arg ? roadmapData(arg) : undefined;
+  if (read === undefined) {
+    console.error("usage: bun src/read-aside.ts spend|roadmap <project>");
+    process.exit(2);
+  }
+  console.log(JSON.stringify(read));
 }

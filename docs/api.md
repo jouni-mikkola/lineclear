@@ -1,6 +1,6 @@
 # The page server's routes
 
-The routes are in `src/web-routes.ts`. All answer JSON. A POST must come from Lineclear's own pages.
+The routes are in `src/web-routes.ts`. They answer JSON unless noted. A POST must come from Lineclear's own pages.
 
 - `GET /api/home`, `GET /api/roadmap/<project>`, `GET /api/plans`: the data the views read, with no AI. `GET /api/plans` lists each plan started with `lineclear plan`, newest first: its goal, where it stands, the steps it adds and its open Inbox item.
 - `GET /api/inbox` lists what waits for you: open items newest first, then waiting tasks. `POST /api/inbox/<n>` with `{"choice": "...", "note": "..."}` answers one (the note is a plan's reason to reject).
@@ -12,3 +12,4 @@ The routes are in `src/web-routes.ts`. All answer JSON. A POST must come from Li
 - `/api/task/<id>/chat` and its `/events`, `/file`, `/image`, `/files` and `/answer` are the same for the chat of one task with its agent.
 
 Projects are read again at most once a second. The slow reads run aside, in a process of their own, and answer with the last value while a new one is read: each roadmap at most once a second (one older than a minute is waited for).
+- Also: `GET /api/repos`, `POST /api/accounts/<name>` (price or retired), `POST /api/prefs`, `GET /api/push/key`, `POST /api/push/subscribe`, `GET /api/applied/<project>`, `POST /api/inbox/<n>/undo`, `GET /api/task/<id>` (with `/changes` and `/terminal`) and `GET /api/roadmap/<project>/step/<step>`.

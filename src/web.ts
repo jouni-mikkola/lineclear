@@ -17,8 +17,8 @@ export { knownHost, PAGE_TOKEN };
 export type { AppliedChange, PlanCard } from "./web-views.ts";
 
 /**
- * The data the views read, with no AI, as one handler of `Request`: the routes are in web-routes.ts and each one's reply is
- * documented in docs/api.md. Projects are read again at most once a second. The slow reads run aside, in a process of
+ * The data the views read, with no AI, as one handler of `Request`: the routes are in web-routes.ts and listed in
+ * docs/api.md. Projects are read again at most once a second. The slow reads run aside, in a process of
  * their own, and answer with the last value while a new one is read: each roadmap at most once a second (one older than
  * a minute is waited for). A POST must be JSON from this server's own pages.
  */
