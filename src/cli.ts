@@ -30,7 +30,6 @@ import { recordReviewCall } from "./task-work.ts";
 export const commands: Record<string, string> = {
   export: "Print what this machine holds as JSON, for the machine that shows all of them",
   doctor: "Check each part and name the command that fixes a problem (--here checks only this machine)",
-  machine: "Add a machine by its SSH host (installs Lineclear there and runs its doctor), list, remove or update machines",
   project: "Add, list, change, remove and check projects",
   roadmap: "Check or show the roadmap (roadmap show <id> prints one step)",
   setup: "Choose a model for the worker, reviewer, planner and step checker from the logged-in harnesses (the reviewer from another company than the worker)",
