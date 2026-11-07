@@ -7,7 +7,7 @@ import type { Settings } from "./project.ts";
 import { type checkRoadmap, doneIds, isFrozen, resultFlag, type StepStatus, type Task } from "./roadmap.ts";
 import { routineWorker } from "./routine.ts";
 import type { Decision, State } from "./rules.ts";
-import { bookRoom, type Candidate, mostRoom, type NewTask, type Room, roomLack, roomSlots } from "./spread.ts";
+import { bookRoom, type Candidate, mostRoom, type NewTask, type Room, remoteCandidates, roomLack, roomSlots } from "./spread.ts";
 import { askKey, availability, reviewerFor } from "./stalls.ts";
 import { THIS_MACHINE } from "./start-failures.ts";
 import { lockWhy, recordStart, reservedLocks, settleLockWaits } from "./starts.ts";
@@ -56,7 +56,7 @@ export function capacityOf(t: Tick, tasks: Task[], waits: Wait[], rooms: Map<str
   // `local: false` keeps the project off this machine: it starts only on the machines it lists.
   const offHere = settings.local === false;
   const free = max === undefined || offHere ? 0 : queued ? 0 : Math.max(0, max - active);
-  // Room is checked once per tick.
+  // A machine's room is read once per tick and counted down as steps are placed on it.
   const remoteFree = new Map<string, number>();
   const remoteLack: string[] = [];
   for (const [host, r] of rooms) {
@@ -202,14 +202,11 @@ function planStep(s: Starting, step: Step): Planned | undefined {
   const reviewer = reviewerFor(worker, settings, world, s.offered(), env);
   if (!reviewer) return (note("no-room", `no reviewer model that pi offers has room`, step.id), undefined);
   // The machine with the most free room, this one and the linked ones alike.
-  const localRoom = !cap.offHere && !cap.overloaded && cap.max !== undefined && cap.free > 0;
+  const localLoad = world.load() + cap.startedHere;
+  const localRoom = !cap.offHere && !cap.overloaded && cap.max !== undefined && cap.free > 0 && localLoad <= limit;
   const candidates: Candidate[] = [
-    ...(localRoom ? [{ host: undefined, load: world.load() + cap.startedHere, loadLimit: limit, free: cap.free }] : []),
-    ...[...cap.remoteFree].flatMap(([h, n]) => {
-      const r = s.rooms.get(h);
-      const free = r ? Math.min(n, roomSlots(r)) : 0;
-      return r && free > 0 ? [{ host: h, load: r.load, loadLimit: r.loadLimit, free }] : [];
-    }),
+    ...(localRoom ? [{ host: undefined, load: localLoad, loadLimit: limit, free: cap.free }] : []),
+    ...remoteCandidates(s.rooms, cap.remoteFree),
   ];
   const host = mostRoom(candidates)?.host;
   const remoteRoom = host === undefined ? undefined : s.rooms.get(host);

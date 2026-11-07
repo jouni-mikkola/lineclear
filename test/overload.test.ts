@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { bookRoom, type Candidate, MEM_PER_AGENT_KB, MEM_RESERVE_KB, mostRoom, type Room, roomSlots } from "../src/spread.ts";
+import { bookRoom, type Candidate, MEM_PER_AGENT_KB, MEM_RESERVE_KB, mostRoom, remoteCandidates, type Room, roomSlots } from "../src/spread.ts";
 
 const at = (host: string | undefined, load: number, free = 3): Candidate => ({ host, load, loadLimit: 8, free });
 
@@ -14,8 +14,8 @@ test("45 starts never pass a machine's slots or memory", () => {
   const rooms = [room("a", 10, 8 * 1024 * 1024), room("b", 12, 64 * 1024 * 1024), room("c", 25, 64 * 1024 * 1024)];
   const placed = new Map<string, number>();
   for (let i = 0; i < 45; i++) {
-    const candidates = rooms.flatMap((r) => (roomSlots(r) > 0 ? [{ host: r.host, load: r.load, loadLimit: r.loadLimit, free: roomSlots(r) }] : []));
-    const host = mostRoom(candidates)?.host;
+    const free = new Map(rooms.map((r) => [r.host, roomSlots(r)]));
+    const host = mostRoom(remoteCandidates(new Map(rooms.map((r) => [r.host, r])), free))?.host;
     if (host === undefined) break;
     bookRoom(rooms.find((r) => r.host === host) as Room);
     placed.set(host, (placed.get(host) ?? 0) + 1);

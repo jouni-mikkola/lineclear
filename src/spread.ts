@@ -118,6 +118,15 @@ export function bookRoom(r: Room) {
   if (r.freeKb !== undefined) r.freeKb -= MEM_PER_AGENT_KB;
 }
 
+/** The other machines that can take one more task now: slots, memory and load, as booked so far in the tick. */
+export function remoteCandidates(rooms: Map<string, Room>, remoteFree: Map<string, number>): Candidate[] {
+  return [...remoteFree].flatMap(([host, n]) => {
+    const r = rooms.get(host);
+    const free = r ? Math.min(n, roomSlots(r)) : 0;
+    return r && free > 0 && r.load <= r.loadLimit ? [{ host, load: r.load, loadLimit: r.loadLimit, free }] : [];
+  });
+}
+
 /** Why the machine takes no new task now, or undefined when it has room. */
 export function roomLack(r: Room): string | undefined {
   if (r.max === undefined) return "cannot read its slots from the server";
