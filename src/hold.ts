@@ -15,7 +15,6 @@ export function holdWorld(world: World, settings: Settings): World {
   held.stopTask = (id) => why(id) ?? world.stopTask(id);
   held.mergeTask = (id) => why(id) ?? world.mergeTask(id);
   held.nudge = (id, text) => why(id) ?? world.nudge(id, text);
-  held.addTask = (...a) => (settings.paused ? "the project is paused" : world.addTask(...a));
-  if (world.addTaskOn) held.addTaskOn = (...a) => (settings.paused ? "the project is paused" : world.addTaskOn?.(...a));
+  held.addTasks = (s, tasks, project) => (settings.paused ? tasks.map(() => "the project is paused") : world.addTasks(s, tasks, project));
   return held;
 }

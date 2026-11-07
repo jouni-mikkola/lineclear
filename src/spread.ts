@@ -4,6 +4,7 @@ import { listProjectNames, projectsDir, readSettings } from "./project.ts";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Task } from "./roadmap.ts";
+import { type Cmd, type Ran, runAll } from "./run-all.ts";
 import { quote, REMOTE_PATH, sshArgs } from "./ssh.ts";
 import { secretsText } from "../server/server/live/secrets.ts";
 
@@ -212,58 +213,71 @@ git -C "$D" fetch -q origin
 if [ "$(git -C "$D" symbolic-ref --short HEAD 2>/dev/null)" = main ] && [ -z "$(git -C "$D" status --porcelain)" ]; then git -C "$D" merge -q --ff-only origin/main; fi
 `;
 
+/** A task to make: here when `host` is undefined, else on that machine of the project. */
+export interface NewTask {
+  host?: string;
+  title: string;
+  brief: string;
+  extra: string[];
+}
+
+const ADD_TIMEOUT_MS = 5 * 60_000;
+
+/** The last lines of a failed command, or undefined when it worked. */
+const failure = (r: Ran) => (r.code === 0 ? undefined : (r.err || r.out).trim().split("\n").slice(-3).join(" ") || `exit ${r.code}`);
+
 /**
- * Puts the project's secrets into the other machine's vault over SSH, at the level of the space the task runs in.
- * They travel on stdin, never in an argument or a log. Returns an error text, or undefined (also when there are none).
+ * What readies a machine for a project's tasks: the project's secrets put into its vault at the level of the space the
+ * tasks run in (they travel on stdin, never in an argument or a log), and the repo clone there made or brought up to date.
  */
-function sendSecrets(host: string, project: string, space: string, env: Env = process.env): string | undefined {
-  const text = secretsText(project, env, host);
-  if (text === "") return undefined;
+function readyCmds(host: string, space: string, origin: string, env: Env, project?: string): (Cmd & { why: string })[] {
+  const clone = {
+    argv: sshArgs(env, host, `set -e\n${REMOTE_PATH}\n${cloneScript(origin, cloneDir(space))}`),
+    timeoutMs: ADD_TIMEOUT_MS,
+    why: "",
+  };
+  const text = project === undefined ? "" : secretsText(project, env, host);
+  if (text === "") return [clone];
   const script = `"$HOME/.local/bin/lineclear" secrets import ${quote(space)} >/dev/null`;
-  try {
-    const p = Bun.spawnSync(sshArgs(env, host, script), { stdin: Buffer.from(text), timeout: 60_000, env: env as Record<string, string> });
-    return p.exitCode === 0 ? undefined : `its secrets did not arrive: ${(p.stderr.toString() || `exit ${p.exitCode}`).trim().split("\n").at(-1)}`;
-  } catch (e) {
-    return `its secrets did not arrive: ${(e as Error).message}`;
-  }
+  return [{ argv: sshArgs(env, host, script), stdin: text, timeoutMs: 60_000, why: "its secrets did not arrive: " }, clone];
 }
 
-/** Makes a task on another machine: refreshes the repo clone there, then the one server adds the task with `task add --on`. Returns an error text, or undefined. */
-export function startOn(
-  host: string,
-  space: string,
-  origin: string,
-  title: string,
-  brief: string,
-  extra: string[],
-  env: Env = process.env,
-  project?: { name: string },
-): string | undefined {
-  if (project) {
-    const sent = sendSecrets(host, project.name, space, env);
-    if (sent) return sent;
-  }
-  const cloned = cloneOn(host, space, origin, env);
-  if (cloned) return cloned;
-  const p = Bun.spawnSync([serverBin(env as NodeJS.ProcessEnv), "task", "add", title, "--brief", brief, "--space", space, "--on", host, ...extra], {
-    stdin: "ignore",
-    timeout: 5 * 60_000,
-    env: env as Record<string, string>,
+/**
+ * Makes tasks here and on the other machines, all at once. Each machine that gets one is readied first (all machines
+ * together), then the one server adds every task (`task add`, with `--on <host>` for another machine) together. One
+ * error text, or undefined, per task. `origin` is undefined when the repo has none to clone elsewhere.
+ */
+export function addTasksAt(space: string, origin: string | undefined, tasks: NewTask[], env: Env = process.env, project?: string): (string | undefined)[] {
+  const hosts = [...new Set(tasks.flatMap((t) => (t.host === undefined ? [] : [t.host])))];
+  const notReady = new Map<string, string>();
+  if (origin === undefined) for (const host of hosts) notReady.set(host, `the repo has no origin to clone on ${host}`);
+  const ready = origin === undefined ? [] : hosts.flatMap((host) => readyCmds(host, space, origin, env, project).map((c) => ({ ...c, host })));
+  runAll(ready, env).forEach((r, i) => {
+    const { host, why } = ready[i] as (typeof ready)[number];
+    const failed = failure(r);
+    if (failed !== undefined && !notReady.has(host)) notReady.set(host, `${why}${failed}`);
   });
-  return p.exitCode === 0 ? undefined : (p.stderr.toString() || p.stdout.toString()).trim().split("\n").slice(-3).join(" ") || `exit ${p.exitCode}`;
-}
-
-/** Runs a command on a machine with stdin. Returns the last lines of its error, or undefined when it succeeded. */
-function runScript(host: string, script: string, stdin: string, env: Env): string | undefined {
-  try {
-    const p = Bun.spawnSync(sshArgs(env, host, script), { stdin: Buffer.from(stdin), timeout: 5 * 60_000, env: env as Record<string, string> });
-    return p.exitCode === 0 ? undefined : (p.stderr.toString() || p.stdout.toString()).trim().split("\n").slice(-3).join(" ") || `exit ${p.exitCode}`;
-  } catch (e) {
-    return (e as Error).message;
-  }
-}
-
-/** Clones a project's repo on a machine, or brings it up to date, with no task. Returns an error text, or undefined. */
-function cloneOn(host: string, space: string, origin: string, env: Env = process.env): string | undefined {
-  return runScript(host, `set -e\n${REMOTE_PATH}\n${cloneScript(origin, cloneDir(space))}`, "", env);
+  const go = tasks.filter((t) => t.host === undefined || !notReady.has(t.host));
+  const ran = runAll(
+    go.map((t) => ({
+      argv: [
+        serverBin(env as NodeJS.ProcessEnv),
+        "task",
+        "add",
+        t.title,
+        "--brief",
+        t.brief,
+        "--space",
+        space,
+        ...(t.host === undefined ? [] : ["--on", t.host]),
+        ...t.extra,
+      ],
+      timeoutMs: ADD_TIMEOUT_MS,
+    })),
+    env,
+  );
+  return tasks.map((t) => {
+    const i = go.indexOf(t);
+    return i < 0 ? notReady.get(t.host as string) : failure(ran[i] as Ran);
+  });
 }

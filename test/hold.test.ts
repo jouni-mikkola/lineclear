@@ -21,10 +21,7 @@ function world(sent: string[]) {
       sent.push(`stop ${id}`);
       return undefined;
     },
-    addTask: () => {
-      sent.push("add");
-      return undefined;
-    },
+    addTasks: (_s, jobs) => jobs.map(() => (sent.push("add"), undefined)),
   });
 }
 
@@ -39,7 +36,9 @@ test("a task the owner stopped is never written to, and another task is", () => 
 
 test("a paused project's tasks are not told, restarted or started", () => {
   const sent: string[] = [];
-  const w = holdWorld(world(sent), { space: "s", paused: true } as Settings);
-  for (const r of [w.tellTask("LIN-2", "x"), w.nudge("LIN-2", "x"), w.stopTask("LIN-2"), w.addTask("s", "t", "b", [])]) expect(r).toContain("paused");
+  const settings = { space: "s", paused: true } as Settings;
+  const w = holdWorld(world(sent), settings);
+  const added = w.addTasks(settings, [{ title: "t", brief: "b", extra: [] }]);
+  for (const r of [w.tellTask("LIN-2", "x"), w.nudge("LIN-2", "x"), w.stopTask("LIN-2"), ...added]) expect(r).toContain("paused");
   expect(sent).toEqual([]);
 });

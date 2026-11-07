@@ -10,7 +10,8 @@ import { harnesses, readRegistry } from "./models.ts";
 import { serverBin } from "./paths.ts";
 import type { Settings } from "./project.ts";
 import { fitTitle, type Task } from "./roadmap.ts";
-import { type Room, readRoom, startOn } from "./spread.ts";
+import { runAll } from "./run-all.ts";
+import { addTasksAt, type NewTask, type Room, readRoom } from "./spread.ts";
 import { agentLastError, type ChatCard, realChatCards, realStallCards, type StallCard } from "./stalls.ts";
 import { agentStart, nudgePane, type StartState } from "./starts.ts";
 import { forgetTaskReads, readers, readTasks } from "./task-read.ts";
@@ -40,20 +41,22 @@ export interface World {
   health(repo: string, command: string): { ok: boolean; output: string };
   /** Reverts a commit on origin/main and pushes the revert, as a plain push. Returns an error text, or undefined. */
   revert(repo: string, commit: string): string | undefined;
-  addTask(space: string, title: string, brief: string, extra: string[]): string | undefined;
   /**
-   * Claims a step on the GitHub repo, once for every machine and space. Returns undefined when it is ours now,
-   * "held" when another loop has it, or an error text. A world with no claims lets every start through.
+   * Makes the project's tasks, here (no host) or on its other machines (cloning the repo there once), all at once.
+   * One error text, or undefined, per task.
    */
-  claimStep?(repo: string, step: string): string | undefined;
+  addTasks(settings: Settings, tasks: NewTask[], project?: string): (string | undefined)[];
+  /**
+   * Claims steps on the GitHub repo, once for every machine and space, all at once. Per step: undefined when it is
+   * ours now, "held" when another loop has it, or an error text. A world with no claims lets every start through.
+   */
+  claimSteps?(repo: string, steps: string[]): (string | undefined)[];
   /** The steps claimed on the repo. */
   claimedSteps?(repo: string): string[];
-  /** Deletes a step's claim. */
-  releaseStep?(repo: string, step: string): void;
+  /** Deletes the steps' claims, all at once. */
+  releaseSteps?(repo: string, steps: string[]): void;
   /** What another machine of the project says about its room and its tasks, or why it cannot be reached. */
   room?(host: string, space: string): Room | string;
-  /** Makes a task on another machine (cloning the repo there once). */
-  addTaskOn?(host: string, settings: Settings, title: string, brief: string, extra: string[], project?: string): string | undefined;
   /** The machine's one-minute load average. */
   load(): number;
   /** `lineclear task stop`. */
@@ -180,7 +183,7 @@ function taskWorld(
   lineclear: string,
   io: Readers,
   env: NodeJS.ProcessEnv,
-): Pick<World, "tasks" | "maxTasks" | "reviewerSetting" | "stopTask" | "tellTask" | "closeTask" | "mergeTask" | "addTask" | "addTaskOn"> {
+): Pick<World, "tasks" | "maxTasks" | "reviewerSetting" | "stopTask" | "tellTask" | "closeTask" | "mergeTask" | "addTasks"> {
   // a done task has no pane: refused here, before the server and herdr are asked
   const doneTask = (id: string) =>
     taskStatus(run([lineclear, "task", "show", id, "--json"]).out) === "done" ? `${id} is Done already: it has no agent, so nothing is sent to it.` : undefined;
@@ -213,11 +216,14 @@ function taskWorld(
         return String(e);
       }
     },
-    addTask: (space, title, brief, extra) => failure(io.change([lineclear, "task", "add", fitTitle(title), "--brief", brief, "--space", space, ...extra])),
-    addTaskOn(host, settings, title, brief, extra, project) {
-      const o = git(settings.repo, "remote", "get-url", "origin");
-      if (!o.ok) return `${settings.repo} has no origin to clone on ${host}`;
-      return startOn(host, settings.space, o.out.trim(), fitTitle(title), brief, extra, env, project ? { name: project } : undefined);
+    addTasks(settings, tasks, project) {
+      const remote = tasks.some((t) => t.host !== undefined);
+      const o = remote ? git(settings.repo, "remote", "get-url", "origin") : undefined;
+      const origin = o?.ok ? o.out.trim() : undefined;
+      const fitted = tasks.map((t) => ({ ...t, title: fitTitle(t.title) }));
+      const errors = addTasksAt(settings.space, origin, fitted, env, project);
+      forgetTaskReads();
+      return errors;
     },
   };
 }
@@ -248,7 +254,11 @@ export function realWorld(env = process.env): World {
     load: () => loadavg()[0] ?? 0,
     room: (host, space) => readRoom(host, space, env),
     ...gitWorld(refsOf),
-    ...claimWorld(run, (repo) => refsOf(repo)[0]),
+    ...claimWorld(
+      run,
+      (cmds) => runAll(cmds, env),
+      (repo) => refsOf(repo)[0],
+    ),
     ...taskWorld(serverBin(env), io, env),
     stallCards: (space, repo) => io.memo(`stall\0${space}\0${repo}`, () => realStallCards(space, repo, env)),
     chatCards: (space, repo) => io.memo(`chat\0${space}\0${repo}`, () => realChatCards(space, repo, env)),

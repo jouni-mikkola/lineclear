@@ -10,7 +10,7 @@ import type { Settings } from "./project.ts";
 import { checkRoadmap, closedSteps, doneIds, isFrozen, resultFlag, type StepStatus, type Task } from "./roadmap.ts";
 import { statusesFrom, stepInputs } from "./task-steps.ts";
 import type { Decision, State } from "./rules.ts";
-import { askMachines, type Candidate, mostRoom, type Room, roomLack } from "./spread.ts";
+import { askMachines, type Candidate, mostRoom, type NewTask, type Room, roomLack } from "./spread.ts";
 import { routineWorker } from "./routine.ts";
 import { askKey, availability, climbStalls, revertLast, reviewerFor, serviceAccounts } from "./stalls.ts";
 import { THIS_MACHINE } from "./start-failures.ts";
@@ -22,7 +22,7 @@ type MainInfo = Exclude<ReturnType<World["main"]>, string>;
 type Parsed = ReturnType<typeof checkRoadmap>["parsed"];
 type Step = Parsed["steps"][number];
 type StepState = StepStatus;
-type Note = (kind: Decision["kind"], reason: string, step?: string, machine?: string) => void;
+type Note = (kind: Decision["kind"], reason: string, step?: string, machine?: string) => Decision;
 
 /** What every part of one project's tick needs. */
 interface Tick {
@@ -85,7 +85,7 @@ function startHealthFix(t: Tick, main: MainInfo, output: string, health: string)
     output: output.slice(-4000).trimEnd(),
     check: settings.check,
   });
-  const err = world.addTask(settings.space, `Fix health ${main.head.slice(0, 7)}`, brief, []);
+  const [err] = world.addTasks(settings, [{ title: `Fix health ${main.head.slice(0, 7)}`, brief, extra: [] }]);
   if (err) {
     // Try the same head again next tick.
     state.healthFailures -= 1;
@@ -234,7 +234,8 @@ interface Starting {
   t: Tick;
   text: string;
   commits: MainInfo["commits"];
-  steps: Step[];
+  /** The tasks here and on the other machines, as the tick read them. */
+  tasks: Task[];
   status: StepState[];
   byId: Map<string, Step>;
   held: Map<string, string>;
@@ -258,10 +259,25 @@ function whyNotStart(s: Starting, step: Step, reserved: Map<string, string>) {
   return undefined;
 }
 
-/** Makes the task of a step, here or on `host`. Returns an error text, or undefined. */
-function addStepTask(s: Starting, step: Step, host: string | undefined, worker: string, reviewer: string) {
-  const { t } = s;
-  const { settings, world } = t;
+/** A step this tick starts: where, and with which models. */
+interface Planned {
+  step: Step;
+  host: string | undefined;
+  worker: string;
+  reviewer: string;
+  cheap: string | undefined;
+  where: string;
+  /** Its line in the tick's decisions, written as it is planned so the lines keep the steps' order; its outcome comes once the starts ran. */
+  decision: Decision;
+}
+
+/** Fills in a planned step's line once its start ran. */
+const settle = (p: Planned, kind: Decision["kind"], reason: string, machine?: string) =>
+  Object.assign(p.decision, { kind, reason }, machine === undefined ? {} : { machine });
+
+/** The task of a planned step, here or on its host. */
+function stepTask(s: Starting, { step, host, worker, reviewer }: Planned): NewTask {
+  const { settings } = s.t;
   const title = `${step.id} ${step.title}`;
   const brief = stepBrief(step, settings, reviewer, worker, { repo: settings.repo, roadmap: s.text }, s.status.find((x) => x.id === step.id)?.unproven);
   const flags = [
@@ -279,54 +295,38 @@ function addStepTask(s: Starting, step: Step, host: string | undefined, worker: 
     // the board refuses a step that already landed; a reopened one is meant to run again
     ...(step.reopened ? ["--reopened", "true"] : []),
   ];
-  if (host === undefined) return world.addTask(settings.space, title, brief, flags);
-  return world.addTaskOn ? world.addTaskOn(host, settings, title, brief, flags, t.name) : `this world cannot start tasks on ${host}`;
+  return { host, title, brief, extra: flags };
 }
 
 /**
- * Just before a start, reads the tasks here and on every other machine, and main, again: the list of this tick may be
- * minutes old. A step with a task that is not done anywhere, or merged on origin/main, is never started twice. A
- * machine that cannot be reached still holds what it last ran.
+ * What holds a ready step that its state does not show, or undefined. The state marks a task here only through the
+ * rules' record of its start: a task just added may not be listed yet, and one titled for the step may have no record.
+ * Main and every machine's tasks were read once, as the tick began; the claim on the repo stops a start another loop made since.
  */
-function whyStale(s: Starting, step: Step): string | undefined {
-  const { t } = s;
-  const { settings, world, state } = t;
-  world.fetch(settings.repo);
-  const main = world.main(settings.repo);
-  if (typeof main === "string") return `main cannot be read again: ${main}`;
-  if (!step.reopened && doneIds(main.commits, new Set([step.id])).has(step.id)) return "it is merged on origin/main already";
-  if (!step.reopened && state.closedSteps?.[step.id] !== undefined) return `${state.closedSteps[step.id]} closed it with nothing to merge: it landed already`;
+function whyHeldUnrecorded(s: Starting, step: Step): string | undefined {
+  const { state } = s.t;
   if (Object.values(state.pendingStarts ?? {}).includes(step.id))
     return "a task was just added for this step and is not listed yet, so it does not start twice";
-  const here = world.tasks(settings.space);
-  if (typeof here === "string") return `its tasks cannot be read again: ${here}`;
-  const remote: Task[] = [];
-  for (const host of settings.machines ?? []) {
-    const r = world.room?.(host, settings.space);
-    remote.push(...(r === undefined || typeof r === "string" ? (state.remoteSeen?.[host] ?? []) : r.tasks));
-  }
-  const open = [...here, ...remote].find(
-    (x) => x.status !== "done" && (x.title.startsWith(`${step.id} `) || (x.id !== undefined && state.taskSteps?.[x.id] === step.id)),
-  );
-  const closed = step.reopened ? undefined : closedSteps(s.steps, here, state.taskSteps, remote).get(step.id);
-  if (closed) return `${closed} closed with nothing to merge for this step`;
+  const open = s.tasks.find((x) => x.status !== "done" && x.title.startsWith(`${step.id} `));
   if (open) return `${open.id ?? open.title} for this step is not done (${open.status}), so it does not start twice`;
-  // A task just added may not show in the list yet: the rules' own record of the start holds the step until it does.
-  if (Object.values(state.pendingStarts ?? {}).includes(step.id))
-    return "a task was just started for this step and is not listed yet, so it does not start twice";
-  if (state.closedSteps?.[step.id] !== undefined) return "it is closed with nothing to merge already";
   return undefined;
 }
 
-/** Starts one ready step, or notes why not. Returns whether it started (or would, in a dry run). */
-function startStep(s: Starting, step: Step): boolean {
+/**
+ * Picks the machine and the models of a ready step, and books its slot and its locks for the rest of the tick. Each
+ * machine is judged by its own load and slots: this one's load only keeps starts off this one. Returns undefined, with
+ * the reason noted, when it does not start.
+ */
+function planStep(s: Starting, step: Step): Planned | undefined {
   const { t, cap, limit } = s;
-  const { settings, world, state, dryRun, note, env } = t;
+  const { settings, world, note, env } = t;
+  const held = whyHeldUnrecorded(s, step);
+  if (held) return (note("skip", held, step.id), undefined);
   // A routine step (docs, tests, baselines) starts on the cheapest worker model that has room; the stall ladder moves it back after two failed checks.
   const cheap = routineWorker(step, s.picked().workers, env, (m) => availability(m, env, world.now()) === "ok");
   const worker = cheap ?? (s.picked().worker as string);
   const reviewer = reviewerFor(worker, settings, world, s.offered(), env);
-  if (!reviewer) return (note("skip", `no reviewer model that pi offers has room`, step.id), false);
+  if (!reviewer) return (note("skip", `no reviewer model that pi offers has room`, step.id), undefined);
   // The machine with the most free room, this one and the linked ones alike.
   const localRoom = !cap.offHere && !cap.overloaded && cap.max !== undefined && cap.free > 0;
   const candidates: Candidate[] = [
@@ -344,46 +344,65 @@ function startStep(s: Starting, step: Step): boolean {
     remoteRoom === undefined
       ? ""
       : ` on ${host} (load ${remoteRoom.load.toFixed(1)} of ${remoteRoom.loadLimit} there, ${world.load().toFixed(1)} of ${limit} here)`;
-  if (dryRun) {
-    note("start", `would start${where} with worker ${worker}, reviewer ${reviewer}`, step.id);
-  } else {
-    const stale = whyStale(s, step);
-    if (stale) {
-      note("skip", stale, step.id);
-      return false;
-    }
-    // One claim per repo, taken before the task: the space names differ per machine, the repo's refs do not.
-    const claim = world.claimStep?.(settings.repo, step.id);
-    if (claim) {
-      note("skip", claim === "held" ? "another loop holds this step's claim on the repo" : `its claim cannot be made: ${claim}`, step.id);
-      return false;
-    }
-    const err = addStepTask(s, step, host, worker, reviewer);
-    if (err) {
-      world.releaseStep?.(settings.repo, step.id);
-      note("skip", `task add failed: ${err}`, step.id, host ?? THIS_MACHINE);
-      return false;
-    }
-    state.models[step.id] = worker;
-    if (cheap) (state.cheap ??= []).push(step.id);
-    if (host === undefined) recordStart(state, `${step.id} ${step.title}`, step.id);
-    const same = company(reviewer) === company(worker) ? " (same company: no other company has room, a different model reviews with a fresh context)" : "";
-    const on = `${cheap ? `routine step on the cheap worker model ${cheap}; ` : ""}worker ${worker}`;
-    note("start", `ready, locks free, slot free${where}; ${on}, reviewer ${reviewer}${same}`, step.id);
-  }
   if (host === undefined) {
     cap.free -= 1;
     cap.startedHere += 1;
   } else {
     if (remoteRoom) remoteRoom.load += 1;
     cap.remoteFree.set(host, (cap.remoteFree.get(host) ?? 0) - 1);
-    // Remembered at once: if that machine is down next tick, its new task still holds its step and locks.
-    state.remoteSeen ??= {};
-    const seen = state.remoteSeen;
-    if (!dryRun) seen[host] = [...(seen[host] ?? []), { title: `${step.id} ${step.title}`, status: "work", sub: `on ${host}` }];
   }
   for (const l of stepHeld(step)) s.held.set(l, step.id);
-  return true;
+  return { step, host, worker, reviewer, cheap, where, decision: note("start", "", step.id) };
+}
+
+/** What the tick keeps of a step whose task was added. */
+function recordStarted(s: Starting, p: Planned) {
+  const { step, host, worker, reviewer, cheap, where } = p;
+  const { state } = s.t;
+  state.models[step.id] = worker;
+  if (cheap) (state.cheap ??= []).push(step.id);
+  if (host === undefined) recordStart(state, `${step.id} ${step.title}`, step.id);
+  else {
+    // Remembered at once: if that machine is down next tick, its new task still holds its step and locks.
+    const seen = (state.remoteSeen ??= {});
+    seen[host] = [...(seen[host] ?? []), { title: `${step.id} ${step.title}`, status: "work", sub: `on ${host}` }];
+  }
+  const same = company(reviewer) === company(worker) ? " (same company: no other company has room, a different model reviews with a fresh context)" : "";
+  const on = `${cheap ? `routine step on the cheap worker model ${cheap}; ` : ""}worker ${worker}`;
+  settle(p, "start", `ready, locks free, slot free${where}; ${on}, reviewer ${reviewer}${same}`);
+}
+
+/**
+ * Starts the planned steps together: every claim at once, then every task at once. One claim per repo, taken before
+ * the task: the space names differ per machine, the repo's refs do not. A task that cannot be added gives its claim back at once.
+ */
+function startPlanned(s: Starting, planned: Planned[]) {
+  const { settings, world, name } = s.t;
+  const claims =
+    world.claimSteps?.(
+      settings.repo,
+      planned.map((p) => p.step.id),
+    ) ?? [];
+  const claimed = planned.filter((p, i) => {
+    const claim = claims[i];
+    if (claim) settle(p, "skip", claim === "held" ? "another loop holds this step's claim on the repo" : `its claim cannot be made: ${claim}`);
+    return !claim;
+  });
+  const errors = world.addTasks(
+    settings,
+    claimed.map((p) => stepTask(s, p)),
+    name,
+  );
+  const failed = claimed.filter((p, i) => {
+    const err = errors[i];
+    if (err === undefined) recordStarted(s, p);
+    else settle(p, "skip", `task add failed: ${err}`, p.host ?? THIS_MACHINE);
+    return err !== undefined;
+  });
+  world.releaseSteps?.(
+    settings.repo,
+    failed.map((p) => p.step.id),
+  );
 }
 
 /**
@@ -404,8 +423,10 @@ function refileReopened(s: Starting, step: Step): boolean {
   return true;
 }
 
+/** Plans every ready step that fits (free slots, disjoint locks and files), then starts them all together. */
 function startReadySteps(s: Starting) {
   const skipped = new Set<string>();
+  const planned: Planned[] = [];
   const reserved = reservedLocks(s.status, s.byId, s.t.state.lockWaits);
   for (const st of s.status) {
     if (st.state !== "ready") continue;
@@ -414,10 +435,18 @@ function startReadySteps(s: Starting) {
     if (step.reopened && refileReopened(s, step)) continue;
     const why = whyNotStart(s, step, reserved);
     if (why) s.t.note("skip", why, step.id);
-    else startStep(s, step);
+    else {
+      const p = planStep(s, step);
+      if (p) planned.push(p);
+    }
     if (why?.startsWith("lock '")) skipped.add(step.id);
   }
-  if (!s.t.dryRun) settleLockWaits(s.t.state, skipped);
+  if (s.t.dryRun) {
+    for (const p of planned) settle(p, "start", `would start${p.where} with worker ${p.worker}, reviewer ${p.reviewer}`);
+    return;
+  }
+  startPlanned(s, planned);
+  settleLockWaits(s.t.state, skipped);
 }
 
 /** One tick for one project. Returns its decisions; with `dryRun` it writes and starts nothing. */
@@ -434,7 +463,9 @@ export function tickProject(
   const out: Decision[] = [];
   const time = world.now().toISOString();
   const note: Note = (kind, reason, step, machine) => {
-    out.push({ time, project: name, step, kind, reason, ...(machine === undefined ? {} : { machine }) });
+    const d = { time, project: name, step, kind, reason, ...(machine === undefined ? {} : { machine }) };
+    out.push(d);
+    return d;
   };
   const t: Tick = { name, settings, world, state, dryRun, env, note };
   const project = readProject(t);
@@ -469,7 +500,10 @@ export function tickProject(
   }
   if (!dryRun) {
     const claimed = world.claimedSteps?.(settings.repo) ?? [];
-    for (const st of status) if (st.state === "done" && claimed.includes(st.id)) world.releaseStep?.(settings.repo, st.id);
+    world.releaseSteps?.(
+      settings.repo,
+      status.filter((st) => st.state === "done" && claimed.includes(st.id)).map((st) => st.id),
+    );
   }
   if (settings.starts === false) {
     note("skip", "this machine does not start steps for the repo (starts: false), it only runs what it is given");
@@ -480,6 +514,7 @@ export function tickProject(
     note("skip", cap.overloadNote);
     return out;
   }
-  startReadySteps({ t, text, commits: main.commits, steps: parsed.steps, status, byId, held, cap, rooms, limit, picked: workerPicker(t, offered), offered });
+  const known = [...tasks, ...remote];
+  startReadySteps({ t, text, commits: main.commits, tasks: known, status, byId, held, cap, rooms, limit, picked: workerPicker(t, offered), offered });
   return out;
 }

@@ -48,7 +48,7 @@ function setup(files: string, tasks: { id: string; title: string; status: string
     tasks: () => tasks,
     closeTask: (id) => (closed.push(id), undefined),
     branchOf: () => "work/5-a-alpha",
-    addTask: (_s, title, brief, extra) => (adds.push([title, brief, ...extra]), undefined),
+    addTasks: (_s, jobs) => jobs.map(({ title, brief, extra }) => (adds.push([title, brief, ...extra]), undefined)),
   });
   recordTaskSteps(config, Object.fromEntries(tasks.map((t) => [t.id, "A"])));
   const decisions = () =>

@@ -63,7 +63,7 @@ export function setup(o: Opts = {}) {
     "lineclear",
     `case "$1 $2" in
   "task list") cat "${fake}/tasks.json" ;;
-  "task add") for a in "$@"; do printf '%s\\001' "$a"; done >> "${fake}/adds.log"; printf '\\002' >> "${fake}/adds.log" ;;
+  "task add") { flock 9; for a in "$@"; do printf '%s\\001' "$a"; done >> "${fake}/adds.log"; printf '\\002' >> "${fake}/adds.log"; } 9>"${fake}/adds.lock" ;;
   "task stop"|"task tell") echo "$*" >> "${fake}/calls.log" ;;
   show*) echo "machine.maxTasks       $(cat "${fake}/max")  (laptop)" ;;
 esac`,
