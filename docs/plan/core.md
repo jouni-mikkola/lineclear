@@ -73,61 +73,15 @@ the 420 MB per agent and coordinator tokens (the agents and machines plan), the 
 
 Wave 1 (L700 to L707) has disjoint files and can run at once. Each later step names its `after`.
 
-### L700 The core loop has one test
-Result: One test adds two steps to a plain repo, a fake pi builds each, a review passes, each merges once and the next step starts.
-- why: no test runs add, build, review, merge and next step end to end, so a refactor of the engine can break the loop unseen.
-- done when: `server/test/core-loop.test.ts` passes on GitHub in under 20 s with a scratch repo (no remote, no workflow) and a fake pi RPC agent; it kills the server once at each of 6 points (after add, start, ready, review, queue, merge) and still sees 2 steps merged, 2 tasks made, 0 started twice; the cases that fail today are marked with the step id that fixes them. Tests: new files only.
-- locks: core-loop-test
-- after: none
-- files: server/test/core-loop.test.ts, server/test/fake-pi.ts
+Each step is in [ROADMAP.md](../ROADMAP.md), or dropped with the step that does its job.
 
-### L701 Tasks are rows in the store
-Result: Tasks and their briefs are rows of `store.sqlite`, and the snapshot, change log, cold log and brief files are gone.
-- why: tasks live in a JSON snapshot, a hot log, a cold log and 561 brief files beside a `store.sqlite` with no task row, so no change can commit with its claim or its jobs.
-- done when: `task-store.ts`, `briefs.ts`, the task half of `cold.ts` and `src/hot-log.ts` are deleted; old files are imported once by `importOnce`; a test kills the writer 1000 times mid-save and every reload holds each acknowledged change; `src/tasks-kept.ts` reads the rows readonly. Tests: deletes `server/test/task-store.test.ts`, `engine-briefs.test.ts`, the task cases of `store-cold.test.ts`; moves `engine-retire.test.ts` into `task-rows.test.ts`.
-- locks: task-rows, file-server-server-live-engine-engine-state-ts, file-server-server-live-engine-cold-ts, file-server-server-live-engine-retire-ts, file-server-server-live-engine-briefs-ts, file-server-server-live-engine-task-store-ts, file-src-tasks-kept-ts, file-src-hot-log-ts, file-src-doctor-task-ids-ts, file-src-measure-ts
-- after: L503
-- files: server/server/live/engine/task-rows.ts, server/server/live/engine/engine-state.ts, server/server/live/engine/task-store.ts, server/server/live/engine/briefs.ts, server/server/live/engine/cold.ts, server/server/live/engine/retire.ts, src/tasks-kept.ts, src/hot-log.ts, src/doctor-task-ids.ts, src/measure.ts
-
-### L702 A task has one phase
-Result: A task's status comes from one named phase, and a table lists every allowed move.
-- why: `status.ts` reads 16 flags and 3 live lookups in 15 ordered ifs, and nothing refuses a combination that cannot be.
-- done when: `engine/phase.ts` exports the phases, the events and `move()`; a test feeds every (phase, event) pair and sees the next phase or a refusal; `rawStatus` is gone and `status.ts` maps a phase to a status with 0 calls into agents or chats. Tests: `server/test/status.test.ts` rewritten on phases; new `phase.test.ts`.
-- locks: task-phase, file-server-server-live-engine-status-ts
-- after: none
-- files: server/server/live/engine/phase.ts, server/server/live/engine/status.ts
-
-### L703 A closed task closes its PR
-Result: A merged or closed task is Done only once its PR, remote branch, local branch, worktree and agent are gone.
-- why: `close()` closes no PR and `putAway` deletes only the local branch: 59 duplicate PRs, 136 stale worktrees and 147 remote branches stayed.
-- done when: `engine/jobs.ts` runs jobs from a `jobs` table after their commit, each idempotent, retried at 1, 5 and 30 minutes, then a card; a test closes 10 tasks with PRs on a fake gh and sees 10 PRs closed, 0 remote and 0 local branches, 0 worktrees; a restart halfway ends with each job run once; `grep -c "\.catch(() =>" engine/worktrees.ts engine/engine-handoff.ts` prints 0. Tests: new `put-away.test.ts`; `kept` cases of `engine-b.test.ts` deleted.
-- locks: put-away, file-server-server-live-engine-worktrees-ts, file-server-server-live-engine-engine-handoff-ts
-- after: none
-- files: server/server/live/engine/jobs.ts, server/server/live/engine/put-away.ts, server/server/live/engine/worktrees.ts, server/server/live/engine/engine-handoff.ts
-
-### L704 Stalls run on deadlines
-Result: A stalled task is named at the minute its wait ran out, from one deadline table, not three loops over every task.
-- why: `stalls.ts` walks all tasks 3 times a minute with a status call each (about 1,700 a minute at 561 tasks) and dedupes with 3 flags.
-- done when: a `deadlines` row is set when a wait starts and cleared by the next move; with 561 tasks and 45 working, a quiet minute makes 0 status calls (about 1,700 today); a fake clock at each deadline (stall 20 min, silent 5 min, ready 20 min) opens one card, none early, none twice. Tests: `server/test/stalls.test.ts` moved to `deadlines.test.ts`.
-- locks: stall-deadlines, file-server-server-live-engine-stalls-ts, file-server-server-live-engine-deadlines-ts
-- after: none
-- files: server/server/live/engine/deadlines.ts, server/server/live/engine/stalls.ts
-
-### L705 Ready tasks join a merge queue
-Result: `lineclear merge` puts the task in its repo's queue and answers at once; the queue lands each task once, across restarts.
-- why: the lane is 6 Maps and Sets in memory, a restart ends every merge on its way, and the agent waits for the merge with its slot held.
-- done when: `landings` rows hold the queue; `lineclear merge` answers in under 0.5 s with a position; a test queues 10 tasks, restarts the server mid-queue and sees 10 merged once each in order; `merge.ts` uses none of `merging`, `landings`, `callerLeft`, `cut`, `runOf`, `frees` (their declarations in `engine-state.ts` go with L709), and `endLostMerges` and `landReady` are gone; `grep -c "Bun.sleep" engine/merge.ts` prints 0 (4 today). Tests: deletes `engine-land-ready.test.ts`; moves the drain and lost-merge cases of `engine-merge*.test.ts` into `merge-queue.test.ts`.
-- locks: merge-queue, file-server-server-live-engine-merge-ts, file-server-server-live-engine-engine-ts
-- after: none
-- files: server/server/live/engine/merge-queue.ts, server/server/live/engine/merge.ts, server/server/live/engine/lane.ts, server/server/live/engine/engine.ts
-
-### L706 A store copy is one file
-Result: An hourly copy is one `VACUUM INTO` file of a few MB, a point in time, and a failed copy shows in doctor.
-- why: 56 copies take 1,068 MB, and files copied one by one while the board writes are not one moment.
-- done when: a copy is one file under 5 MB (34 MB today); secrets and push keys are not in it; `restoreCopy` puts one file back; a test breaks the copy folder and sees the line in `lineclear doctor`. Tests: `test/store-copies.test.ts` rewritten.
-- locks: store-copy, file-src-store-copies-ts, file-src-rules-ts
-- after: none
-- files: src/store-copies.ts, src/rules.ts
+- L700 The core loop has one test: in ROADMAP.md.
+- L701 Tasks are rows in the store: in ROADMAP.md as "The task change log is gone", the part L541 (merged) left.
+- L702 A task has one phase: dropped, L521 did it (merged).
+- L703 A closed task closes its PR: dropped, L793 closes the PR and L750 removes the rest (ROADMAP.md).
+- L704 Stalls run on deadlines: dropped, L523 did it (merged).
+- L705 Ready tasks join a merge queue: in ROADMAP.md.
+- L706 A store copy is one file: dropped, L546 did it (merged).
 
 ### L707 One id series in the store
 Result: Task ids come from a table of `store.sqlite`, and `task-ids.sqlite` is gone.
@@ -137,85 +91,16 @@ Result: Task ids come from a table of `store.sqlite`, and `task-ids.sqlite` is g
 - after: none
 - files: server/server/live/task-ids.ts
 
-### L708 A step is claimed by a row
-Result: Two adds of one step, from two processes or across a restart, make one task and one refusal.
-- why: `StepClaims` is a Map in memory; 795 tasks were made for 37 steps in one hour.
-- done when: a partial unique index on open tasks' (project, step) refuses the second insert; a test races 2 processes on one store 100 times and sees 100 times exactly 1 task; `StepClaims` is deleted. Tests: the Map cases of `server/test/step-once.test.ts` move to a two-process test.
-- locks: step-claim, file-server-server-live-engine-step-once-ts, file-server-server-live-source-task-words-ts
-- after: L701
-- files: server/server/live/engine/step-once.ts, server/server/live/source-task-words.ts
-
-### L709 The phase is stored
-Result: Every change of a task is a move that writes its phase and a history line, and a restart in any phase shows the same status.
-- why: `settleOne` sets flags and saves; the phase of L702 is still derived from them.
-- done when: `tasks.phase` and a `moves(task, at, from, to, event)` table are written in one transaction per move; a test restarts in each phase and sees the same status; `TaskRec` loses `reported`, `merged`, `closed`, `told`, `posted` (60 fields today, 55 or fewer); the lane's Maps and Sets that L705 left unused are deleted. Tests: restart cases of `engine-b.test.ts` move to `phase.test.ts`.
-- locks: phase-store, file-server-server-live-engine-engine-state-ts, file-server-server-live-engine-engine-helpers-ts
-- after: L701, L702
-- files: server/server/live/engine/engine-state.ts, server/server/live/engine/engine-helpers.ts
-
-### L710 The start waits for pi's word
-Result: A task is Working when pi says `agent_start`, and its go and brief are jobs that run once.
-- why: `starting`, `briefing` and `handing` are Sets lost on restart; `BRIEF_WAIT` (120 s) resends a brief, `resumeQueue` resends a go, 4 sends swallow errors.
-- done when: `grep -n "briefResent\|BRIEF_WAIT\|resumeQueue\|briefLate\|ORPHAN_AFTER" server/server/live` lists none; a restart in `starting` sends the brief once (a test counts 1); 45 held tasks released make 0 status scans of other tasks (about 25,000 today). Tests: brief-resend cases of `engine-queue*.test.ts` deleted.
-- locks: start-phase, file-server-server-live-engine-engine-launch-ts, file-server-server-live-engine-engine-start-ts
-- after: L703, L709
-- files: server/server/live/engine/engine-launch.ts, server/server/live/engine/engine-start.ts
-
-### L711 Turns end by pi's word
-Result: A task shows Ready or Needs you the moment pi says `agent_settled`, with no 4 to 6 second wait.
-- why: `settleSoon` (4 s) and `ANSWER_GRACE` (6 s) guess what `agent_settled` says.
-- done when: `grep -n "settleSoon\|ANSWER_GRACE" server/server/live` lists none (10 lines today); a test sends `agent_settled` and sees the move in the same tick (4000 ms today); with `aborted` no Ready card. Tests: the fake-timer cases of `engine.test.ts` for the grace are deleted.
-- locks: turn-end, file-server-server-live-engine-engine-tidy-ts, file-server-server-live-quiet-ts, file-server-server-live-engine-engine-launch-ts, file-server-server-live-engine-merge-ts
-- after: L705, L710
-- files: server/server/live/engine/engine-tidy.ts, server/server/live/quiet.ts, server/server/live/engine/engine-launch.ts, server/server/live/engine/merge.ts
-
-### L712 The queue checks the real head
-Result: Main only moves to a commit whose checks passed on main's tip, so two steps that pass alone and fail together never land both.
-- why: PRs merge on a stale base with the changed tests only; main went red 6 times today; `holdWhileRed` sleeps with no limit and `/^fix\b/i` opens it.
-- done when: the lane rebases the head on main's tip, pushes it, waits for the repo's required checks at that commit through `RepoWatch`, merges with `--match-head-commit`; a repo with no GitHub runs the project's check command and fast-forwards; a fake-gh test of 10 tasks with 2 pairs that fail together sees main at 0 red commits and the 2 later ones sent back; `holdWhileRed`, `RedMainWatch` and the title regex are gone; 20 merges on this repo after it show 0 failed runs on main. Tests: deletes `red-stops-merges.test.ts` and the red-main cases of `engine-lane-watch.test.ts`.
-- locks: queue-check, file-server-server-live-engine-engine-pr-ts, file-server-server-live-engine-engine-merge-ts, file-server-server-live-engine-merge-queue-ts
-- after: L705
-- files: server/server/live/engine/merge-queue.ts, server/server/live/engine/engine-pr.ts, server/server/live/engine/engine-merge.ts
-
-### L713 The queue lands in trains
-Result: Up to 4 ready tasks are checked as one train, so a busy repo lands about 4 times as many tasks an hour.
-- why: one check per task at 47 s median caps a repo at about 50 merges an hour, below what 45 agents make.
-- done when: with a fake gh at 60 s per check, 20 ready tasks land in 8 simulated minutes or less (about 25 serial); a train with one red task lands the other 3 with at most 2 extra runs and sends the red one back. Tests: new `merge-train.test.ts`.
-- locks: queue-train, file-server-server-live-engine-merge-queue-ts
-- after: L712
-- files: server/server/live/engine/train.ts, server/server/live/engine/merge-queue.ts
-
-### L714 A merge step can be stopped
-Result: A hung git or gh call in the lane ends at its own timeout with its process group, and no `/proc` scan guesses at it.
-- why: `HeadWatch` reads every `/proc/*/stat` each minute and kills by directory after 15 minutes of no CPU.
-- done when: each lane call takes an `AbortSignal` and a timeout; a test plants a step that never ends and sees it aborted with `pgrep` of its group at 0; `HeadWatch`, `workIn` and `killWork` are gone. Tests: HeadWatch cases of `engine-lane-watch.test.ts` deleted.
-- locks: lane-abort, file-server-server-live-engine-lane-watch-ts, file-server-server-live-engine-machine-ts
-- after: L712
-- files: server/server/live/engine/lane-watch.ts, server/server/live/engine/machine.ts, server/server/live/engine/git.ts
-
-### L715 Merge has one setting
-Result: Settings has no "wait for GitHub checks" switch: every merge goes through the queue's check.
-- why: `waitChecks` is a second way to merge that skips the check on the merged result.
-- done when: `grep -rn "waitChecks" server/server src` lists none (6 files today); the agent brief says "merge queues it". Tests: waitChecks cases in the settings tests deleted.
-- locks: merge-setting, file-server-server-live-settings-store-ts, file-server-server-live-prompts-ts, file-server-server-live-engine-engine-helpers-ts
-- after: L712
-- files: server/server/live/settings-store.ts, server/server/live/prompts.ts, server/server/live/engine/engine-helpers.ts
-
-### L716 Leftovers are swept
-Result: At start, every worktree, branch and PR of Lineclear's that no open task owns is put away, and doctor prints what is left.
-- why: 136 stale worktrees (9 GB), 162 local branches, 147 remote branches and 59 open duplicate PRs outlived their tasks.
-- done when: a test plants 136 orphan worktrees, 162 branches and 59 PRs beside 3 live tasks and after one sweep sees only the 3 live ones; on a real machine `git worktree list | wc -l` is at most open tasks + 1. Tests: new `sweep.test.ts`; sweep cases of `engine-b.test.ts` deleted.
-- locks: sweep
-- after: L703
-- files: server/server/live/engine/sweep.ts
-
-### L717 A task stops at its budget
-Result: A task that spends its token budget is told once to finish, then stopped with a card, and its tokens show on the task.
-- why: an agent's new input ranges from 36 k to 379 k per task with no limit; no step enforces a budget.
-- done when: the budget per role comes from Settings; a `budget` deadline fires on pi's session stats; a test passes a fake agent over budget and sees one note and then a stop; `lineclear task show` prints tokens used and the budget. Tests: new `budget.test.ts`.
-- locks: task-budget, file-server-server-live-engine-deadlines-ts
-- after: L704, L709
-- files: server/server/live/engine/budget.ts, server/server/live/engine/deadlines.ts
+- L708 A step is claimed by a row: dropped, L583 does it (ROADMAP.md).
+- L709 The phase is stored: dropped, L521 keeps the phase across a restart (merged).
+- L710 The start waits for pi's word: in ROADMAP.md, cut to the part L522 (merged) left.
+- L711 Turns end by pi's word: dropped, L522 did it (merged).
+- L712 The queue checks the real head: dropped, L791 does it (ROADMAP.md).
+- L713 The queue lands in trains: dropped, L792 does it (ROADMAP.md).
+- L714 A merge step can be stopped: dropped, L525 did it (merged).
+- L715 Merge has one setting: in ROADMAP.md, split in two: L721 (the engine) and L715 (the setting).
+- L716 Leftovers are swept: in ROADMAP.md.
+- L717 A task stops at its budget: dropped, L798 does it (ROADMAP.md).
 
 ### L718 Any repo runs the loop
 Result: The core loop test passes on a second small repo with a plain GitHub PR check and on one with no remote, with no Lineclear setup.
@@ -233,13 +118,7 @@ Result: The engine no longer rewrites old task shapes at every start; the import
 - after: L701, L705
 - files: server/server/live/engine/engine.ts
 
-### L720 The engine is composed
-Result: The engine is a few modules with one job each, and no class inherits from another.
-- why: a chain of 11 classes puts every member in reach of every layer and makes parallel steps collide on hub files.
-- done when: `grep -c "extends Engine" server/server/live/engine/*.ts` prints 0 (10 today); no file of `engine/` is over 400 lines (575 today); `TaskRec` has 30 fields or fewer (60); the engine tests pass unchanged on GitHub.
-- locks: engine-compose, file-server-server-live-engine-engine-ts, file-server-server-live-engine-engine-state-ts, file-server-server-live-engine-engine-tidy-ts, file-server-server-live-engine-engine-merge-ts, file-server-server-live-engine-engine-handoff-ts, file-server-server-live-engine-github-ts
-- after: L708, L709, L710, L711, L712, L713, L714, L715, L716, L717, L719
-- files: server/server/live/engine/engine.ts, server/server/live/engine/engine-state.ts, server/server/live/engine/engine-tidy.ts, server/server/live/engine/engine-merge.ts, server/server/live/engine/engine-handoff.ts, server/server/live/engine/github.ts
+- L720 The engine is composed: dropped, L529 does it (ROADMAP.md).
 
 ## The audit steps this replaces
 
