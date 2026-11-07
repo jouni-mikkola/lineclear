@@ -131,7 +131,7 @@ Task agents
   lineclear todo <id>                            the brief says to wait for a go: show as To do until one comes
   lineclear ready <id> --summary "<what changed>" [--facts "<PR · commit · checks · review · not proven>"]
                                                  the summary at most ${SUMMARY_MAX} characters, in plain words for the
-                                                 human (longer is refused); the facts go in the PR,
+                                                 human (longer is refused); the facts go in
                                                  task show and the coordinator's news, not the card;
                                                  Ready to merge (done is its old name); a branch with no changes (an
                                                  answer, research) has nothing to merge and goes straight to Done

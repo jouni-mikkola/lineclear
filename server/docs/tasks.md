@@ -64,7 +64,8 @@
   end), an agent started before this, or a menu up between turns that no hook tells of. One function (`statusFrom` in
   `server/live/agents.ts`) decides, so taking herdr's OSC 7501 program status once it passes that on is one change.
 - On a repo with a GitHub remote that `gh` is logged in to, each task gets a pull request. The lineclear-agent skill runs
-  `lineclear pr <id>`: it pushes the branch and opens a draft (its title the task's, its words the agent's summary only), and pushes to it again after new commits. `lineclear checks <id>` waits
+  `lineclear pr <id>`: it pushes the branch and opens a draft (its title the task's, its words the agent's summary only),
+  and pushes to it again after new commits. `lineclear checks <id>` waits
   for GitHub's checks (merging waits for them only when Settings → How tasks work → Merge is "after GitHub checks", or the task's --set says so);
   failed ones go back to the agent to fix. Reporting it ready takes the pull request out of draft.
   While it waits, Lineclear looks at it every two minutes and passes news on to the resting agent once, in
