@@ -114,7 +114,12 @@ export const cases: Case[] = [
   { id: "move-7", lang: "en", text: "put U44 behind U43 and U42 in lineclear", expect: one(move("lineclear", "U44", "U43", "U42")) },
   { id: "move-8", lang: "fi", text: "lineclear u41 siirto: after u40 please", expect: one(move("lineclear", "U41", "U40")) },
   // a task's question: answer it, and ask the owner only for a login, money, an outward act or a choice
-  { id: "answer-1", lang: "en", text: "LIN-77 is stuck: it asks whether to run the full suite before review. Answer it.", expect: one({ c: "tell", task: "LIN-77" }) },
+  {
+    id: "answer-1",
+    lang: "en",
+    text: "LIN-77 is stuck: it asks whether to run the full suite before review. Answer it.",
+    expect: one({ c: "tell", task: "LIN-77" }),
+  },
   { id: "answer-2", lang: "en", text: "The reviewer of LIN-85 did not answer. Tell the task what to do.", expect: one({ c: "tell", task: "LIN-85" }) },
   { id: "answer-3", lang: "en", text: "LIN-77 asks which licence the project should use, MIT or GPL. Decide.", expect: one({ c: "ask" }) },
   // refused: only the owner answers the Inbox, merges, pushes, edits, starts
