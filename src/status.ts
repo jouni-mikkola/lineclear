@@ -65,7 +65,7 @@ function problemsOf(name: string, env: NodeJS.ProcessEnv): string[] {
   const state = readState(name, env);
   return [
     ...state.roadmapErrors.map((e) => `roadmap broken, nothing starts: ${e}`),
-    ...(state.stopped ? ["new starts stopped: the health command failed twice in a row"] : []),
+    ...(state.stopped ? ["new starts stopped: main is red"] : []),
     ...laneLines(name, env),
     ...readWaits(env)
       .filter((w) => w.project === name)

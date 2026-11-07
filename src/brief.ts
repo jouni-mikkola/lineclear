@@ -44,9 +44,10 @@ function namedFiles(repo: string, text: string): string[] {
 /** Files the commits of the `after` steps changed on main. */
 function afterFiles(repo: string, after: string[]): string[] {
   const out: string[] = [];
-  if (after.length === 0) return out;
+  const ids = after.filter((id) => id !== "none");
+  if (ids.length === 0) return out;
   const [origin] = mainRefs(repo);
-  for (const id of after) {
+  for (const id of ids) {
     const esc = id.replace(/[^\w-]/g, "");
     if (esc === "") continue;
     const names = gitText(
@@ -108,12 +109,12 @@ export function fitSections(base: number, files: string[], rules: string): { fil
 /** Review rounds when the project sets none. */
 export const DEFAULT_ROUNDS = 2;
 
-export function fill(template: string, values: Record<string, string>): string {
+function fill(template: string, values: Record<string, string>): string {
   return template.replace(/\{\{(\w+)\}\}/g, (_, k: string) => values[k] ?? "");
 }
 
 /** A template of `templates/` with the direction of `repo`, else the general one. */
-export const template = (name: string, repo?: string) =>
+const template = (name: string, repo?: string) =>
   readFileSync(join(import.meta.dir, "..", "templates", name), "utf8").replace("{{direction}}", ownerDirection(repo));
 
 const doneWhen = (s: Step) => {

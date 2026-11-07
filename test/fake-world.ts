@@ -55,7 +55,7 @@ export function fakeWorld(env: Record<string, string | undefined>, list: T[], ro
     now: () => clock.at,
     fetch: () => {},
     roadmap: () => roadmap,
-    main: () => ({ head: "abc", checkedOut: "abc", commits: [{ subject: "start", body: "" }, ...commits] }),
+    main: () => ({ head: "abc", commits: [{ subject: "start", body: "" }, ...commits] }),
     tasks: () => tasks.list,
     maxTasks: () => 3,
     offered: () => undefined,

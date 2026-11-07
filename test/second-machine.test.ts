@@ -200,6 +200,21 @@ test("a machine that is not started on gets no secrets", () => {
   expect(existsSync(join(t.home, "imported"))).toBe(false);
 });
 
+test("one tick with 5 ready steps and 1 other machine spawns 15 commands or fewer", () => {
+  const t = setup({ steps: [1, 2, 3, 4, 5].map((n) => step(`S${n}`, `s${n}`)), localMax: 0 });
+  let spawned = 0;
+  const { spawnSync, spawn } = Bun;
+  Bun.spawnSync = ((...a: Parameters<typeof spawnSync>) => (spawned++, spawnSync(...a))) as typeof spawnSync;
+  Bun.spawn = ((...a: Parameters<typeof spawn>) => (spawned++, spawn(...a))) as typeof spawn;
+  try {
+    t.doTick();
+  } finally {
+    Object.assign(Bun, { spawnSync, spawn });
+  }
+  expect(t.remote().match(/ADD /g)).toHaveLength(5);
+  expect(spawned).toBeLessThanOrEqual(15);
+});
+
 test("this machine goes first when it has room", () => {
   const t = setup({ steps: [step("A")], localMax: 2 });
   const d = t.doTick();

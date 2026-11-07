@@ -4,10 +4,11 @@ import { join } from "node:path";
 import { claimWorld } from "./claims.ts";
 import { sessionFolderPath } from "./harness-pi.ts";
 import { gitLimited as git } from "./git.ts";
-import { mainRefs, revertOnMain } from "./main-branch.ts";
+import { mainRefs } from "./main-branch.ts";
 import { lineclearDir } from "./measure.ts";
 import { lineclearServer, readSnapshot } from "./lineclear-client.ts";
 import { harnesses, readRegistry } from "./models.ts";
+import { readTasksKept } from "./tasks-kept.ts";
 import { serverBin } from "./paths.ts";
 import type { Settings } from "./project.ts";
 import { fitTitle, type Task } from "./roadmap.ts";
@@ -27,7 +28,7 @@ export interface World {
   /** A tick starts: what the world read before is read again. */
   newTick?(): void;
   /** Done commits on origin/main, and its head. */
-  main(repo: string): { head: string; checkedOut: string; commits: { subject: string; body: string }[] } | string;
+  main(repo: string): { head: string; commits: { subject: string; body: string }[] } | string;
   /** How many commits on origin/main are newer than the one that added the roadmap line `line` (a step's `Reopened:` item), or undefined when none did. */
   commitsSince?(repo: string, line: string): number | undefined;
   /** Fetches, then fast-forwards the repo folder when it is clean and on main. */
@@ -39,9 +40,8 @@ export interface World {
   maxTasks(space: string): number | undefined;
   /** `provider/model` names pi offers, or undefined when pi cannot say. */
   offered(now: Date): Set<string> | undefined;
-  health(repo: string, command: string): { ok: boolean; output: string };
-  /** Reverts a commit on origin/main and pushes the revert, as a plain push. Returns an error text, or undefined. */
-  revert(repo: string, commit: string): string | undefined;
+  /** Whether the board marked this head of main red. */
+  mainRed(repo: string, head: string): boolean;
   /**
    * Makes the project's tasks, here (no host) or on its other machines (cloning the repo there once), all at once.
    * One error text, or undefined, per task.
@@ -125,8 +125,8 @@ const run: Run = (cmd, cwd) => {
 
 type Readers = ReturnType<typeof readers<ReturnType<Run>>>;
 
-/** The git side of the world: main, fetch, the roadmap, health, revert, branches. */
-function gitWorld(refsOf: (repo: string) => [string, string]): Pick<World, "main" | "fetch" | "commitsSince" | "roadmap" | "health" | "revert" | "branchOf"> {
+/** The git side of the world: main, fetch, the roadmap, branches. */
+function gitWorld(refsOf: (repo: string) => [string, string]): Pick<World, "main" | "fetch" | "commitsSince" | "roadmap" | "branchOf"> {
   return {
     main(repo) {
       const log = git(repo, "log", refsOf(repo)[0], "-z", "--format=%H%x01%s%x01%b");
@@ -137,7 +137,6 @@ function gitWorld(refsOf: (repo: string) => [string, string]): Pick<World, "main
         .map((r) => r.split("\x01"));
       return {
         head: (rows[0]?.[0] ?? "").trim(),
-        checkedOut: git(repo, "rev-parse", "HEAD").out.trim(),
         commits: rows.map(([, subject = "", body = ""]) => ({ subject: subject.trim(), body })),
       };
     },
@@ -162,11 +161,6 @@ function gitWorld(refsOf: (repo: string) => [string, string]): Pick<World, "main
       const { ok, out } = git(repo, "show", `${refsOf(repo)[0]}:docs/ROADMAP.md`);
       return ok ? out : undefined;
     },
-    health(repo, command) {
-      const r = run(["sh", "-c", `${command} 2>&1`], repo);
-      return { ok: r.code === 0, output: r.out };
-    },
-    revert: revertOnMain,
     branchOf(repo, task) {
       const n = /-(\d+)$/.exec(task)?.[1];
       if (n === undefined) return undefined;
@@ -274,6 +268,7 @@ export function realWorld(env = process.env): World {
     offered: offeredModels(env),
     load: () => loadavg()[0] ?? 0,
     room: (host, space) => readRoom(host, space, snapshot.latest(), env),
+    mainRed: (repo, head) => head !== "" && readTasksKept(lineclearDir(env)).red?.[repo] === head,
     ...gitWorld(refsOf),
     ...claimWorld(
       run,
