@@ -30,7 +30,8 @@ curl -fsSL https://raw.githubusercontent.com/jouni-mikkola/lineclear/main/instal
 The install puts `lineclear` in `~/.local/bin` and starts `lineclear run` as a user service. Run `lineclear doctor`
 to check it; it names any problem and the command that fixes it.
 
-To update, run the install line again. An update that does not work puts the previous version back.
+To update, run the install line again. An update that does not work puts the previous version back: one whose pages,
+API or chat do not answer, or whose rule loop does not tick.
 `LINECLEAR_REPO` names another copy of the repository (a URL or a path) and `LINECLEAR_REF` a branch, tag or commit
 (default: `main`).
 

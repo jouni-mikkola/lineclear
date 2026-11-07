@@ -1,11 +1,12 @@
 // The smoke check install.sh runs after an update restarts the service (see "An update that breaks rolls back" in the
-// README). `bun scripts/smoke.ts check <projects-folder> <api|noapi>` retries each check until LINECLEAR_SMOKE_SECONDS (default 120)
-// are up and prints one line per failure.
+// README). `bun scripts/smoke.ts check <projects-folder> <api|noapi> [<restart time, s>]` retries each check until
+// LINECLEAR_SMOKE_SECONDS (default 120) are up and prints one line per failure.
 // `bun scripts/smoke.ts branch` is the merge lane's: it starts this checkout's service on free ports with a scratch
 // data folder, runs the web and API checks against it, stops it, and prints one line per failure.
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { buildRoot, readLoopBeat } from "../src/loop-beat.ts";
 import { dataDir } from "../src/paths.ts";
 import { projectsDir } from "../src/project.ts";
 
@@ -94,13 +95,26 @@ async function runningOrPaused(before: Record<string, boolean>) {
   if (moved.length) throw new Error(moved.join("; "));
 }
 
-/** Runs every check until it passes or the time is up; returns what still failed. */
-export async function check(before: Record<string, boolean>, api = true, limit = seconds, t: Target = live, scratch = false): Promise<string[]> {
+/** The rule loop of this build ticked since the restart: a server that answers while its loop never runs is a broken update. */
+async function loopTicks(since: number) {
+  const beat = readLoopBeat(env);
+  if (!beat) throw new Error("it never ticked");
+  if (beat.build !== buildRoot()) throw new Error(`its last tick ran ${beat.build}`);
+  if (beat.at < since) throw new Error(`its last tick was at ${new Date(beat.at).toISOString()}, before the restart`);
+}
+
+/** Runs every check until it passes or the time is up; returns what still failed. `since` is when the service restarted, in ms. */
+export async function check(before: Record<string, boolean>, api = true, limit = seconds, t: Target = live, scratch = false, since = 0): Promise<string[]> {
   // A machine that did not run the Lineclear API before the update has nothing to compare it with. A scratch data
   // folder has no spaces, so there is no chat to write to and no project to keep Running or Paused.
   const checks: [string, () => Promise<void>][] = [
     ["the web pages do not answer", () => pages(t)],
-    ...(scratch ? [] : ([["Running or Paused", () => runningOrPaused(before)]] as [string, () => Promise<void>][])),
+    ...(scratch
+      ? []
+      : ([
+          ["Running or Paused", () => runningOrPaused(before)],
+          ["the rule loop does not tick", () => loopTicks(since)],
+        ] as [string, () => Promise<void>][])),
     ...(api
       ? ([
           ["the board API does not answer", async () => void (await snapshot(t))],
@@ -189,10 +203,10 @@ export async function checkBranch(root: string, limit = seconds): Promise<string
 }
 
 if (import.meta.main) {
-  const [verb, arg = "", api = "api"] = process.argv.slice(2);
+  const [verb, arg = "", api = "api", restarted = "0"] = process.argv.slice(2);
   if (verb === "check") {
     const before = pausedIn(arg);
-    const failed = await check(before, api === "api");
+    const failed = await check(before, api === "api", seconds, live, false, Number(restarted) * 1000 || 0);
     for (const f of failed) console.log(f);
     process.exit(failed.length ? 1 : 0);
   } else if (verb === "branch") {
@@ -200,7 +214,7 @@ if (import.meta.main) {
     for (const f of failed) console.log(f);
     process.exit(failed.length ? 1 : 0);
   } else {
-    console.error("usage: smoke.ts check <projects-folder> <api|noapi>");
+    console.error("usage: smoke.ts check <projects-folder> <api|noapi> [<restart time, s>]");
     process.exit(2);
   }
 }

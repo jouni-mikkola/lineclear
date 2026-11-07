@@ -301,6 +301,9 @@ test("--once --dry-run prints the decisions and changes nothing", async () => {
   expect(decisionsSince(t.env, 0)).toEqual([]);
   expect(existsSync(join(t.dir, "config", "projects", "demo", "state.json"))).toBe(false);
   expect(await runMain(["--dry-run"], () => {}, realWorld(t.env))).toBe(2);
+  const said: string[] = [];
+  expect(await runMain(["--loop", "--once"], (l) => said.push(l), realWorld(t.env))).toBe(2);
+  expect(said).toEqual(["lineclear run: --loop runs ticks until stopped, --once runs one: give one of them"]);
 });
 
 test("steps start whatever the hour", () => {
