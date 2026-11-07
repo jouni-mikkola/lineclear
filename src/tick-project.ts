@@ -289,6 +289,7 @@ function addStepTask(s: Starting, step: Step, host: string | undefined, worker: 
 function whyStale(s: Starting, step: Step): string | undefined {
   const { t } = s;
   const { settings, world, state } = t;
+  if (!step.reopened && state.closedSteps?.[step.id] !== undefined) return `${state.closedSteps[step.id]} closed it with nothing to merge, so it is landed`;
   world.fetch(settings.repo);
   const main = world.main(settings.repo);
   if (typeof main === "string") return `main cannot be read again: ${main}`;
