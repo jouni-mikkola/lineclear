@@ -37,7 +37,7 @@ async function allow(): Promise<void> {
   if (!r.ok) throw new Error(r.error);
 }
 
-/** One quiet line at the foot of Settings: allow alerts on this device, or see that they are on. */
+/** One row in Settings' Secrets tab: allow alerts on this device, or see that they are on. */
 export function Alerts({ sample }: { sample?: Stand }) {
   const [stand, setStand] = useState<Stand>(sample ?? "unknown");
   const [why, setWhy] = useState("");
@@ -61,7 +61,8 @@ export function Alerts({ sample }: { sample?: Stand }) {
     }
   };
   return (
-    <p className="pt-4 text-sm text-fg3" data-alerts={stand}>
+    <div className="min-w-0 rounded-lg bg-raised2 p-4 text-sm text-fg2" data-alerts={stand}>
+      <h3 className="mb-1 font-medium text-fg">Alerts on this device</h3>
       {stand === "on" && "This device hears from the Inbox."}
       {stand === "blocked" && "Alerts are blocked for this site. Allow them in the browser's site settings."}
       {(stand === "off" || stand === "busy" || stand === "failed") && (
@@ -77,7 +78,7 @@ export function Alerts({ sample }: { sample?: Stand }) {
           </button>
         </>
       )}
-    </p>
+    </div>
   );
 }
 
