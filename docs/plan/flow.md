@@ -2,7 +2,9 @@
 
 The part of v0.2 that takes a step from `ready` to merged: checks, review, the merge lane, token budgets, the measure
 that parallel work pays, and the night watch. Steps L790 to L809. In flight and planned around: L540 L520 L524 L526
-L527 L528 L504 L505 L560 L565 L566 L569 L587 L592 L607 (L524, L560, L569, L592, L607, L504 are merged).
+L527 L528 L504 L505 L560 L565 L566 L569 L587 L592 L607. L524, L560, L569, L592, L607 and L504 are merged: their commits are on main, though ROADMAP.md still lists them.
+So are L453, L464, L494 and L601, which makes the open steps L525 and L608 startable now. L803 is not used: L525
+already drops the title gate, and the fix task passes by `by: main-green` (`merge.ts:281`).
 
 ## What is wrong today
 
@@ -94,15 +96,15 @@ fails while any timer or cron line runs `lineclear`, `herdr` or `pi` outside the
 
 ## Rank by the owner's priorities
 
-Order: (1) core loop, (2) simple and clean, (3) token budgets, (4) any project, (5) web.
+Order: (1) core loop, (2) simple and clean, (3) token budgets, (4) any project, (5) theme in every view.
 
 | Rank | Steps |
 | --- | --- |
-| 1 core loop | L525 (open, now startable), L790, L791, L803, L795, L796, L797, L792 |
+| 1 core loop | L525 (open, now startable), L790, L791, L795, L796, L797, L792 |
 | 2 simple, clean | L793, L805, L608 (open, now startable), L802, L804 |
 | 3 tokens | L794, L798, L799, L800, L801 |
 | 4 any project | L806, L807, L808 |
-| 5 web | L809 |
+| 5 theme, in the web | L809 |
 
 **The flow's part of v0.2 starts with these 10, all at once, on disjoint files:** L525, L790, L793, L805, L608, L794,
 L798, L799, L800, L806. L807 is the 11th. L809 starts once L799 is merged.
@@ -124,11 +126,11 @@ Result: A task merges only after GitHub's full check passed on its branch rebase
   - Owner only: set `strict_required_status_checks_policy` to true in the `main` ruleset (a change to the public repo's rules).
 - locks: merge-lane, file-server-server-live-engine-merge-ts, file-server-server-live-engine-lane-ts
 - after: L525, L790
-- files: server/server/live/engine/merge.ts, server/server/live/engine/lane.ts
+- files: server/server/live/engine/merge.ts, server/server/live/engine/lane.ts, server/test/engine-merge-b.test.ts
 
 ### L792 The lane tests 4 at once
 Result: With many tasks ready in one repo, the lane checks up to 4 rebased branches as one candidate and finds a bad one by halves.
-- why: one full check per merge caps a repo near 60 merges an hour, and 45 agents on 10 minute tasks make about 270.
+- why: one full check per merge caps a repo near 60 merges an hour, and 45 agents on 10 minute tasks make about 270. It adds a part for a core job only it serves: GitHub's merge queue is not offered to this repo.
 - done when: a new `batch.ts` stacks up to 4 queued branches on main's tip and merges them in order once the candidate's check is green; a test queues 8 with 1 bad and sees 7 merged, 1 sent back with its failing test, and 6 or fewer full runs; a test with 45 simulated ready tasks keeps the lane wait at 5 minutes or less at p90; `merge.ts` and `batch.ts` stay under 600 lines.
 - locks: merge-lane, file-server-server-live-engine-merge-ts
 - after: L791
@@ -164,7 +166,7 @@ Result: A task's brief and skill say: build, run the quick tests, `lineclear rea
 - done when: `SKILL.md` has no review procedure and no `lineclear checks` wait, and is 70 lines or less (114 today); the Settings lines of `prompts.ts` say the review and the merge are Lineclear's; Merge "after GitHub checks" is gone from `settings-store.ts` (`git grep -c waitChecks server/server` prints 0); the brief cases of `server/test/live-b.test.ts`, `live-c.test.ts` and `source-b.test.ts` change with them.
 - locks: brief-words, file-server-server-live-prompts-ts, file-server-server-live-settings-store-ts
 - after: L795
-- files: server/server/live/prompts.ts, server/server/live/settings-store.ts, server/skill/lineclear-agent/SKILL.md, server/skill/lineclear-agent/START.md
+- files: server/server/live/prompts.ts, server/server/live/settings-store.ts, server/skill/lineclear-agent/SKILL.md, server/skill/lineclear-agent/START.md, server/test/live-b.test.ts, server/test/live-c.test.ts, server/test/source-b.test.ts
 
 ### L797 An agent stops at ready
 Result: A task waiting for review, checks or merge has no running agent; a finding starts it again from its session within 20 seconds.
@@ -214,14 +216,6 @@ Result: The rule loop installs the newest green main as stable at set hours, so 
 - after: L608
 - files: src/rules.ts, scripts/promote.ts
 
-### L803 One red gate for the lane
-Result: A red main holds every merge of its repo except the one task whose `fixes` field names the red commit.
-- why: the hold reads a title (`/^fix\b/`, `merge.ts:281`), so "Fix typo" passes a red main, and the fix task made by `lane-watch.ts` has no field to pass by.
-- done when: `fixTask` writes `fixes: <sha>` on the task; the lane passes only that task while main is red; a test holds a "Fix typo" task and passes the fix task; `git grep -n "fix\\\\b" server/server/live/engine` lists nothing.
-- locks: merge-lane, file-server-server-live-engine-lane-watch-ts
-- after: L525
-- files: server/server/live/engine/lane-watch.ts, server/server/live/engine/engine-helpers.ts
-
 ### L804 No timer outside Lineclear
 Result: `lineclear doctor` fails while a systemd timer or a cron line runs lineclear, herdr or pi outside the service, and none is left.
 - why: five timers and two cron lines on the owner's machine do the loop's jobs untested, one of them calls a model every few minutes.
@@ -260,7 +254,7 @@ Result: A small second repo with no special setup goes through 3 steps: add, bui
 - done when: `docs/numbers.md` lists the repo, its 3 tasks and their times from add to merge, with 0 hand steps and 0 red runs on its main.
   - Owner only: create the second small repo on GitHub (it leaves the machine).
 - locks: swarm-measure, file-docs-numbers-md
-- after: L806, L807, L791, L795, L801
+- after: L806, L807, L791, L795
 - files: docs/numbers.md
 
 ### L809 Usage shows tokens per step
