@@ -97,7 +97,7 @@ test("the repo's bin/lineclear refuses the stable config and data folders and ch
   for (const p of [plain, stableEnv]) {
     expect(p.exitCode).toBe(2);
     expect(p.stderr).toContain("stable config folder");
-    expect(p.stderr).toContain("test instance");
+    expect(p.stderr).toContain("LINECLEAR_CONFIG");
   }
   expect(port.stderr).toContain("stable port 7420");
   expect(noData.stderr).toContain("stable data folder");

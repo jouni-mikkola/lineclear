@@ -12,7 +12,6 @@ import { answerCard, closeItem, closeSettledUpdates, isOpen, type Item, readItem
 import { listProjectNames, projectsDir, readSettings, type Settings } from "./project.ts";
 import { refreshQuota } from "./quota.ts";
 import { realWorld } from "./real-world.ts";
-import { startPromoteIfDue } from "./promote-step.ts";
 import { startReleaseIfDue } from "./release.ts";
 import type { Task } from "./roadmap.ts";
 import { cutDecisionsDaily, type StallEntry } from "./stall-class.ts";
@@ -147,7 +146,7 @@ export function tick(world: World, dryRun: boolean, env = process.env): Decision
   world.newTick?.();
   // plans that wait from before their project let plans apply by themselves are settled under the rule
   if (!dryRun) {
-    for (const start of [copyStoreQuietly, watchMachine, startReleaseIfDue, startPromoteIfDue]) start(env, world.now());
+    for (const start of [copyStoreQuietly, watchMachine, startReleaseIfDue]) start(env, world.now());
     all.push(
       ...logDecisions(
         [...settlePlans(world.now(), env), ...closeSettledUpdates(world.now(), env), ...sweepOldTemp(world.now(), env)].map(

@@ -8,12 +8,9 @@ export interface Prefs {
   showPaused?: boolean;
 }
 
-/** The project of the test fixture (`lineclear track`): a test space, never work to look at. */
-export const TEST_PROJECT = "lineclear-track";
-
-/** The projects Home and the places list show: not the paused ones or the test space, unless the owner asked for them. */
+/** The projects Home and the places list show: not the paused ones, unless the owner asked for them. */
 export const shownProjects = <T extends { project?: string; paused?: boolean }>(list: T[], prefs: Prefs): T[] =>
-  prefs.showPaused ? list : list.filter((p) => !p.paused && p.project !== TEST_PROJECT);
+  prefs.showPaused ? list : list.filter((p) => !p.paused);
 
 const prefsPath = (env: NodeJS.ProcessEnv) => join(configDir(env), "prefs.json");
 

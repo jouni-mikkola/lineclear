@@ -38,8 +38,6 @@ export type Settings = {
   paused?: boolean;
   /** False turns the step check's model call off; the form rule stays. Missing means on. */
   stepCheck?: boolean;
-  /** `release.promote`: `ask` waits for the owner's tap before a checked build becomes stable; missing means it promotes by itself. */
-  release?: { promote?: "auto" | "ask" };
   /** Lineclear's own project: the one its fix steps go to. Found by its package name when no project says so. */
   self?: boolean;
   /** Which checks run when: missing means what `proposeTiers` reads from the repo. */

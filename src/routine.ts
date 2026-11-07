@@ -15,7 +15,7 @@ export function isRoutine(step: Step): boolean {
 }
 
 /** Price per token (input plus output) of a model in pi's models store, or undefined when unpriced. */
-export function modelPrice(env = process.env): (model: string) => number | undefined {
+function modelPrice(env = process.env): (model: string) => number | undefined {
   const price = priceFinder(readJson(join(env.PI_CODING_AGENT_DIR ?? join(homedir(), ".pi", "agent"), "models-store.json")));
   return (m) => {
     const [provider, ...rest] = m.split("/");

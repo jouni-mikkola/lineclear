@@ -2,7 +2,6 @@ import { expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { shownProjects } from "../src/prefs.ts";
 import { listProjectNames } from "../src/project.ts";
 import { webApi } from "../src/web.ts";
 import { json, until } from "./helpers.ts";
@@ -66,9 +65,6 @@ test("paused projects and the test space leave Home until Settings asks for them
   expect(await shown()).toBe(true);
   await handle(json("/api/prefs", { showPaused: false }));
   expect(await names()).toEqual([]);
-  // the test space goes the same way
-  expect(shownProjects([{ project: "lineclear-track" }, { project: "web-shop" }], {}).map((p) => p.project)).toEqual(["web-shop"]);
-  expect(shownProjects([{ project: "lineclear-track" }], { showPaused: true })).toHaveLength(1);
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -119,13 +115,9 @@ test("/api/home lists exactly `project list` less the paused and the test space,
     ["a", {}],
     ["b", {}],
     ["c", { paused: true }],
-    ["lineclear-track", {}],
   ] as const) {
     mkdirSync(join(dir, "config", "projects", n), { recursive: true });
-    writeFileSync(
-      join(dir, "config", "projects", n, "settings.json"),
-      JSON.stringify({ space: n === "lineclear-track" ? "a" : n, repo: join(dir, n), ...extra }),
-    );
+    writeFileSync(join(dir, "config", "projects", n, "settings.json"), JSON.stringify({ space: n, repo: join(dir, n), ...extra }));
   }
   const conf = {
     LINECLEAR_CONFIG: join(dir, "config"),
@@ -137,8 +129,8 @@ test("/api/home lists exactly `project list` less the paused and the test space,
   const listed = async () =>
     ((await (await handle(new Request("http://127.0.0.1:7420/api/home"))).json()) as { projects: { project: string }[] }).projects.map((p) => p.project).sort();
   const all = listProjectNames(conf);
-  expect(all).toEqual(["a", "b", "c", "lineclear-track"]);
-  expect(await listed()).toEqual(all.filter((n) => n !== "c" && n !== "lineclear-track"));
+  expect(all).toEqual(["a", "b", "c"]);
+  expect(await listed()).toEqual(all.filter((n) => n !== "c"));
   await handle(json("/api/prefs", { showPaused: true }));
   expect(await listed()).toEqual(all);
   rmSync(dir, { recursive: true, force: true });

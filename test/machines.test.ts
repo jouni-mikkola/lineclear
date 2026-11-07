@@ -109,7 +109,7 @@ test("machine update runs install.sh again on each machine, without letting it u
   expect(await machineMain(["update", "nowhere"], (l) => out.push(l), env)).toBe(1);
 });
 
-test("machines update in turn: a failure there rolls it back, leaves the next machine on its old build", async () => {
+test("machines update in turn: a failure there stops the run and leaves the next machine on its old build", async () => {
   for (const h of ["good-box", "broken-box", "last-box"]) await installMachine(h, env);
   writeFileSync(join(root, "ssh.log"), "");
   const out: string[] = [];
@@ -117,26 +117,10 @@ test("machines update in turn: a failure there rolls it back, leaves the next ma
   expect(code).toBe(1);
   const lines = log()
     .split("\n")
-    .filter((l) => l.includes(" sh -s < ") || l.endsWith(" rollback"));
-  expect(lines.map((l) => l.split(" ")[0] + (l.endsWith("rollback") ? " rollback" : " update"))).toEqual([
-    "good-box update",
-    "broken-box update",
-    "broken-box rollback",
-  ]);
+    .filter((l) => l.includes(" sh -s < "));
+  expect(lines.map((l) => `${l.split(" ")[0]} update`)).toEqual(["good-box update", "broken-box update"]);
   expect(out).toContain("good-box is up to date.");
-  expect(out).toContain("broken-box is back on its previous build.");
   expect(out).toContain("Stopped: last-box stay on their old build.");
-});
-
-test("a machine whose install changed nothing is not rolled back", async () => {
-  await installMachine("one-box", env);
-  await installMachine("offline-box", env);
-  writeFileSync(join(root, "ssh.log"), "");
-  const out: string[] = [];
-  // offline-box cannot be reached, so its install fails with nothing changed there
-  expect(await machineMain(["update", "offline-box"], (l) => out.push(l), env)).toBe(1);
-  expect(out).toContain("offline-box still runs its previous build.");
-  expect(log()).not.toContain("rollback");
 });
 
 test("a good build reaches the second machine after the first", async () => {

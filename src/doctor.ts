@@ -7,7 +7,6 @@ import { readJson } from "../pi/config.ts";
 import { failureTail } from "./secrets.ts";
 import { copiesProblem, runByNote } from "./store-copies.ts";
 import { follows, type ReleaseState, readRelease, releaseLines } from "./release.ts";
-import { tryLines } from "./try-instance.ts";
 import { cacheEnvFile, dataDir, extensionFile, INSTALL_URL, type Paths, SERVICE, serverBin } from "./paths.ts";
 import type { Relation } from "./remotes.ts";
 import { diskTrouble, freeBytes } from "./health.ts";
@@ -70,8 +69,6 @@ export interface Probe {
   runFrom?: RunFrom;
   /** The stable and next builds, the last promotion and why next is held. */
   release?: ReleaseState;
-  /** The lines of the test instance of a build, none when there is none. */
-  tryInstance?: string[];
   /** The machine whose promotions this one takes, when another machine installed it. */
   follows?: string;
   /** Every id and alias in the live task store. Without it the ids are not checked. */
@@ -100,7 +97,6 @@ export function realProbe(paths: Paths, env: Record<string, string | undefined> 
     store: copiesProblem(env),
     runFrom: runFrom(paths, env),
     release: readRelease(env),
-    tryInstance: tryLines(env),
     follows: follows(env),
     taskIds: () => storedTaskIds(dataDir(env)),
     ci: env.CI === "true",
@@ -367,8 +363,8 @@ function compactionWindows(p: Probe): Check {
 /** The service and the command are the release build, or the problem and the install that fixes it. */
 function stableBuild(p: Probe): Check {
   const problem = p.runFrom ? buildProblem(p.runFrom, p.dataDir ?? dataDir()) : "";
-  const { current, previous, candidate } = buildNames(p.dataDir ?? dataDir());
-  const info = `current ${current ?? "none"}, previous ${previous ?? "none"}, candidate ${candidate ?? "none"}`;
+  const { current, previous } = buildNames(p.dataDir ?? dataDir());
+  const info = `current ${current ?? "none"}, previous ${previous ?? "none"}`;
   return { name: "stable build", problem, fix: installReleaseCommand(), info, skip: !p.runFrom };
 }
 
@@ -438,14 +434,12 @@ function release(p: Probe): Check {
   const s = p.release ?? {};
   const fix = "lineclear release (it names what holds next); lineclear release run";
   if (p.follows) return { name: "release", problem: "", fix, info: `follows ${p.follows}, which promotes for it` };
-  const test = p.tryInstance ?? [];
-  if (!s.checked && test.length === 0) return { name: "release", problem: "", fix, skip: true };
-  const lines = s.checked ? [...releaseLines(s), ...test] : test;
+  if (!s.checked) return { name: "release", problem: "", fix, skip: true };
   return {
     name: "release",
     problem: s.held?.startsWith("cannot read main") && !p.ci ? s.held : "",
     fix,
-    info: lines.join("; ").replace(/ {2,}/g, " "),
+    info: releaseLines(s).join("; ").replace(/ {2,}/g, " "),
   };
 }
 

@@ -111,7 +111,7 @@ export function stableRefusal(root: string, args: string[], env: Env = process.e
   const set = flag ?? env.LINECLEAR_WEB_PORT ?? env.LINECLEAR_PORT ?? (serves ? String(STABLE_PORT) : undefined);
   if (set !== undefined && [STABLE_PORT, stableBoardPort(stableData)].includes(Number(set))) used.push(`the stable port ${set}`);
   if (!used.length) return "";
-  return `this checkout's bin/lineclear would use ${used.join(", ")}. The stable lineclear on PATH runs the real system. To try this code, start a test instance (lineclear release try, L130), or set LINECLEAR_CONFIG, LINECLEAR_HOME and LINECLEAR_PORT to a folder and a port of your own.`;
+  return `this checkout's bin/lineclear would use ${used.join(", ")}. The stable lineclear on PATH runs the real system. To try this code, set LINECLEAR_CONFIG, LINECLEAR_HOME and LINECLEAR_PORT to a folder and a port of your own.`;
 }
 
 /** The commit of the code that runs here. */

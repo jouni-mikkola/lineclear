@@ -6,15 +6,6 @@
 /** The command for one herdr call, here or, with `machine`, on a machine saved in herdr. */
 export const herdrArgv = (args: string[], machine?: string): string[] => ["herdr", ...(machine ? ["--machine", machine] : []), ...args];
 
-/** The command for a call to one named herdr session. */
-export const herdrSessionArgv = (session: string, args: string[]): string[] => ["herdr", "--session", session, ...args];
-
-/** Where a named session's socket is, under `home`. */
-export const herdrSocketOf = (home: string, session: string): string => `${home}/.config/herdr/sessions/${session}/herdr.sock`;
-
-/** The environment variable that points a child at one herdr socket. */
-export const HERDR_SOCKET_ENV = "HERDR_SOCKET_PATH";
-
 /** The variables a detached child keeps: the path, the home, and where herdr and Lineclear live. */
 export const KEPT_ENV = /^(PATH|HOME|XDG_.*|LINECLEAR_.*|HERDR_SOCKET_PATH)$/;
 

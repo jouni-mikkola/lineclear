@@ -145,11 +145,6 @@ test("install adds Lineclear, the extension and the service, and doctor passes",
   expect(unit).toContain(`:${stubs}:`);
   expect(readFileSync(join(state, "tailscale.log"), "utf8")).toContain(`serve --bg --https=${service.port} http://127.0.0.1:${service.port}`); // the web and board ports are published
   expect(existsSync(join(state, "linger"))).toBe(true); // lingering is on, so the service starts at boot
-  // the test track: every night from a timer, once after an update from its own unit
-  expect(readFileSync(join(home, ".config/systemd/user/lineclear-track.timer"), "utf8")).toContain("OnCalendar=");
-  expect(readFileSync(join(home, ".config/systemd/user/lineclear-track.service"), "utf8")).toMatch(/lineclear track$/m);
-  expect(readFileSync(join(home, ".config/systemd/user/lineclear-track-update.service"), "utf8")).toContain("lineclear track --after-update");
-  expect(readFileSync(join(state, "systemctl.log"), "utf8")).toContain("--user enable --now lineclear-track.timer");
   // the compile cache goes to the disk cache for every user service and session
   expect(readFileSync(join(home, ".config/environment.d/60-lineclear.conf"), "utf8")).toBe(
     `NODE_COMPILE_CACHE=${join(root, "cache/lineclear/node-compile-cache")}\n`,
@@ -303,12 +298,6 @@ test("a version that works passes the smoke check and stays", () => {
   expect(r.code).toBe(0);
   expect(r.out).toContain("the new version works");
   expect(existsSync(join(app, "good.txt"))).toBe(true);
-  // the test track runs on it next; when it breaks, it puts the version before back with install.sh
-  expect(readFileSync(join(state, "systemctl.log"), "utf8")).toContain("--user start --no-block lineclear-track-update.service");
-  const back = sh(["sh", join(app, "install.sh")], { env: { ...env(), LINECLEAR_ROLLBACK: "the test track broke at merge (main red)" } });
-  expect(back.code).toBe(0);
-  expect(existsSync(join(app, "good.txt"))).toBe(false);
-  expect(inbox().at(-1)?.question).toContain("failed: the test track broke at merge (main red)");
   expect(install().code).toBe(0);
   expect(existsSync(join(app, "good.txt"))).toBe(true);
 }, 240_000);
@@ -384,30 +373,7 @@ test("the README names the install variables and the fork's notice, and the lice
   expect(forkLicense).toContain("Elias Stravik");
 });
 
-/** A newer release installed beside the stable one is a candidate: install moves nothing, a promotion without checks is refused, one with them switches. */
-function promoteFirstCandidate(w: { home2: string; builds: string; releaseEnv: (tag: string) => Record<string, string> }) {
-  const { home2, builds, releaseEnv } = w;
-  // an install builds a newer release as a candidate and promotes nothing; only `release promote` does, and only after its checks
-  expect(sh(["readlink", join(builds, "current")]).out.trim()).toBe(join(builds, "1.0.0"));
-  expect(existsSync(join(builds, "previous"))).toBe(false);
-  const lineclear = join(home2, ".local/bin/lineclear");
-  const refused = sh([lineclear, "release", "promote", "1.0.1"], { env: releaseEnv("v1.0.1") });
-  expect(refused.code).toBe(1);
-  expect(refused.out).toContain("was not checked");
-  const checks = ["check", "smoke", "canary", "store"].map((name) => ({ name, outcome: "passed" }));
-  const candidate = { version: "1.0.1", commit: "c".repeat(40), at: new Date().toISOString(), result: "ready", checks };
-  mkdirSync(join(home2, ".config/lineclear"), { recursive: true });
-  writeFileSync(join(home2, ".config/lineclear/release.json"), JSON.stringify({ candidate }));
-  const promoted = sh([lineclear, "release", "promote", "1.0.1"], { env: releaseEnv("v1.0.1") });
-  expect(promoted.out).toContain("1.0.1 is stable now");
-  expect(promoted.code).toBe(0);
-  expect(sh(["readlink", join(builds, "current")]).out.trim()).toBe(join(builds, "1.0.1"));
-  expect(sh(["readlink", join(builds, "previous")]).out.trim()).toBe(join(builds, "1.0.0"));
-  expect(readFileSync(join(home2, ".config/lineclear/decisions.jsonl"), "utf8")).toContain("promoted 1.0.1 (was 1.0.0)");
-  return { lineclear, candidate };
-}
-
-test("a release installs into builds/<version>, the service and the command run from current, and a newer one keeps the first as previous", () => {
+test("a release installs into builds/<version>, the service and the command run from current, and a newer one becomes current with the first as previous", () => {
   const home2 = join(root, "home-release");
   mkdirSync(join(home2, ".lineclear"), { recursive: true });
   writeFileSync(join(home2, ".lineclear/server.json"), JSON.stringify({ port: service.port }));
@@ -433,13 +399,8 @@ test("a release installs into builds/<version>, the service and the command run 
   expect(existsSync(join(builds, "previous"))).toBe(false);
   const doctor = () => sh([join(home2, ".local/bin/lineclear"), "doctor"], { env: releaseEnv("v1.0.0") });
   expect(doctor().out).toContain("ok     stable build");
-  // every installed file names the stable path: the extension pi loads, the three units and the command link
-  const installed = [
-    ".pi/agent/extensions/lineclear.ts",
-    ".config/systemd/user/lineclear.service",
-    ".config/systemd/user/lineclear-track.service",
-    ".config/systemd/user/lineclear-track-update.service",
-  ];
+  // every installed file names the stable path: the extension pi loads, the unit and the command link
+  const installed = [".pi/agent/extensions/lineclear.ts", ".config/systemd/user/lineclear.service"];
   for (const file of installed) {
     const text = readFileSync(join(home2, file), "utf8");
     expect(text).toContain(`${builds}/current/`);
@@ -453,39 +414,12 @@ test("a release installs into builds/<version>, the service and the command run 
 
   release("1.0.1");
   passes(installRelease("1.0.1"));
-  const { lineclear, candidate } = promoteFirstCandidate({ home2, builds, releaseEnv });
+  expect(sh(["readlink", join(builds, "current")]).out.trim()).toBe(join(builds, "1.0.1"));
+  expect(sh(["readlink", join(builds, "previous")]).out.trim()).toBe(join(builds, "1.0.0"));
+  expect(doctor().out).toContain("current 1.0.1, previous 1.0.0");
   expect(existsSync(join(builds, "1.0.0/.release"))).toBe(true);
   expect(unit()).not.toContain(repo);
 
-  // a rollback: current is 1.0.0 again, 1.0.1 stays but is not offered, the unit and the command still point at current, a running task lives on
-  expect(doctor().out).toContain("current 1.0.1, previous 1.0.0, candidate none");
-  const task = Bun.spawn(["sleep", "300"], { stdio: ["ignore", "ignore", "ignore"] });
-  const back = sh([join(home2, ".local/bin/lineclear"), "release", "rollback"], { env: releaseEnv("v1.0.1") });
-  expect(back.out).toContain("the smoke check passed");
-  expect(back.code).toBe(0);
-  expect(sh(["readlink", join(builds, "current")]).out.trim()).toBe(join(builds, "1.0.0"));
-  expect(sh(["readlink", "-f", join(home2, ".local/bin/lineclear")]).out.trim()).toBe(join(builds, "1.0.0/bin/lineclear"));
-  expect(unit()).toContain(`${builds}/current/bin/lineclear run`);
-  expect(existsSync(join(builds, "1.0.1/.release"))).toBe(true);
-  expect(readFileSync(join(home2, ".config/lineclear/decisions.jsonl"), "utf8")).toContain("rolled back 1.0.1 to 1.0.0");
-  expect(task.exitCode).toBe(null);
-  task.kill();
-  // the rollback restarts the Lineclear units only: herdr, which holds the agents' terminals, is left alone
-  const calls = readFileSync(join(state, "systemctl.log"), "utf8");
-  expect(calls).toContain("--user restart lineclear.service");
-  expect(calls).not.toContain("restart lineclear-herdr");
-  expect(sh([join(home2, ".local/bin/lineclear"), "release", "rollback"], { env: releaseEnv("v1.0.1") }).code).toBe(1);
-  expect(sh(["readlink", join(builds, "current")]).out.trim()).toBe(join(builds, "1.0.0"));
-  expect(doctor().out).toContain("current 1.0.0, previous 1.0.0, candidate none");
-  const again = installRelease("1.0.1");
-  expect(again.code).not.toBe(0);
-  expect(again.out).toContain("was rolled back");
-  release("1.0.2");
-  passes(installRelease("1.0.2"));
-  writeFileSync(join(home2, ".config/lineclear/release.json"), JSON.stringify({ candidate: { ...candidate, version: "1.0.2" } }));
-  expect(sh([lineclear, "release", "promote", "1.0.2"], { env: releaseEnv("v1.0.2") }).code).toBe(0);
-  expect(sh(["readlink", join(builds, "current")]).out.trim()).toBe(join(builds, "1.0.2"));
-  expect(existsSync(join(builds, "rejected")) ? readFileSync(join(builds, "rejected"), "utf8").trim() : "").toBe("");
   // a Lineclear worktree beside the release: nothing installed points into it, and a planted pi setting that does fails doctor
   const worktree = join(root, "worktree");
   mkdirSync(join(worktree, "pi"), { recursive: true });

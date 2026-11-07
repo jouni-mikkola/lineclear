@@ -62,15 +62,6 @@ export function uninstall(r: Remover, all: boolean, out: (line: string) => void)
     r.run(["systemctl", "--user", "daemon-reload"]);
     out(`Removed the ${name} service`);
   }
-  // the test track's timer and units (install_track in install.sh)
-  const dir = dirname(paths.unit);
-  const track = ["lineclear-track.timer", "lineclear-track.service", "lineclear-track-update.service"].filter((f) => exists(join(dir, f)));
-  if (track.length > 0) {
-    r.run(["systemctl", "--user", "disable", "--now", "lineclear-track.timer"]);
-    for (const f of track) rmSync(join(dir, f), { force: true });
-    r.run(["systemctl", "--user", "daemon-reload"]);
-    out("Removed the test track's timer");
-  }
   if (exists(paths.cacheEnv)) {
     rmSync(paths.cacheEnv, { force: true });
     r.run(["systemctl", "--user", "unset-environment", "NODE_COMPILE_CACHE"]);

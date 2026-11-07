@@ -138,16 +138,13 @@ build_deps() {
 is_release() { printf '%s' "$ref" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; }
 builds_dir() { printf '%s/builds' "$(data_dir)"; }
 
-# install_release: builds the tag in $ref. It points builds/current at it only on a machine with no build yet; a newer
-# build waits there as a candidate until `lineclear release promote`. Sets changed=1 when current moved. The service, the track and the command all run from builds/current.
+# install_release: builds the tag in $ref and points builds/current at it, builds/previous at the build it replaces.
+# Sets changed=1 when current moved. The service and the command run from builds/current.
 install_release() {
   changed=0
   builds=$(builds_dir)
   dest=$builds/${ref#v}
   mkdir -p "$builds"
-  if grep -qx "${ref#v}" "$builds/rejected" 2>/dev/null; then
-    die "release ${ref#v} was rolled back (lineclear release rollback). It is offered again when a newer version is installed."
-  fi
   if [ ! -f "$dest/.release" ]; then
     say "Lineclear: installing release ${ref#v}"
     rm -rf "$dest"
@@ -161,26 +158,15 @@ install_release() {
     say "Lineclear: release ${ref#v} is built already"
   fi
   was=$(readlink "$builds/current" 2>/dev/null || true)
-  if [ -z "$was" ]; then
-    # the first build on this machine has nothing to be proven against
+  if [ "$was" != "$dest" ]; then
+    [ -z "$was" ] || ln -sfn "$was" "$builds/previous"
     ln -sfn "$dest" "$builds/current"
     changed=1
-  elif [ "$was" != "$dest" ]; then
-    say "Lineclear: release ${ref#v} is a candidate. It becomes stable only by: lineclear release promote ${ref#v}"
   fi
   code=$builds/current
   link "$code/bin/lineclear" "$bindir/lineclear"
   extension_file "$code" "$ext"
   say "Lineclear: command in $bindir, pi extension in $ext"
-}
-
-# lift_hold: a version newer than a rolled-back one has passed, so that hold ends.
-lift_hold() {
-  [ -f "$builds/rejected" ] || return 0
-  while read -r bad; do
-    [ "$(printf '%s\n%s\n' "$bad" "${ref#v}" | sort -V | tail -n 1)" = "$bad" ] && printf '%s\n' "$bad"
-  done <"$builds/rejected" >"$builds/rejected.tmp" || true
-  mv -f "$builds/rejected.tmp" "$builds/rejected"
 }
 
 # The update failed: builds/current goes back to the build before it.
@@ -312,54 +298,6 @@ install_service() {
     say "Service: lineclear.service is running"
   else
     say "Service: lineclear.service is not staying up. See 'systemctl --user status lineclear.service'."
-  fi
-}
-
-# The test track (lineclear track) runs every night from a timer, and once after each update from its own unit.
-install_track() {
-  dir=$(dirname "$unit")
-  mkdir -p "$dir"
-  changed_track=0
-  for name in lineclear-track lineclear-track-update; do
-    flag=; [ "$name" = lineclear-track-update ] && flag=" --after-update"
-    new=$(mktemp)
-    cat >"$new" <<UNIT
-[Unit]
-Description=Lineclear test track${flag:+ after an update}
-
-[Service]
-Type=oneshot
-Environment="PATH=$PATH"
-ExecStart=$(command -v bun) $code/bin/lineclear track$flag
-UNIT
-    if cmp -s "$new" "$dir/$name.service" 2>/dev/null; then rm -f "$new"; else mv "$new" "$dir/$name.service" && chmod 644 "$dir/$name.service" && changed_track=1; fi
-  done
-  new=$(mktemp)
-  cat >"$new" <<UNIT
-[Unit]
-Description=Lineclear test track, every night
-
-[Timer]
-OnCalendar=*-*-* 03:30
-RandomizedDelaySec=20m
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-UNIT
-  if cmp -s "$new" "$dir/lineclear-track.timer" 2>/dev/null; then rm -f "$new"; else mv "$new" "$dir/lineclear-track.timer" && chmod 644 "$dir/lineclear-track.timer" && changed_track=1; fi
-  [ "$changed_track" -eq 0 ] || systemctl --user daemon-reload 2>/dev/null || true
-  systemctl --user enable --now lineclear-track.timer >/dev/null 2>&1 && say "Track: the test track runs every night" ||
-    say "Track: the nightly timer did not start. See 'systemctl --user status lineclear-track.timer'."
-}
-
-# After an update that passed its smoke check, the test track runs the whole chain on it; a broken run rolls back.
-track_after_update() {
-  [ -z "${LINECLEAR_NO_TRACK:-}" ] || return 0
-  if systemctl --user start --no-block lineclear-track-update.service >/dev/null 2>&1; then
-    say "Track: the test track runs on the new version; a broken run puts $(printf '%.7s' "$prev") back"
-  else
-    say "Track: could not start the test track. Run 'lineclear track --after-update'."
   fi
 }
 
@@ -571,9 +509,7 @@ main_release() {
   install_release
   "$bindir/lineclear" store copy >/dev/null 2>&1 || true
   install_service
-  install_track
   if [ "$active" -eq 1 ] && [ "$changed" -eq 1 ]; then smoke; fi
-  lift_hold
   rm -rf "$projects_before"
   enable_linger
   update_machines
@@ -595,15 +531,6 @@ main() {
   code=$app
   if is_release; then main_release; return; fi
 
-  # lineclear track --after-update: the new version broke the test track, so the version before it comes back
-  if [ -n "${LINECLEAR_ROLLBACK:-}" ]; then
-    prev=$(git -C "$app" rev-parse -q --verify refs/lineclear/previous 2>/dev/null) || die "there is no version from before the update to put back"
-    projects_before=
-    [ -d "$app/.git" ] && save_store
-    rollback "$LINECLEAR_ROLLBACK"
-    [ "$(git -C "$app" rev-parse HEAD)" = "$prev" ]
-    exit
-  fi
   install_tools
   mark_follows
   # The version running now is kept: a failed update puts it back (rollback).
@@ -625,8 +552,7 @@ main() {
   "$bindir/lineclear" store copy >/dev/null 2>&1 || true # the hourly copy doctor looks for, at once
   [ -z "$prev" ] || [ "$(git -C "$app" rev-parse HEAD)" = "$prev" ] || git -C "$app" update-ref refs/lineclear/previous "$prev"
   install_service
-  install_track
-  if [ "$armed" -eq 1 ] && [ "$(git -C "$app" rev-parse HEAD)" != "$prev" ]; then smoke; track_after_update; fi
+  if [ "$armed" -eq 1 ] && [ "$(git -C "$app" rev-parse HEAD)" != "$prev" ]; then smoke; fi
   armed=0
   rm -rf "$projects_before"
   enable_linger
