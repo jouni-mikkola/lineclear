@@ -5,15 +5,12 @@
 // `--full` runs everything the light check has, never a browser: checks are light and run on GitHub (docs/numbers.md). `--changed`
 // is the worker's loop.
 // The budget is 180 s on a machine that is not busy (docs/numbers.md); a busy one is slower for reasons outside the change.
-// Tests never run on an owner's machine: GitHub runs them (.github/workflows/check.yml). Here only the types run;
-// `lineclear pr` pushes the branch and `lineclear checks` waits for GitHub's result.
+// Nothing runs on an owner's machine: no tests and no tsc (307 MB and 2 cores each for every agent's worktree).
+// GitHub runs the types and the tests (.github/workflows/check.yml): `lineclear pr` pushes the branch and
+// `lineclear checks` waits for the result.
 if (!process.env.GITHUB_ACTIONS) {
-  const types = Bun.spawnSync(["bunx", "tsc", "--noEmit", "--incremental", "--tsBuildInfoFile", "node_modules/.cache/tsc-changed.tsbuildinfo"], {
-    stdout: "inherit",
-    stderr: "inherit",
-  });
-  console.log(types.success ? "check: types passed; the tests run on GitHub (lineclear pr, then lineclear checks)" : "check: types failed");
-  process.exit(types.success ? 0 : 1);
+  console.log("check: types and tests run on GitHub (lineclear pr, then lineclear checks)");
+  process.exit(0);
 }
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
