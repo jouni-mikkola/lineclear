@@ -1,8 +1,8 @@
 # Roles and flow
 
 Who does what in Lineclear, so the flow is simple and the web UI shows only what serves it. The order of work is in
-[ROADMAP.md](ROADMAP.md); each module's fate is in [scope.md](scope.md). This file decides roles. The steps at the end
-change the code to match.
+[ROADMAP.md](ROADMAP.md); each module's fate is in [scope.md](scope.md). This file decides roles. The steps that change
+the code to match are in ROADMAP.md.
 
 ## The flow
 
@@ -135,89 +135,7 @@ one removed, so 8 remain.
 
 ## 4. The steps
 
-Written in the roadmap step format. They go after the core steps of [ROADMAP.md](ROADMAP.md): each names the open
-core step it waits for when their files overlap. The locks are disjoint from every lock there and from each other.
-Copy them into ROADMAP.md when the owner takes the plan; this file is the reasoning.
-
-### L600 Questions go to the project chat
-Result: A question from a task lands in its project's chat first, and the Dispatcher chat gets it only when the project chat does not answer.
-- why: 195 of 201 Inbox items in the measured burst were answerable by the Dispatcher, and 137 closed because the owner wrote to the task.
-- done when: `lineclear ask` and `lineclear wait owner` from a task put a card in its project's chat, not the Inbox view; a test asks a question the roadmap answers and sees no owner push.
-- locks: ask-route
-- after: L485, L430
-- files: src/asks.ts, src/cards.ts
-
-### L601 The Dispatcher answers tasks
-Result: The Dispatcher answers a task's question from the roadmap and docs and asks the owner only for a login, money, an outward act or a choice.
-- why: the owner's model says the Dispatcher answers what the roadmap and docs answer; today the 168 stuck items and 11 step items reach a person.
-- done when: the Dispatcher prompt names the four owner needs; an eval case in `test/dispatcher-eval/` asks a stuck task, a reviewer that did not answer and a licence choice, and sees an answer, an answer and an owner card.
-- locks: dispatcher-answers
-- after: L600
-- files: src/dispatcher.ts, server/server/live/prompts.ts, test/dispatcher-eval
-
-### L602 The Inbox keeps three kinds
-Result: The Inbox has login, outward and choice items only, so a stuck task or a plan never becomes an item.
-- why: of 201 items in the measured burst 168 were stuck, 14 plan and 12 step, and 97% of all were answered without the owner.
-- done when: `src/inbox.ts` has the kinds `login`, `outward` and `choice`; `KIND_LABEL` and the code of `stuck`, `plan`, `step` and `release` are deleted with their tests; `wc -l` of `src/inbox.ts`, `src/inbox-answer.ts` and `src/notify.ts` is 400 or less in all (561 today).
-- locks: inbox-kinds
-- after: L601, L430, L485
-- files: src/inbox.ts, src/inbox-answer.ts, src/notify.ts
-
-### L603 The Dispatcher plans itself
-Result: A plan is written by the Dispatcher in its own chat, so no separate planning task starts and Settings has no planner model.
-- why: `lineclear plan` starts a task agent only to write steps, which costs a worktree, a start and tokens that the Dispatcher already has in context.
-- done when: `lineclear plan <project> "<goal>"` hands the goal to the Dispatcher chat and starts no task; `lineclear plan submit` and the rule checks run unchanged; `templates/plan.md` is read by the Dispatcher, and `models.planner` is gone from settings. A test plans a goal and sees no new task in `lineclear task list`.
-- locks: dispatcher-plans
-- after: L601, L496
-- files: src/plan.ts, src/plan-brief.ts, src/requests.ts, templates/plan.md, ui/web/roadmap/since.tsx
-
-### L604 A plan applies without the owner
-Result: A plan that passes the rule checks applies by itself and can be undone from the chat, with no approval card.
-- why: 9 of 14 plan items were approved without a note and 5 applied by themselves; none was rejected.
-- done when: `plansAreAuto` is gone and a plan that passes `planProblems` merges; a rejected check sends it back to the Dispatcher; `lineclear undo` of an applied plan is reachable from the chat card; a test sees no Inbox item for a plan.
-- locks: plan-apply
-- after: L603, L602
-- files: src/autoplan.ts, src/dispatcher.ts
-
-### L605 The Inbox view is gone
-Result: The web UI has no Inbox page: `/inbox` and `/inbox/<ask>` land on the Dispatcher chat with the card.
-- why: 3% of the items need the owner, and the chat shows those cards.
-- done when: `ui/web/inbox-strip.tsx` and `ui/kit/inbox-card.tsx` no longer hold a view; `View` in `ui/web/routes.ts` has no `inbox`; an old `/inbox/7` link opens `/chat` on that card; `bun run ui:test` has no Inbox page screenshot.
-- locks: view-inbox
-- after: L602
-- files: ui/web/routes.ts, ui/web/app.tsx, ui/web/inbox-strip.tsx, ui/kit/inbox-card.tsx
-
-### L606 Home shows one Needs you line
-Result: Home shows a single "Needs you" line when a login, money, an outward action or a product choice waits, and nothing when none does.
-- why: the ask strip of 345 lines was built for 201 items in 7 hours; the owner's need is 1 or 2 a day.
-- done when: `ui/web/home.tsx` shows the line with a link to the chat card; `wc -l ui/web/inbox-strip.tsx` is 120 or less or the file is deleted; the screenshot at 1440 and 390 px has the line, the empty state and 3 items.
-- locks: home-needs
-- after: L605
-- files: ui/web/home.tsx, ui/web/home-table.tsx, ui/web/home-rows.ts
-
-### L607 Run commands of a chat gone
-Result: `lineclear progress`, `checkpoint` and `complete` and stopping-goal runs no longer exist; a step's done-when is the one stopping goal.
-- why: two ways to run a long goal (a stopping goal and a roadmap step) cost a second state and tokens.
-- done when: the three commands are deleted from `src/cli.ts` and `server/server/live/source-cli.ts`; `autopilot-runs.json` is not read; `lineclear --help` lists none; the project chat still answers.
-- locks: coordinator-cli
-- after: L442
-- files: src/cli.ts, server/server/live/source-cli.ts, server/server/live/source-subcommands.ts
-
-### L608 Watch and backup are loop jobs
-Result: The night watch is one message the rule loop sends only on a stall, and the hourly store copy is a plain rule-loop job.
-- why: the rule loop already finds a stalled task and an unstarted step, so a model checklist every 2 hours at night costs tokens for what a program knows.
-- done when: `src/night-watch.ts` is deleted or under 30 lines; a night tick with nothing stalled sends nothing; a test stalls a task at night and sees one Dispatcher message. `src/store-copies.ts` stays and is called from `rules.ts` only.
-- locks: watch-backup
-- after: L601
-- files: src/night-watch.ts, src/rules.ts, src/store-copies.ts
-
-### L609 Swarm against one agent
-Result: A table shows merged steps per hour and tokens per merged step on the devbox, swarm against one agent, and names roles that cost too much.
-- why: parallel work is worth keeping only if it merges more steps an hour for no more tokens each; no number says so today.
-- done when: a doc in `docs/numbers.md` has two runs on the devbox on the same 5 steps with disjoint locks: the swarm as it runs and one pi agent in a row with the same model and review setting; each run lists merged steps per hour and tokens per merged step summed over every role; then the swarm run repeated with the planner, the coordinator, the night watch and the Inbox off one at a time. Each role whose run costs more tokens or time per merged step than it saves gets a step that deletes it.
-- locks: swarm-measure
-- after: L603, L608
-- files: docs/numbers.md, src/measure.ts
+The open steps of this file are in [ROADMAP.md](ROADMAP.md).
 
 ## What this file does not decide
 
