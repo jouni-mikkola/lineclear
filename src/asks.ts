@@ -229,7 +229,7 @@ function routeCard(card: Card, at: number, id: string, inMerge: boolean, project
     if (say(r, task, DECIDE_TEXT, `tell ${task} to decide it: ${asked}`, `${task} was told to decide itself: ${asked}`)) r.done.add(id);
     return;
   }
-  if (idle && isIdle(card)) return answerQuietTurn(card, id, inMerge, idle, r);
+  if (idle && isIdle(card)) return void answerQuietTurn(card, id, inMerge, idle, r);
   // a reset is read against when the card was posted: read later, "resets 1am" would mean the next day's
   const action = ruleFor(card, project, new Date(Math.min(at, r.now.getTime())), env);
   if (action === undefined) return;
