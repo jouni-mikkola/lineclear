@@ -22,19 +22,21 @@ export interface Finding {
 }
 
 const RULE_FILES = ["AGENTS.md", "CLAUDE.md", "REVIEW.md"];
-const CONTEXT_LINES = 20;
-/** The diff and the rules are cut to this many characters each, so a huge change cannot overflow the model. */
-const PART_MAX = 150_000;
+const CONTEXT_LINES = 5;
+/** Each part is cut to this many characters, so a huge change cannot overflow the model or the bill. */
+const DIFF_MAX = 60_000;
+const RULES_MAX = 20_000;
+const BRIEF_MAX = 12_000;
 
 /** The repo's own rules, each file under its name. */
 function repoRules(repo: string): string {
   return RULE_FILES.filter((f) => existsSync(join(repo, f)))
     .map((f) => `--- ${f}\n${readFileSync(join(repo, f), "utf8")}`)
     .join("\n")
-    .slice(0, PART_MAX);
+    .slice(0, RULES_MAX);
 }
 
-/** The change since the branch left its base, with 20 lines of context, committed or not. */
+/** The change since the branch left its base, with 5 lines of context, committed or not. */
 function diffAgainst(repo: string, base: string): string | undefined {
   const ref = [`origin/${base}`, base].find((r) => git(repo, "rev-parse", "--verify", "--quiet", r).ok);
   const from = ref && gitText(repo, "merge-base", ref, "HEAD");
@@ -54,13 +56,13 @@ function reviewQuestion(brief: string, diff: string, rules: string): string {
     "No finding: answer the single line NONE.",
     "",
     "BRIEF",
-    brief,
+    brief.slice(0, BRIEF_MAX),
     "",
     "THE REPO'S RULES",
     rules || "(none)",
     "",
     "DIFF",
-    diff.length > PART_MAX ? `${diff.slice(0, PART_MAX)}\n(the diff is cut here; say so if a finding depends on what follows)` : diff,
+    diff.length > DIFF_MAX ? `${diff.slice(0, DIFF_MAX)}\n(the diff is cut here; say so if a finding depends on what follows)` : diff,
   ].join("\n");
 }
 
