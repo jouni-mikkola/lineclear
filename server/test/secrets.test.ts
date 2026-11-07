@@ -1,7 +1,7 @@
 // Agents' secrets: kept at a level (Everywhere, a machine, a space) in a file only you can read, picked most specific
 // first, asked for with a masked card, and never in a snapshot, a chat or the command's printed answer.
-import { afterAll, describe, expect, test } from 'bun:test'
-import { mkdtempSync, readFileSync, statSync, mkdirSync, copyFileSync, unlinkSync } from 'node:fs'
+import { afterAll, describe, expect, spyOn, test } from 'bun:test'
+import { mkdtempSync, writeFileSync, readFileSync, statSync, mkdirSync, copyFileSync, unlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawn } from 'node:child_process'
@@ -15,6 +15,19 @@ const { LiveSource } = await import('../server/live/source.ts')
 const { placeId } = await import('../server/live/places.ts')
 
 describe('the vault', () => {
+  test('the file is parsed once per change, and a failed write names its path', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shep-vault-'))
+    const v = new Vault(dir)
+    v.set('all', 'TOKEN', 'x')
+    const parse = spyOn(JSON, 'parse')
+    for (let i = 0; i < 100; i++) v.read()
+    expect(parse).toHaveBeenCalledTimes(1)
+    parse.mockRestore()
+    const { writeJson } = require('../server/store.ts')
+    writeFileSync(join(process.env.LINECLEAR_HOME as string, 'blocked'), '')
+    expect(() => writeJson('blocked/x.json', {})).toThrow('blocked')
+  })
+
   test('the most specific level wins, and its file is readable by you only', () => {
     const dir = mkdtempSync(join(tmpdir(), 'shep-vault-'))
     const v = new Vault(dir)

@@ -7,7 +7,7 @@
 // uses it, over the SSH link to that machine (its lineclear's tunnel), and never lands in a chat, a log or the
 // snapshot: those have names only.
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { hostname } from 'node:os'
 import { join, resolve } from 'node:path'
 import { dataDir } from '../../../src/paths.ts'
@@ -43,13 +43,18 @@ export class Vault {
     private seed?: Store,
   ) {}
 
+  private cached?: { mtimeMs: number; size: number; store: Store }
+
   /** what the file holds; one that can't be read is never taken for none (a save would lose every secret in it) */
   read(): Store {
     if (this.seed) return this.seed
     const f = join(this.home, FILE)
     if (!existsSync(f)) return {}
     try {
-      return JSON.parse(readFileSync(f, 'utf8')) as Store
+      const { mtimeMs, size } = statSync(f)
+      if (this.cached?.mtimeMs !== mtimeMs || this.cached.size !== size) this.cached = { mtimeMs, size, store: JSON.parse(readFileSync(f, 'utf8')) as Store }
+      // a copy: callers change what they get before they save it
+      return structuredClone(this.cached.store)
     } catch (e) {
       throw new Error(`Secrets can't be read from ${f} (${(e as Error).message}): fix or move that file; nothing was changed.`)
     }
