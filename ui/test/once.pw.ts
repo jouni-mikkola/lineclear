@@ -16,8 +16,7 @@ test("no view shows a lineclear command, or a headline that repeats the Inbox co
       const at = `${view}?state=${state}`;
       const cmd = text.match(COMMAND);
       if (cmd) wrong.push(`${at}: command "${cmd[0]}"`);
-      if (view !== "/inbox" && /\b\d+ (things? |items? )?(waits?|wait) for you/i.test(h1)) wrong.push(`${at}: headline "${h1}" repeats the count`);
-      if (view === "/inbox" && /\b\d+\b.*\bwaits? for you|waiting for you/i.test(h1)) wrong.push(`${at}: Inbox headline "${h1}" repeats the count`);
+      if (/\b\d+ (things? |items? )?(waits?|wait) for you/i.test(h1)) wrong.push(`${at}: headline "${h1}" repeats the count`);
     }
   }
   expect(wrong).toEqual([]);

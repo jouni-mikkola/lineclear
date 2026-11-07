@@ -1,13 +1,13 @@
 // Every address Lineclear's views live at. A view, a project, a step and an ask each have one, so a reload or a
 // shared link lands on the same thing.
 //   /                        Home, where the asks are a strip on top
-//   /inbox, /inbox/<ask>     the Inbox view; the ask named is the one it shows first
+//   /inbox, /inbox/<ask>     old links: they open /chat, on the ask named
 //   /chat, /usage, /settings the views of those names; /setup is the first run, where the models are chosen
 //   /task/<id>               one task's chat with its agent
 //   /browsers                the agents' browsers, /browsers/<session> one of them
 //   /<project>/roadmap       a project's roadmap, /<project>/roadmap/<step> one step
 
-export type View = "home" | "inbox" | "roadmap" | "task" | "browsers" | "chat" | "usage" | "settings" | "setup";
+export type View = "home" | "roadmap" | "task" | "browsers" | "chat" | "usage" | "settings" | "setup";
 const ROADMAP_PATH = /^\/([a-z0-9][a-z0-9_-]{0,79})\/roadmap(?:\/([^/]+))?$/;
 const BROWSERS_PATH = /^\/browsers(?:\/([^/]+))?$/;
 const TASK_PATH = /^\/task\/([A-Za-z0-9_-]{1,40})$/;
@@ -19,7 +19,6 @@ const FLAT = ["/", "/chat", "/usage", "/settings", "/setup"];
 /** The path of each view that has no part after it. */
 export const PATHS: Record<Exclude<View, "roadmap" | "task">, string> = {
   home: "/",
-  inbox: "/inbox",
   browsers: "/browsers",
   chat: "/chat",
   usage: "/usage",
@@ -43,7 +42,7 @@ export function viewOf(path: string): View {
   if (ROADMAP_PATH.test(p)) return "roadmap";
   if (TASK_PATH.test(p)) return "task";
   if (BROWSERS_PATH.test(p)) return "browsers";
-  if (INBOX_PATH.test(p)) return "inbox";
+  if (INBOX_PATH.test(p)) return "chat";
   return FLAT_VIEWS.find((v) => p === `/${v}`) ?? "home";
 }
 
