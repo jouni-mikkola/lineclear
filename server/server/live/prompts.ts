@@ -16,8 +16,12 @@ const known: Record<string, () => string> = {
 
 function fill(name: string, vars: Record<string, string | number> = {}): string {
   const text = readFileSync(join(ROOT, 'skill', 'prompts', `${name}.md`), 'utf8')
-  const value = (k: string) =>
-    k === 'chat' && name === 'command' ? JSON.stringify(vars.chat) : (known[k]?.() ?? String(vars[k] ?? (k === 'command' ? fill('command', vars) : '')))
+  const value = (k: string): string => {
+    if (k === 'chat' && name === 'command') return JSON.stringify(vars.chat)
+    const v = known[k]?.() ?? vars[k] ?? (k === 'command' ? fill('command', vars) : undefined)
+    if (v === undefined) throw new Error(`prompt ${name}.md has no value for {{${k}}}`)
+    return String(v)
+  }
   return text
     .replace(/\{\{(\w+)\}\}/g, (_, k) => value(k))
     .replace(/\n{3,}/g, '\n\n')
@@ -34,14 +38,12 @@ export function coordinatorPrompt(p: { role: 'space' | 'home' | 'main'; name: st
 export const taskPrompt = (t: { id: string; branch: string; base: string }, times = '') =>
   [fill('task', { ...t, chat: `${t.id}/Agent` }), times].filter(Boolean).join('\n\n')
 export const taskFirst = (t: { title: string; desc: string }) => (t.desc && t.desc !== t.title ? `${t.title}\n\n${t.desc}` : t.title)
-
 export function restartLine(o: { from: string; to: string; chat: string; commits?: string; changes?: string }) {
   const task = o.commits !== undefined
   const work = task ? fill('restart-task', { commits: o.commits || 'none', changes: o.changes || 'none' }) : ''
   const chat = o.chat ? fill('restart-chat', o) : ''
   return fill('restart', { ...o, kind: task ? 'task' : 'chat', where: task ? 'worktree and branch' : 'folder', task: work, chat })
 }
-
 export const relaunchedLine = () => fill('relaunched')
 export const resumedLine = (on: string) => fill('resumed', { on })
 
@@ -49,7 +51,6 @@ export function queuedLine(who: string[], when: 'start' | 'later' | 'changed', i
   const rest = fill('queued-rest', { them: who.length === 1 ? 'it is' : 'they are', id })
   return fill(`queued-${when}`, { ...ids(who), rest })
 }
-
 export const goLine = (who: string[], notes: string[], cleared = false) =>
   cleared ? fill('go-cleared', ids(who)) : [fill('go', ids(who)), ...notes].join('\n')
 
