@@ -321,6 +321,7 @@ function chatLink(env: Env, target: ChatTarget, backoffStartMs: number, sizes: M
   let base: string | undefined;
   let nextAt = 0;
   let misses = 0;
+  let keyAt = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const listeners = new Set<(v: ChatView) => void>();
   const set = (v: ChatView) => {
@@ -331,7 +332,7 @@ function chatLink(env: Env, target: ChatTarget, backoffStartMs: number, sizes: M
     ws = undefined;
     set({ ...view, state, reason, writing: false });
     // try again while someone listens, each time a little later (doubling to 30 s, with jitter)
-    const wait = Math.min(backoffStartMs * 2 ** misses++, 30_000) * (1 + Math.random() * 0.25);
+    const wait = state === "none" ? 3000 : Math.min(backoffStartMs * 2 ** misses++ * (1 + Math.random() * 0.25), 30_000);
     nextAt = Date.now() + wait;
     if (listeners.size && !timer) timer = setTimeout(() => ((timer = undefined), void connect()), wait);
   };
@@ -348,6 +349,8 @@ function chatLink(env: Env, target: ChatTarget, backoffStartMs: number, sizes: M
     // the chat key is kept for the server it came from, so a reconnect reads no snapshot
     if (server !== base) key = undefined;
     base = server;
+    // a key that never got a chat message is read again after two minutes: the chat may have been made anew
+    if (key && misses > 0 && Date.now() - keyAt > 120_000) key = undefined;
     let found = key;
     if (!found) {
       const read = await snapshotOrWhy(base);
@@ -360,6 +363,7 @@ function chatLink(env: Env, target: ChatTarget, backoffStartMs: number, sizes: M
       if ((await makeDispatcher()) === 0) return void (await connect());
     }
     if (!found) return down("none", target.none);
+    if (found !== key) keyAt = Date.now();
     key = found;
     if (ws) return;
     const watched = found;
