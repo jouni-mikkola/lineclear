@@ -57,12 +57,6 @@ export const commands: Record<string, string> = {
   progress: 'A space\'s coordinator saves or reads its progress: progress ["<text>"]',
   checkpoint: "A space's coordinator commits its owned task's work: checkpoint \"<message>\"",
   complete: 'A space\'s coordinator proves its stopping goal and ends its run: complete "<evidence>"',
-<<<<<<< HEAD
-  release:
-    "Show the stable and next builds, the last promotion and why next is held (release status); release run tests main and promotes it when green, as the rule loop does every 2 minutes",
-=======
-  stalls: "Print the stalls of the last day by class with the minutes lost (--hours N, --json)",
->>>>>>> a4a8c9c (Delete the stable/next promotion loop (src/release.ts))
   store: "The local copies of the task store (store list, store copy, store restore <name>); the rule loop takes one an hour",
   totp: "Print the current code of a stored login: totp NAME reads NAME_TOTP from this folder's secrets",
   status:
