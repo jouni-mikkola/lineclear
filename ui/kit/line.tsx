@@ -29,6 +29,8 @@ interface More {
   y: number;
   need: boolean;
   what: string;
+  /** Where the hidden trains are: the Inbox when one waits for you, else the project's roadmap, else the first hidden task. */
+  href: string;
 }
 interface Row {
   p: Project;
@@ -95,13 +97,16 @@ function layout(projects: Project[], w: number) {
     const atSignal = of("review");
     const ready = of("ready");
     const href = (t: Task) => (t.state === "need" ? "/inbox" : p.roadmap ? `/${p.roadmap}/roadmap` : undefined);
+    const moreHref = (hidden: Task[]) =>
+      anyNeed(hidden) ? "/inbox" : p.roadmap ? `/${p.roadmap}/roadmap` : `/task/${encodeURIComponent(hidden[0]?.id ?? "")}`;
     const put = (t: Task, x: number, dy = 0) => placed.push({ t, project: p.name, x, y: y + dy, href: href(t) });
     const fit = (list: Task[], at: number[], key: string, what: string) => {
       const show = list.length > at.length ? at.length - 1 : list.length;
       list.slice(0, show).forEach((t, i) => {
         put(t, at[i] ?? 0);
       });
-      if (show < list.length) more.push({ key, n: list.length - show, x: at[show] ?? 0, y, need: anyNeed(list.slice(show)), what });
+      if (show < list.length)
+        more.push({ key, n: list.length - show, x: at[show] ?? 0, y, need: anyNeed(list.slice(show)), what, href: moreHref(list.slice(show)) });
       return show;
     };
     const stations: Row["stations"] = [];
@@ -126,7 +131,8 @@ function layout(projects: Project[], w: number) {
     });
     if (shownW < working.length) {
       const x = hi;
-      more.push({ key: `work-${p.name}`, n: working.length - shownW, x, y, need: anyNeed(working.slice(shownW)), what: "more at work" });
+      const hidden = working.slice(shownW);
+      more.push({ key: `work-${p.name}`, n: hidden.length, x, y, need: anyNeed(hidden), what: "more at work", href: moreHref(hidden) });
     }
     // the review waits before the signal, one train behind the other
     fit(atSignal, spots(sigX - 10 - s.slot / 2, zones.z2 + s.slot / 2, -(s.slot + 2)), `review-${p.name}`, "more in review");
@@ -229,6 +235,23 @@ function ZoneNames({ zones, s, counts, junction }: { zones: Zones; s: Sizes; cou
       {label(zones.z2 + 8, "In review", counts.review)}
       {label(junction + 4, "main")}
     </>
+  );
+}
+
+const opens = (href: string) => (href === "/inbox" ? "the Inbox" : href.startsWith("/task/") ? "the first of them" : "the roadmap");
+
+/** The "+N" where trains do not fit: it says what it holds and, as a link, opens where they are. */
+function MoreChip({ m }: { m: More }) {
+  const tone = m.need ? "border-caution/60 text-caution" : "border-line2 text-fg3";
+  const cls = `flex h-5 items-center justify-center rounded-full border bg-base text-xs font-semibold tabular-nums ${tone}`;
+  return (
+    <a
+      href={m.href}
+      className={`${cls} hover:underline focus-visible:outline-2 focus-visible:outline-accent`}
+      aria-label={`${m.n} ${m.what}: open ${opens(m.href)}`}
+    >
+      +{m.n}
+    </a>
   );
 }
 
@@ -458,13 +481,9 @@ export function TheLine({
                   data-key={m.key}
                   className="absolute"
                   style={{ left: m.x - s.slot / 2, top: m.y - 9, width: s.slot }}
-                  title={`${m.n} ${m.what}`}
+                  title={`${m.n} ${m.what}: open ${opens(m.href)}`}
                 >
-                  <span
-                    className={`flex h-5 items-center justify-center rounded-full border bg-base text-xs font-semibold tabular-nums ${m.need ? "border-caution/60 text-caution" : "border-line2 text-fg3"}`}
-                  >
-                    +{m.n}
-                  </span>
+                  <MoreChip m={m} />
                 </li>
               ))}
             </ul>

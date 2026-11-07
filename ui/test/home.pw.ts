@@ -96,6 +96,13 @@ test("the line shows every project to its main end, and +N names what it opens",
   const more = page.locator("[data-inbox-more]");
   await expect(more).toHaveAccessibleName(/^Show \d+ more asks?$/);
   await expect(more).toHaveText(/^\+\d+ more asks?$/);
+  // the line's own +N chips say what they hold and where they open
+  const chips = page.locator("[data-line] li[title] a");
+  expect(await chips.count()).toBeGreaterThan(0);
+  for (const chip of await chips.all()) {
+    await expect(chip).toHaveAccessibleName(/^\d+ more (in line|at work|in review|ready to merge): open (the Inbox|the roadmap|the first of them)$/);
+    await expect(chip).toHaveAttribute("href", /^\/(inbox|task\/.+|.+\/roadmap)$/);
+  }
   await expect(line).toHaveScreenshot("home-line-two.png");
 });
 
