@@ -7,7 +7,7 @@ import type { StepRecord } from "../../src/step-page.ts";
 import type { AppliedChange, PlanCard } from "../../src/web.ts";
 import { ApiError, forget, startRead } from "./health.ts";
 import { noteRevision, useStreamed, watch } from "./live.ts";
-import { samples } from "./lazy-samples.ts";
+import { samples } from "./sample-loader.ts";
 import { emptySettings } from "./settings-empty.ts";
 import type { SettingsData } from "./settings-empty.ts";
 import { CHAT_STATES, type PageState, STATES } from "./states.ts";

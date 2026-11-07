@@ -138,17 +138,6 @@ function generatedRoadmap(project: string, count = 400, phases = 12, wide = 250)
   return build(project, out);
 }
 
-export const emptyRoadmap = (project: string): RoadmapData => ({
-  project,
-  phases: [],
-  steps: [],
-  done: 0,
-  total: 0,
-  line: { done: 0, work: 0, waiting: 0, left: 0, total: 0, text: "All 0 steps are done." },
-  history: [],
-  rounds: 2,
-});
-
 /** `length` steps in a row, the first at work, sharing no lock; "fork" is 4 in a row and one side step after the first. */
 function chainRoadmap(project: string, length: number, fork = false): RoadmapData {
   const seeds: Seed[] = Array.from(

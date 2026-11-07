@@ -4,7 +4,7 @@ import { Button, PageTitle, Part, type PartState } from "../kit/index.ts";
 import type { SetupView } from "../../src/setup.ts";
 import type { PageState } from "./states.ts";
 import { hasLists, sampleState, send, useLoad } from "./data.ts";
-import { samples } from "./lazy-samples.ts";
+import { samples } from "./sample-loader.ts";
 
 // The first run in the web: the harnesses and accounts found, and one model per role with none chosen for you. Settings
 // shows the same panel and edits the choice afterwards. It saves where `lineclear setup` does.

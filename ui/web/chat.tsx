@@ -5,7 +5,7 @@ import type { PlanCard } from "../../src/web.ts";
 import { MAX_FILE_BYTES, MAX_FILES } from "../../src/chat-limits.ts";
 import { type Attached, sizeText } from "../kit/index.ts";
 import { get, isList, post } from "./data.ts";
-import { samples } from "./lazy-samples.ts";
+import { samples } from "./sample-loader.ts";
 import { CHAT_STATES, type ChatState } from "./states.ts";
 
 // The Chat view at `/chat`: you talk to the Dispatcher, with words, pictures and files. The chat comes from the

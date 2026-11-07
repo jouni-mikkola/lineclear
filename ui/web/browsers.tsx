@@ -16,7 +16,7 @@ import {
   splitSessions,
   whereOf,
 } from "../kit/index.ts";
-import { samples } from "./lazy-samples.ts";
+import { samples } from "./sample-loader.ts";
 import { drive, type Load } from "./data.ts";
 
 // The agents' browsers at `/browsers`: each open playwright-cli session as a card with a live picture. One click

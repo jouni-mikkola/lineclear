@@ -5,7 +5,7 @@ import type { Row } from "./home-rows.ts";
 import { AskInRow } from "./inbox-strip.tsx";
 
 type Choose = (item: InboxItem, choice: string, note?: string) => void;
-import { samples } from "./lazy-samples.ts";
+import { samples } from "./sample-loader.ts";
 
 // Home's table of working tasks: one row each, the row opens in place with the log tail, the diff stat, the check,
 // the review's findings and the task's browser.
