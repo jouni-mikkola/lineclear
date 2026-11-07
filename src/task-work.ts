@@ -27,11 +27,15 @@ export interface WorkLine {
   reason: string;
 }
 
-/** One line of work done for `task` on this machine (or `machine` when the server acts for another). */
+const SAME_WORK_MS = 30 * 60_000;
+
+/** One line of work done for `task` on this machine (or `machine` when the server acts for another). The same work on the same machine within half an hour is one line, so a restart loop never fills the log. */
 export function recordWork(task: string, work: Work, env: Env = process.env, machine = machineOf(env)): void {
+  const now = Date.now();
+  if (readWork(env).some((w) => w.step === task && w.work === work && w.machine === machine && now - Date.parse(w.time) < SAME_WORK_MS)) return;
   const file = decisionsFile(env);
   mkdirSync(dirname(file), { recursive: true });
-  const line: WorkLine = { time: new Date().toISOString(), project: "-", step: task, kind: "run", work, machine, reason: `${work} ran on ${machine}` };
+  const line: WorkLine = { time: new Date(now).toISOString(), project: "-", step: task, kind: "run", work, machine, reason: `${work} ran on ${machine}` };
   appendFileSync(file, `${JSON.stringify(line)}\n`);
 }
 
