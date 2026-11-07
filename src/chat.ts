@@ -1,7 +1,7 @@
 import { openSync, readSync, closeSync, realpathSync, statSync } from "node:fs";
 import { basename, extname, sep } from "node:path";
 import { DISPATCHER_SPACE, dispatcherDir } from "./dispatcher.ts";
-import { keepLinks, postAction, readSnapshot, lineclearServer, taskChatKey, watchSocket } from "./lineclear-client.ts";
+import { keepLinks, postAction, lineclearServer, taskChatKey, watchSocket } from "./lineclear-client.ts";
 import { listProjectNames, readSettings } from "./project.ts";
 
 // The web chat with the Dispatcher. The Dispatcher is the coordinator chat of its own Lineclear space, so
@@ -214,7 +214,19 @@ export function chatView(chat: Raw, sizes: ReadonlyMap<string, number> = new Map
 
 const OFFLINE = "The board server is not running on this machine, so the Dispatcher cannot be reached.";
 const NONE = "There is no Dispatcher yet.";
+const reasonOf = (e: unknown) => (["TimeoutError", "AbortError"].includes((e as Error)?.name) ? TIMEOUT : OFFLINE);
+
+/** The board snapshot, or why it could not be read: a refused connection, a timeout and an error status differ. */
+async function snapshotOrWhy(base: string): Promise<{ snap: Raw } | { why: string }> {
+  try {
+    const r = await fetch(`${base}/api/snapshot`, { signal: AbortSignal.timeout(4000) });
+    return r.ok ? { snap: await r.json() } : { why: `The board server answered ${r.status}, so the Dispatcher cannot be reached.` };
+  } catch (e) {
+    return { why: reasonOf(e) };
+  }
+}
 const NO_TASK_CHAT = "This task has no chat.";
+const TIMEOUT = "The board server did not answer in time.";
 const SLOW = "The board server has not said yet that the Dispatcher took it. Try again: it goes in only once.";
 const GONE = "An attached file is gone. Attach it again.";
 
@@ -246,8 +258,8 @@ export const DISPATCHER: ChatTarget = {
 const taskTarget = (id: string): ChatTarget => ({ none: NO_TASK_CHAT, find: (snap) => taskChatKey(snap, id) });
 
 /** The live link to the Dispatcher's chat; see `lineclearChat`. */
-export function dispatcherChat(env: Env = process.env, retryMs = 3000, sendMs = 120_000, makeDispatcher?: () => number | Promise<number>) {
-  return lineclearChat(env, DISPATCHER, retryMs, sendMs, makeDispatcher);
+export function dispatcherChat(env: Env = process.env, backoffStartMs = 1000, sendMs = 120_000, makeDispatcher?: () => number | Promise<number>) {
+  return lineclearChat(env, DISPATCHER, backoffStartMs, sendMs, makeDispatcher);
 }
 
 /** The live link to one task's chat with its agent. */
@@ -265,8 +277,8 @@ async function saveToServer(base: string, key: string, name: string, type: strin
     const path = ((await r.json().catch(() => ({}))) as { path?: unknown }).path;
     if (!r.ok || typeof path !== "string") return { error: `The board server did not save ${name}.`, status: 502 };
     return path;
-  } catch {
-    return { error: OFFLINE, status: 503 };
+  } catch (e) {
+    return { error: reasonOf(e), status: 503 };
   }
 }
 
@@ -275,8 +287,8 @@ async function fileResponse(base: string, key: string, path: string): Promise<Re
   let r: Response;
   try {
     r = await fetch(`${base}/api/file?${new URLSearchParams({ chat: key, path })}`, { signal: AbortSignal.timeout(30_000) });
-  } catch {
-    return Response.json({ error: OFFLINE }, { status: 503 });
+  } catch (e) {
+    return Response.json({ error: reasonOf(e) }, { status: 503 });
   }
   if (!r.ok) return Response.json({ error: "There is no such file." }, { status: 404 });
   const bytes = new Uint8Array(await r.arrayBuffer());
@@ -300,14 +312,15 @@ async function fileResponse(base: string, key: string, path: string): Promise<Re
  * The live link to one chat of Lineclear: one WebSocket to it, opened when a page first asks and opened again
  * when it drops. Each change of the chat goes to every listener at once, so a reply shows as Lineclear reads it.
  */
-function chatLink(env: Env, target: ChatTarget, retryMs: number, sizes: Map<string, number>, makeDispatcher?: () => number | Promise<number>) {
+function chatLink(env: Env, target: ChatTarget, backoffStartMs: number, sizes: Map<string, number>, makeDispatcher?: () => number | Promise<number>) {
   // a missing Dispatcher is made once, here, so no one is asked to run a command
   let madeAt = 0;
   let view: ChatView = { state: "loading", messages: [], writing: false, failed: [] };
   let ws: WebSocket | undefined;
   let key: string | undefined;
   let base: string | undefined;
-  let tried = 0;
+  let nextAt = 0;
+  let misses = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const listeners = new Set<(v: ChatView) => void>();
   const set = (v: ChatView) => {
@@ -317,8 +330,10 @@ function chatLink(env: Env, target: ChatTarget, retryMs: number, sizes: Map<stri
   const down = (state: "offline" | "none", reason: string) => {
     ws = undefined;
     set({ ...view, state, reason, writing: false });
-    // try again while someone listens
-    if (listeners.size && !timer) timer = setTimeout(() => ((timer = undefined), void connect()), retryMs);
+    // try again while someone listens, each time a little later (doubling to 30 s, with jitter)
+    const wait = Math.min(backoffStartMs * 2 ** misses++, 30_000) * (1 + Math.random() * 0.25);
+    nextAt = Date.now() + wait;
+    if (listeners.size && !timer) timer = setTimeout(() => ((timer = undefined), void connect()), wait);
   };
 
   const lost = (sock: unknown) => {
@@ -327,12 +342,18 @@ function chatLink(env: Env, target: ChatTarget, retryMs: number, sizes: Map<stri
 
   async function connect() {
     if (ws) return;
-    tried = Date.now();
-    base = lineclearServer(env);
-    if (!base) return down("offline", OFFLINE);
-    const snap: Raw = await readSnapshot(base);
-    if (snap === undefined) return down("offline", OFFLINE);
-    const found = target.find(snap);
+    nextAt = Date.now() + 1000;
+    const server = lineclearServer(env);
+    if (!server) return down("offline", OFFLINE);
+    // the chat key is kept for the server it came from, so a reconnect reads no snapshot
+    if (server !== base) key = undefined;
+    base = server;
+    let found = key;
+    if (!found) {
+      const read = await snapshotOrWhy(base);
+      if ("why" in read) return down("offline", read.why);
+      found = target.find(read.snap);
+    }
     // a failed setup is tried again after a minute, not on every retry
     if (!found && makeDispatcher && Date.now() - madeAt > 60_000) {
       madeAt = Date.now();
@@ -341,18 +362,22 @@ function chatLink(env: Env, target: ChatTarget, retryMs: number, sizes: Map<stri
     if (!found) return down("none", target.none);
     key = found;
     if (ws) return;
+    const watched = found;
     ws = watchSocket(
       base,
-      { chats: [key], term: null },
+      { chats: [watched], term: null },
       (m) => {
-        if (m?.type === "chat" && m.chat?.key === key) set({ state: "ready", ...chatView(m.chat, sizes) });
+        if (m?.type === "chat" && m.chat?.key === watched) {
+          misses = 0;
+          set({ state: "ready", ...chatView(m.chat, sizes) });
+        }
       },
       lost,
     );
   }
 
   const ensure = () => {
-    if (!ws && !timer && Date.now() - tried > 1000) void connect();
+    if (!ws && !timer && Date.now() >= nextAt) void connect();
   };
 
   return {
@@ -376,11 +401,11 @@ function chatLink(env: Env, target: ChatTarget, retryMs: number, sizes: Map<stri
 }
 
 /** The chat of one target, with the actions a page takes on it. */
-function lineclearChat(env: Env, target: ChatTarget, retryMs = 3000, sendMs = 120_000, makeDispatcher?: () => number | Promise<number>) {
+function lineclearChat(env: Env, target: ChatTarget, backoffStartMs = 1000, sendMs = 120_000, makeDispatcher?: () => number | Promise<number>) {
   // what you attached here, by the id the page holds: its path in Lineclear's inbox
   const uploads = new Map<string, { path: string; at: number }>();
   const sizes = new Map<string, number>();
-  const link = chatLink(env, target, retryMs, sizes, makeDispatcher);
+  const link = chatLink(env, target, backoffStartMs, sizes, makeDispatcher);
   const { ensure } = link;
   // Lineclear answers once the Dispatcher took it, which waits for a stopped one to start
   const act = (action: Record<string, unknown>) => postAction(link.base() ?? "", action, sendMs, OFFLINE, SLOW);
