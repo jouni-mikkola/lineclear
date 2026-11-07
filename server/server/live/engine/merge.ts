@@ -143,32 +143,7 @@ export class EngineLand extends EngineHandoff {
   }
 
   protected async mergeNow(t: TaskRec, self: boolean): Promise<{ ok: boolean; error?: string; note?: string }> {
-    const held = this.heldByRedMain(t)
-    if (held) return { ok: false, error: held }
-    const r = await this.onMachineOf(t, () => this.mergeOnMachine(t, self))
-    // a merge that failed lets the next one try: only a landed merge counts
-    if (!r.ok) this.redClaims.forEach((id, key) => id === t.id && this.redClaims.delete(key))
-    return r
-  }
-
-  /** the task allowed to merge on a red main, by the red commit: one may (it can be the fix), the rest wait */
-  private redClaims = new Map<string, string>()
-
-  /**
-   * One red on main stops the merges: the first task to merge while main is red goes through (it may be the fix, as a
-   * fix task always does), the rest wait for a green run, so a burst of failures is one failure.
-   */
-  private heldByRedMain(t: TaskRec): string | undefined {
-    const p = this.proj(t)
-    const red = this.data.red?.[p.path]
-    if (!red || t.by === 'main-green') return
-    const key = `${p.path}@${red}`
-    const claimed = this.redClaims.get(key)
-    if (!claimed || claimed === t.id) {
-      this.redClaims.set(key, t.id)
-      return
-    }
-    return `${p.base} is red at ${red.slice(0, 7)}: ${t.id} waits for a green run on it, then merge again.`
+    return this.onMachineOf(t, () => this.mergeOnMachine(t, self))
   }
 
   private async mergeOnMachine(t: TaskRec, self: boolean): Promise<{ ok: boolean; error?: string; note?: string }> {
