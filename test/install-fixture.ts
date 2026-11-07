@@ -15,8 +15,9 @@ export async function installFixture() {
 
   const app = join(home, ".local/share/lineclear");
 
-  // The running service, as far as the smoke check sees it: the pages, the Lineclear API and a chat. A version that has a
-  // file BROKEN in it breaks what the file says ("chat": a message is refused, "paused": it pauses the project p).
+  // The running service, as far as the smoke check sees it: the pages, the Lineclear API, a chat and the rule loop's beat. A
+  // version that has a file BROKEN in it breaks what the file says ("chat": a message is refused, "paused": it pauses the
+  // project p, "loop": its loop never ticks).
   // It runs in a process of its own: the tests wait on install.sh without letting this process answer.
   const fake = Bun.spawn(
     [
@@ -38,7 +39,12 @@ const s = Bun.serve({ port: 0, fetch(req) {
   return new Response("<html></html>");
 } });
 console.log(s.port);
-setInterval(() => {}, 1000);`,
+// the loop of the build that runs ticks, as src/loop-beat.ts writes it
+const data = ${JSON.stringify(join(home, ".lineclear"))};
+setInterval(() => {
+  if (broken() === "loop") return;
+  try { fs.writeFileSync(data + "/loop.json", JSON.stringify({ at: Date.now(), build: fs.realpathSync(data + "/builds/current") })); } catch {}
+}, 200);`,
     ],
     { stdout: "pipe", stderr: "inherit" },
   );

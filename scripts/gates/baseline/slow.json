@@ -8,6 +8,7 @@
   "test/install-update.test.ts": 14,
   "test/install.test.ts": 22,
   "test/kit.test.ts": 1.5,
+  "test/loop-runs.test.ts": 6,
   "test/machines.test.ts": 3.5,
   "test/pace.test.ts": 1.8,
   "test/quiet.test.ts": 10.6,

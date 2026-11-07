@@ -32,7 +32,7 @@ export const commands: Record<string, string> = {
   project: "Add, list, change, remove and check projects",
   roadmap: "Check or show the roadmap (roadmap show <id> prints one step)",
   setup: "Choose a model for the worker, reviewer and step checker from the logged-in harnesses (the reviewer from another company than the worker)",
-  run: "Run Lineclear's one server: the same as serve. One tick of the rules: --once (--dry-run shows it)",
+  run: "Run Lineclear's one server: the same as serve. Only the rule loop, as the server runs it: --loop. One tick of the rules: --once (--dry-run shows it)",
   serve: "Run Lineclear's one server: the rule loop, the web pages and the board on one port: serve --port <port>",
   space: "The board's spaces: space add <path> --name <name>, space list, space rename, space remove",
   task: "The board's tasks: task add, list, show, tell, stop, close (task --help lists them)",
@@ -166,7 +166,7 @@ const COMMANDS: Record<string, (rest: string[], out: Out) => number | Promise<nu
   top: (_rest, out) => topMain(out),
   roadmap: roadmapMain,
   run: (rest, out) =>
-    rest.includes("--once") || rest.includes("--dry-run")
+    rest.includes("--loop") || rest.includes("--once") || rest.includes("--dry-run")
       ? runMain(rest, out)
       : serveMain(
           rest.map((a) => (a === "--board" ? "--port" : a)),

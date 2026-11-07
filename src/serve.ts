@@ -47,13 +47,16 @@ export async function mount(env: NodeJS.ProcessEnv = process.env) {
 
 const RESTART_MS = 5_000;
 
-/** Runs the rule loop as one process of its own, so its commands never hold up the web server, and starts it again when it crashes. */
+/**
+ * Runs the rule loop as one process of its own, so its commands never hold up the web server, and starts it again when it
+ * crashes. `run --loop` is the loop alone: a bare `run` is the server, which would find this one holding the store's lock.
+ */
 function superviseLoop(): { stop(): Promise<void> } {
   let stopping = false;
   let child: ReturnType<typeof Bun.spawn> | undefined;
   let restart: ReturnType<typeof setTimeout> | undefined;
   const start = () => {
-    child = Bun.spawn([process.execPath, join(import.meta.dir, "..", "bin", "lineclear"), "run"], {
+    child = Bun.spawn([process.execPath, join(import.meta.dir, "..", "bin", "lineclear"), "run", "--loop"], {
       env: process.env,
       stdin: "ignore",
       stdout: "inherit",

@@ -65,6 +65,14 @@ test("an update that breaks the chat is rolled back, and the Inbox says so", () 
   expect(inbox()).toEqual([]);
 }, 180_000);
 
+test("an update whose rule loop never ticks is rolled back, though its server answers", () => {
+  const before = running();
+  const { r } = installBroken("loop");
+  expect(r.code).not.toBe(0);
+  expect(running()).toBe(before);
+  expect(r.out).toContain("the rule loop does not tick");
+}, 180_000);
+
 test("an update that pauses a Running project is rolled back too", () => {
   const { r, after } = installBroken("paused");
   expect(r.code).not.toBe(0);

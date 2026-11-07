@@ -16,6 +16,7 @@ import { sweepOldTemp } from "./tmpdirs.ts";
 import { holdWorld } from "./hold.ts";
 import { DISPATCHER } from "./chat.ts";
 import { lineclearServer, postAction, readSnapshot } from "./lineclear-client.ts";
+import { writeLoopBeat } from "./loop-beat.ts";
 import { dataDir } from "./paths.ts";
 import { serviceWaits } from "./wait-service.ts";
 import { clearWait, loadLimit, readWaits } from "./waits.ts";
@@ -215,10 +216,19 @@ export interface RunDeps {
   signals?: { once(e: string, f: (...a: any[]) => void): unknown };
 }
 
+/** `--once` runs one tick; otherwise, or with `--loop`, the rule loop runs until a signal stops it. It never takes the server's lock. */
 export async function runMain(args: string[], out: (l: string) => void, world: World = realWorld(), deps: RunDeps = {}): Promise<number> {
-  const bad = args.find((a) => a !== "--once" && a !== "--dry-run");
-  if (bad !== undefined || (args.includes("--dry-run") && !args.includes("--once"))) {
-    out(bad !== undefined ? `lineclear run: unknown option '${bad}'` : "lineclear run: --dry-run needs --once");
+  const bad = args.find((a) => a !== "--once" && a !== "--dry-run" && a !== "--loop");
+  const wrong =
+    bad !== undefined
+      ? `unknown option '${bad}'`
+      : args.includes("--loop") && args.includes("--once")
+        ? "--loop runs ticks until stopped, --once runs one: give one of them"
+        : args.includes("--dry-run") && !args.includes("--once")
+          ? "--dry-run needs --once"
+          : undefined;
+  if (wrong !== undefined) {
+    out(`lineclear run: ${wrong}`);
     return 2;
   }
   const dryRun = args.includes("--dry-run");
@@ -234,12 +244,21 @@ export async function runMain(args: string[], out: (l: string) => void, world: W
     return 0;
   }
   const sig = deps.signals ?? process;
+  const beat = () => {
+    try {
+      writeLoopBeat(world.now().getTime());
+    } catch (e) {
+      // a beat that cannot be written is said, not a reason to stop acting on agents
+      console.error(`lineclear run: the loop's beat was not written: ${e instanceof Error ? e.message : e}`);
+    }
+  };
   return new Promise((resolve) => {
     // a tick that is still running is not started again, and a stop waits for it
     let ticking: Promise<void> | undefined;
     const tickNow = () => {
       if (ticking) return;
       const mine = (ticking = oneTick()
+        .then(beat)
         .catch((e) => {
           // a process in an unknown state does not go on acting on agents: it ends, and its supervisor starts a fresh one
           console.error(`lineclear run: tick failed, stopping: ${e instanceof Error ? (e.stack ?? e.message) : e}`);

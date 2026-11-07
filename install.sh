@@ -281,7 +281,9 @@ save_projects() {
   return 0
 }
 
+# Sets restarted, the time in seconds: the smoke check wants a tick of the rule loop after it.
 restart_all() {
+  restarted=$(date +%s)
   systemctl --user restart lineclear.service
 }
 
@@ -397,11 +399,11 @@ on_exit() {
   exit "$status"
 }
 
-# After the restart: the web pages, the Lineclear API and a chat message must work, and each project must be Running
-# or Paused as it was. The smoke check ends when they do.
+# After the restart: the web pages, the Lineclear API and a chat message must work, the rule loop must tick, and each
+# project must be Running or Paused as it was. The smoke check ends when they do.
 smoke() {
   say "Lineclear: checking the new version"
-  failed=$(bun "$code/scripts/smoke.ts" check "$projects_before" "$api_before" 2>&1) ||
+  failed=$(bun "$code/scripts/smoke.ts" check "$projects_before" "$api_before" "$restarted" 2>&1) ||
     rollback "$(printf '%s' "$failed" | tr '\n' ';' | sed 's/;$//;s/;/; /g')"
   if store_lost; then
     rollback "the task store holds $(store_tasks "$(data_dir)") tasks, it held $tasks_before before the update"
@@ -435,7 +437,7 @@ main() {
   export PATH
   builds=$(builds_dir)
   code=$builds/current
-  changed=0; armed=0; api_before=noapi; active=0
+  changed=0; armed=0; api_before=noapi; active=0; restarted=0
   projects_before=$(mktemp -d)
   # a stop (Ctrl-C, a dropped SSH session) runs the EXIT trap too
   trap 'exit 130' INT TERM HUP
