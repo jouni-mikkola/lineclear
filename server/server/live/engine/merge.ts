@@ -241,6 +241,21 @@ export class EngineLand extends EngineHandoff {
   }
 
   /**
+   * One red stops the merges: while the newest verdict on main is a failure, one merge may land (the fix), and the
+   * rest wait until a run on main passes. A commit on main past the red one means that merge has no verdict yet.
+   */
+  protected async heldByRedMain(t: TaskRec, p: Space, g: G.GitHub): Promise<string | undefined> {
+    const runs = await GH.branchRuns(g, p.path, t.base!)
+    const verdict = runs?.find((r) => r.state !== 'pending')
+    if (verdict?.state !== 'fail') return undefined
+    await G.git(p.path, 'fetch', '--quiet', 'origin', t.base!)
+    const head = (await G.git(p.path, 'rev-parse', `origin/${t.base}`)).out
+    if (head === verdict.sha) return undefined
+    this.land(t, 'checks')
+    return `${t.base} is red on GitHub (${verdict.sha.slice(0, 7)}) and the merge on top of it has no green run yet: ${t.id} is held. Run lineclear merge ${t.id} again once main is green.`
+  }
+
+  /**
    * Through the pull request, as herdr-projects lands one: the branch pushed as it is, rebased on GitHub's main only
    * when it conflicts with it (its pull request opened if the agent didn't), GitHub's checks passed at exactly that
    * commit, then squash-merged on GitHub only while its head is still that commit, its branch there deleted, and main here brought up to GitHub's (which
@@ -327,6 +342,8 @@ export class EngineLand extends EngineHandoff {
       await this.sendBack(t, `${why} ${this.fixIt(t)}`)
       return { ok: false, error: `${why} Sent back to ${t.id}'s agent to fix.` }
     }
+    const held = await this.heldByRedMain(t, p, g)
+    if (held) return { ok: false, error: held }
     const m = await GH.mergePr(g, wt, n, head, `${t.id}: ${t.title} (#${n})`, t.said ?? '')
     let state = (await GH.viewPr(g, wt, n))?.state
     // a repo with a merge queue only queues the pull request: GitHub's full check runs there and merges it when green

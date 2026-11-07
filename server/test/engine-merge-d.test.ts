@@ -219,6 +219,36 @@ describe('on GitHub: news, checks and the default way in', () => {
     expect(reds()).toBe(before + 2)
   })
 
+  test('one red stops the merges: with main red, the first merge lands and the 2nd and 3rd wait for a green run', async () => {
+    const w = world()
+    const g = onGitHub()
+    const run = (headSha: string, conclusion: string, n: number) => ({
+      headSha,
+      status: 'completed',
+      conclusion,
+      url: `https://github.com/acme/app/actions/runs/${n}`,
+      workflowName: 'Check',
+    })
+    const planted = sh('git rev-parse main', g.bare)
+    g.set({ runs: [run(planted, 'failure', 1)] })
+    const tasks = []
+    for (const name of ['redone', 'redtwo', 'redthree']) {
+      const { t } = await started(w, g.dir, name)
+      writeFileSync(join(t.worktree!, `${name}.txt`), `${name}\n`)
+      sh('git add -A && git commit -qm x', t.worktree!)
+      tasks.push(t)
+    }
+    expect((await w.engine.merge(tasks[0].id, { self: true })).ok).toBe(true)
+    for (const t of tasks.slice(1)) {
+      const held = await w.engine.merge(t.id, { self: true })
+      expect(held.ok).toBe(false)
+      expect(held.error).toContain('is held')
+    }
+    const landed = sh('git rev-parse main', g.bare)
+    g.set({ runs: [run(landed, 'success', 2), run(planted, 'failure', 1)] })
+    expect((await w.engine.merge(tasks[1].id, { self: true })).ok).toBe(true)
+  })
+
   test('GitHub slow on the merge: one lineclear merge waits for its result, and asked again while it runs joins the same merge', async () => {
     const w = world()
     const g = onGitHub()
