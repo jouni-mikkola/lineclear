@@ -1,10 +1,12 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { configDir } from "../pi/config.ts";
 import { herdrArgv } from "./herdr.ts";
 import { join } from "node:path";
 import { fileClash, stepHeld, stepNeeds } from "./parts.ts";
 import { fitTitle, type Step, stepOfTask, type Task } from "./roadmap.ts";
 import type { State } from "./rules.ts";
 
+type Env = Record<string, string | undefined>;
 type Run = (cmd: string[]) => { code: number; out: string; err?: string };
 
 /** The herdr name of a task's agent: `shep-` and the lowercase task id. */
@@ -124,6 +126,36 @@ export function lockWhy(step: Step, held: Map<string, string>, reserved: Map<str
   const others = [...reserved].filter(([, owner]) => owner !== step.id).map(([lock]) => lock);
   const lock = stepNeeds(step).find((l) => others.includes(l)) ?? fileClash(step, others);
   return lock === undefined ? undefined : `lock '${lock.replace(/^[=~]/, "")}' is reserved for ${reserved.get(lock)}, skipped for locks ${AGE_TICKS} ticks`;
+}
+
+/** A start claim holds its step this long: by then the new task shows in the lists the next start reads. */
+const CLAIM_MS = 3 * 60_000;
+
+const claimFile = (project: string, step: string, env: Env) => join(configDir(env), "projects", project, "claims", `${step}.claim`);
+
+/**
+ * Takes the one start of a step. The create is atomic, so two ticks that both found the step free cannot both start it:
+ * the second gets false. A claim older than `CLAIM_MS` is stale and is taken over.
+ */
+export function claimStart(project: string, step: string, now: number, env: Env): boolean {
+  const file = claimFile(project, step, env);
+  mkdirSync(join(file, ".."), { recursive: true });
+  try {
+    if (now - statSync(file).mtimeMs > CLAIM_MS) rmSync(file, { force: true });
+  } catch {
+    // no claim yet
+  }
+  try {
+    writeFileSync(file, String(now), { flag: "wx" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Gives the claim back when the task was not made, so the step may start on the next tick. */
+export function releaseStart(project: string, step: string, env: Env): void {
+  rmSync(claimFile(project, step, env), { force: true });
 }
 
 /** After a tick: the steps skipped for locks count one more tick, every other step starts over. */

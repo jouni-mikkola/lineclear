@@ -93,6 +93,14 @@ test("a step merged on origin/main since the tick read it is not started", () =>
   expect(t.decisions().some((x) => x.step === "A" && x.reason.includes("merged on origin/main"))).toBe(true);
 });
 
+test("the same step added twice starts once and is refused once", () => {
+  const t = setup({ steps: [step("A", "none")] });
+  t.doTick();
+  const second = t.doTick();
+  expect(t.adds()).toHaveLength(1);
+  expect(second.some((x) => x.step === "A" && x.reason.includes("does not start twice"))).toBe(true);
+});
+
 test("the order of the worker list decides the model the next task starts on", () => {
   const model = (worker: string[]) => {
     const t = setup({ steps: [step("A", "none")], worker });

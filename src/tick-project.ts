@@ -14,7 +14,7 @@ import { askMachines, type Candidate, mostRoom, type Room, roomLack } from "./sp
 import { routineWorker } from "./routine.ts";
 import { askKey, availability, climbStalls, revertLast, reviewerFor, serviceAccounts } from "./stalls.ts";
 import { THIS_MACHINE } from "./start-failures.ts";
-import { bindStarts, liveSteps, recordStart, lockWhy, reservedLocks, settleLockWaits } from "./starts.ts";
+import { bindStarts, claimStart, liveSteps, releaseStart, recordStart, lockWhy, reservedLocks, settleLockWaits } from "./starts.ts";
 import type { Wait } from "./waits.ts";
 import type { World } from "./world.ts";
 
@@ -341,8 +341,13 @@ function startStep(s: Starting, step: Step): boolean {
       note("skip", stale, step.id);
       return false;
     }
+    if (!claimStart(t.name, step.id, world.now().getTime(), env)) {
+      note("skip", "another start of this step is under way, so it does not start twice", step.id);
+      return false;
+    }
     const err = addStepTask(s, step, host, worker, reviewer);
     if (err) {
+      releaseStart(t.name, step.id, env);
       note("skip", `task add failed: ${err}`, step.id, host ?? THIS_MACHINE);
       return false;
     }
