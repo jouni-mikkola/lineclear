@@ -3,7 +3,7 @@ import { CLI_NAME } from '../settings.ts'
 import * as Lane from './lane.ts'
 import { askOf, fitStatus } from './status-line.ts'
 import { type TaskRec, loginGone, ended, HELD, ANSWER_GRACE } from './engine-helpers.ts'
-import { EngineState } from './engine-state.ts'
+import { EngineStart } from './engine-start.ts'
 
 /** what a task that waits on you shows instead of its agent's message: a few words on why, never the message itself */
 export const NEED = {
@@ -14,7 +14,7 @@ export const NEED = {
   reply: 'Waits for your reply',
 } as const
 
-export class EngineStatus extends EngineState {
+export class EngineStatus extends EngineStart {
   /** the one status the task list, the task's own chat, the place dots and the command all show */
   statusOf(t: TaskRec): TaskStatus {
     const status = this.rawStatus(t)
