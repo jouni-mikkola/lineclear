@@ -53,3 +53,13 @@ test("each spend bar names its day and its dollars on hover, focus and tap", asy
   const first = (await tip.boundingBox())!;
   expect(first.x).toBeGreaterThanOrEqual(0);
 });
+
+test("/usage sits in the frame, takes no focus on load and says so when nothing was used", async ({ page }, info) => {
+  await page.goto("/usage?state=filled");
+  await page.waitForSelector("[data-usage-sheet]");
+  await expect(page.locator(info.project.name === "390" ? "[data-bar]" : "nav").first()).toBeVisible();
+  expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true);
+  await info.attach(`usage-${info.project.name}.png`, { body: await page.screenshot(), contentType: "image/png" });
+  await page.goto("/usage?state=empty");
+  await expect(page.locator("[data-usage-sheet]")).toHaveText(/Usage\s*Nothing has been used yet\./);
+});
