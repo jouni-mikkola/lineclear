@@ -11,7 +11,7 @@ copies in each project's `state.json`. That is the cause behind "each machine ha
 
 What I did not check: herdr's and pi's event APIs beyond the herdr skill text (`agent wait`, `pane wait-output`, `agent
 prompt --wait`) and the repo; the replacements below say "verify the call" where a step needs one. Context7 was not
-queried for these two tools in this pass. Numbers are from the code (calls per tick), not from a measurement.
+queried for these two tools in this pass. Numbers are from the code (calls per tick) or marked as estimates; none is a measurement.
 
 ## Findings
 
@@ -175,10 +175,10 @@ Format: `file:line`, what it does, why it is a patch or does not scale, the repl
     only for its own task. Replacement: reverse the direction: the worker on the machine connects out to the main server
     (one WebSocket over an SSH `-L` or a plain HTTPS/WireGuard address); agents on the machine talk to the local
     worker over a unix socket it owns; no `rm -f`, no `sleep 10`, no chown.
-34. `machines-links.ts:263` `Bun.spawn(process.execPath, main.ts)` of a full Bun server per machine, each with its own
+34. `machines-links.ts:243` `Bun.spawn(process.execPath, main.ts)` of a full Bun server per machine, each with its own
     herdr client, snapshot builder, tick, and `Push`: about one extra server process per machine on the main machine (3
     machines = 3 more processes, each holding its own caches).
-    only by `codeVersion()` hashing the repo's files (`worker-process.ts:57-71`: walks `server/` and `shared/` and reads every
+    `codeVersion()` hashes the repo files to compare versions (`worker-process.ts:57-71`: walks `server/` and `shared/` and reads every
     file, sync, at start). Replacement: the worker is a small agent-host (executor) built
     from a release directory with a version string; compare that string, not a hash of all files.
 
@@ -286,7 +286,7 @@ Result: A worker is an executor with no store, no rule loop and no `last.json`; 
 
 ### L587 One way to run on a machine
 Result: One `ssh.ts` builds every SSH command and quotes it, and `runSync`, `tellRunBy` and the 2 s git read cache are gone.
-- why: five places build an SSH command line and three copy `quote`; `runSync` freezes the server for the round trip (about 100 ms each, 4.5 s for 45); `tellRunBy` fires an unchecked ssh on every probe (findings 26-30).
+- why: five places build an SSH command line and three copy `quote`; `runSync` freezes the server for the round trip (an estimated 100 ms each, 4.5 s for 45; not measured); `tellRunBy` fires an unchecked ssh on every probe (findings 26-30).
 - done when: `grep -rn "Bun.spawnSync" server/server/live/box.ts` prints 0; `grep -rln "sshArgs" src server | wc -l` shows one definition; a test of 45 reads of a file on a fake box blocks the loop for under 50 ms in total.
 - locks: ssh-one
 - after: none
