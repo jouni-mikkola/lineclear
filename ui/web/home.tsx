@@ -89,7 +89,11 @@ export function Home({
             />
           </div>
         )}
-        <section aria-label="The line" className="shrink-0 overflow-y-auto overflow-x-hidden lg:max-h-[calc(80px+round(down,55dvh-80px,92px))] lg:border-b lg:border-line" data-line>
+        <section
+          aria-label="The line"
+          className="shrink-0 overflow-y-auto overflow-x-hidden lg:max-h-[calc(80px+round(down,55dvh-80px,92px))] lg:border-b lg:border-line"
+          data-line
+        >
           <Part state={d ? "filled" : "loading"} label="The line" empty={{ text: "" }} rows={2}>
             {!!onLine.length && (
               <TheLine
