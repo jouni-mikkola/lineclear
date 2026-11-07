@@ -2,12 +2,12 @@
 // its home folder (~), first under it until dragged and never removed; its coordinator also keeps an eye on the machine (and the main
 // machine's on every machine). Any other space is a git repo with its own herdr space, added from the sidebar or by
 // asking a coordinator; its tasks are made in its repo. Each space has its own mode.
+import type { Database } from 'bun:sqlite'
 import { execFileSync } from 'node:child_process'
 import { hostname } from 'node:os'
-import { existsSync, readFileSync } from 'node:fs'
-import { basename, join, resolve } from 'node:path'
+import { basename, resolve } from 'node:path'
 import { nameProblem, slugify } from '../../shared/types.ts'
-import { HOME, readJson, writeJson } from '../store.ts'
+import { db, importOnce, readJson, readMain, tx, writeJson } from '../store.ts'
 import { agentName } from './agent-start.ts'
 import { boxHome } from './box.ts'
 import { defaultBranch, isRepo, topLevel } from './engine/git.ts'
@@ -84,31 +84,37 @@ export function keyFor(name: string, taken: string[]) {
   return `${cands[0]}${i}`
 }
 
+const namesIn = (store: Database) =>
+  Object.fromEntries((store.query('select id, name from names').all() as { id: string; name: string }[]).map((r) => [r.id, r.name]))
+
 export class Places {
   /** Historical task prefixes, including deleted tasks; supplied by the owning engine. */
   takenTaskKeys?: () => string[]
   spaces: Space[] = this.loadSpaces()
+
+  /** the spaces table, in the order they were saved; an old spaces.json or names.json becomes rows once */
+  private loadSpaces(): Space[] {
+    db.exec('create table if not exists spaces (position integer primary key, data text not null)')
+    db.exec('create table if not exists names (id text primary key, name text not null)')
+    importOnce<Space[]>('spaces.json', (list, store) => {
+      if (Array.isArray(list)) list.forEach((s, i) => store.query('insert or replace into spaces (position, data) values (?, ?)').run(i, JSON.stringify(s)))
+    })
+    importOnce<Record<string, string>>('names.json', (all, store) => {
+      for (const [id, name] of Object.entries(all)) store.query('insert or replace into names (id, name) values (?, ?)').run(id, name)
+    })
+    return (db.query('select data from spaces order by position').all() as { data: string }[]).map((r) => JSON.parse(r.data))
+  }
+
   /** the names the human gave machines and spaces in the sidebar, by id, every machine's: only what shows changes,
    *  never a folder, repo, herdr space or task id */
-  names: Record<string, string> = readJson('names.json', {})
-
-  /** a fresh store has no spaces.json yet: it starts empty and the file is written, so a store is told from none */
-  private loadSpaces(): Space[] {
-    if (!existsSync(join(HOME, 'spaces.json'))) writeJson('spaces.json', [])
-    const spaces = readJson<unknown>('spaces.json', [])
-    return Array.isArray(spaces) ? spaces : []
+  get names(): Record<string, string> {
+    return namesIn(db)
   }
 
   /** the names given: on another machine's worker, the main machine's (it keeps them), read as they are now, so its
    *  commands take the names the sidebar shows */
   given(): Record<string, string> {
-    const main = process.env.LINECLEAR_SHARED_HOME
-    if (!main) return this.names
-    try {
-      return JSON.parse(readFileSync(join(main, 'names.json'), 'utf8')) as Record<string, string>
-    } catch {
-      return this.names
-    }
+    return readMain(namesIn) ?? this.names
   }
 
   /** the emoji the human gave machines, by id, kept by the main machine */
@@ -116,9 +122,8 @@ export class Places {
 
   /** a place's new name; '' gives it back its own */
   rename(id: string, name: string) {
-    if (name) this.names[id] = name
-    else delete this.names[id]
-    writeJson('names.json', this.names)
+    if (name) db.query('insert or replace into names (id, name) values (?, ?)').run(id, name)
+    else db.query('delete from names where id = ?').run(id)
   }
 
   /** a machine's emoji; '' takes it away */
@@ -129,7 +134,10 @@ export class Places {
   }
 
   save() {
-    writeJson('spaces.json', this.spaces)
+    tx((store) => {
+      store.exec('delete from spaces')
+      this.spaces.forEach((s, i) => store.query('insert into spaces (position, data) values (?, ?)').run(i, JSON.stringify(s)))
+    })
   }
 
   /** the name each of this machine's spaces shows, the home space first: as given, by the space rules, each its own */

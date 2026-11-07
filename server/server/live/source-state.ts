@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { clock } from '../../shared/time.ts'
 import type { Alert, Place } from '../../shared/types.ts'
 import { Emitter, type SourceEvents } from '../source.ts'
-import { HOME, readJson, writeJson } from '../store.ts'
+import { HOME } from '../store.ts'
 import { ROOT } from '../root.ts'
 import { Agents, hidden, type Spec } from './agents.ts'
 import { Chats } from './chats.ts'
@@ -18,7 +18,7 @@ import { Revivals } from './revive.ts'
 import { Settings, type Level } from './settings.ts'
 import { Vault } from './secrets.ts'
 import { RequestedNewsMailbox } from './requested-news.ts'
-import { healthWords, Monitor, meters, procLines, summary, topProcs, type HealthEvent } from './health.ts'
+import { healthWords, Monitor, storedWatch, meters, procLines, summary, topProcs, type HealthEvent } from './health.ts'
 import { REPLY_AFTER_CARD } from './source-helpers.ts'
 import { listing } from './source-listing.ts'
 
@@ -42,7 +42,7 @@ export class LiveSourceState extends Emitter<SourceEvents> {
     () => this.agents.reachable,
     (e) => void this.onHealth(e).catch(() => undefined),
     undefined,
-    { read: () => readJson('health.json', {}), write: (w) => writeJson('health.json', w) },
+    storedWatch,
   )
   /** what the last look at each other machine found (source-views.ts readBoxes) */
   protected boxes = new Map<string, { read?: { busy?: 'cpu' | 'memory'; herdr: boolean }; at: number; reading: boolean }>()
