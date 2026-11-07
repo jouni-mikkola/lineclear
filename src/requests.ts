@@ -1,11 +1,10 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
-import { writeAtomic } from "../pi/atomic.ts";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { readItems, type Item } from "./inbox.ts";
 import { listProjectNames, readSettings } from "./project.ts";
 import { nearest } from "./resolve.ts";
 import { roadmapData } from "./roadmap-view.ts";
-import { configDir } from "../pi/config.ts";
+import { tables } from "./tables.ts";
 
 // A request is one goal handed to the planner with `lineclear plan`. It is kept by its planning task, so the steps
 // that plan adds can be followed: on the roadmap view at its live link, and with `lineclear status --plan <task>`.
@@ -34,29 +33,17 @@ export interface PlanView extends PlanRequest {
 
 type Env = Record<string, string | undefined>;
 
-const dir = (env: Env) => join(configDir(env as NodeJS.ProcessEnv), "requests");
-
 /** The roadmap view of one request's steps, as a link on Lineclear's own pages. */
 export const liveLink = (project: string, task: string) => `/${project}/roadmap/track?plan=${encodeURIComponent(task)}`;
 
 export function recordRequest(r: PlanRequest, env: Env = process.env): void {
-  mkdirSync(dir(env), { recursive: true });
-  writeAtomic(join(dir(env), `${r.task}.json`), `${JSON.stringify(r, null, 2)}\n`);
+  tables(env).query("insert or replace into requests (task, since, request) values (?, ?, ?)").run(r.task, r.since, JSON.stringify(r));
 }
 
 /** Every request, oldest first. */
 export function readRequests(env: Env = process.env): PlanRequest[] {
-  if (!existsSync(dir(env))) return [];
-  const out: PlanRequest[] = [];
-  for (const f of readdirSync(dir(env))) {
-    if (!f.endsWith(".json")) continue;
-    try {
-      out.push(JSON.parse(readFileSync(join(dir(env), f), "utf8")) as PlanRequest);
-    } catch {
-      // a half-written file is read again next time
-    }
-  }
-  return out.sort((a, b) => a.since.localeCompare(b.since));
+  const rows = tables(env).query("select request from requests order by since").all() as { request: string }[];
+  return rows.map((r) => JSON.parse(r.request) as PlanRequest);
 }
 
 /** The ids of the steps a roadmap diff adds. */

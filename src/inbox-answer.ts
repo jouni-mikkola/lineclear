@@ -1,7 +1,6 @@
-import { writeAtomic } from "../pi/atomic.ts";
 import { undoApplied } from "./plan-apply.ts";
 import { applyMove } from "./dispatcher.ts";
-import { answerCard, isOpen, type Item, itemPath, KIND_LABEL, readAllItems, lineclear, usage, waitReason } from "./inbox.ts";
+import { answerCard, isOpen, type Item, KIND_LABEL, readAllItems, lineclear, saveItem, usage, waitReason } from "./inbox.ts";
 import { readSettings } from "./project.ts";
 import { clearWait } from "./waits.ts";
 import { gitText } from "./git.ts";
@@ -57,7 +56,7 @@ export function inboxMain(args: string[], out: (l: string) => void, env = proces
 }
 
 const writeAnswer = (item: Item, answer: string, note: string | undefined, env: NodeJS.ProcessEnv) =>
-  writeAtomic(itemPath(item.n, env), `${JSON.stringify({ ...item, answer, ...(note ? { note } : {}), answeredAt: new Date().toISOString() }, null, 2)}\n`);
+  saveItem({ ...item, answer, ...(note ? { note } : {}), answeredAt: new Date().toISOString() }, env);
 
 /** Carries the answer out: the merge, the close or the word to the task. Returns the line to say when it fails. */
 function deliverAnswer(item: Item, choice: string, note: string | undefined, resend: boolean, env: NodeJS.ProcessEnv): string | undefined {

@@ -1,7 +1,7 @@
 // The UI bar on Home (`/`), served by `lineclear run`. The pictures use the sample states
 // (`?state=`); the rest reads the files the server reads, and changes them to make each motion.
 import { expect, type Page, test } from "@playwright/test";
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { MOTIONS, type Motion } from "../kit/motion.ts";
 import { clickAfterReread, liveMotionTests, PAGE_STATES, reread, running, shotEveryState, traceMotion } from "./bar.ts";
@@ -195,7 +195,10 @@ test.describe("live", () => {
     await strip.getByRole("button", { name: "Reject" }).click();
     await strip.getByRole("textbox").fill("Gift cards wait for the payment step");
     await strip.locator('button[type="submit"]').click();
-    const plan = () => JSON.parse(readFileSync(join(FIXTURE, "config", "inbox", "2.json"), "utf8"));
+    const plan = () => {
+      const code = `import { Database } from "bun:sqlite"; console.log((new Database(${JSON.stringify(join(FIXTURE, "config", "store.sqlite"))}, { readonly: true }).query("select item from inbox where n = 2").get() as { item: string }).item)`;
+      return JSON.parse(execFileSync("bun", ["-e", code], { encoding: "utf8" }));
+    };
     await expect.poll(() => plan().answer, { timeout: 10_000 }).toBe("Reject");
     expect(plan().note).toBe("Gift cards wait for the payment step");
     // an answer that does not reach the server brings the ask back with the reason

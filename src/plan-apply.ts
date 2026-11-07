@@ -1,9 +1,6 @@
-import { join } from "node:path";
-import { writeAtomic } from "../pi/atomic.ts";
-import { configDir } from "../pi/config.ts";
 import { planProblems, plansAreAuto, readiness } from "./autoplan.ts";
 import { gitAsLineclear } from "./git.ts";
-import { addItem, closeItem, isOpen, readItems, type Item } from "./inbox.ts";
+import { addItem, closeItem, isOpen, readItems, saveItem, type Item } from "./inbox.ts";
 import { serverBin } from "./paths.ts";
 import { readSettings } from "./project.ts";
 import { clearWait } from "./waits.ts";
@@ -83,11 +80,9 @@ export function undoApplied(item: Item, now: Date, env = process.env): string | 
       return `git push failed, nothing changed: ${p.err}`;
     }
   }
-  writeAtomic(itemFile(item.n, env), `${JSON.stringify({ ...item, undone: now.toISOString() }, null, 2)}\n`);
+  saveItem({ ...item, undone: now.toISOString() }, env);
   return undefined;
 }
-
-const itemFile = (n: number, env = process.env) => join(configDir(env), "inbox", `${n}.json`);
 
 /**
  * Plans that wait in the Inbox from before their project let them apply by themselves: the same checks, then the same
@@ -111,7 +106,7 @@ function settleOne(item: Item & { head: string; diff: string }, now: Date, env: 
   if (typeof settings === "string") return;
   const repo = settings.repo;
   const tried = (why: string) => {
-    writeAtomic(itemFile(item.n, env), `${JSON.stringify({ ...item, tried: item.head }, null, 2)}\n`);
+    saveItem({ ...item, tried: item.head }, env);
     out.push(`inbox ${item.n}: ${item.task} stays: ${why}`);
   };
   const n = /-(\d+)$/.exec(item.task)?.[1];
@@ -144,9 +139,17 @@ function settleOne(item: Item & { head: string; diff: string }, now: Date, env: 
     tried(`the merge failed: ${merged}`);
     return;
   }
-  writeAtomic(
-    itemFile(item.n, env),
-    `${JSON.stringify({ ...item, answer: "Approve", answeredAt: now.toISOString(), auto: true, base: merged.base, commit: merged.commit, ...(merged.commits ? { commits: merged.commits } : {}) }, null, 2)}\n`,
+  saveItem(
+    {
+      ...item,
+      answer: "Approve",
+      answeredAt: now.toISOString(),
+      auto: true,
+      base: merged.base,
+      commit: merged.commit,
+      ...(merged.commits ? { commits: merged.commits } : {}),
+    },
+    env,
   );
   clearWait(item.task, env);
   out.push(`inbox ${item.n}: ${item.task} applied by itself under the rule`);

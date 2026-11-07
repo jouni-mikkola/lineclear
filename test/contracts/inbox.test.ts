@@ -1,7 +1,8 @@
 // The contract of inbox: items as rules, dispatcher, planner, measure and ui add, read and close them.
 import { expect, test } from "bun:test";
-import { existsSync, writeFileSync } from "node:fs";
-import { addItem, closeItem, isOpen, itemPath, readAllItems, readItems } from "../../src/inbox.ts";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { addItem, closeItem, isOpen, readAllItems, readItems } from "../../src/inbox.ts";
 import { tmp } from "../helpers.ts";
 
 const item = { kind: "outward" as const, task: "T-1", question: "Go?", choices: ["Go", "Not yet"], since: "2026-01-01T00:00:00Z" };
@@ -26,17 +27,37 @@ test("closeItem keeps the item, closed with its reason, and isOpen says no", () 
   expect(addItem(item, vars).n).toBe(2);
 });
 
-test("a closed plan stays in the folder for its tries, and an item closed in the old way moves to closed/", () => {
+test("50 items added from 5 processes get 50 distinct numbers", async () => {
+  const config = tmp("contract-inbox-race");
+  const code = `import { addItem } from ${JSON.stringify(join(import.meta.dir, "../../src/inbox.ts"))};
+    for (let i = 0; i < 10; i++) addItem({ kind: "outward", task: "T-1", question: "Go?", choices: ["Go", "No"], since: "2026-01-01T00:00:00Z" });`;
+  const env = { ...process.env, LINECLEAR_CONFIG: config };
+  const runs = Array.from({ length: 5 }, () => Bun.spawn([process.execPath, "-e", code], { env, stdout: "ignore", stderr: "pipe" }));
+  for (const r of runs) expect(await r.exited).toBe(0);
+  const numbers = readItems({ LINECLEAR_CONFIG: config }).map((i) => i.n);
+  expect(new Set(numbers).size).toBe(50);
+  expect(numbers).toEqual(Array.from({ length: 50 }, (_, i) => i + 1));
+});
+
+test("a closed plan stays in the list for its tries, and the folders of an older version are imported once", () => {
   const vars = { LINECLEAR_CONFIG: tmp("contract-inbox-plan") };
   const plan = addItem({ ...item, kind: "plan" }, vars);
   closeItem(plan, "the branch changed", new Date(), vars);
   expect(readItems(vars).map((i) => i.closed)).toEqual(["the branch changed"]);
   const old = addItem(item, vars);
-  writeFileSync(itemPath(old.n, vars), JSON.stringify({ ...old, closed: "old way" }));
+  closeItem(old, "old way", new Date(), vars);
   expect(readItems(vars).map((i) => i.n)).toEqual([plan.n]);
-  expect(existsSync(itemPath(old.n, vars))).toBe(false);
   expect(readAllItems(vars).map((i) => i.n)).toEqual([plan.n, old.n]);
   expect(addItem(item, vars).n).toBe(old.n + 1);
+
+  const older = { LINECLEAR_CONFIG: tmp("contract-inbox-old") };
+  mkdirSync(join(older.LINECLEAR_CONFIG, "inbox", "closed"), { recursive: true });
+  writeFileSync(join(older.LINECLEAR_CONFIG, "inbox", "3.json"), JSON.stringify({ n: 3, ...item }));
+  writeFileSync(join(older.LINECLEAR_CONFIG, "inbox", "closed", "2.json"), JSON.stringify({ n: 2, ...item, closed: "old way" }));
+  expect(readItems(older).map((i) => i.n)).toEqual([3]);
+  expect(readAllItems(older).map((i) => i.n)).toEqual([2, 3]);
+  expect(existsSync(join(older.LINECLEAR_CONFIG, "inbox"))).toBe(false);
+  expect(addItem(item, older).n).toBe(4);
 });
 
 test("every link the Inbox and the CLI give opens the Lineclear UI: no old port, no old page path", async () => {

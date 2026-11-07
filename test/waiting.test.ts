@@ -6,6 +6,7 @@ import { countWaiting, waitingForYou } from "../src/waiting.ts";
 import { projectsData } from "../src/home-data.ts";
 import { askMachines, type MachineRead, type Room, SILENT_DROP_MS } from "../src/spread.ts";
 import { webApi } from "../src/web.ts";
+import { clearWait, writeWait } from "../src/waits.ts";
 import { tmp } from "./helpers.ts";
 
 // WEB-1 asked in the Inbox and has a card, WEB-2 waits with a card only, WEB-3 works.
@@ -45,9 +46,9 @@ function setup() {
 }
 
 const planter = (dir: string) => (n: number, w: object) =>
-  writeFileSync(
-    join(dir, "config", "waits", `WEB-${n}.json`),
-    JSON.stringify({ task: `WEB-${n}`, project: "web-shop", since: "2026-01-05T09:12:00.000Z", ...w }),
+  writeWait(
+    { task: `WEB-${n}`, project: "web-shop", kind: "owner", reason: "", since: "2026-01-05T09:12:00.000Z", ...w },
+    { LINECLEAR_CONFIG: join(dir, "config") },
   );
 
 const homeText = (world: Record<string, string>) => (id: string) =>
@@ -97,7 +98,7 @@ test("an idle agent stays out of the Inbox, a declared wait shows its reason, an
   );
   expect(waitingForYou(world).tasks.map((t) => [t.task, t.text])).toEqual([["WEB-2", "Log in to Ledger"]]);
   writeFileSync(join(lineclear, "chatlog", "cards.json"), JSON.stringify({ posted: [card(2, "needs you: Pick A or B")] }));
-  rmSync(join(dir, "config", "waits", "WEB-2.json"));
+  clearWait("WEB-2", { LINECLEAR_CONFIG: join(dir, "config") });
   expect(waitingForYou(world).tasks.map((t) => t.text)).toEqual(["Pick A or B"]);
   rmSync(dir, { recursive: true, force: true });
 });

@@ -126,10 +126,6 @@ for (const kind of ["a killed service", "a reboot"] as const) {
     await Bun.sleep(1500);
     first.kill("SIGKILL"); // no chance to clean up
     await first.exited;
-    if (kind === "a reboot") {
-      // a reboot also leaves what a power cut leaves: a half-written temporary file
-      writeFileSync(join(m.config, "waits", "LIN-9.json.1.0.tmp"), '{"task":"LIN-9","kind"');
-    }
     expect(m.state(false)).toBe(before);
     // the service may log a decision of its own before the kill, so the earlier ones must stay as the first lines
     expect(m.decisions().slice(0, earlier.length)).toEqual(earlier);

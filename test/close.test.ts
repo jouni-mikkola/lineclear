@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { inboxMain } from "../src/inbox-answer.ts";
 import { addItem, readAllItems } from "../src/inbox.ts";
@@ -8,7 +8,7 @@ import { decisionsPath } from "../pi/config.ts";
 import { realWorld, tick } from "../src/rules.ts";
 import { status } from "../src/status.ts";
 import { changeSettings } from "../src/project-change.ts";
-import { readWaits, waitPath, writeWait } from "../src/waits.ts";
+import { readWaits, writeWait } from "../src/waits.ts";
 import { demoConfig, idleWorld } from "./demo-world.ts";
 import { tmp } from "./helpers.ts";
 
@@ -89,7 +89,7 @@ test("an item closes when the owner wrote to its task after it was made", () => 
   t.wrote.add("LIN-2");
   t.tick();
   expect(readAllItems(t.env)[0]!.closed).toBe("you wrote to its task after the item was made");
-  expect(existsSync(waitPath("LIN-2", t.env))).toBe(false);
+  expect(readWaits(t.env).some((w) => w.task === "LIN-2")).toBe(false);
   expect(readFileSync(decisionsPath(t.env), "utf8")).toContain("closed inbox item 1");
 });
 

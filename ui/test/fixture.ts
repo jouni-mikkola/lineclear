@@ -108,7 +108,16 @@ export function writeItem(
 }
 
 function clearFixture() {
-  for (const d of ["lineclear", "config/inbox", "config/projects", "browsers.json", "browser-inputs.log"])
+  for (const d of [
+    "lineclear",
+    "config/inbox",
+    "config/store.sqlite",
+    "config/store.sqlite-wal",
+    "config/store.sqlite-shm",
+    "config/projects",
+    "browsers.json",
+    "browser-inputs.log",
+  ])
     rmSync(join(FIXTURE, d), { recursive: true, force: true });
   // the doctor of the run finds nothing, so no picture shows the host's own findings
   write(join(FIXTURE, "doctor.json"), []);
@@ -185,7 +194,6 @@ export const LIVE: Partial<Record<Motion, { path: string; change: () => void; af
 /** A clean config: two projects from their repos, no task, no request, nothing in the Inbox. */
 export function startFirstRun() {
   clearFixture();
-  rmSync(join(FIXTURE, "config", "requests"), { recursive: true, force: true });
   writeTasks([]);
 }
 

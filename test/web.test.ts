@@ -2,6 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { readAllItems } from "../src/inbox.ts";
 import { PAGE_TOKEN, serveWeb, webApi } from "../src/web.ts";
 import { webAddress } from "../src/web-address.ts";
 import { webResponse } from "../src/web-files.ts";
@@ -276,7 +277,7 @@ test("a plan's rejection needs its reason, and the reason goes with the answer",
   expect(items.find((i) => i.id === "1").needsNote).toBeUndefined();
   expect((await handle(post(4, { choice: "Reject" }))).status).toBe(400);
   expect((await handle(post(4, { choice: "Reject", note: "Split step 3" }))).status).toBe(200);
-  expect(JSON.parse(readFileSync(join(dir, "config", "inbox", "4.json"), "utf8"))).toMatchObject({ answer: "Reject", note: "Split step 3" });
+  expect(readAllItems({ LINECLEAR_CONFIG: join(dir, "config") }).find((i) => i.n === 4)).toMatchObject({ answer: "Reject", note: "Split step 3" });
   rmSync(dir, { recursive: true, force: true });
 });
 

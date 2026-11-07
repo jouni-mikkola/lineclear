@@ -1,7 +1,7 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { writeAtomic } from "../pi/atomic.ts";
-import { isOpen, type Item, itemNumbers, KIND_LABEL, readItems } from "./inbox.ts";
+import { inboxStamp, isOpen, type Item, KIND_LABEL, newestItem, readItems } from "./inbox.ts";
 import { configDir } from "../pi/config.ts";
 
 export type Alert = { id: string; from: string; title: string; body: string; go: { place: string; focus?: string }; tag: string };
@@ -41,7 +41,7 @@ export function alertOf(item: Item): Alert {
  * nothing is, no item is read. Returns how many were sent.
  */
 export async function notifyNew(push: Pusher, env: NodeJS.ProcessEnv = process.env): Promise<number> {
-  const newest = Math.max(0, ...itemNumbers(env));
+  const newest = newestItem(env);
   const mark = existsSync(markPath(env)) ? Number(readFileSync(markPath(env), "utf8")) : Number.NaN;
   if (!Number.isInteger(mark) || newest > mark) writeAtomic(markPath(env), `${newest}\n`);
   if (!Number.isInteger(mark) || newest <= mark) return 0;
@@ -77,16 +77,13 @@ export function pushOnChange(push: Pusher, env: NodeJS.ProcessEnv = process.env)
 }
 
 /**
- * Calls `onChange` once a second at most when the Inbox folder changes: an item written or closed replaces a file, which
- * moves the folder's time. One stat of the folder is the whole cost, and a folder removed and made again is noticed too.
- * Returns a function that stops it.
+ * Calls `onChange` once a second at most when the Inbox changes: an item added, answered or closed moves the stamp.
+ * One aggregate query is the whole cost. Returns a function that stops it.
  */
 export function watchInboxFolder(env: Record<string, string | undefined>, onChange: () => void): () => void {
-  const dir = join(configDir(env as NodeJS.ProcessEnv), "inbox");
   const stamp = () => {
     try {
-      const s = statSync(dir);
-      return `${s.ino}:${s.mtimeMs}`;
+      return inboxStamp(env);
     } catch {
       return "";
     }
