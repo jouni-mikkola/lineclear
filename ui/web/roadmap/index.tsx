@@ -236,7 +236,11 @@ function useStepFlip(ref: React.RefObject<HTMLUListElement | null>, steps: Roadm
 
 const GLOW = "0 0 0 1px var(--lc-fg), 0 0 28px 4px color-mix(in srgb, var(--lc-fg) 28%, transparent)";
 
-const plain = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const plain = (text: string) =>
+  text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 
 /** A result that only restates the title adds nothing to a card. */
 const restatesTitle = (s: RoadmapStep) => {
