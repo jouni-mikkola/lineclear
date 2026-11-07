@@ -9,7 +9,9 @@ import { logKind } from './readers/find.ts'
 import { LogTail, readerFor } from './readers/index.ts'
 import type { LogEvent } from './readers/types.ts'
 import { replyOnScreen } from './streaming.ts'
-import { yours, turnOf, replying, type Shown, type Posted, type ChatLog, safe, type ScreenMenu, parseMenu, sawReply, PIECE } from './chats-helpers.ts'
+import { yours, turnOf, replying, sawReply, type Shown } from './chat-turns.ts'
+import { parseMenu, type ScreenMenu } from './screen-menu.ts'
+import { safe, PIECE, type Posted, type ChatLog } from './chats-helpers.ts'
 
 export class ChatsLogs {
   constructor(
