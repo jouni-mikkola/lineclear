@@ -1,6 +1,5 @@
 import { Emitter } from '../source.ts'
-import { readJson, writeJson } from '../store.ts'
-import { AgentRows } from './engine/cold.ts'
+import { AgentRows, OutboxRows } from './agent-rows.ts'
 import { addLog, uniqueLogs } from './log-list.ts'
 import type { AgentInfo, AgentStatus } from './herdr.ts'
 import { findPiLog } from './readers/find.ts'
@@ -16,8 +15,8 @@ export class AgentsState extends Emitter<Events> {
   private rows = new AgentRows<AgentRecord>()
   records: Record<string, AgentRecord> = this.rows.read()
   // news held in an older version's outbox is dropped too (quiet.ts)
-  outbox: OutItem[] = readJson<OutItem[]>('outbox.json', []).filter((o) => !machineNews(o.text))
-  private outboxWritten = JSON.stringify(this.outbox)
+  private outboxRows = new OutboxRows<OutItem>()
+  outbox: OutItem[] = this.outboxRows.read().filter((o) => !machineNews(o.text))
   live = new Map<string, AgentInfo>()
   /** the agents that run as a child of this server, by chat key: herdr knows nothing of them */
   rpcs = new Map<string, RpcAgent>()
@@ -51,11 +50,7 @@ export class AgentsState extends Emitter<Events> {
 
   save() {
     this.rows.write(this.records)
-    // a save for a record change leaves the outbox file as it is
-    const waiting = JSON.stringify(this.outbox)
-    if (waiting === this.outboxWritten) return
-    this.outboxWritten = waiting
-    writeJson('outbox.json', this.outbox)
+    this.outboxRows.write(this.outbox)
   }
 
   /** drops what waits and matches; whether any did */
