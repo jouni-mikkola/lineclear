@@ -1,8 +1,8 @@
 // What a working task's row on Home shows: its last card, the files it changed and its check, and, once the row is
 // opened, its log tail, diff stat, check output, review findings and cost. All from Lineclear's files, git, the check
 // log and pi's session files, with no AI.
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync } from "node:fs";
+import { type ChatFile, readChatLogs } from "./chat-kept.ts";
 import { prChecks } from "./check-runs.ts";
 import { readTasksKept } from "./tasks-kept.ts";
 import { dataDir } from "./paths.ts";
@@ -64,16 +64,12 @@ export interface TaskDetail {
   cost?: number;
 }
 
-const cardTexts = (file: string, task?: string) => {
-  try {
-    const posted: { at?: unknown; card?: { text?: unknown; task?: string } }[] = JSON.parse(readFileSync(file, "utf8"))?.posted ?? [];
-    return posted
-      .filter((p) => typeof p?.at === "number" && typeof p.card?.text === "string" && (task === undefined || p.card.task === task))
-      .sort((a, b) => Number(a.at) - Number(b.at))
-      .map((p) => String(p.card?.text));
-  } catch {
-    return [];
-  }
+const cardTexts = (chat: ChatFile | undefined, task?: string) => {
+  const posted: { at?: unknown; card?: { text?: unknown; task?: string } }[] = chat?.log.posted ?? [];
+  return posted
+    .filter((p) => typeof p?.at === "number" && typeof p.card?.text === "string" && (task === undefined || p.card.task === task))
+    .sort((a, b) => Number(a.at) - Number(b.at))
+    .map((p) => String(p.card?.text));
 };
 
 /** What the caller brings: Lineclear's folder and a pricer of a worktree's sessions. */
@@ -89,13 +85,12 @@ export interface TaskSources {
 export function taskDetail(id: string, from: TaskSources, env: Env = process.env, now = Date.now()): TaskDetail | undefined {
   const t = readTasksKept(from.lineclear).tasks.find((x) => x.id === id) as TaskRef | undefined;
   if (!t) return undefined;
-  const chats = join(dataDir(env), "chatlog");
-  const files = existsSync(chats) ? readdirSync(chats) : [];
-  const log = files
-    .filter((f) => f === `${id}_Agent.json`)
-    .flatMap((f) => cardTexts(join(chats, f), id))
-    .slice(-LOG_LINES);
-  const review = files.filter((f) => f === `${id}_Reviewer.json`).flatMap((f) => cardTexts(join(chats, f)));
+  const chats = readChatLogs(dataDir(env));
+  const log = cardTexts(
+    chats.find((c) => c.name === `${id}_Agent`),
+    id,
+  ).slice(-LOG_LINES);
+  const review = cardTexts(chats.find((c) => c.name === `${id}_Reviewer`));
   const worktree = typeof t.worktree === "string" && existsSync(t.worktree) ? t.worktree : undefined;
   const diff = worktree ? taskGit(worktree, "diff", "--stat", `${baseOf(t)}...HEAD`) : "";
   const run = worktree ? branchChecks(worktree, now).at(-1) : undefined;

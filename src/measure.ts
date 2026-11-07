@@ -1,6 +1,6 @@
 import { readJson } from "../pi/config.ts";
+import { readChatLogs } from "./chat-kept.ts";
 import { dataDir, piDir } from "./paths.ts";
-import { existsSync, readdirSync } from "node:fs";
 import { readRetiredKept, readTasksKept } from "./tasks-kept.ts";
 import { join } from "node:path";
 import { readSessions } from "./harness-pi.ts";
@@ -63,15 +63,12 @@ export function spaceTasks(dir: string, space: { key: string }, retired = false)
 
 /** The chat logs of a space's tasks, with the ones of retired tasks in archive/chatlog. `coordinatorOnly`: just the space's coordinator chat. */
 export function chatFiles(dir: string, space: { name: string; key: string }, coordinatorOnly = false): any[] {
-  const own = (f: string) => (!coordinatorOnly && f.startsWith(`${space.key}-`)) || (f.startsWith("p_") && f.endsWith(`_${space.name}.json`));
-  return [join(dir, "chatlog"), ...(coordinatorOnly ? [] : [join(dir, "archive", "chatlog")])]
-    .filter((log) => existsSync(log))
-    .flatMap((log) =>
-      readdirSync(log)
-        .filter((f) => f.endsWith(".json") && own(f))
-        .map((f) => readJson(join(log, f))),
-    )
-    .filter((d) => d !== undefined);
+  const own = (f: string) => (!coordinatorOnly && f.startsWith(`${space.key}-`)) || (f.startsWith("p_") && f.endsWith(`_${space.name}`));
+  return [false, ...(coordinatorOnly ? [] : [true])].flatMap((archived) =>
+    readChatLogs(dir, archived)
+      .filter((c) => own(c.name))
+      .map((c) => c.log),
+  );
 }
 
 /** The start of a task is its first "started" card, else the time it was made if it has a worktree, else it never started. */

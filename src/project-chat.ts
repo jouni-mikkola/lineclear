@@ -1,5 +1,4 @@
-import { existsSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { readChatLogs } from "./chat-kept.ts";
 import { lineclearDir } from "./measure.ts";
 import { serverBin } from "./paths.ts";
 import { readSettings } from "./project.ts";
@@ -11,9 +10,7 @@ export type CardPoster = (chat: string, title: string, choices: string[], env: N
 function projectChat(project: string | undefined, env: NodeJS.ProcessEnv): string | undefined {
   const settings = project === undefined ? undefined : readSettings(project, env);
   if (settings === undefined || typeof settings === "string") return undefined;
-  const log = join(lineclearDir(env), "chatlog");
-  const file = existsSync(log) ? readdirSync(log).find((f) => f.startsWith("p_") && f.endsWith(`_${settings.space}.json`)) : undefined;
-  return file?.replace(/\.json$/, "");
+  return readChatLogs(lineclearDir(env)).find((c) => c.name.startsWith("p_") && c.name.endsWith(`_${settings.space}`))?.name;
 }
 
 const postCard: CardPoster = (chat, title, choices, env) => {

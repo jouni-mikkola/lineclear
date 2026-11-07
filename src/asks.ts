@@ -1,6 +1,7 @@
 import { allowanceReset } from "./zone.ts";
-import { existsSync, mkdirSync, readdirSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { writeAtomic } from "../pi/atomic.ts";
+import { readChatLogs } from "./chat-kept.ts";
 import { readJsonKept } from "./kept-read.ts";
 import { join } from "node:path";
 import { addItem, type InboxKind, stepRule } from "./inbox.ts";
@@ -116,12 +117,10 @@ export function ruleFor(card: Card, project: string, now: Date, env = process.en
  * when its file changed. A retired task's chat is in archive/chatlog and asks nothing, so it is not read.
  */
 function liveChats(dir: string, space: { name: string; key: string }, coordinatorOnly = false): any[] {
-  const log = join(dir, "chatlog");
-  if (!existsSync(log)) return [];
-  const own = (f: string) => (!coordinatorOnly && f.startsWith(`${space.key}-`)) || (f.startsWith("p_") && f.endsWith(`_${space.name}.json`));
-  return readdirSync(log)
-    .flatMap((f) => (f.endsWith(".json") && own(f) ? [readJsonKept<any>(join(log, f))] : []))
-    .filter((d) => d !== undefined);
+  const own = (f: string) => (!coordinatorOnly && f.startsWith(`${space.key}-`)) || (f.startsWith("p_") && f.endsWith(`_${space.name}`));
+  return readChatLogs(dir)
+    .filter((c) => own(c.name))
+    .map((c) => c.log);
 }
 
 /** The ids of every card the live chats hold: a record of a card that left them has nothing to say any more. */

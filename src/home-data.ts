@@ -1,18 +1,19 @@
 import { readJson } from "../pi/config.ts";
 import { IDLE_TEXT } from "./cards.ts";
+import { readChatLogs } from "./chat-kept.ts";
 import { farTasks } from "./far-tasks.ts";
 import { IDLE_CARD, lastCards, stageSince, stepOf, type TaskRecord, taskStage, taskState } from "./home-stage.ts";
 import { laneNote } from "./lane-note.ts";
 import { readTasksKept, retiredCounts } from "./tasks-kept.ts";
 import { dataDir } from "./paths.ts";
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { hostname } from "node:os";
 import { join } from "node:path";
 import { type Blocker, countSteps, readPlan, type Where } from "./progress.ts";
 import { lineOf, type RoadmapLine } from "./roadmap-line.ts";
 import { roadmapSource, lineclearAllTasks } from "./roadmap-source.ts";
 import { planInputs, titledByStep } from "./task-steps.ts";
-import { keptBy, readJsonKept, refsKey } from "./kept-read.ts";
+import { keptBy, refsKey } from "./kept-read.ts";
 import { spaceStops, waitBlocker, waitingOf } from "./home-waits.ts";
 import { remoteTasks } from "./spread.ts";
 import { readWaits, type Wait, type WaitGroup, waitsForOwner } from "./waits.ts";
@@ -195,12 +196,7 @@ function machineSpaces(dir: string, env: Env, now: number): HomeProject[] {
   const machine = hostname();
   const waits = readWaits(env);
   const honest = new Map(waits.filter((w) => !waitsForOwner(w)).map((w) => [w.task, waitBlocker(w).text] as const));
-  const log = join(dir, "chatlog");
-  const chats = existsSync(log)
-    ? readdirSync(log)
-        .filter((f) => f.endsWith(".json"))
-        .map((f) => readJsonKept<object>(join(log, f)))
-    : [];
+  const chats = readChatLogs(dir).map((c) => c.log);
   const cards = lastCards(chats);
   const owners = new Map<string, { project: string; paused: boolean }[]>();
   const strays: SpaceRecord[] = [];
