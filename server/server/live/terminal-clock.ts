@@ -1,6 +1,10 @@
 // herdr sends no event when a pane's output changes, so a terminal on screen is read again on a clock.
 import type { TermScreen } from '../../shared/types.ts'
 
+/** a terminal is read at most once in this time and only this many are watched: 2 reads a second at most */
+const MIN_PERIOD_MS = 1000
+const MAX_WATCHED = 2
+
 export class TerminalClock {
   private timer?: ReturnType<typeof setInterval>
   private keys: string[] = []
@@ -15,12 +19,16 @@ export class TerminalClock {
 
   /** reads these terminals from now on, and no other; one still watched keeps its clock and what it showed */
   watch(keys: string[]) {
+    keys = keys.slice(0, MAX_WATCHED)
     this.keys = keys
     for (const k of this.shown.keys()) if (!keys.includes(k)) this.shown.delete(k)
     if (!keys.length) return this.stop()
-    this.timer ??= setInterval(() => {
-      for (const k of this.keys) this.tick(k)
-    }, this.everyMs)
+    this.timer ??= setInterval(
+      () => {
+        for (const k of this.keys) this.tick(k)
+      },
+      Math.max(this.everyMs, MIN_PERIOD_MS),
+    )
   }
 
   stop() {

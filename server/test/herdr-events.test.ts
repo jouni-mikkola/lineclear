@@ -103,17 +103,17 @@ function fakeClock() {
 describe('an agents list kept by herdr events', () => {
   writeJson('agents.json', {})
 
-  test('an idle hour with five agents: one subscription, one snapshot, no pane read; a lost one reads once more; a status shows', async () => {
+  test('an idle hour with five agents: one held link and one connection per pane status, one snapshot, no pane read; a lost one reads once more; a status shows', async () => {
     const clock = fakeClock()
     const a = new Agents()
     try {
       a.start()
-      await settled(() => count('events.subscribe') === 1)
+      await settled(() => count('events.subscribe') === 6)
       // open once herdr's first answer is read: the handshake wait (15 s) is over
       await settled(() => !clock.has(15_000))
       expect(a.live.size).toBe(5)
       await clock.advance(60 * 60_000)
-      expect(count('events.subscribe')).toBe(1)
+      expect(count('events.subscribe')).toBe(6)
       expect(count('session.snapshot')).toBe(1)
       expect(count('pane.read')).toBe(0)
       expect(count('pane.process_info')).toBe(0)
@@ -131,11 +131,11 @@ describe('an agents list kept by herdr events', () => {
       subscribers[0].write(`${JSON.stringify({ id: 'sub-1', error: { code: 'events_lost', message: 'behind' } })}\n`)
       await settled(() => !a.reachable)
       await clock.advance(3000)
-      await settled(() => count('events.subscribe') === 2 && count('session.snapshot') === 2 && !clock.has(15_000))
+      await settled(() => count('events.subscribe') === 7 && count('session.snapshot') === 2 && !clock.has(15_000))
       // the snapshot is answered before the hour passes, or its own timeout fires
       await settled(() => a.reachable)
       await clock.advance(60 * 60_000)
-      expect(count('events.subscribe')).toBe(2)
+      expect(count('events.subscribe')).toBe(7)
       expect(count('session.snapshot')).toBe(2)
       expect(count('pane.read') + count('pane.process_info')).toBe(0)
       expect(a.reachable).toBe(true)
@@ -144,11 +144,11 @@ describe('an agents list kept by herdr events', () => {
       subscribers[subscribers.length - 1].end()
       await settled(() => !a.reachable)
       await clock.advance(3000)
-      await settled(() => count('events.subscribe') === 3 && count('session.snapshot') === 3 && !clock.has(15_000))
+      await settled(() => count('events.subscribe') === 8 && count('session.snapshot') === 3 && !clock.has(15_000))
       // the snapshot is answered before the hour passes, or its own timeout fires
       await settled(() => a.reachable)
       await clock.advance(60 * 60_000)
-      expect(count('events.subscribe')).toBe(3)
+      expect(count('events.subscribe')).toBe(8)
       expect(count('session.snapshot')).toBe(3)
       expect(a.reachable).toBe(true)
     } finally {
