@@ -31,6 +31,13 @@ test("a right call scores null, a wrong one says why", () => {
   expect(score(byId("move-2"), did(lc("move", "lineclear", "L58", "--after", "L56")))).toContain("called move");
 });
 
+test("answering a task is a tell, a licence choice is a card", () => {
+  expect(score(byId("answer-1"), did(lc("status"), lc("task", "tell", "LIN-77", "Do not run it.")))).toBeNull();
+  expect(score(byId("answer-1"), did(lc("card", "Run the suite?", "--choice", "yes")))).toContain("called");
+  expect(score(byId("answer-3"), did(lc("card", "Which licence?", "--choice", "MIT", "--choice", "GPL")))).toBeNull();
+  expect(score(byId("answer-3"), did(lc("task", "tell", "LIN-77", "MIT")))).toContain("called");
+});
+
 test("a refusal allows reading and asking, and nothing that changes", () => {
   expect(score(byId("refuse-3"), did(lc("status", "--plan", "LIN-85")))).toBeNull();
   expect(score(byId("refuse-3"), did({ program: "lineclear", args: ["ask", "Merge?"] }))).toBeNull();
