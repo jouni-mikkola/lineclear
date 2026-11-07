@@ -100,31 +100,33 @@ function start(n: number): void {
   console.log(`tasks whose brief was sent again: ${resent}`);
 }
 
+/** A one-call review has no session; its input, counted from the question's size, is stored with its findings. */
+function reviewCallInput(t: Task): number {
+  try {
+    return (JSON.parse(readFileSync(reviewPath(t.id, { LINECLEAR_HOME: BOARD }), "utf8")) as { inputTokens?: number }).inputTokens ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
 function tokens(n: number): void {
   const tasks = doneTasks(n);
   for (const role of ["agent", "reviewer"] as const) {
     const per = tasks
       .map((t) => {
-        // a review is one call without a session: its size is stored with its findings
-        if (role === "reviewer") {
-          const file = reviewPath(t.id, { LINECLEAR_HOME: BOARD });
-          const tokensIn = existsSync(file) ? (JSON.parse(readFileSync(file, "utf8")) as { inputTokens?: number }).inputTokens : undefined;
-          return { fresh: tokensIn ?? 0, cached: Number.NaN, out: Number.NaN, has: tokensIn !== undefined };
-        }
         const u = sessionsOf(t)
           .filter((s) => s.role === role)
           .map((s) => s.usage);
         return {
-          fresh: u.reduce((a, x) => a + x.input + x.cacheWrite, 0),
+          fresh: u.reduce((a, x) => a + x.input + x.cacheWrite, 0) + (role === "reviewer" ? reviewCallInput(t) : 0),
           cached: u.reduce((a, x) => a + x.cacheRead, 0),
           out: u.reduce((a, x) => a + x.output, 0),
-          has: u.length > 0,
+          has: u.length > 0 || (role === "reviewer" && reviewCallInput(t) > 0),
         };
       })
       .filter((p) => p.has);
     const k = (xs: number[]) => xs.map((x) => x / 1000);
     line(`${role} input (new, cache writes), k tokens per task`, k(per.map((p) => p.fresh)), "k", 0);
-    if (role === "reviewer") continue; // a review call reports only the size of its input
     line(`${role} input (cache reads), k tokens per task`, k(per.map((p) => p.cached)), "k", 0);
     line(`${role} output, k tokens per task`, k(per.map((p) => p.out)), "k", 0);
   }
