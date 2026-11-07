@@ -23,6 +23,9 @@ export const gitFailure = (r: GitRun) => (r.ok ? undefined : r.err || r.out.trim
 /** `git -C cwd <args>`: the one way Lineclear runs git. */
 export const git = (cwd: string, ...args: string[]) => gitWith({}, cwd, ...args);
 
+/** Like `git`, stopped after ten minutes: for a git that talks to a remote or runs a hook. */
+export const gitLimited = (cwd: string, ...args: string[]) => gitWith({ timeout: 10 * 60_000 }, cwd, ...args);
+
 /** Like `git`, for a commit made where no git identity is set. */
 export const gitAsLineclear = (cwd: string, ...args: string[]) => git(cwd, "-c", "user.name=Lineclear", "-c", "user.email=lineclear@localhost", ...args);
 

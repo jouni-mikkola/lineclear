@@ -2,7 +2,7 @@ import { statSync } from "node:fs";
 import { loadavg } from "node:os";
 import { join } from "node:path";
 import { sessionFolderPath } from "./harness-pi.ts";
-import { git } from "./git.ts";
+import { gitLimited as git } from "./git.ts";
 import { mainRefs, revertOnMain } from "./main-branch.ts";
 import { lineclearDir } from "./measure.ts";
 import { harnesses, readRegistry } from "./models.ts";
@@ -18,14 +18,14 @@ import { taskWorktree, worktreeClean } from "./worktree.ts";
 
 export type TellKind = "resume" | "answer";
 
-/** Everything a tick needs from outside, so a test can fake each part. */
+/** Everything a tick needs from outside, so a test can fake each part. A method that can fail returns an error text, or undefined. */
 export interface World {
   now(): Date;
   /** A tick starts: what the world read before is read again. */
   newTick?(): void;
   /** Done commits on origin/main, and its head. */
   main(repo: string): { head: string; checkedOut: string; commits: { subject: string; body: string }[] } | string;
-  /** How many commits on origin/main are newer than the one that added the roadmap line `line`, or undefined when none did. */
+  /** How many commits on origin/main are newer than the one that added the roadmap line `line` (a step's `Reopened:` item), or undefined when none did. */
   commitsSince?(repo: string, line: string): number | undefined;
   /** Fetches, then fast-forwards the repo folder when it is clean and on main. */
   fetch(repo: string): void;
@@ -219,7 +219,8 @@ function offeredModels(env: NodeJS.ProcessEnv): World["offered"] {
     const at = now.getTime();
     if (!cached || at - cached.at >= OFFERED_TTL_MS) {
       const set = new Set(readRegistry(harnesses(env)).map((m) => `${m.provider}/${m.name}`));
-      cached = { at, set: set.size > 0 ? set : undefined };
+      if (set.size === 0) return undefined;
+      cached = { at, set };
     }
     return cached.set;
   };

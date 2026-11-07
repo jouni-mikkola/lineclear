@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { git, gitFailure, gitText } from "./git.ts";
+import { gitFailure, gitLimited, gitText } from "./git.ts";
 // Which branch is a repo's main. New repos call it main, many older ones master; origin/HEAD names it when a clone set it.
 
 const exists = (repo: string, ref: string) => gitText(repo, "rev-parse", "--verify", "-q", ref) !== undefined;
@@ -24,17 +24,17 @@ export function revertOnMain(repo: string, commit: string): string | undefined {
   // In a folder of its own, from exactly this commit: a main that moved meanwhile makes the push fail, never overwrites.
   const dir = mkdtempSync(join(tmpdir(), "lineclear-revert-"));
   try {
-    const added = git(repo, "worktree", "add", "--detach", dir, commit);
+    const added = gitLimited(repo, "worktree", "add", "--detach", dir, commit);
     if (!added.ok) return gitFailure(added);
-    const parents = git(dir, "rev-list", "--parents", "-n", "1", commit).out.trim().split(/\s+/).length - 1;
-    const reverted = git(dir, "revert", "--no-edit", ...(parents > 1 ? ["-m", "1"] : []), commit);
+    const parents = gitLimited(dir, "rev-list", "--parents", "-n", "1", commit).out.trim().split(/\s+/).length - 1;
+    const reverted = gitLimited(dir, "revert", "--no-edit", ...(parents > 1 ? ["-m", "1"] : []), commit);
     if (!reverted.ok) {
-      git(dir, "revert", "--abort");
+      gitLimited(dir, "revert", "--abort");
       return gitFailure(reverted);
     }
-    return gitFailure(git(dir, "push", "origin", "HEAD:main"));
+    return gitFailure(gitLimited(dir, "push", "origin", "HEAD:main"));
   } finally {
-    git(repo, "worktree", "remove", "--force", dir);
+    gitLimited(repo, "worktree", "remove", "--force", dir);
     rmSync(dir, { recursive: true, force: true });
   }
 }
