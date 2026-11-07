@@ -1,0 +1,119 @@
+@import "tailwindcss";
+@import "../brand/tokens.css";
+/* The kit's own sources, so Tailwind sees the classes its parts use wherever the CSS is built. */
+@source "./";
+
+@theme inline {
+  --color-base: var(--lc-base);
+  --color-raised: var(--lc-raised);
+  --color-line: var(--lc-line);
+  --color-line2: var(--lc-line2);
+  --color-line3: var(--lc-line3);
+  --color-raised2: var(--lc-raised-2);
+  --color-raised3: var(--lc-raised-3);
+  --color-railbg: var(--lc-rail-bg);
+  --color-fg: var(--lc-fg);
+  --color-fg2: var(--lc-fg2);
+  --color-fg3: var(--lc-fg3);
+  --color-accent: var(--lc-accent);
+  --color-action: var(--lc-action);
+  --color-clear: var(--lc-clear);
+  --color-caution: var(--lc-caution);
+  --color-stop: var(--lc-stop);
+  --font-sans: var(--lc-font);
+  --font-mono: var(--lc-font-mono);
+  --spacing: var(--lc-unit);
+  --text-xs: var(--lc-text-xs);
+  --text-xs--line-height: var(--lc-text-xs-lh);
+  --text-sm: var(--lc-text-sm);
+  --text-sm--line-height: var(--lc-text-sm-lh);
+  --text-base: var(--lc-text-base);
+  --text-base--line-height: var(--lc-text-base-lh);
+  --text-lg: var(--lc-text-lg);
+  --text-lg--line-height: var(--lc-text-lg-lh);
+  --text-xl: var(--lc-text-xl);
+  --text-xl--line-height: var(--lc-text-xl-lh);
+  --text-2xl: var(--lc-text-2xl);
+  --text-2xl--line-height: var(--lc-text-2xl-lh);
+  --text-answer: var(--lc-text-answer);
+  --text-answer--line-height: var(--lc-text-answer-lh);
+  --radius-sm: var(--lc-radius-sm);
+  --radius: var(--lc-radius);
+  --radius-lg: var(--lc-radius-lg);
+}
+
+html {
+  background: var(--lc-base);
+  color: var(--lc-fg);
+  color-scheme: dark;
+  font-family: var(--lc-font);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* One focus ring on every focusable part, and no other. */
+:focus-visible {
+  outline: var(--lc-ring);
+  outline-offset: var(--lc-ring-offset);
+}
+
+/* On a touch screen every button, tab, field and summary is at least 44 px each way. */
+@media (pointer: coarse) {
+  :is(button:not([data-day], [data-dense]), summary, select, input:not([type="checkbox"], [type="radio"], [type="hidden"])) {
+    min-height: 44px;
+  }
+  :is(button:not([data-day], [data-dense]), summary) {
+    min-width: 44px;
+  }
+}
+
+/* Every link, button and summary lightens under a mouse; a part may add its own hover on top. */
+@media (hover: hover) {
+  :is(a[href], button:not(:disabled), summary):hover {
+    filter: brightness(1.15);
+  }
+}
+
+/* A press shows at once, on a click and on a tap (press.ts). Tabs are buttons too. */
+:is(a[href], button:not(:disabled), summary):is(:active, [data-pressed]) {
+  scale: var(--lc-press-scale);
+  filter: var(--lc-press-dim);
+}
+
+/* Everything that acts shows it: a pointer, a fill that lifts in the hover time, and on a phone a target of 48 px.
+   Hover is the one CSS transition in the kit, on the colour of a fill and nothing else; press has none (it shows at
+   once). Every other motion lives in motion.ts only: no other CSS transition or keyframe animation. */
+:is(a[href], button, [role="tab"], [role="button"], summary, select, label[for], input[type="checkbox"], input[type="radio"]) {
+  cursor: pointer;
+  transition: background-color var(--lc-hover-ms) ease-out, color var(--lc-hover-ms) ease-out;
+}
+:is(button, input, select, textarea):disabled {
+  cursor: not-allowed;
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(a[href], button, [role="tab"], [role="button"], summary, select, label[for]) {
+    transition: none;
+  }
+}
+/* On a phone and a tablet every target is at least 48 by 48 px. A link inside running text is not a target of its own. */
+@media (max-width: 1023px) {
+  :is(button, [role="tab"], [role="button"], summary, select, input:not([type="hidden"]), textarea, a[href]:not([data-inline])) {
+    min-height: var(--lc-target);
+    min-width: var(--lc-target);
+  }
+  a[href]:not([data-inline], [data-block], .block, .flex, .grid, .inline-flex, .inline-block) {
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+/* Motion lives in motion.ts only: no CSS transition or keyframe animation anywhere in the kit. */
+
+/* The height of the bottom bar under 1024 px, which pages leave room for; there is none from 1024 px. */
+:root {
+  --bar-h: calc(56px + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 1024px) {
+  :root {
+    --bar-h: 0px;
+  }
+}
