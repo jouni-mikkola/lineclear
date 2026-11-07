@@ -1,5 +1,5 @@
 import { writeAtomic } from "../pi/atomic.ts";
-import { undoApplied } from "./autoplan.ts";
+import { undoApplied } from "./plan-apply.ts";
 import { applyMove } from "./dispatcher.ts";
 import { answerCard, isOpen, type Item, itemPath, KIND_LABEL, readItems, lineclear, usage, waitReason } from "./inbox.ts";
 import { readSettings } from "./project.ts";

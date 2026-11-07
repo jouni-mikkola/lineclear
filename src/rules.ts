@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { writeAtomic } from "../pi/atomic.ts";
 import { configDir, decisionsPath } from "../pi/config.ts";
 import { routeAsks } from "./asks.ts";
-import { settlePlans } from "./autoplan.ts";
+import { settlePlans } from "./plan-apply.ts";
 import { copyStoreQuietly } from "./store-copies.ts";
 import { freshDecisions } from "./decision-dedupe.ts";
 import { answerCard, closeItem, closeSettledUpdates, isOpen, type Item, readItems } from "./inbox.ts";
