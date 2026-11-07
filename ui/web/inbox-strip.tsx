@@ -186,7 +186,7 @@ function Ask({
             className="min-h-9 px-1 text-sm tabular-nums text-fg2 underline underline-offset-4"
             data-inbox-more
           >
-            +{more}
+            +{more} more {more === 1 ? "ask" : "asks"}
           </button>
         )}
       </span>
