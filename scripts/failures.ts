@@ -74,8 +74,9 @@ export interface Verdict {
 
 /** Sorts a step's failures by what the rerun alone showed (`failedAlone`: the ones that failed again). */
 export function judgeFailures(failures: Failure[], failedAlone: Failure[], quarantine: Quarantined[]): Verdict {
-  const broken = failures.filter((f) => failedAlone.includes(f));
-  const flaky = failures.filter((f) => !failedAlone.includes(f));
+  const again = (f: Failure) => failedAlone.some((g) => g.file === f.file && g.test === f.test);
+  const broken = failures.filter(again);
+  const flaky = failures.filter((f) => !again(f));
   const quarantined = flaky.filter((f) => quarantine.some((q) => sameTest(q, f)));
   const unlisted = flaky.filter((f) => !quarantined.includes(f));
   return {
@@ -93,4 +94,18 @@ export const passes = (v: Verdict): boolean => v.broken.length === 0 && v.unlist
 export function aloneCommand(f: Failure): string[] {
   const name = f.test.split(" > ").at(-1) ?? f.test;
   return ["bun", "test", "--timeout", "120000", f.file.startsWith(".") ? f.file : `./${f.file}`, "-t", `${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`];
+}
+
+/** Reruns each failure alone with `runAlone` (true when it passed) and sorts them; server files are named `server/<file>` in the list. */
+export async function rerunVerdict(
+  failures: Failure[],
+  runAlone: (f: Failure) => Promise<boolean>,
+  quarantine: Quarantined[],
+  inServer: boolean,
+): Promise<Verdict> {
+  const failedAlone: Failure[] = [];
+  // a real break fails many tests: past 20 reruns the rest count as broken, so the step stays inside its time
+  for (const [i, f] of failures.entries()) if (i >= 20 || !(await runAlone(f))) failedAlone.push(f);
+  const named = (f: Failure): Failure => (inServer ? { ...f, file: `server/${f.file.replace(/^\.\//, "")}` } : f);
+  return judgeFailures(failures.map(named), failedAlone.map(named), quarantine);
 }

@@ -53,3 +53,20 @@ test("a failed test is rerun alone by its file and name", async () => {
   const { aloneCommand } = await import("../scripts/failures.ts");
   expect(aloneCommand({ file: "test/a.test.ts", test: "group > does (x)" }).slice(-3)).toEqual(["./test/a.test.ts", "-t", "does \\(x\\)"]);
 });
+
+test("the rerun alone names a server break, a quarantined flake and a 6th flake", async () => {
+  const { rerunVerdict, passes } = await import("../scripts/failures.ts");
+  const broke: Failure = { file: "test/s.test.ts", test: "breaks" };
+  const flaky: Failure = { file: "test/s.test.ts", test: "flake 1" };
+  const five = [1, 2, 3, 4, 5].map(listed);
+  // the server's files are listed as server/<file>; only the flake passes alone
+  const alone = async (f: Failure) => f.test !== "breaks";
+  const quarantine = [{ file: "server/test/s.test.ts", test: "flake 1", task: "LE-1" }];
+  const flakeOnly = await rerunVerdict([flaky], alone, quarantine, true);
+  expect(flakeOnly.quarantined).toHaveLength(1);
+  expect(passes(flakeOnly)).toBe(true);
+  const withBreak = await rerunVerdict([flaky, broke], alone, quarantine, true);
+  expect(withBreak.broken.map((f) => f.test)).toEqual(["breaks"]);
+  expect(passes(withBreak)).toBe(false);
+  expect(passes(await rerunVerdict([flake(6)], async () => true, five, true))).toBe(false);
+});
