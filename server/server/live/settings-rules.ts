@@ -31,7 +31,7 @@ export function refuse(key: string, value: string): string | undefined {
   if (key.endsWith('.instructions') && (value.length > 16000 || value.includes('\0')))
     return 'Use at most 16,000 characters, without null characters. Keep secrets in Secrets.'
   const cli = key === 'task.agent' || key === 'coordinator.agent' || (key === 'task.fallback' && value.trim().toLowerCase() !== 'off')
-  if (cli && !kindOf(value)) return `${value} is not an agent herdr can start.`
+  if (cli && !kindOf(value)) return `${value} is not an agent Lineclear runs: pi is the only one.`
   if (key === 'reviewer.agent' && !REVIEWERS.includes(CLI_NAME[kindOf(value) ?? ''] ?? '')) return `Pick one of: ${REVIEWERS.join(' · ')}.`
   if (key.endsWith('.model') && !/^[\w.:/@[\] -]+$/.test(value.trim())) return 'Write a model id like vendor/model-top-5-5, or default.'
   const num = numOf(key)
