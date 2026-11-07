@@ -13,6 +13,12 @@ export const OVERVIEW_MAX = 240
 export const REPLY_AFTER_CARD =
   'reply after it in one or two short lines of plain words: what it means here, what comes next, and whether the human needs to know or do anything (“Letter garden is live. TG-30 starts next, nothing needed from you.”). Never <no-reply> to it.'
 
+/** where a lineclear command comes from: an agent's chat (`TASK-1/Agent`), a space's chat, or a folder */
+export type Ctx = { chat?: string; cwd?: string; stdin?: string; proof?: string }
+
+/** the task whose agent runs the command, none for a coordinator or a human */
+export const agentTask = (ctx: { chat?: string }) => (ctx.chat?.includes('/') ? ctx.chat.split('/')[0] : undefined)
+
 /** what a task holds, in words for the screen without its path: "uncommitted changes" */
 export const heldWords = (h: string) => /\(([^)]*)\)$/.exec(h)?.[1] ?? h
 
