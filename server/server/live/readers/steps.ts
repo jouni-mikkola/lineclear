@@ -379,6 +379,3 @@ function subagent(description: unknown): StepWords {
   const first = /^[A-Za-z]+/.exec(d)?.[0]
   return first && say(first).title !== say(first).doing ? words(`Ask a subagent to ${lower}`) : words(`Ask a subagent: ${d}`)
 }
-
-/** the tool's name as a step keeps it: an MCP server's tool by its own name */
-export const toolName = (name: string) => /^mcp__.+?__(.+)$/.exec(name)?.[1] ?? name

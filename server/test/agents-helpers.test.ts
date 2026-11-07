@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { AgentInfo } from '../server/live/herdr.ts'
-import { holdFrom, ownOldPane } from '../server/live/agent-start.ts'
+import { holdFrom, ownOldPane } from '../server/live/agents-helpers.ts'
 
 describe('holdFrom', () => {
   test('a blocked agent means a menu is up', () => {

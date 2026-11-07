@@ -2,16 +2,6 @@ import { describe, expect, test } from 'bun:test'
 import { existsSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { sh, repo, world, until, started, settingsBlock, writeJson, fakeHerdr } from './engine-world.ts'
-import { seedModels } from './model-fixture.ts'
-
-seedModels()
-
-/** past the time a silent agent would be called asking, nothing says it needs the human */
-async function staysQuiet(w: ReturnType<typeof world>) {
-  await Bun.sleep(4300)
-  expect(w.news.some((n) => n.includes('needs you'))).toBe(false)
-  expect(w.cards.some((c) => c.status === 'need')).toBe(false)
-}
 
 describe('a task is its brief and one agent', () => {
   test('adding a task starts its agent at once, in its own worktree from main, with the brief first', async () => {
@@ -178,26 +168,6 @@ describe('a task is its brief and one agent', () => {
     expect(w.engine.view(t).sub).toBe('Waits for your reply')
   })
 
-  test('what its hooks report waits on you: a permission prompt, its own question tool, a plan, a lost login', async () => {
-    const w = world()
-    const { t, key } = await started(w, repo(), 'hooked')
-    const at = Date.now()
-    w.status[key] = 'blocked'
-    w.said[key] = { state: 'blocked', kind: 'permission', turnAt: at, at }
-    expect(w.engine.statusOf(t)).toBe('need')
-    expect(w.engine.view(t).sub).toBe('Asks permission')
-    w.said[key] = { state: 'blocked', kind: 'question', ask: 'Which colour should the button be?', turnAt: at, at }
-    expect(w.engine.view(t).sub).toBe('Which colour should the button be?')
-    w.said[key] = { state: 'blocked', kind: 'question', turnAt: at, at }
-    expect(w.engine.view(t).sub).toBe('Question for you')
-    w.said[key] = { state: 'blocked', kind: 'plan', turnAt: at, at }
-    expect(w.engine.view(t).sub).toBe('Plan to approve')
-    w.status[key] = 'idle'
-    w.said[key] = { state: 'idle', kind: 'auth', last: 'OAuth token has expired', turnAt: at, at }
-    w.chat.reply = 'Done with the first part.'
-    expect(w.engine.view(t).sub).toBe('Signed out')
-  })
-
   test('a standard reason: a plan, a choice card, a question, a lost login', async () => {
     const w = world()
     const { t, key } = await started(w, repo(), 'reasons')
@@ -229,55 +199,6 @@ describe('a task is its brief and one agent', () => {
     w.agentIs(key, 'idle')
     await until(() => w.cards.length === 1)
     expect(w.news.at(-1)).toBe(`${t.id} needs you: Signed out`)
-  })
-
-  test('a turn that ends while its own background work runs is still work: no news, no card', async () => {
-    const w = world()
-    const { t, key } = await started(w, repo(), 'background')
-    // it started its fresh-eyes reviewer in the background and ended its turn to wait for it
-    w.chat.reply = 'Committed. A reviewer is checking it now.'
-    w.bg[key] = 'agents'
-    w.agentIs(key, 'done')
-    expect(w.engine.statusOf(t)).toBe('work')
-    expect(w.engine.view(t).sub).toBe('Working')
-    await staysQuiet(w)
-    // shells or monitors alone are background work too
-    w.bg[key] = 'shells'
-    expect(w.engine.statusOf(t)).toBe('work')
-    // a link is not a question
-    w.chat.reply = 'The preview is up: https://box.ts.net/app?tab=2'
-    expect(w.engine.statusOf(t)).toBe('work')
-    // a question in its words alone is no fact: still at work while its background work runs
-    w.chat.reply = 'The tests run in the background.\n\nWant me to merge once they pass?'
-    expect(w.engine.statusOf(t)).toBe('work')
-    // a choice card of its waits: that needs you, background or not
-    w.chat.reply = 'Pick one.'
-    w.chat.card = 'ask'
-    expect(w.engine.statusOf(t)).toBe('need')
-    w.chat.card = undefined
-    // the reviewer finished and woke it; it fixed what it found and stopped with nothing left in the background
-    w.agentIs(key, 'working')
-    w.bg[key] = undefined
-    w.chat.reply = 'Fixed both findings.'
-    w.agentIs(key, 'done')
-    await until(() => w.news.some((n) => n.includes('needs you')))
-    expect(w.engine.statusOf(t)).toBe('need')
-  })
-
-  test('SHE-90: a turn that ends with only <no-reply> while its subagent runs is work, never needs you, and no news', async () => {
-    const w = world()
-    const { t, key } = await started(w, repo(), 'paused-reviewer')
-    // its reviewer's notice woke it ("waiting on its own background work") and it answered with a hidden reply only.
-    // That its agent then reports a subagent in the background is tested on the real hooks and Agents
-    // (hooks.test.ts, background.test.ts); this is the engine's half: such a turn is work, with no card and no news
-    w.chat.reply = ''
-    w.bg[key] = 'agents'
-    w.agentIs(key, 'done')
-    expect(w.engine.statusOf(t)).toBe('work')
-    w.chat.reply = '<no-reply>Reviewer still running its checks; waiting for its result</no-reply>'
-    expect(w.engine.statusOf(t)).toBe('work')
-    expect(w.engine.view(t).sub).toBe('Working')
-    await staysQuiet(w)
   })
 
   test('a plan is a card in its chat; the answer goes back as a chat line', async () => {

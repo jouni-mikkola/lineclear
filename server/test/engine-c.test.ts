@@ -1,8 +1,5 @@
 import { fitStatus, reportOf } from './engine-fixture.ts'
 import { describe, expect, test } from 'bun:test'
-import { seedModels } from './model-fixture.ts'
-
-seedModels()
 
 describe("a task's own status line, % done and time left", () => {
   test('a status line longer than 40 characters is cut cleanly at a word', () => {

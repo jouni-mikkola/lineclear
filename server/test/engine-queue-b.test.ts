@@ -427,21 +427,6 @@ describe('pausing', () => {
     expect(t.todo).toBeUndefined()
   })
 
-  test('paused while work it left in the background runs: woken by it, it shows Working again, not To do', async () => {
-    const w = world()
-    const { t, key } = await started(w, repo(), 'pausebg')
-    w.chat.reply = 'A reviewer is checking it now.'
-    w.bg[key] = 'agents'
-    w.agentIs(key, 'done')
-    expect(w.engine.statusOf(t)).toBe('work')
-    await w.engine.pause(t.id)
-    expect(w.engine.statusOf(t)).toBe('todo')
-    w.bg[key] = undefined
-    w.agentIs(key, 'working')
-    expect(w.engine.statusOf(t)).toBe('work')
-    expect(t.todo).toBeUndefined()
-  })
-
   test('an agent paused mid-turn that still reads as working is not taken as woken', async () => {
     const w = world()
     const { t, key } = await started(w, repo(), 'pauselag')

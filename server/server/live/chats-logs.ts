@@ -8,9 +8,8 @@ import { herdr } from './herdr.ts'
 import { logKind } from './readers/find.ts'
 import { LogTail, readerFor } from './readers/index.ts'
 import type { LogEvent } from './readers/types.ts'
-import { findModel, modelsOf, nearest } from './models.ts'
 import { replyOnScreen } from './streaming.ts'
-import { activityOf, codexThreadLog, cutOutput, headlessJob, JobLogs, lastLine, outputAt, shown as shownStep, tailOf, type JobRec } from './activity.ts'
+import { activityOf, cutOutput, lastLine, outputAt, shown as shownStep, tailOf, type JobRec } from './activity.ts'
 import { yours, turnOf, replying, type Shown, type Posted, type ChatLog, safe, type ScreenMenu, parseMenu, sawReply, PIECE } from './chats-helpers.ts'
 
 export class ChatsLogs {
@@ -32,8 +31,6 @@ export class ChatsLogs {
   protected menus = new Map<string, ScreenMenu>()
   protected menuAt = new Map<string, number>()
   protected shown = new Map<string, Shown>()
-  protected jobLogs = new JobLogs()
-  protected threadLogs = new Map<string, string>()
   protected jobsSeen = new Map<string, string>()
 
   /* ---------- Lineclear's own log per chat ---------- */
@@ -306,7 +303,7 @@ export class ChatsLogs {
     return undefined
   }
 
-  /** its log shows a turn that ended after this time */
+  /** its log shows a turn that ended after this time: one cut short (Esc, a prompt turned down) */
   endedSince(key: string, at: number): boolean {
     this.pull(key)
     return (this.events.get(key) ?? []).some((e) => e.kind === 'turn-end' && e.at > at)
@@ -333,28 +330,12 @@ export class ChatsLogs {
 
   /**
    * What it started in the background that still runs, each with what it does now: what its log started and didn't
-   * say is over, and the headless agents it runs. Nothing once it is gone; with Claude Code, nothing once its turn is
-   * over and its session says nothing runs (a log may miss an end).
+   * say is over. Nothing once it is gone.
    */
   jobs(key: string, act = activityOf(this.events.get(key) ?? [])): JobRec[] {
     const st = this.agents.status(key)
     if (st === 'gone') return []
-    const r = this.agents.record(key)
-    let list = act.jobs.map((j) => ({ ...j }))
-    if (r?.kind === 'claude' && st !== 'working' && st !== 'blocked' && !this.agents.stillRuns(key)) list = []
-    const heads = this.agents.reviewers.list(key).map((h) => headlessJob(h, r?.logs ?? []))
-    // a headless agent run as a background shell is the agent, once
-    if (heads.length) list = list.filter((j) => j.kind !== 'shell' || !/\b(codex (exec|e)|(claude|pi)\b.* (-p|--print))\b/.test(j.title))
-    list.push(...heads)
-    for (const j of list) {
-      if (j.kind === 'agent' && !j.log && r?.kind === 'codex') {
-        const f = this.threadLogs.get(j.id) ?? codexThreadLog(j.id)
-        if (f) this.threadLogs.set(j.id, (j.log = f))
-      }
-      if (j.log) j.more = 'steps'
-      j.now = j.log ? this.jobLogs.now(j.log) : j.output ? lastLine(j.output) : undefined
-    }
-    return list
+    return act.jobs.map((j) => ({ ...j, now: j.output ? lastLine(j.output) : undefined }))
   }
 
   /** what runs in the background changed since it was last asked (a pass of the watched chats): a job came or went,
@@ -367,7 +348,7 @@ export class ChatsLogs {
     return true
   }
 
-  /** what the screen opens: a turn's steps, a step's raw output, a background job's own steps or output */
+  /** what the screen opens: a turn's steps, a step's raw output, a background job's output */
   activity(a: ActivityAsk): ActivityAnswer {
     this.pull(a.chat)
     const act = activityOf(this.events.get(a.chat) ?? [])
@@ -384,7 +365,6 @@ export class ChatsLogs {
     }
     const j = this.jobs(a.chat, act).find((x) => x.id === a.id)
     if (!j) return { error: 'That is over now.' }
-    if (j.log) return this.jobLogs.steps(j.log)
     const tail = j.output && tailOf(j.output)
     return tail === undefined || tail === '' ? { error: 'Nothing to show for it yet.' } : cutOutput(tail)
   }
@@ -395,17 +375,8 @@ export class ChatsLogs {
     return replying(turn, !!s?.on && s.turn === turn.id, ev)
   }
 
-  protected controls(key: string, kind: string): ChatControls {
-    // only Claude Code changes model and effort mid-session (/model, /effort); Codex and pi change them only through
-    // their own pickers: their menu only adds files
-    const c = kind === 'claude' ? modelsOf(kind) : undefined
-    const r = this.agents.record(key)
-    const on = findModel(kind, r?.model) ?? c?.models[0]
-    if (!c || !on) return { models: [], model: 0, efforts: [], effort: 0 }
-    // the models it offers, and an older one it was started on (--model model-top-4-8) as well
-    const models = c.models.some((m) => m.id === on.id) ? c.models : [...c.models, on]
-    // the level it runs at: a level this model lacks shows as the nearest it has, as it goes in
-    const effort = nearest(on.efforts, r?.effort) ?? on.effort ?? on.efforts[0]
-    return { models: models.map((m) => m.label), model: models.indexOf(on), efforts: on.efforts, effort: Math.max(0, on.efforts.indexOf(effort ?? '')) }
+  /** Codex and pi change model and effort only through their own pickers: their menu only adds files */
+  protected controls(): ChatControls {
+    return { models: [], model: 0, efforts: [], effort: 0 }
   }
 }

@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import type { TermScreen } from '../../shared/types.ts'
-import type { AgentStatus } from './herdr.ts'
+import type { AgentInfo, AgentStatus, HerdrError } from './herdr.ts'
 import { tag } from './chatlines.ts'
 import { boxDir } from './mfs.ts'
 
@@ -34,8 +34,6 @@ export interface AgentRecord {
   access?: 'full' | 'ask'
   /** environment for its terminal: who it is to the lineclear command */
   env?: Record<string, string>
-  /** where its hooks record what it reports of itself (Claude Code: readers/hooks.ts) */
-  hooks?: string
   /** the CLI, model and effort Settings said for its role when it last started on them: a change since is offered as
    *  a restart in its chat (restart.ts) */
   set?: { kind: string; model?: string; effort?: string }
@@ -103,14 +101,25 @@ export type Events = {
   output: [key: string, screen: TermScreen]
 }
 
-/** where the hooks of the agents Lineclear starts record their events */
-export const HOOKS_DIR = join(boxDir(), 'hooks')
-
 /** where an agent's instructions are kept for its CLI to read */
 export const promptPath = (name: string) => join(boxDir(), 'prompts', `${name}.md`)
 
-/** what an agent's hooks said is read again at most this often */
-export const SAID_MS = 250
+/** herdr refused a start because the agent's name sits on a pane: the pane (not `except`, the new one) that holds
+ *  exactly this name, which is the agent's own earlier pane; never a pane under another name */
+export function ownOldPane(e: unknown, list: AgentInfo[], name: string, except: string): string | undefined {
+  if (!/already used/.test((e as Error)?.message ?? '')) return undefined
+  return list.find((a) => a.name === name && a.pane_id !== except)?.pane_id
+}
+
+/** what a refusal from herdr means for what you send: a menu is up, or the agent just started and herdr doesn't count
+ *  it as its named agent yet ("agent shep-all is not an active named agent"); anything else, it can't go in */
+export function holdFrom(e: unknown): Hold | undefined {
+  const code = (e as HerdrError).code
+  if (code === 'agent_blocked') return 'menu'
+  if (code === 'agent_not_found' || code === 'agent_not_ready' || code === 'agent_not_running') return 'start'
+  if (/not an active named agent/.test((e as Error)?.message ?? '')) return 'start'
+  return undefined
+}
 
 /** wraps text Lineclear sends that is not for the chat (instructions, news), in a tag of what it is when it is one
  *  of its lines: <lineclear><news task="SHE-9" event="merged">…</news></lineclear>; readers' text is stripped of it */

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Task } from '../../shared/types.ts'
-import { effortsOf, findModel, knowsModels, modelsOf } from './models.ts'
+import { effortsOf, findModel, knowsModels, modelsOf } from '../../../src/models.ts'
 import { one, type Parsed } from './args.ts'
 import { harnessProblem } from './restart.ts'
 import { CLI_NAME, CLIS, kindOf, refuse, type Settings } from './settings.ts'

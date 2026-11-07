@@ -1,31 +1,10 @@
 // Faults seen in herdr-projects 2.0 (ebb17d5) that the fork fixes, each with a test that fails on the base's behaviour. The
 // Each is named for the fault it plants.
 import { describe, expect, spyOn, test } from 'bun:test'
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { Engine, fakeHerdr, repo, started, world } from './engine-world.ts'
 
-process.env.CLAUDE_CONFIG_DIR = mkdtempSync(join(tmpdir(), 'shep-claude-'))
-const { canResume } = await import('../server/live/agent-start.ts')
-const { claudeLogPath } = await import('../server/live/readers/find.ts')
 const { Worktrees } = await import('../server/live/engine/worktrees.ts')
 void Engine
-
-describe('(c) a restart that would resume a session Claude Code does not have', () => {
-  test('starts a session of its own instead of failing with "No conversation found"', () => {
-    const cwd = mkdtempSync(join(tmpdir(), 'shep-cwd-'))
-    const rec = { kind: 'claude', cwd, sessionId: '11111111-1111-1111-1111-111111111111', logs: [] as string[] }
-    expect(canResume(rec, cwd)).toBe(false)
-    const log = claudeLogPath(cwd, rec.sessionId)
-    mkdirSync(join(log, '..'), { recursive: true })
-    writeFileSync(log, '{}\n')
-    expect(canResume(rec, cwd)).toBe(true)
-    // the other CLIs resume as before
-    expect(canResume({ ...rec, kind: 'pi', logs: ['/x.jsonl'] }, cwd)).toBe(true)
-    expect(canResume({ ...rec, kind: 'codex', sessionId: undefined as never, logs: [] }, cwd)).toBe(false)
-  })
-})
 
 describe('(d) Ready with no review and no merge', () => {
   test('its agent is told once, and its coordinator hears, after 20 minutes', async () => {

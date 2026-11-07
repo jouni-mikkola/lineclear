@@ -19,7 +19,7 @@ export class EngineLand extends EngineHandoff {
    */
   protected async nudgeToMerge(t: TaskRec, n: number, c: GH.PrChecks) {
     const key = this.key(t)
-    if (!t.landing || t.landing.nudged || (c.state !== 'pass' && c.state !== 'none') || this.agents.background(key)) return
+    if (!t.landing || t.landing.nudged || (c.state !== 'pass' && c.state !== 'none')) return
     t.landing.nudged = true
     this.save()
     // its process ended at ready (landAtReady): the board merges, there is no agent to tell

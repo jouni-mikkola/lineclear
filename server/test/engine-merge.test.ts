@@ -3,9 +3,6 @@ import { existsSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { sh, repo, world, until, started } from './engine-world.ts'
-import { seedModels } from './model-fixture.ts'
-
-seedModels()
 
 /** its worktree stays while its turn runs, and goes once the turn ends */
 async function cleanedAfterTurn(w: ReturnType<typeof world>, t: Awaited<ReturnType<typeof started>>['t'], key: string) {

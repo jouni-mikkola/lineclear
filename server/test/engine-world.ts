@@ -22,7 +22,6 @@ export const writeJson = (name: string, value: unknown) => {
 }
 export const { fakeHerdr } = await import('./fake-herdr.ts')
 export const G = await import('../server/live/engine/git.ts')
-type Said = import('../server/live/readers/hooks.ts').Said
 
 // each engine's timers stop with its test: a sweep an earlier test's engine starts 20 s on (sooner than its test ends
 // on a busy machine) would go through the files this test's engine uses
@@ -47,10 +46,6 @@ export function world(herdr = fakeHerdr(), o: { boot?: string } = {}) {
   const records: Record<string, { kind: string; started: number; finished?: boolean }> = {}
   const panes: Record<string, string> = {}
   const outbox: string[] = []
-  /** work an agent started in the background that still runs: a subagent, or shells */
-  const bg: Record<string, string | undefined> = {}
-  /** what an agent reports of itself through its hooks */
-  const said: Record<string, Said | undefined> = {}
   const routed: Record<string, boolean> = {}
   const agents = {
     routed: (key: string) => routed[key] ?? false,
@@ -71,8 +66,6 @@ export function world(herdr = fakeHerdr(), o: { boot?: string } = {}) {
       return { waiting: false, item: {} }
     },
     status: (key: string) => status[key] ?? 'gone',
-    background: (key: string) => bg[key],
-    said: (key: string) => said[key],
     record: (key: string) => records[key],
     herdrView: () => undefined,
     info: (key: string) => (status[key] && status[key] !== 'gone' && panes[key] ? { pane_id: panes[key] } : undefined),
@@ -159,9 +152,7 @@ export function world(herdr = fakeHerdr(), o: { boot?: string } = {}) {
     brief,
     herdr,
     chat,
-    bg,
     forgot,
-    said,
     stopped,
   }
 }

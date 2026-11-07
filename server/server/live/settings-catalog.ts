@@ -1,77 +1,17 @@
-import { CHAT_KINDS } from './readers/index.ts'
 import { cpus } from 'node:os'
 import { NOTIFY, NOTIFY_DEFAULT, NOTIFY_KEY } from '../../shared/alerts.ts'
 import { SEVERITIES } from './prompts.ts'
-import { herdrCliSync } from './herdr.ts'
-import { effortFor, effortsOf, findModel, LEVELS, modelsOf } from './models.ts'
+import { effortFor, effortsOf, findModel, LEVELS, modelsOf } from '../../../src/models.ts'
 import { OWN_ZONE, validZone } from './trigger.ts'
 
-/** every agent kind herdr can start (interactive chat requires runtime log discovery and a reader) */
-const FALLBACK_KINDS = [
-  'pi',
-  'claude',
-  'codex',
-  'gemini',
-  'cursor',
-  'devin',
-  'agy',
-  'cline',
-  'omp',
-  'mastracode',
-  'copilot',
-  'kimi',
-  'kiro',
-  'droid',
-  'amp',
-  'grok',
-  'hermes',
-  'kilo',
-  'qodercli',
-  'qwen',
-  'letta',
-  'maki',
-  'muse',
-]
+/** pi runs every agent: it is the one CLI to pick, by its name or its herdr kind */
+export const CLIS: string[] = ['pi']
+export const KIND: Record<string, string> = { pi: 'pi' }
+export const CLI_NAME: Record<string, string> = { pi: 'pi' }
 
-function herdrKinds(): string[] {
-  try {
-    const r = herdrCliSync(['agent', 'start', '--help'])
-    const m = `${r?.out}${r?.err}`.match(/possible values: ([^\]]+)\]/)
-    const kinds = m?.[1]
-      .split(',')
-      .map((k) => k.trim())
-      .filter(Boolean)
-    if (kinds?.length) return kinds
-  } catch {
-    /* herdr not on PATH */
-  }
-  return FALLBACK_KINDS
-}
-
-// GitHub Copilot by its full name, not to be taken for the Copilot mode
-const NAMES: Record<string, string> = {
-  claude: 'Claude Code',
-  pi: 'pi',
-  qodercli: 'Qoder',
-  agy: 'Antigravity',
-  omp: 'Oh My Pi',
-  mastracode: 'Mastra Code',
-  copilot: 'GitHub Copilot',
-}
-const nameOf = (kind: string) => NAMES[kind] ?? kind[0].toUpperCase() + kind.slice(1)
-const KINDS = herdrKinds()
-// chat-readable kinds first, then the rest as herdr lists them
-const ORDER = [...CHAT_KINDS, ...KINDS.filter((k) => !CHAT_KINDS.includes(k))].filter((k) => KINDS.includes(k))
-
-export const CLIS: string[] = ORDER.map(nameOf)
-const CHAT_CLIS = ORDER.filter((kind) => CHAT_KINDS.includes(kind)).map(nameOf)
-export const KIND: Record<string, string> = Object.fromEntries(ORDER.map((k) => [nameOf(k), k]))
-export const CLI_NAME: Record<string, string> = Object.fromEntries(ORDER.map((k) => [k, nameOf(k)]))
-
-/** a CLI by its name or its herdr kind, any case ("Claude Code", "claude"): its kind */
+/** a CLI by its name or its herdr kind, any case: its kind */
 export function kindOf(cli: string): string | undefined {
-  const c = cli.trim().toLowerCase()
-  return ORDER.find((k) => k === c || nameOf(k).toLowerCase() === c)
+  return cli.trim().toLowerCase() === 'pi' ? 'pi' : undefined
 }
 
 /** the effort words a setting may hold: each CLI and model takes its own few of them (models.ts), the rest becoming the
@@ -79,7 +19,7 @@ export function kindOf(cli: string): string | undefined {
 const EFFORTS = ['default', ...LEVELS]
 
 /** the CLIs a brief's Review line may suggest for a task's review */
-export const REVIEWERS = ['Claude Code', 'pi']
+export const REVIEWERS = ['pi']
 
 /** the agents Settings picks a CLI, model and effort for */
 export type Role = 'task' | 'coordinator' | 'reviewer' | 'backup'
@@ -184,10 +124,10 @@ export const CATALOG: Section[] = [
     about:
       "What each kind of agent starts with: its CLI and effort. The models of tasks, reviewers and the backup are Lineclear's Settings > Models. Default is the agent's own effort. Backup takes a task over when its agent can't go on. Chat choices need a chat log reader; other installed CLIs cannot show replies here. Headless review is separate.",
     rows: [
-      ...agentRows('Tasks', 'task', [...CHAT_CLIS], 'default', 'default'),
-      ...agentRows('Coordinators', 'coordinator', [...CHAT_CLIS], 'default', 'default'),
+      ...agentRows('Tasks', 'task', [...CLIS], 'default', 'default'),
+      ...agentRows('Coordinators', 'coordinator', [...CLIS], 'default', 'default'),
       // a backup agent takes a task over where its agent can't go on (engine.ts cantGoOn)
-      { group: 'Backup', label: 'Agent', key: 'task.fallback', value: 'pi', options: ['off', ...CHAT_CLIS] },
+      { group: 'Backup', label: 'Agent', key: 'task.fallback', value: 'pi', options: ['off', ...CLIS] },
       { group: 'Backup', label: 'Model', key: 'backup.model', value: 'default', text: true },
       { group: 'Backup', label: 'Effort', key: 'backup.effort', value: 'default', options: [...EFFORTS] },
     ],
@@ -246,7 +186,7 @@ export const CATALOG: Section[] = [
 
 /** the CLI a role's agent runs, by these settings: its herdr kind; nothing for an unset backup */
 export const roleKind = (role: Role, get: (key: string) => string) =>
-  kindOf(get(role === 'backup' ? 'task.fallback' : `${role}.agent`)) ?? (role === 'backup' ? undefined : 'claude')
+  kindOf(get(role === 'backup' ? 'task.fallback' : `${role}.agent`)) ?? (role === 'backup' ? undefined : 'pi')
 
 /** the model rows Lineclear's lists replace: a model set here would disagree with the list that starts tasks */
 export const LINECLEAR_MODELS = new Set(['task.model', 'reviewer.model', 'backup.model'])

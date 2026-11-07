@@ -6,7 +6,6 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { helperFiles, helperVersion } from '../server/live/install.ts'
-import { carryClaudeSession } from '../server/live/agent-start.ts'
 import type { BoxInfo } from '../server/live/box.ts'
 import { until } from './until.ts'
 
@@ -164,28 +163,6 @@ describe('a machine run from the main one', () => {
       expect(away[1]).toContain("The main machine's Lineclear can't be reached right now")
     } finally {
       server.stop(true)
-    }
-  })
-
-  test('a session resumed in another folder takes its transcript along, wherever Claude Code wrote it', () => {
-    const claude = mkdtempSync(join(tmpdir(), 'shep-carry-'))
-    const was = process.env.CLAUDE_CONFIG_DIR
-    process.env.CLAUDE_CONFIG_DIR = claude
-    try {
-      // it ran in the home folder, not the folder its record named
-      mkdirSync(join(claude, 'projects', '-home-user'), { recursive: true })
-      writeFileSync(join(claude, 'projects', '-home-user', 'abc.jsonl'), '{"type":"user"}\n')
-      const log = carryClaudeSession('abc', '/home/user/.lineclear/coordinators/machine')
-      expect(log).toBe(join(claude, 'projects', '-home-user--lineclear-coordinators-machine', 'abc.jsonl'))
-      expect(readFileSync(log!, 'utf8')).toBe('{"type":"user"}\n')
-      // one that is there already stays as it is; one written nowhere has nothing to carry
-      writeFileSync(log!, 'kept\n')
-      expect(carryClaudeSession('abc', '/home/user/.lineclear/coordinators/machine')).toBe(log)
-      expect(readFileSync(log!, 'utf8')).toBe('kept\n')
-      expect(carryClaudeSession('nope', '/home/user/elsewhere')).toBeUndefined()
-    } finally {
-      if (was === undefined) delete process.env.CLAUDE_CONFIG_DIR
-      else process.env.CLAUDE_CONFIG_DIR = was
     }
   })
 })
