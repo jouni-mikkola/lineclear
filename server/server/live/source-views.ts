@@ -200,7 +200,7 @@ export class LiveSourceViews extends LiveSourceState {
       }
       if (card.ask) shown.set(card.id, this.askOf(card.ask, tc, waits, t.id))
     }
-    if (saved) this.chats.saveLog(c.key)
+    if (saved) this.chats.keep(c.key)
     if (!shown.size) return c
     return { ...c, messages: c.messages.map((m) => (m.card && shown.has(m.card.id) ? { ...m, card: { ...m.card, ask: shown.get(m.card.id) } } : m)) }
   }
@@ -242,7 +242,7 @@ export class LiveSourceViews extends LiveSourceState {
     const p = l.posted.findLast((x) => x.card?.ask?.chat === key)
     if (p?.card?.ask) {
       p.card.ask.answered = { where: 'space', text }
-      this.chats.saveLog(space)
+      this.chats.keep(space)
     }
     const task = key.split('/')[0]
     const words = `The human answered ${task}'s question from its card in this chat (“${excerpt(title, 120)}”: ${excerpt(text, 200)}). It went to ${task}'s agent as their answer: don't answer it too. Nothing else to say: reply with only <no-reply>answered by the human</no-reply>.`

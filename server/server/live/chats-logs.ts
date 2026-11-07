@@ -1,7 +1,6 @@
-import { existsSync, rmSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync } from 'node:fs'
 import type { ChatControls, Question } from '../../shared/types.ts'
-import { HOME, readJson, writeJson } from '../store.ts'
+import { ChatRows } from './chat-rows.ts'
 import { stripHidden, type Agents, type OutItem } from './agents.ts'
 import { agentLines } from './agentlines.ts'
 import { herdr } from './herdr.ts'
@@ -30,6 +29,7 @@ export class ChatsLogs {
   /** a chat's logs were read in the background to their end: what it shows changed */
   onRead?: (key: string) => void
   protected logs = new Map<string, ChatLog>()
+  protected rows = new ChatRows()
   protected menus = new Map<string, ScreenMenu>()
   protected menuAt = new Map<string, number>()
 
@@ -38,20 +38,21 @@ export class ChatsLogs {
   log(key: string): ChatLog {
     let l = this.logs.get(key)
     if (!l) {
-      l = readJson<ChatLog>(`chatlog/${safe(key)}.json`, { posted: [], answers: {} })
+      l = this.rows.load(safe(key))
       this.logs.set(key, l)
     }
     return l
   }
 
-  saveLog(key: string) {
-    writeJson(`chatlog/${safe(key)}.json`, this.log(key))
+  /** writes the rows of this chat's log that changed since they were read or last kept */
+  keep(key: string) {
+    this.rows.save(safe(key), this.log(key))
   }
 
   /** a deleted task's chat: its log goes, and all that was read of it */
   forget(key: string) {
     for (const m of [this.tails, this.events, this.where, this.reading, this.logs, this.menus, this.menuAt]) m.delete(key)
-    rmSync(join(HOME, 'chatlog', `${safe(key)}.json`), { force: true })
+    this.rows.forget(safe(key))
   }
 
   /** told of each new post: the chat has something new (unread.ts) */
@@ -63,7 +64,7 @@ export class ChatsLogs {
     const item = { at: Date.now(), ...p }
     if (i >= 0) l.posted[i] = { ...l.posted[i], ...item, at: l.posted[i].at }
     else l.posted.push(item)
-    this.saveLog(key)
+    this.keep(key)
     if (i < 0 && !p.who) this.onPost?.(key)
   }
 
@@ -72,13 +73,13 @@ export class ChatsLogs {
     const l = this.log(key)
     l.answers[qid] = choice
     if (other || space) (l.said ??= {})[qid] = { text: other, space }
-    this.saveLog(key)
+    this.keep(key)
   }
 
   /** a reply to the agent's plain question went from its copy in a space's chat: the reply says so */
   repliedFrom(key: string, reply: string, space: string) {
     ;(this.log(key).said ??= {})[`reply:${reply}`] = { space }
-    this.saveLog(key)
+    this.keep(key)
   }
 
   /** where a question answered on its copy in a space's chat says it was answered, with a link there */
@@ -94,7 +95,7 @@ export class ChatsLogs {
       l.answers[p.question!.id] = -1
       ;(l.said ??= {})[p.question!.id] = { text: text?.trim() || undefined, chat: true }
     }
-    this.saveLog(key)
+    this.keep(key)
     return true
   }
 

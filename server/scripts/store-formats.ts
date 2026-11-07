@@ -68,6 +68,7 @@ function taskIds(): string[] {
 /** Chats and the Inbox live in chatlog/: the server falls back to an empty chat on a file it cannot parse, so a bad one loses its cards. */
 function chats(): string[] {
   const dir = join(home, 'chatlog')
+  if (!existsSync(dir)) return []
   const bad = readdirSync(dir).filter((f) => {
     if (!f.endsWith('.json')) return false
     try {

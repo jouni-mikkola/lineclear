@@ -4,6 +4,7 @@ import { execSync } from 'node:child_process'
 import { existsSync, mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { db } from '../server/store.ts'
 
 describe('private instruction CLI', () => {
   test('an explicit empty value suppresses inherited instructions without restarting agents', async () => {
@@ -200,7 +201,8 @@ describe('deleting a task from the command', () => {
     expect(src.engine.task(t.id)).toBeUndefined()
     expect(existsSync(t.worktree!)).toBe(false)
     expect(execSync('git branch --list "work/*"', { cwd: dir, encoding: 'utf8' }).trim()).toBe('')
-    expect(existsSync(join(process.env.LINECLEAR_HOME!, 'chatlog', `${key.replace('/', '_')}.json`))).toBe(false)
+    await Promise.resolve()
+    expect(db.query('select 1 from chatlog where chat = ?').get(key.replace('/', '_'))).toBeNull()
     expect(existsSync(file)).toBe(false)
     expect(src.agents.record(key)).toBeUndefined()
     expect((await src.cli(['task', 'list'], {})).out).not.toContain(t.id)
