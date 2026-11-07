@@ -10,7 +10,7 @@ export { codeVersion } from './worker-process.ts'
 
 export class Machines extends MachinesActions {
   /** saved: herdr's list of machines; none (tests) runs only the workers adopt() names */
-  constructor(saved: (() => Promise<Saved[]>) | null = savedMachines, status: typeof machineStatus = machineStatus) {
+  constructor(saved: (() => Promise<Saved[] | null>) | null = savedMachines, status: typeof machineStatus = machineStatus) {
     super(saved, status)
     // from the time Lineclear was installed on every machine: the machines that announced themselves
     rmSync(join(HOME, 'peers.json'), { force: true })
@@ -23,7 +23,9 @@ export class Machines extends MachinesActions {
         this.pendingResume.set(k.saved.label, k)
       }
       void this.sync()
-      this.timers.push(setInterval(() => void this.sync(), 15_000))
+      // a machine that just showed it has no working task may be the next to update
+      this.on('snapshot', () => this.stepUpdates())
+      this.timers.push(setInterval(() => this.tick(), 15_000))
     }
   }
 }

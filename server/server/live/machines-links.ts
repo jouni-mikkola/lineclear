@@ -12,7 +12,7 @@ import { codeVersion, readAddress, running, type Worker } from './worker-process
 
 export class MachinesLinks extends LinkPoll {
   constructor(
-    protected saved: (() => Promise<Saved[]>) | null = savedMachines,
+    protected saved: (() => Promise<Saved[] | null>) | null = savedMachines,
     protected status: typeof machineStatus = machineStatus,
   ) {
     super()
@@ -40,10 +40,12 @@ export class MachinesLinks extends LinkPoll {
     const was = workerRecord(k.saved.label)
     const w = running(was.pid, was.token)
     if (!w) return
-    if (was.port && was.code === codeVersion()) {
+    if (was.port) {
       this.own(l, w)
       l.rec.url = `http://127.0.0.1:${was.port}`
       l.state = 'Connecting…'
+      // a worker on older code goes on until it has no working task, one machine at a time (stepUpdates)
+      if (was.code !== codeVersion()) this.stale.add(l)
       void this.poll(l)
       // a newer helper goes there meanwhile, without stopping the worker
       void this.refresh(l)
@@ -102,6 +104,46 @@ export class MachinesLinks extends LinkPoll {
   }
 
   protected syncing = false
+  /** machines whose worker runs older code: each is replaced when it has no working task */
+  protected stale = new Set<Link>()
+  protected updating?: Link
+  protected ticks = 0
+
+  /** every 15 s: workers that are down start again, the next update goes. herdr is read at start, on a change
+   *  (sync) and every 30 minutes, never on each tick */
+  protected tick() {
+    if (this.stopped) return
+    if (++this.ticks % 120 === 0) return void this.sync()
+    for (const l of this.links.values()) if (!l.worker && !l.busy && this.active(l)) void this.start(l)
+    this.stepUpdates()
+  }
+
+  /** whether a machine's worker has a task at work or merging; not read yet counts as working */
+  protected working(l: Link) {
+    return !l.snap || l.snap.tasks.some((t) => t.status === 'work' || t.status === 'merging')
+  }
+
+  /** the one worker on older code that may go now: idle, and no other is updating. A busy one waits for its turn */
+  stepUpdates() {
+    if (this.updating || this.stopped) return
+    const l = [...this.links.values()].find((x) => this.stale.has(x) && x.worker && !x.busy && this.active(x) && !this.working(x))
+    const w = l?.worker
+    if (!l || !w) return
+    this.updating = l
+    l.busy = true
+    w.kill()
+    // a merge finishes on its way (main.ts): the new worker starts once the old one is gone, never beside it
+    void Promise.race([w.exited, Bun.sleep(MERGE_DEADLINE + 30_000)])
+      .then(async () => {
+        l.busy = false
+        this.stale.delete(l)
+        if (this.active(l)) await this.start(l)
+      })
+      .finally(() => {
+        this.updating = undefined
+        this.stepUpdates()
+      })
+  }
 
   /** the machines herdr has saved: a new one is set up and started, a removed one stopped */
   async sync() {
@@ -109,6 +151,8 @@ export class MachinesLinks extends LinkPoll {
     this.syncing = true
     try {
       const saved = await this.saved()
+      // herdr could not be read: every worker stays as it is
+      if (!saved) return
       const status = await this.status()
       if (this.stopped) return
       for (const m of saved.filter((m) => m.enabled !== false)) {

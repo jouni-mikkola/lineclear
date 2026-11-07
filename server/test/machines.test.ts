@@ -301,7 +301,7 @@ describe('a restart of the main server (an update)', () => {
     try {
       await until(() => !w.alive(), 'the worker to stop')
       expect(w.alive()).toBe(false)
-      expect(m.list()[0].worker?.pid).not.toBe(w.pid)
+      await until(() => m.list()[0].worker?.pid !== w.pid, 'its worker to be gone')
     } finally {
       m.stop()
       if (w.alive()) process.kill(w.pid)
