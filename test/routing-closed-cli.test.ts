@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { realWorld, taskStatus } from "../src/real-world.ts";
+import { realWorld, taskStatus } from "../src/world.ts";
 
 test("a task show answer gives its status; anything else gives none", () => {
   expect(taskStatus(JSON.stringify({ id: "A-1", status: "done" }))).toBe("done");
