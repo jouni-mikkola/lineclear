@@ -92,4 +92,8 @@ test('a task started on machine B has its agent recorded as run on B, none on th
   const lines = readWork().filter((l) => l.step === t.id)
   expect(lines.map((l) => l.work)).toEqual(['agent'])
   expect(lines.every((l) => l.machine === 'boxb')).toBe(true)
+  // an agent seen as gone on every tick is launched again each time: still one run line
+  const launch = (w.engine as unknown as { launch(t: unknown): Promise<unknown> }).launch.bind(w.engine)
+  for (let i = 0; i < 100; i++) await launch(t)
+  expect(readWork().filter((l) => l.step === t.id)).toHaveLength(1)
 })
