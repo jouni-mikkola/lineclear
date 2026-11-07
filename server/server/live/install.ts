@@ -183,9 +183,11 @@ perl -e 'rename($ARGV[0], $ARGV[1]) or die "rename: $!"' "$d/.current.$$" "$d/cu
 for n in bin skill route.pl version; do
   [ -L "$d/$n" ] || { rm -rf "$d/$n"; ln -s "current/$n" "$d/$n"; }
 done
-for old in "$d"/v/*; do
-  case "$old" in "$d/v/$ver"|"$d/$prev") ;; *) rm -rf "$old" ;; esac
-done
+if [ "$prev" != "v/$ver" ]; then
+  for old in "$d"/v/*; do
+    case "$old" in "$d/v/$ver"|"$d/$prev") ;; *) rm -rf "$old" ;; esac
+  done
+fi
 `
 
 /** put the helper there (again): a new version folder is switched in, the old one stays beside it */
