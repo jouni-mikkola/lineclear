@@ -27,8 +27,17 @@ export interface WorkLine {
   reason: string;
 }
 
-/** One line of work done for `task` on this machine (or `machine` when the server acts for another). */
+const AGENT_REPEAT_MS = 10 * 60_000;
+const agentWrittenAt = new Map<string, number>();
+
+/** One line of work done for `task` on this machine (or `machine` when the server acts for another). An agent start the server asks for on every tick is written once per 10 minutes. */
 export function recordWork(task: string, work: Work, env: Env = process.env, machine = machineOf(env)): void {
+  if (work === "agent") {
+    const key = `${decisionsFile(env)}|${task}|${machine}`;
+    const now = Date.now();
+    if (now - (agentWrittenAt.get(key) ?? 0) < AGENT_REPEAT_MS) return;
+    agentWrittenAt.set(key, now);
+  }
   const file = decisionsFile(env);
   mkdirSync(dirname(file), { recursive: true });
   const line: WorkLine = { time: new Date().toISOString(), project: "-", step: task, kind: "run", work, machine, reason: `${work} ran on ${machine}` };
