@@ -12,9 +12,9 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-type Task = { id: string; project: string; created: number; doneAt?: number; worktree: string; briefResent?: unknown; mergeStopped?: unknown };
+type Task = { id: string; project: string; created: number; doneAt?: number; worktree: string; briefResent?: unknown; mergeStopped?: unknown; startMs?: { worktree: number; install: number; session: number } };
 type Usage = { input: number; output: number; cacheRead: number; cacheWrite: number };
-type Session = { role: "agent" | "reviewer"; firstToolCallAt?: number; usage: Usage };
+type Session = { role: "agent" | "reviewer"; openedAt?: number; promptAt?: number; firstToolCallAt?: number; usage: Usage };
 
 const SESSIONS = join(homedir(), ".pi/agent/sessions");
 const BOARD = join(homedir(), ".lineclear");
@@ -50,14 +50,18 @@ function sessionsOf(task: Task): Session[] {
       const usage: Usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
       let role: Session["role"] = "reviewer";
       let firstToolCallAt: number | undefined;
+      let openedAt: number | undefined;
+      let promptAt: number | undefined;
       let seenUser = false;
       for (const raw of readFileSync(join(dir, f), "utf8").split("\n")) {
         if (!raw) continue;
         const e = JSON.parse(raw) as { type: string; timestamp?: string; message?: { role: string; content: unknown; usage?: Usage } };
+        openedAt ??= Date.parse(e.timestamp ?? "");
         const m = e.message;
         if (e.type !== "message" || !m) continue;
         if (m.role === "user" && !seenUser) {
           seenUser = true;
+          promptAt = Date.parse(e.timestamp ?? "");
           if (JSON.stringify(m.content).includes("Settings: (from lineclear show")) role = "agent";
         }
         if (m.role !== "assistant") continue;
@@ -65,19 +69,28 @@ function sessionsOf(task: Task): Session[] {
           firstToolCallAt = Date.parse(e.timestamp ?? "");
         for (const k of Object.keys(usage) as (keyof Usage)[]) usage[k] += m.usage?.[k] ?? 0;
       }
-      return { role, firstToolCallAt, usage };
+      return { role, openedAt, promptAt, firstToolCallAt, usage };
     });
 }
 
 function start(n: number): void {
   const secs: number[] = [];
+  const phases: Record<string, number[]> = { worktree: [], install: [], session: [], "pi open": [], "brief delivered": [], "first call": [] };
   let resent = 0;
   for (const t of doneTasks(n)) {
-    const first = sessionsOf(t).find((s) => s.role === "agent")?.firstToolCallAt;
-    if (first) secs.push((first - t.created) / 1000);
+    const s = sessionsOf(t).find((x) => x.role === "agent");
+    if (s?.firstToolCallAt) secs.push((s.firstToolCallAt - t.created) / 1000);
+    if (t.startMs) for (const k of ["worktree", "install", "session"] as const) phases[k]?.push(t.startMs[k] / 1000);
+    // from the session file: add to pi's first line, pi's first line to the brief, the brief to the first tool call
+    if (s?.openedAt && s.promptAt && s.firstToolCallAt) {
+      phases["pi open"]?.push((s.openedAt - t.created) / 1000);
+      phases["brief delivered"]?.push((s.promptAt - s.openedAt) / 1000);
+      phases["first call"]?.push((s.firstToolCallAt - s.promptAt) / 1000);
+    }
     if (t.briefResent) resent++;
   }
   line("task add to first tool call", secs, "s");
+  for (const [name, xs] of Object.entries(phases)) if (xs.length) line(`  phase ${name}`, xs, "s");
   console.log(`tasks whose brief was sent again: ${resent}`);
 }
 

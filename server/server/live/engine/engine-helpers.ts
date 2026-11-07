@@ -16,6 +16,8 @@ export interface TaskRec {
   /** the file under the data folder that holds the brief, and its size in bytes */
   briefPath?: string
   briefSize?: number
+  /** the phases of its start in ms: worktree, install, session (the agent's launch) */
+  startMs?: { worktree: number; install: number; session: number }
   by: string
   /** Exact coordinator chat that requested this task, when known. */
   requester?: string

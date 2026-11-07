@@ -21,6 +21,8 @@ export interface Made {
   path: string
   workspace: string
   root?: string
+  /** how long its worktree and its install step took, in ms (the start's phases, scripts/core-baseline.ts) */
+  took?: { worktree: number; install: number }
 }
 
 /** where a task's worktree belongs: its project's repo, and the name of the project's own space (its coordinator's) */
@@ -96,6 +98,7 @@ export class Worktrees {
    * opened instead.
    */
   async create(home: Home, branch: string, base: string, label: string, path?: string): Promise<Made> {
+    const t0 = Date.now()
     const open = async () => {
       const at = await G.worktreeOf(home.repo, branch)
       return at && existsSync(at) ? this.made(await this.opening(home, (from) => this.h.worktreeOpen(from, at, label)), at) : undefined
@@ -113,13 +116,14 @@ export class Worktrees {
     }
     const made = this.made(r)
     await G.copyIncludes(home.repo, made.path)
-    return this.installed(home, made)
+    return this.installed(home, made, t0)
   }
 
   /** its install step has run (a failure throws; the worktree stays, and the next start runs the step again) */
-  private async installed(home: Home, made: Made) {
+  private async installed(home: Home, made: Made, t0 = Date.now()) {
+    const t1 = Date.now()
     await G.install(made.path, home.install)
-    return made
+    return { ...made, took: { worktree: t1 - t0, install: Date.now() - t1 } }
   }
 
   /** the task's space: its herdr worktree workspace, or the plain one by its label (a task started before) */

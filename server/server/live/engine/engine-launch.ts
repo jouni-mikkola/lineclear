@@ -424,7 +424,9 @@ export class EngineLaunch extends EngineStalls {
       }
       Object.assign(t, { branch, worktree: made.path })
       this.save()
+      const launched = Date.now()
       await this.launch(t, this.queued(t) ? `${taskFirst(t)}\n\n${queuedLine(this.open(t), 'start', t.id)}` : taskFirst(t), made)
+      if (made.took) t.startMs = { ...made.took, session: Date.now() - launched }
       this.briefing.add(t.id)
       clearTimeout(this.later.get(`${t.id}:brief`))
       const x = setTimeout(() => {
