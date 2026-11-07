@@ -48,7 +48,8 @@ export async function workedTask(name: string) {
   const t = src.engine.add({ project: p.name, title: 'Worked', by: 'test' })
   src.engine.machine = machine
   src.engine.room = room
-  await until(() => !!t.worktree).catch(() => undefined)
+  // the worktree is there before the agent's start is over, and a delete in that time is refused as busy
+  await until(() => !!t.worktree && t.phase !== 'starting').catch(() => undefined)
   // never in the folder the tests run from
   if (!t.worktree) throw new Error(`${t.id} got no worktree: ${t.trouble}`)
   execSync('echo x > x.txt && git add -A && git commit -qm work', { cwd: t.worktree!, shell: '/bin/sh' })
