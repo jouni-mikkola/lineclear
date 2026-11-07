@@ -28,6 +28,7 @@ export class AgentsDelivery extends AgentsState {
 
   stop() {
     this.stopped = true
+    for (const rpc of this.rpcs.values()) rpc.stop()
     if (this.timer) clearInterval(this.timer)
     if (this.retryTimer) clearTimeout(this.retryTimer)
     this.terminals.stop()
@@ -85,7 +86,7 @@ export class AgentsDelivery extends AgentsState {
     this.listed = list
     this.heardAt = Date.now()
     this.live = new Map(list.filter((a) => a.name).map((a) => [a.name!, a]))
-    for (const [key, a] of this.rpcs) this.live.set(this.records[key].name, this.rpcInfo(this.records[key], a))
+    for (const [key, a] of this.rpcs) if (this.records[key]) this.live.set(this.records[key].name, this.rpcInfo(this.records[key], a))
     this.settle()
     void this.routes.repair()
     this.sub.set(paneEvents(list.map((x) => x.pane_id)))
@@ -361,12 +362,12 @@ export class AgentsDelivery extends AgentsState {
     const a = this.info(key)
     if (this.records[key]) this.records[key].finished = true
     this.save()
-    if (!a) return
     const rpc = this.rpcs.get(key)
     if (rpc) {
       this.rpcEnded(key, rpc)
       return rpc.stop()
     }
+    if (!a) return
     const close = herdr.closePane(a.pane_id)
     await (strict ? close : close.catch(() => undefined))
     await this.refresh() // gone from what herdr runs at once, so starting it again starts a new one

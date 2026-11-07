@@ -17,17 +17,23 @@ writeFileSync(
 import { appendFileSync } from 'node:fs'
 const send = (o) => process.stdout.write(JSON.stringify(o) + '\\n')
 let buf = ''
+let busy = false
 process.stdin.on('data', (d) => {
   buf += d
   for (let i = buf.indexOf('\\n'); i >= 0; i = buf.indexOf('\\n')) {
     const c = JSON.parse(buf.slice(0, i))
     buf = buf.slice(i + 1)
     if (c.type === 'get_state') send({ id: c.id, type: 'response', command: 'get_state', success: true, data: { sessionFile: '${join(dir, 'session.jsonl')}' } })
-    if (c.type === 'prompt') {
+    if (c.type === 'prompt' && busy && !c.streamingBehavior) send({ id: c.id, type: 'response', command: 'prompt', success: false, error: 'streaming' })
+    else if (c.type === 'prompt') {
+      busy = true
       appendFileSync('${join(dir, 'told.txt')}', c.message + '\\n')
       send({ id: c.id, type: 'response', command: 'prompt', success: true, data: { disposition: 'started' } })
       send({ type: 'agent_start' })
-      setTimeout(() => send({ type: 'agent_settled', aborted: false }), 100)
+      setTimeout(() => {
+        busy = false
+        send({ type: 'agent_settled', aborted: false })
+      }, 100)
     }
   }
 })
@@ -61,12 +67,14 @@ describe('a task agent as a pi RPC child', () => {
       expect(Date.now() - began).toBeLessThan(3000)
       expect(a.info(key)?.agent_session).toMatchObject({ kind: 'path', value: join(dir, 'session.jsonl') })
       await until(() => Bun.file(join(dir, 'told.txt')).size > 0)
-      await until(() => a.status(key) === 'working' || a.status(key) === 'idle')
+      await until(() => a.status(key) === 'working')
+      await a.send(key, 'One more thing.')
+      await until(() => a.status(key) === 'idle')
       await until(() => a.waiting(key).length === 0)
       await a.finish(key)
       expect(a.status(key)).toBe('gone')
       expect(asked.filter((s) => s.includes('shep-rpc-1') || s.includes('rpc:'))).toEqual([])
-      expect(await Bun.file(join(dir, 'told.txt')).text()).toContain('Do the task.')
+      expect(await Bun.file(join(dir, 'told.txt')).text()).toContain('One more thing.')
     } finally {
       a.stop()
       herdr.close()

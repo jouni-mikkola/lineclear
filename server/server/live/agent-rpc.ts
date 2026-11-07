@@ -8,6 +8,8 @@ export const isRpcPane = (pane?: string) => !!pane?.startsWith('rpc:')
 /** the CLI an RPC agent runs: found on PATH, as herdr's panes find it */
 const KIND = process.env.LINECLEAR_PI ?? 'pi'
 
+const FIRST_EVENT_MS = 20_000
+
 export interface RpcState {
   status: 'working' | 'idle'
   sessionFile?: string
@@ -43,15 +45,19 @@ export class RpcAgent {
       this.on.change(this)
     })
     this.firstEvent.catch(() => undefined)
+    // a pi that never answers must not hold its start for ever
+    const silent = setTimeout(() => this.ended(), FIRST_EVENT_MS)
+    silent.unref()
+    void this.firstEvent.finally(() => clearTimeout(silent)).catch(() => undefined)
   }
 
   get pid() {
     return this.child.pid
   }
 
-  /** one prompt; what pi did with it: started, queued or handled */
+  /** one prompt; what pi did with it: started, queued or handled. Mid-turn it steers: pi takes it at its next step, as a pane's CLI does */
   async prompt(message: string): Promise<string> {
-    const r = await this.ask({ type: 'prompt', message })
+    const r = await this.ask({ type: 'prompt', message, streamingBehavior: 'steer' })
     if (!r.success) throw new Error(r.error ?? 'pi refused the prompt')
     return r.data?.disposition ?? 'started'
   }
@@ -106,6 +112,7 @@ export class RpcAgent {
   private ended() {
     if (this.exited) return
     this.exited = true
+    this.child.kill()
     for (const a of this.asked.values()) a.done({ success: false, error: 'The agent process has ended.' })
     this.asked.clear()
     this.on.exit(this)
