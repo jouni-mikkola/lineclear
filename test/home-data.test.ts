@@ -375,6 +375,16 @@ describe("the merge lane's stall on Home", () => {
     const [t] = rows([{ id: "AL-1", title: "Head", told: "work", reported: true, created: 1, mergeStopped: hung }]);
     expect(t?.lane).toBe('Released from the merge line: hung in "Rebasing on main" for 15 min (no progress for 15 min)');
   });
+  test("a release field names the step, whatever the sentence says", () => {
+    const [t] = rows([{ id: "AL-1", title: "Head", told: "work", reported: true, created: 1, mergeStopped: "other words", laneReleased: 'hung in "Merging"' }]);
+    expect(t?.lane).toBe('Released from the merge line: hung in "Merging"');
+  });
+  test("a working task keeps its start across reads at other times, as after a restart", () => {
+    const task = { id: "AL-1", title: "Work", told: "work", created: 1, stage: "review", stageAt: NOW - 5000, reported: false };
+    const [first] = rows([task]);
+    const [later] = rows([task]);
+    expect([first?.stage, first?.since, later?.since]).toEqual(["review", NOW - 5000, NOW - 5000]);
+  });
   test("a task that joined the line again, or merged, carries no release", () => {
     const [back, done] = rows([
       { ...head({ step: "queue", at: NOW - 1000 }), mergeStopped: hung },

@@ -1,7 +1,7 @@
 import { readJson } from "../pi/config.ts";
 import { IDLE_TEXT } from "./cards.ts";
 import { farTasks } from "./far-tasks.ts";
-import { IDLE_CARD, lastCards, stageSince, stepOf, taskStage, taskState } from "./home-stage.ts";
+import { IDLE_CARD, lastCards, stageSince, stepOf, type TaskRecord, taskStage, taskState } from "./home-stage.ts";
 import { laneNote } from "./lane-note.ts";
 import { readTasksKept } from "./tasks-kept.ts";
 import { dataDir } from "./paths.ts";
@@ -24,8 +24,13 @@ import { DAY } from "./time.ts";
 import { worktreeInput } from "./measure.ts";
 import { gitText } from "./git.ts";
 
-/** A parsed file or event read as it is: its shape is not ours to promise. */
-type Raw = any;
+/** A space as spaces.json keeps it. */
+interface SpaceRecord {
+  name: string;
+  key: string;
+  path: string;
+  github?: string;
+}
 
 /** What Home draws. Built from Lineclear's files, pi's session files and git, with no AI. */
 export interface HomeData {
@@ -131,7 +136,7 @@ const mainHead = (repo: string) => {
 };
 
 /** What a space is called: its name in Lineclear's names file, else its repo's name, else its folder's name. */
-function displayName(space: Raw, names: Record<string, string>, machine: string): string {
+function displayName(space: SpaceRecord, names: Record<string, string>, machine: string): string {
   const named = names[`p:${machine}:${space.name}`];
   if (typeof named === "string" && named.trim()) return named.trim();
   const repo =
@@ -180,9 +185,9 @@ export function stepMarks(tasks: { title: string; status: string }[]): StepMarks
 
 /** A machine's own folder: its spaces, tasks and chat files. */
 function machineSpaces(dir: string, env: Env, now: number): HomeProject[] {
-  const spaces: Raw[] = readJson(join(dir, "spaces.json")) ?? [];
+  const spaces: SpaceRecord[] = readJson(join(dir, "spaces.json")) ?? [];
   const file = readTasksKept(dir);
-  const tasks: Raw[] = file.tasks ?? [];
+  const tasks = (file.tasks ?? []) as TaskRecord[];
   const red: Record<string, string> = file.red ?? {};
   const names: Record<string, string> = readJson(join(dir, "names.json")) ?? {};
   const machine = hostname();
@@ -196,7 +201,7 @@ function machineSpaces(dir: string, env: Env, now: number): HomeProject[] {
     : [];
   const cards = lastCards(chats);
   const owners = new Map<string, { project: string; paused: boolean }[]>();
-  const strays: Raw[] = [];
+  const strays: SpaceRecord[] = [];
   const unreadable: string[] = [];
   for (const n of listProjectNames(env as NodeJS.ProcessEnv)) {
     const p = readSettings(n, env as NodeJS.ProcessEnv);
@@ -218,7 +223,7 @@ function machineSpaces(dir: string, env: Env, now: number): HomeProject[] {
 }
 
 interface SpaceContext {
-  tasks: Raw[];
+  tasks: TaskRecord[];
   red: Record<string, string>;
   names: Record<string, string>;
   machine: string;
@@ -234,7 +239,7 @@ interface SpaceContext {
 type Roadmap = ReturnType<typeof roadmapProgress>;
 
 /** The tokens an agent sent to the model so far, from its session logs, read again at most every 30 s. */
-function liveStatus(t: Raw, env: Env, now: number): { input?: number } {
+function liveStatus(t: TaskRecord, env: Env, now: number): { input?: number } {
   if (typeof t.worktree !== "string" || t.machine) return {};
   const worktree = t.worktree;
   return keptBy(`status:${worktree}`, String(Math.floor(now / 30_000)), () => {
@@ -244,11 +249,11 @@ function liveStatus(t: Raw, env: Env, now: number): { input?: number } {
 }
 
 /** One of this machine's tasks as the home view shows it. */
-function localRow(x: { t: Raw; state: TaskState }, roadmap: Roadmap, line: string | undefined, ctx: SpaceContext): HomeTask {
+function localRow(x: { t: TaskRecord; state: TaskState }, roadmap: Roadmap, line: string | undefined, ctx: SpaceContext): HomeTask {
   const { t, state } = x;
   const { cards, env, now } = ctx;
   const title = String(t.title ?? t.id);
-  const step = stepOf(title);
+  const step = t.step ?? stepOf(title);
   const full = step && roadmap?.titles.get(step);
   const result = step && roadmap?.results.get(step);
   const stage = taskStage(t, state, line);
@@ -272,13 +277,13 @@ function localRow(x: { t: Raw; state: TaskState }, roadmap: Roadmap, line: strin
     ...(typeof t.stalled?.life === "number" && (stage === "work" || stage === "review") ? { stalled: true } : {}),
     // the row shows `last`, so the lane's word takes its place; a hanging head is stuck, whatever its stage
     ...(lane !== undefined ? { lane, last: { text: lane, at: now }, ...(lane.startsWith("Stuck") ? { stalled: true } : {}) } : {}),
-    at: t.doneAt ?? t.updated ?? t.created,
+    at: t.doneAt ?? t.updated ?? t.created ?? now,
     ...(text !== undefined ? { text } : {}),
   };
 }
 
 /** One space as a project on the home view. */
-function spaceView(s: Raw, ctx: SpaceContext, owner?: { project: string; paused: boolean }): HomeProject {
+function spaceView(s: SpaceRecord, ctx: SpaceContext, owner?: { project: string; paused: boolean }): HomeProject {
   const { env, now, waits } = ctx;
   // a red mark counts only while it is the head of main
   const head = existsSync(s.path) ? mainHead(s.path) : undefined;
@@ -298,9 +303,9 @@ function spaceView(s: Raw, ctx: SpaceContext, owner?: { project: string; paused:
   const own = ctx.tasks
     .filter((t) => String(t.id).startsWith(`${s.key}-`))
     .map((t) => ({ t, state: quiet(t.id, taskState(t, status.get(t.id))) }))
-    .filter((x): x is { t: Raw; state: TaskState } => x.state !== undefined);
+    .filter((x): x is { t: TaskRecord; state: TaskState } => x.state !== undefined);
   const open = own.filter((x) => x.state !== "done");
-  const done = own.filter((x) => x.state === "done").sort((a, b) => (b.t.doneAt ?? b.t.updated) - (a.t.doneAt ?? a.t.updated));
+  const done = own.filter((x) => x.state === "done").sort((a, b) => (b.t.doneAt ?? b.t.updated ?? 0) - (a.t.doneAt ?? a.t.updated ?? 0));
   const merged7 = done.filter((x) => (x.t.doneAt ?? x.t.updated ?? 0) >= now - 7 * DAY).length;
   const roadmap = existsSync(s.path)
     ? roadmapProgress(
@@ -348,9 +353,10 @@ const spaceSlug = (name: string) =>
 
 /** The space of this machine whose slug it is, when exactly one has it. */
 export function localSpaceBySlug(slug: string, env: Env = process.env): { name: string; path: string; key?: string } | undefined {
-  const spaces: Raw[] = readJson(join(dataDir(env), "spaces.json")) ?? [];
+  const spaces: SpaceRecord[] = readJson(join(dataDir(env), "spaces.json")) ?? [];
   const hits = spaces.filter((s) => typeof s.name === "string" && typeof s.path === "string" && spaceSlug(s.name) === slug);
-  return hits.length === 1 ? { name: hits[0].name, path: hits[0].path, key: hits[0].key } : undefined;
+  const [hit] = hits;
+  return hits.length === 1 && hit ? { name: hit.name, path: hit.path, key: hit.key } : undefined;
 }
 
 /** The projects among spaces: a space no project points at is not work to list. */
@@ -379,5 +385,3 @@ export function homeData(env: Env = process.env, now = Date.now()): HomeData {
     moves: readMoves(env as NodeJS.ProcessEnv, 5),
   };
 }
-
-if (import.meta.main) console.log(JSON.stringify(homeData(), null, 2));

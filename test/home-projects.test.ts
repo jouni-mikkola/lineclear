@@ -25,12 +25,17 @@ describe("where a task is on the line", () => {
     expect(taskStage({ reported: true }, "done")).toBe("done");
   });
 
-  test("its time at the stage holds while it stays, and starts again when it moves", () => {
-    const task = { id: "SINCE-1", created: 5 };
-    expect(stageSince(task, "queued", 100)).toBe(5);
-    expect(stageSince(task, "work", 200)).toBe(200);
-    expect(stageSince(task, "work", 300)).toBe(200);
-    expect(stageSince(task, "review", 400)).toBe(400);
+  test("its stage comes from the record, not the status line", () => {
+    expect(taskStage({ stage: "review" }, "work", "Working")).toBe("review");
+    expect(taskStage({ stage: "work" }, "work", "In review")).toBe("work");
+  });
+
+  test("its time at the stage is the record's, so a restart keeps it", () => {
+    const task = { id: "SINCE-1", created: 5, updated: 150, stage: "work", stageAt: 120 };
+    expect(stageSince({ id: "SINCE-1", created: 5 }, "queued", 100)).toBe(5);
+    expect(stageSince(task, "work", 200)).toBe(120);
+    expect(stageSince(task, "work", 99_999)).toBe(120);
+    expect(stageSince({ id: "SINCE-1", created: 5, updated: 150 }, "work", 99_999)).toBe(150);
   });
 });
 
