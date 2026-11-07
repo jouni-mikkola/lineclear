@@ -225,7 +225,7 @@ async function run(step: Step): Promise<{ code: number; failing: Failure[]; outp
 async function rerunAlone(step: Step, failing: Failure[], prefix: string): Promise<Set<string>> {
   const passed = new Set<string>();
   await Promise.all(
-    failing.slice(0, 20).map(async (f) => {
+    failing.slice(0, 50).map(async (f) => {
       if (!f.file) return;
       const name = f.test.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const cmd = ["bun", "test", "--timeout", "120000", `./${f.file.replace(/^\.\//, "")}`, "-t", name];
@@ -253,6 +253,8 @@ async function runStep(step: Step): Promise<boolean> {
   const isTests = step.name.startsWith("tests");
   let ok = code === 0;
   if (!ok && failing.length > 0 && (isTests || step.name === "server tests")) {
+    // bun's own count of failures: more than were parsed means a load error or crash, which no rerun clears
+    const counted = Number(/^\s*(\d+) fail$/m.exec(output)?.[1] ?? failing.length);
     const prefix = step.cwd === "server" ? "server/" : "";
     const verdict = judge(failing, await rerunAlone(step, failing, prefix), readQuarantine(), prefix);
     for (const f of verdict.tolerated) console.log(`check: quarantined flake failed in the run, passed alone: ${describeFailure(f)}`);
@@ -262,7 +264,7 @@ async function runStep(step: Step): Promise<boolean> {
         `check: new flake, passed alone: ${describeFailure(f)}\ncheck: list it with its fix task: bun scripts/quarantine.ts add ${file} "${f.test}" <task>`,
       );
     }
-    ok = verdict.broken.length === 0 && verdict.flaky.length === 0 && verdict.tolerated.length === failing.length;
+    ok = verdict.broken.length === 0 && verdict.flaky.length === 0 && verdict.tolerated.length === failing.length && counted === failing.length;
   }
   times.push({ step: step.name, seconds: (performance.now() - at) / 1000, ok });
   if (!ok) {

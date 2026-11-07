@@ -16,7 +16,9 @@ export const QUARANTINE_FILE = "test/quarantine.json";
 export const QUARANTINE_LIMIT = 5;
 
 export function readQuarantine(path = QUARANTINE_FILE): Quarantined[] {
-  return existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")) as Quarantined[]) : [];
+  const list = existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")) as Quarantined[]) : [];
+  if (list.length > QUARANTINE_LIMIT) throw new Error(`${path} holds ${list.length} tests, the limit is ${QUARANTINE_LIMIT}: fix one first`);
+  return list;
 }
 
 /** The key of a failure: the repo path of its file and its name. `prefix` is the folder the step ran in. */
