@@ -147,8 +147,6 @@ export class LiveSourceUpkeep extends LiveSourceCli {
           if (!this.places.find(n.to) || !this.agents.record(n.to) || this.agents.record(n.to)?.finished) return
           // Main home receives this event through the existing overview route.
           if (n.to === placeId.home() && !BOX) return
-          const _kind =
-            ({ added: 'added', ready: 'ready', 'needs-you': 'need', merged: 'done', closed: 'done', stalled: 'stalled' } as const)[n.event as 'ready'] ?? 'need'
           const words = `${n.from}: ${n.text}. You requested this task. Its owning coordinator still handles it. Act only within the human's request; otherwise reply with only <no-reply>reason</no-reply>.`
           await this.agents.send(n.to, hidden(words, 'news', { task: n.task, event: n.event }), {
             cid: `requested-news:${n.id}`,
@@ -171,9 +169,7 @@ export class LiveSourceUpkeep extends LiveSourceCli {
     const line = clip(n.line.split('\n')[0].replace(/\.$/, ''), OVERVIEW_MAX)
     const tail =
       ' Its own coordinator has the whole of it. If it can’t wait, alert the human with lineclear alert (--task <id> when it is about a task) and say why; otherwise reply with only <no-reply>reason</no-reply>.'
-    this.agents
-      .send(home, hidden(`${from}: ${line}.${tail}`, n.kind === 'health' ? 'health' : 'news', n.about), { ensure: () => this.coordinator(home) })
-      .catch(() => undefined)
+    this.agents.send(home, hidden(`${from}: ${line}.${tail}`, 'health', n.about), { ensure: () => this.coordinator(home) }).catch(() => undefined)
   }
 
   /** another machine's news, from its worker: its space by the name the human sees, or the machine for its health */

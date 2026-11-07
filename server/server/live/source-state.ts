@@ -1,8 +1,7 @@
 import { chooseModel } from '../../../src/models.ts'
 import { randomUUID } from 'node:crypto'
-import { homedir } from 'node:os'
 import { clock } from '../../shared/time.ts'
-import { slugify, type Alert, type Machine, type Place } from '../../shared/types.ts'
+import type { Alert, Place } from '../../shared/types.ts'
 import { Emitter, type SourceEvents } from '../source.ts'
 import { HOME, readJson, writeJson } from '../store.ts'
 import { ROOT } from '../root.ts'
@@ -12,15 +11,16 @@ import { ended, Engine } from './engine/engine.ts'
 import { userName } from './user-name.ts'
 import { Machines } from './machines.ts'
 import { agentEnv, BOX } from './box.ts'
-import { HOST, NAME, placeId, Places } from './places.ts'
+import { NAME, placeId, Places } from './places.ts'
 import { privatePrompt, coordinatorPrompt } from './prompts.ts'
 import type { Harness } from './restart.ts'
 import { Revivals } from './revive.ts'
 import { Settings, type Level } from './settings.ts'
 import { Vault } from './secrets.ts'
 import { RequestedNewsMailbox } from './requested-news.ts'
-import { Monitor, meters, procLines, summary, topProcs, type HealthEvent, type Kind } from './health.ts'
+import { healthWords, Monitor, meters, procLines, summary, topProcs, type HealthEvent } from './health.ts'
 import { REPLY_AFTER_CARD } from './source-helpers.ts'
+import { listing } from './source-listing.ts'
 
 export class LiveSourceState extends Emitter<SourceEvents> {
   user = userName()
@@ -92,82 +92,8 @@ export class LiveSourceState extends Emitter<SourceEvents> {
     return this.placeList().find((x) => x.id === (own?.id ?? name))
   }
 
-  /** every space and every machine, as the sidebar shows them: this machine's, then the others' as they last showed
-   *  themselves (just after a start, while they connect, as before it), the names the human gave them */
-  protected listed(): { places: Place[]; machines: Machine[] } {
-    const ts = this.engine.tasks
-    const status = (ids: string[], coord: string[]): Place['status'] => {
-      const mine = ts.filter((t) => ids.includes(t.project) && !t.archived).map((t) => this.engine.statusOf(t))
-      if (mine.includes('need') || ids.some((id) => this.asks()[id])) return 'need'
-      if (mine.includes('ready')) return 'ready'
-      if (mine.includes('work') || mine.includes('merging') || coord.some((k) => this.agents.status(k) === 'working')) return 'work'
-      return 'idle'
-    }
-    const peers = this.peers?.list() ?? []
-    const up = this.agents.reachable
-    const machines: Machine[] = [
-      {
-        id: placeId.machine(),
-        machine: HOST,
-        name: NAME,
-        status: up ? 'idle' : 'off',
-        unreachableSince: up ? undefined : clock(this.agents.lastReach),
-        health: this.healthView(),
-        herdrDown: up ? undefined : clock(this.agents.lastReach),
-      },
-    ]
-    const places: Place[] = this.places.shown().map(({ id, name, space }) => ({
-      id,
-      name,
-      machine: HOST,
-      ...(space ? {} : { home: true }),
-      // what its lists show: a home space its machine's, the main machine's every machine's
-      level: space ? 2 : peers.length ? 0 : 1,
-      status: space
-        ? status([id], [id])
-        : status(
-            this.places.spaces.map((p) => placeId.space(p.name)),
-            [id],
-          ),
-      chat: id,
-      ...(space ? { githubRemote: !!space.github } : {}),
-      // herdr gone: this machine's chats say so plainly
-      ...(up ? {} : { herdrDown: clock(this.agents.lastReach) }),
-    }))
-    for (const l of peers) {
-      const m = l.snap?.machines?.find((x) => x.machine === l.rec.machine) ?? {
-        id: placeId.machine(l.rec.machine),
-        machine: l.rec.machine,
-        name: l.rec.machine,
-        status: 'idle' as const,
-      }
-      const away = !l.reachable ? (l.connecting ? { connecting: true } : { status: 'off' as const, unreachableSince: clock(l.down ?? l.rec.lastSeen) }) : {}
-      machines.push({ ...m, ...away })
-      // a machine never reached yet still has its home space, to come back to
-      const theirs = l.snap?.places ?? [
-        {
-          id: placeId.home(l.rec.machine),
-          name: 'home',
-          machine: l.rec.machine,
-          home: true,
-          level: 1 as const,
-          status: 'off' as const,
-          chat: placeId.home(l.rec.machine),
-        },
-      ]
-      for (const p of theirs) places.push({ ...p, ...(p.home ? { level: 1 as const } : {}), ...away })
-    }
-    // the names the human gave them: a space's by the space rules (another on its machine with it keeps its own)
-    for (const m of machines) {
-      if (this.places.names[m.id]) m.name = this.places.names[m.id]
-      if (this.places.emojis[m.id]) m.emoji = this.places.emojis[m.id]
-      else delete m.emoji
-    }
-    for (const p of places) {
-      const want = this.places.names[p.id] && slugify(this.places.names[p.id])
-      if (want && !places.some((x) => x !== p && x.machine === p.machine && x.name === want)) p.name = want
-    }
-    return { places, machines }
+  protected listed() {
+    return listing({ places: this.places, engine: this.engine, agents: this.agents, peers: this.peers, asks: this.asks(), health: this.healthView() })
   }
 
   /** open coordinator questions by place: a choice card not answered yet, or the CLI's own menu (a permission) it waits on */
@@ -274,35 +200,13 @@ export class LiveSourceState extends Emitter<SourceEvents> {
    */
   protected async onHealth(e: HealthEvent) {
     const s = e.sample
-    const l = this.settings.machine()
-    const load = (x: number | null) => +((x ?? 0) * s.cores).toFixed(1)
-    const disk = s.disks.reduce((a, d) => (d.pct > a.pct ? d : a), s.disks[0])
-    const over: Record<Kind, string> = {
-      cpu: `CPU load has stayed over ${load(l.alertLoad)} (${l.alertLoad}× its ${s.cores} cores) for 10 minutes: ${s.load.toFixed(1)} now`,
-      memory: `memory is over ${l.alertMemory}%: ${Math.round((s.memUsed / s.memTotal) * 100)}% in use`,
-      disk: `${disk?.path === homedir() ? 'home' : disk?.path} is ${disk?.pct}% full (over ${l.alertDisk}%), ${Math.round(disk?.freeGb ?? 0)} GB free`,
-      herdr: `herdr isn't answering (since ${clock(e.since ?? Date.now())}), so its agents can't hear anything`,
-    }
-    const back: Record<Kind, string> = {
-      cpu: `CPU load is back under ${load(l.alertLoad)}: ${s.load.toFixed(1)} now`,
-      memory: `memory is back under ${l.alertMemory}%`,
-      disk: 'disk space is back under its limit',
-      herdr: `herdr answers again; it was gone from ${clock(e.since ?? Date.now())} to ${clock(Date.now())}`,
-    }
-    // on its card, a few words
-    const brief: Record<Kind, [string, string]> = {
-      cpu: [`CPU load is high: ${s.load.toFixed(1)}`, 'CPU load is back to normal'],
-      memory: [`memory is ${Math.round((s.memUsed / s.memTotal) * 100)}% used`, 'memory is back to normal'],
-      disk: [`${disk?.path === homedir() ? 'home' : disk?.path} is ${disk?.pct}% full`, 'disk space is back to normal'],
-      herdr: ["herdr isn't answering", 'herdr answers again'],
-    }
-    const words = e.what === 'over' ? over[e.kind] : back[e.kind]
+    const { words, card } = healthWords(e, this.settings.machine())
     const machine = placeId.home()
     // one line per kind, updated in place: a load hovering at its limit would otherwise post a pair each time
     const id = `health:${e.kind}`
     this.chats.post(machine, {
       id,
-      card: { id, text: brief[e.kind][e.what === 'over' ? 0 : 1], health: { level: e.what === 'over' ? 'over' : 'ok', machine: NAME } },
+      card: { id, text: card, health: { level: e.what === 'over' ? 'over' : 'ok', machine: NAME } },
     })
     if (this.watched.includes(machine)) this.emit('chat', machine)
     this.emit('snapshot')

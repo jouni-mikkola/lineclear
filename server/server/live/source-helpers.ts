@@ -34,13 +34,14 @@ export function chatDir(chat: string) {
 }
 
 /** a worker's lineclear command run by the main machine's Lineclear, as the main machine's own */
-export async function mainCli(args: string[]): Promise<{ out: string; code: number }> {
+export async function mainCli(args: string[], chat?: string): Promise<{ out: string; code: number }> {
   try {
     const { port } = JSON.parse(readFileSync(join(process.env.LINECLEAR_MAIN_HOME ?? '', 'server.json'), 'utf8')) as { port: number }
     const r = await fetch(`http://127.0.0.1:${port}/api/cli`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ args }),
+      body: JSON.stringify({ args, chat }),
+      signal: AbortSignal.timeout(20_000),
     })
     return (await r.json()) as { out: string; code: number }
   } catch {

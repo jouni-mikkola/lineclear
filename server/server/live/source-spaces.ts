@@ -1,19 +1,12 @@
-import { randomUUID } from 'node:crypto'
-import { dirname, join, sep } from 'node:path'
 import { STATUS_MAX } from '../../shared/types.ts'
 import { one, type Parsed } from './args.ts'
 import { fitStatus } from './engine/status-line.ts'
-import { BOX, boxHome } from './box.ts'
-import { fileType } from '../../shared/files.ts'
-import { boxDir } from './mfs.ts'
-import * as task from './mfs.ts'
 import { HOST, NAME, placeId } from './places.ts'
-import { SECRET_NAME } from './secrets.ts'
-import { minutesOf, chatDir, sharedEverywhere } from './source-helpers.ts'
+import { minutesOf, sharedEverywhere } from './source-helpers.ts'
 import type { LiveSource } from './source.ts'
-import { LiveSourceViews } from './source-views.ts'
+import { LiveSourceFiles } from './source-files.ts'
 
-export class LiveSourceSpaces extends LiveSourceViews {
+export class LiveSourceSpaces extends LiveSourceFiles {
   /** the space a needs-you card's answer came from, when that is the task's own space */
   protected spaceOf(key: string, space?: string) {
     return space && key.endsWith('/Agent') && this.engine.task(key.slice(0, -'/Agent'.length))?.project === space ? space : undefined
@@ -38,56 +31,6 @@ export class LiveSourceSpaces extends LiveSourceViews {
       const pulled = this.chats.pull(k)
       const menu = await this.chats.readMenu(k).catch(() => false)
       if (pulled || menu) this.emit('chat', k)
-    }
-  }
-
-  async upload(chat: string, name: string, data: Uint8Array) {
-    // a file lands on the machine of the agent it is for
-    const peer = this.peers?.owner(chat)
-    if (peer) {
-      const body = new FormData()
-      body.append('chat', chat)
-      body.append('file', new File([new Uint8Array(data)], name))
-      const r = await this.peers!.fetch(peer, '/api/upload', { method: 'POST', body })
-      return ((await r.json()) as { path: string }).path
-    }
-    // on the machine of the agent it is for: there it reads it
-    const dir = join(boxDir(), 'inbox', chatDir(chat))
-    task.mkdirSync(dir, { recursive: true })
-    const safe = name.replace(/[^a-zA-Z0-9_. -]+/g, '_').slice(0, 120) || 'file'
-    // its own path even next to a file of the same name: a reply names the file by it
-    const f = join(dir, `${Date.now().toString(36)}${randomUUID().slice(0, 4)}-${safe}`)
-    task.writeFileSync(f, data)
-    return f
-  }
-
-  async attachment(chat: string, path: string) {
-    // only a file attached in this chat, or uploaded for it and still waiting in the message box, and only from the
-    // inbox: a path that leads anywhere else is refused
-    const c = this.chat(chat)
-    if (!c) return null
-    const sent = c.messages.some((m) => m.file?.path === path)
-    const peer = this.peers?.owner(chat)
-    if (peer) {
-      const r = await this.peers!.fetch(peer, `/api/file?chat=${encodeURIComponent(chat)}&path=${encodeURIComponent(path)}`).catch(() => null)
-      return r?.ok ? r.blob() : null
-    }
-    try {
-      const inbox = task.realpathSync(join(boxDir(), 'inbox'))
-      const real = task.realpathSync(path.replace(/^~(?=\/)/, boxHome()))
-      // a file sent before this machine was run from the main one is still in its own install's inbox
-      const old = () => {
-        try {
-          return BOX ? real.startsWith(task.realpathSync(join(boxHome(), '.lineclear', 'inbox')) + sep) : false
-        } catch {
-          return false
-        }
-      }
-      const ok = sent ? real.startsWith(inbox + sep) || old() : dirname(real) === join(inbox, chatDir(chat))
-      if (!ok || !task.statSync(real).isFile()) return null
-      return BOX ? new Blob([new Uint8Array(task.readFileSync(real))], { type: fileType(real).type }) : Bun.file(real)
-    } catch {
-      return null
     }
   }
 
@@ -180,8 +123,6 @@ export class LiveSourceSpaces extends LiveSourceViews {
     this.agents.follow(key, at)
   }
 
-  protected menuAnswers = new Set<string>()
-
   protected projectFor(p: Parsed, ctx: { chat?: string; cwd?: string }) {
     const named = one(p, 'space')
     if (named) {
@@ -218,22 +159,5 @@ export class LiveSourceSpaces extends LiveSourceViews {
     const r = this.engine.report(t.id, line, Number(done), left)
     const cut = r.msg !== line.replace(/\s+/g, ' ') ? ` (cut to ${STATUS_MAX} characters)` : ''
     return `Noted: ${t.id} shows "${r.msg}"${cut}, ${r.progress}% done${r.left !== undefined ? `, about ${r.left} min left` : ''}.`
-  }
-
-  /** each name's value, for lineclear secret run and env (names may come comma-separated) */
-  protected secretValues(words: string[], chain: string[]) {
-    const names = words
-      .flatMap((w) => w.split(','))
-      .map((w) => w.trim())
-      .filter(Boolean)
-    if (!names.length) throw new Error('lineclear secret run NAME [NAME …] -- <command>, or lineclear secret env NAME [NAME …] [--file .env]')
-    const bad = names.filter((n) => !SECRET_NAME.test(n))
-    if (bad.length) throw new Error(`Not a secret's name: ${bad.join(', ')} (letters, digits and _, like GITHUB_TOKEN)`)
-    const { found, missing } = this.vault.pick(names, chain)
-    if (missing.length)
-      throw new Error(
-        `No secret ${missing.join(', ')} here. Ask the human for it: lineclear secret ask ${missing[0]} --why "<what it is for>", then end your turn.`,
-      )
-    return Object.fromEntries(Object.entries(found).map(([n, f]) => [n, f.value]))
   }
 }

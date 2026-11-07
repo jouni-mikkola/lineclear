@@ -9,6 +9,7 @@ import { cpus, homedir, tmpdir } from 'node:os'
 import type { HealthLevel, HealthMeter } from '../../shared/types.ts'
 import type { MachineLimits } from './settings.ts'
 import { BOX } from './box.ts'
+import { clock } from '../../shared/time.ts'
 
 const SAMPLE_MS = 30_000
 /** the load must stay over its limit this long before the chat or the coordinator hears of it: a test run's or a build's spike is no news */
@@ -307,6 +308,39 @@ export interface HealthEvent {
   sample: Sample
   /** herdr: since when it stopped answering */
   since?: number
+}
+
+/** what an event says: in full for the coordinator, in a few words for the card in the chat */
+export function healthWords(e: HealthEvent, l: MachineLimits): { words: string; card: string } {
+  const { sample: s } = e
+  const over = e.what === 'over'
+  const load = +((l.alertLoad ?? 0) * s.cores).toFixed(1)
+  const disk = s.disks.reduce((a, d) => (d.pct > a.pct ? d : a), s.disks[0])
+  const mem = Math.round((s.memUsed / s.memTotal) * 100)
+  const since = clock(e.since ?? Date.now())
+  const words: Record<Kind, [string, string]> = {
+    cpu: [
+      `CPU load has stayed over ${load} (${l.alertLoad}× its ${s.cores} cores) for 10 minutes: ${s.load.toFixed(1)} now`,
+      `CPU load is back under ${load}: ${s.load.toFixed(1)} now`,
+    ],
+    memory: [`memory is over ${l.alertMemory}%: ${mem}% in use`, `memory is back under ${l.alertMemory}%`],
+    disk: [
+      `${tilde(disk?.path ?? '')} is ${disk?.pct}% full (over ${l.alertDisk}%), ${Math.round(disk?.freeGb ?? 0)} GB free`,
+      'disk space is back under its limit',
+    ],
+    herdr: [
+      `herdr isn't answering (since ${since}), so its agents can't hear anything`,
+      `herdr answers again; it was gone from ${since} to ${clock(Date.now())}`,
+    ],
+  }
+  const card: Record<Kind, [string, string]> = {
+    cpu: [`CPU load is high: ${s.load.toFixed(1)}`, 'CPU load is back to normal'],
+    memory: [`memory is ${mem}% used`, 'memory is back to normal'],
+    disk: [`${tilde(disk?.path ?? '')} is ${disk?.pct}% full`, 'disk space is back to normal'],
+    herdr: ["herdr isn't answering", 'herdr answers again'],
+  }
+  const i = over ? 0 : 1
+  return { words: words[e.kind][i], card: card[e.kind][i] }
 }
 
 /**
