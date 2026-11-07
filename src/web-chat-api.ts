@@ -1,4 +1,5 @@
-import { type browsers, Busy, parseInput, SESSION_NAME } from "./browsers.ts";
+import { SESSION_NAME } from "./browser-cli.ts";
+import { type browsers, Busy, parseInput } from "./browsers.ts";
 import { chatEvents, type dispatcherChat, MAX_FILE_BYTES, namedImageResponse, parseSend, sizeText } from "./chat.ts";
 import { type Env, json, ownPage } from "./web-guard.ts";
 

@@ -14,7 +14,7 @@ const RULES = join(import.meta.dir, "..", "src", "rules.ts");
 
 test("no source file writes a state file in place", () => {
   // Allowed: the one-time code file in a private temp folder.
-  const allowed = new Set(["atomic.ts", "browsers.ts"]);
+  const allowed = new Set(["atomic.ts", "browser-cli.ts"]);
   // Appends are for the logs only (a cut leaves at most one partial last line, which readers skip).
   const plain = /\b(writeFileSync|writeFile|Bun\.write|createWriteStream|appendFileSync|cpSync)\(/;
   const logs = new Set(["rules.ts", "full.ts", "plan.ts", "task-work.ts", "api-latency.ts", "stall-class.ts", "stall-ladder.ts"]);
