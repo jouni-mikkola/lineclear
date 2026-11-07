@@ -66,3 +66,22 @@ test("Home opens with the four zones, the Dispatcher's box above, and a labelled
   await expect(card).toContainText(" · ");
   await expect(card.locator("p").first()).not.toBeEmpty();
 });
+
+test("no track is cut by the line's region, and a region that scrolls has a visible edge", async ({ page }) => {
+  for (const state of ["many", "tasks200"]) {
+    await page.goto(`/?state=${state}`);
+    await page.waitForSelector("[data-line] [data-track]");
+    await page.waitForTimeout(300);
+    const r = await page.evaluate(() => {
+      const region = document.querySelector("[data-line]") as HTMLElement;
+      const box = region.getBoundingClientRect();
+      const tracks = [...region.querySelectorAll("[data-track]")].map((t) => t.getBoundingClientRect());
+      // a track that starts inside the region must end inside it
+      const cut = tracks.filter((t) => t.top >= box.top && t.top < box.bottom && t.bottom > box.bottom + 1).length;
+      return { cut, scrolls: region.scrollHeight > region.clientHeight, edge: getComputedStyle(region).borderBottomWidth };
+    });
+    expect(r.cut, state).toBe(0);
+    if (r.scrolls) expect(r.edge, state).not.toBe("0px");
+    await page.locator("section[data-line]").screenshot({ path: `test-results/home-line-${state}-${page.viewportSize()?.width}.png` });
+  }
+});
