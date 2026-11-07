@@ -23,21 +23,23 @@ test("45 ready steps on disjoint locks start within 5 simulated minutes on machi
   const roadmap = `# Roadmap\n\n## Next in order\n\n${Array.from({ length: 45 }, (_, i) => step(i + 1)).join("\n")}`;
   const f = fakeWorld(env, [], roadmap, []);
   const slots: Record<string, number> = { mid: 12, big: 25 };
-  const remote: Record<string, Task[]> = { mid: [], big: [] };
+  const mid: Task[] = [];
+  const big: Task[] = [];
+  const remote: Record<string, Task[] | undefined> = { mid, big };
   f.world.maxTasks = () => 10;
   f.world.room = (host) => ({ host, tasks: remote[host] ?? [], working: remote[host]?.length ?? 0, max: slots[host], load: 0, loadLimit: 1e6 });
   f.world.addTaskOn = (host, _s, title) => {
     remote[host]?.push({ id: `T${host}${remote[host].length}@${host}`, title, status: "work" });
     return undefined;
   };
-  const started = () => f.tasks.list.length + remote.mid.length + remote.big.length;
+  const started = () => f.tasks.list.length + mid.length + big.length;
   const start = f.clock.at.getTime();
   let elapsed = 0;
   while (started() < 45 && elapsed < 5 * 60_000) {
     tick(f.world, false, env);
     expect(f.tasks.list.length).toBeLessThanOrEqual(10);
-    expect(remote.mid.length).toBeLessThanOrEqual(12);
-    expect(remote.big.length).toBeLessThanOrEqual(25);
+    expect(mid.length).toBeLessThanOrEqual(12);
+    expect(big.length).toBeLessThanOrEqual(25);
     f.clock.at = new Date(start + (elapsed += 30_000));
   }
   expect(started()).toBe(45);
