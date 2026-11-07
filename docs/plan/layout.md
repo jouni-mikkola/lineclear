@@ -84,13 +84,15 @@ Priorities (owner): 1 core loop, 2 simple (cleanup and layout), 3 tokens, 4 any 
 rank 2; L762 to L764 serve 4 too (any repo gets step files), L769 serves 3 (a prompt's size per role). Moves come after
 the core steps that touch the same files (`after`), so rank 1 is never held up by a move.
 
-- Wave 1, at once (disjoint files): L760, L761, L762, L769, L773, L775.
-- Wave 2: L763, L766, L767, L768, L774, L776 (after L760 or a wave 1 step).
-- Wave 3, one folder each: L777, then L765, L778 to L788 as their `after` steps land.
+- Wave 1, at once (disjoint files): L760, L761, L762, L769, L775.
+- Wave 2: L763, L766, L767, L768, L776 (after L760 or a wave 1 step); L773 and L774 once L609 lands.
+- Wave 3, one folder each: L777, then L765, L770 to L772, L778 to L788 as their `after` steps land.
 - Last: L764 (after the lead plan's ROADMAP.md edits), L789.
 
-A move step rewrites imports in other files; git follows the renamed files on a rebase, so a concurrent step
-conflicts only on its import lines.
+A move step moves each moved file's tests (`test/<name>*.test.ts`, `server/test/<name>*.test.ts`) beside it, and
+rewrites imports in other files; git follows the renamed files on a rebase, so a concurrent step conflicts only on
+its import lines. L95 and U43 are frozen by the owner: they are not in any `after`; their `files` lines take the new
+paths when they open.
 
 ## Steps
 
@@ -105,7 +107,7 @@ Result: A test file next to its module runs in the check, so a step changes one 
 ### L761 Borders live in each folder
 Result: A new module states its own border in its folder; nobody edits a central table to add one.
 - why: `docs/architecture.md` was changed by 17 PRs in 3 days, 2 of them with a conflict, because its table lists every module.
-- done when: `scripts/gates/borders.ts` reads `Owns`, `May import` and `Lines` from the first lines of a folder's `README.md`; architecture.md keeps only the layer rules (0 table rows); `test/borders.test.ts` adds a folder with a README and sees a forbidden import fail with no edit to architecture.md.
+- done when: `scripts/gates/borders.ts` reads `Owns`, `May import` and `Lines` from the first lines of a folder's `README.md`; architecture.md keeps only the layer rules (0 table rows); a new `test/borders.test.ts` adds a folder with a README and sees a forbidden import fail with no edit to architecture.md.
 - locks: borders, file-docs-architecture-md
 - after: none
 - files: scripts/gates/borders.ts, docs/architecture.md, test/borders.test.ts
@@ -113,10 +115,10 @@ Result: A new module states its own border in its folder; nobody edits a central
 ### L762 The roadmap reads step files
 Result: A project's steps are read from one file per step, so two plans never edit the same file.
 - why: `docs/ROADMAP.md` is one file for every step; 3 plan tasks write it at once today.
-- done when: `roadmapSource` reads `docs/roadmap/<id>.md` when the folder exists (order: after, then id) and `docs/ROADMAP.md` otherwise; `lineclear roadmap check .` checks the folder; a test reads 3 step files and checks one with a bad title.
+- done when: `roadmapSource` reads `docs/roadmap/<id>.md` when the folder exists (joined in id order, so the parser is unchanged) and `docs/ROADMAP.md` otherwise; `lineclear roadmap check .` checks the folder; a test reads 3 step files and checks one with a bad title.
 - locks: roadmap-read, file-src-roadmap-source-ts
 - after: none
-- files: src/roadmap-source.ts, src/roadmap.ts, src/roadmap-cli.ts, test/roadmap.test.ts
+- files: src/roadmap-source.ts, src/roadmap-cli.ts, test/roadmap.test.ts
 
 ### L763 Plans write step files
 Result: A plan that applies adds or edits one file per step, in any repo, even one with no docs folder.
@@ -139,7 +141,7 @@ Result: Install, update, uninstall and the store copies live in one folder with 
 - why: 9 install files sit among 125 flat files in `src/`.
 - done when: `src/install/` holds `install-paths`, `builds`, `uninstall`, `store-copies`, `health`, `board`, `serve`, `reaper` and their tests, with a README row; `ls src/*.ts` lists none of them; gates green.
 - locks: layout-install, file-src-store-copies-ts, file-src-serve-ts
-- after: L546, L608, L777
+- after: L545, L546, L608, L777
 - files: src/install/, src/install-paths.ts, src/builds.ts, src/uninstall.ts, src/store-copies.ts, src/health.ts, src/board.ts, src/serve.ts, src/reaper.ts
 
 ### L766 One file per CLI word
@@ -163,7 +165,7 @@ Result: A new doctor check is one new file; `src/doctor.ts` only runs them.
 - why: `src/doctor.ts` (422 lines) was changed by 18 PRs, 3 with a conflict.
 - done when: each check is `src/doctor/<check>.ts`; `src/doctor/doctor.ts` runs every file of the folder and is at most 100 lines; `test/doctor.test.ts` passes and adds a check file in a temp copy.
 - locks: doctor, file-src-doctor-ts
-- after: L760
+- after: L760, L541
 - files: src/doctor.ts, src/doctor-task-ids.ts, src/doctor/, test/doctor.test.ts
 
 ### L769 One prompt file per role
@@ -203,7 +205,7 @@ Result: Each measure has its own page in `docs/numbers/`, so two measuring steps
 - why: `docs/numbers.md` was changed by 11 PRs, 1 with a conflict.
 - done when: `docs/numbers/<measure>.md` holds each section; `docs/numbers.md` is gone; `git grep -n "numbers.md"` lists none outside git history.
 - locks: numbers-doc, file-docs-numbers-md
-- after: none
+- after: L760, L609
 - files: docs/numbers.md, docs/numbers/, scripts/check-speed.ts, scripts/core-baseline.ts, scripts/check.ts
 
 ### L774 Collisions can be measured
@@ -243,7 +245,7 @@ Result: The roadmap, plan apply and the step check live in `src/plan/` with thei
 - why: 16 plan files are spread among 125 in `src/`, their tests in `test/`.
 - done when: `src/plan/` holds `roadmap*`, `plan*`, `autoplan`, `stepcheck`, `parts`, `direction`, `reader-ask`, `step-check-cost`, `ask-model` and their tests; owner module `src/plan/plan.ts`; gates green.
 - locks: layout-plan, autoplan, file-src-plan-ts, file-src-autoplan-ts
-- after: L564, L567, L603, L604, L764, L777
+- after: L547, L564, L567, L603, L604, L764, L777
 - files: src/plan/, src/roadmap.ts, src/roadmap-cli.ts, src/roadmap-line.ts, src/roadmap-source.ts, src/roadmap-view.ts, src/plan.ts, src/plan-apply.ts, src/plan-brief.ts, src/autoplan.ts, src/stepcheck.ts, src/parts.ts, src/direction.ts, src/reader-ask.ts, src/step-check-cost.ts, src/ask-model.ts
 
 ### L779 The loop folder
@@ -251,7 +253,7 @@ Result: The rule loop's files live in `src/loop/` with their tests.
 - why: 17 loop files sit flat in `src/`; `rules.ts` and `tick-project.ts` were changed by 40 PRs together.
 - done when: `src/loop/` holds `rules`, `tick-project`, `starts`, `stalls`, `stall-class`, `waits*`, `waiting`, `world`, `real-world`, `task-steps`, `owner-steps`, `routine`, `hold`, `heal`, `night-watch`, `decision-dedupe`, `start-failures` and tests; owner `src/loop/loop.ts`; gates green.
 - locks: layout-loop, slots, file-src-rules-ts, file-src-tick-project-ts
-- after: L561, L562, L563, L581, L583, L547, L548, L608, L777
+- after: L545, L546, L547, L548, L561, L562, L563, L564, L567, L580, L581, L583, L608, L777
 - files: src/loop/, src/rules.ts, src/tick-project.ts, src/starts.ts, src/stalls.ts, src/stall-class.ts, src/waits.ts, src/wait-service.ts, src/waiting.ts, src/world.ts, src/real-world.ts, src/task-steps.ts, src/owner-steps.ts, src/routine.ts, src/hold.ts, src/heal.ts, src/night-watch.ts, src/decision-dedupe.ts, src/start-failures.ts
 
 ### L780 Tick jobs one file each
@@ -267,7 +269,7 @@ Result: The task engine lives in `src/engine/` with its tests beside it.
 - why: the engine is split between `server/server/live/engine/` (28 files) and 22 test files in `server/test/`.
 - done when: `src/engine/` holds the engine files, `restart.ts` and `task-ids.ts`, tests beside them; owner `src/engine/engine.ts`; gates green.
 - locks: layout-engine, engine-compose, task-phase
-- after: L521, L522, L523, L525, L529, L541, L506, L772, L777
+- after: L503, L506, L521, L522, L523, L525, L529, L541, L544, L547, L772, L777
 - files: src/engine/, server/server/live/engine/, server/server/live/restart.ts, server/server/live/task-ids.ts
 
 ### L782 The agents folder
@@ -283,7 +285,7 @@ Result: The Dispatcher, project chats, asks and pushes live in `src/chats/`.
 - why: chat code is in two packages: `server/server/live/chats*` and `src/chat*`, `asks`, `inbox*`.
 - done when: `src/chats/` holds the server's `chats*`, `chatlines`, `chatquotes` and `src/chat*`, `dispatcher`, `asks`, `inbox*`, `cards`, `notify`, `requests`, `resolve` with tests; owner `src/chats/chats.ts`; gates green.
 - locks: layout-chats, inbox-path, file-src-asks-ts, file-src-inbox-ts
-- after: L543, L600, L602, L603, L605, L777
+- after: L543, L545, L548, L600, L602, L603, L604, L605, L777
 - files: src/chats/, server/server/live/chats.ts, server/server/live/chats-logs.ts, server/server/live/chatlines.ts, src/chat.ts, src/dispatcher.ts, src/asks.ts, src/inbox.ts, src/inbox-answer.ts, src/cards.ts, src/notify.ts, src/requests.ts, src/resolve.ts
 
 ### L784 The machines folder
@@ -291,7 +293,7 @@ Result: Workers, links, the room and placement live in `src/machines/`.
 - why: machine code is in `server/server/live/machines*`, `box`, `tunnel`, `install` and `src/spread.ts`.
 - done when: `src/machines/` holds them with tests; owner `src/machines/machines.ts`; gates green.
 - locks: layout-machines, machine-link, machine-room
-- after: L580, L581, L582, L583, L585, L586, L588, L589, L590, L591, L593, L777
+- after: L549, L580, L581, L582, L583, L585, L586, L587, L588, L589, L590, L591, L593, L777
 - files: src/machines/, server/server/live/machines.ts, server/server/live/machines-links.ts, server/server/live/machines-helpers.ts, server/server/live/machines-actions.ts, server/server/live/box.ts, server/server/live/tunnel.ts, server/server/live/install.ts, server/server/live/herdr-forward.ts, server/server/live/link-poll.ts, server/server/live/worker-process.ts, src/spread.ts
 
 ### L785 The settings folder
@@ -299,7 +301,7 @@ Result: Settings, models, accounts and projects live in `src/settings/`.
 - why: settings are read in two packages (`settings-store.ts`, `src/project*.ts`, `src/models.ts`).
 - done when: `src/settings/` holds `settings-*`, `project-models`, `places`, `models`, `project*`, `setup`, `fill-setup`, `company`, `full`, `harness-pi`, `session-text`, `measure`, `task-work` and tests; owner `src/settings/settings.ts`; gates green.
 - locks: layout-settings, settings, cli-settings
-- after: L544, L545, L549, L609, L777
+- after: L543, L544, L545, L547, L549, L567, L609, L777
 - files: src/settings/, server/server/live/settings-store.ts, server/server/live/settings-catalog.ts, server/server/live/project-models.ts, server/server/live/places.ts, src/models.ts, src/project.ts, src/setup.ts, src/measure.ts, src/task-work.ts
 
 ### L786 The secrets folder
@@ -307,7 +309,7 @@ Result: The vault, login codes and the page guard live in `src/secrets/`.
 - why: secrets code is in `server/server/live/secret*` and `src/totp.ts`, `web-guard.ts`, `published.ts`.
 - done when: `src/secrets/` holds them with tests; owner `src/secrets/secrets.ts`; gates green.
 - locks: layout-secrets
-- after: L777
+- after: L549, L777
 - files: src/secrets/, server/server/live/secrets.ts, server/server/live/secret-access.ts, server/server/live/secret-paths.ts, src/totp.ts, src/web-guard.ts, src/published.ts
 
 ### L787 The board folder
@@ -323,7 +325,7 @@ Result: The web server and the data of each page live in `src/web/`.
 - why: 19 web and Home files sit flat in `src/`.
 - done when: `src/web/` holds `web*`, `home*`, `kept-read`, `live*`, `progress`, `step-page`, `task-detail`, `task-live`, `status`, `agent-status`, `lineclear-client`, `prefs`, `read-aside`, `top-cmd` and tests; owner `src/web/web.ts`; gates green.
 - locks: layout-web, web-server
-- after: L606, L777
+- after: L541, L547, L606, L777
 - files: src/web/, src/web.ts, src/web-routes.ts, src/home-data.ts, src/kept-read.ts, src/progress.ts, src/status.ts, src/task-live.ts
 
 ### L789 Recount and collisions
@@ -331,5 +333,5 @@ Result: The code fits its line target and budgets, and parallel steps rarely col
 - why: v0.2 needs a number that shows the layout stopped collisions.
 - done when: scope.md's count prints at most 40,000 non-test lines and the test folders plus `*.test.ts` at most 26,000; each folder's `Lines` budget holds (the gate fails over it); `bun scripts/core-baseline.ts collisions 100` prints at most 3 conflicting PRs per 100 and no file touched by more than 10; `ls src/*.ts` lists none; scope.md and AGENTS.md's Layout name the folders.
 - locks: recount, file-docs-scope-md
-- after: L765, L774, L778, L779, L780, L787, L788
+- after: L567, L765, L770, L771, L774, L778, L779, L780, L787, L788
 - files: docs/scope.md, AGENTS.md, docs/architecture.md
