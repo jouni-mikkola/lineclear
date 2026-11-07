@@ -166,10 +166,7 @@ export abstract class LinkPoll extends Emitter<Events> {
     ws.onclose = () => {
       if (l.ws !== ws) return
       l.ws = undefined
-      if (!this.active(l)) return
-      l.reachable = false
-      l.down ??= Date.now()
-      this.emit('snapshot')
+      // the next look says whether the worker is still there
       this.retry(l)
     }
   }
