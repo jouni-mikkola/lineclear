@@ -12,6 +12,7 @@ import { readModelFile } from "./models.ts";
 import { checkoutPointers } from "./install-paths.ts";
 import { buildNames, buildProblem, buildsDir, installReleaseCommand, type RunFrom, unitCommand } from "./builds.ts";
 import { publishedAddress, serveCommand } from "./published.ts";
+import { type MachineStarts, startsLine } from "./start-failures.ts";
 import { compileCacheDir } from "./tmpdirs.ts";
 
 export interface Check {
@@ -62,6 +63,8 @@ export interface Probe {
   taskIds?: () => string[];
   /** A CI runner: its checkout has no origin main to read. */
   ci?: boolean;
+  /** The failed starts of the last 24 hours, one entry per machine. */
+  starts?: MachineStarts[];
 }
 
 export function realProbe(paths: Paths, env: Record<string, string | undefined> = process.env): Probe {
@@ -350,6 +353,7 @@ export function doctorChecks(probe: Probe): Check[] {
       skip: !p.runBy,
     },
     taskIdsUnique(p),
+    ...(p.starts ?? []).map((m) => ({ name: "failed starts", problem: "", fix: "", info: startsLine(m).replace(/^failed starts /, "") })),
   ];
 }
 

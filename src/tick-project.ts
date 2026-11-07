@@ -13,6 +13,7 @@ import type { Decision, State } from "./rules.ts";
 import { askMachines, type Candidate, mostRoom, type Room, roomLack } from "./spread.ts";
 import { routineWorker } from "./routine.ts";
 import { askKey, availability, climbStalls, revertLast, reviewerFor, serviceAccounts } from "./stalls.ts";
+import { THIS_MACHINE } from "./start-failures.ts";
 import { bindStarts, liveSteps, recordStart, lockWhy, reservedLocks, settleLockWaits } from "./starts.ts";
 import type { Wait } from "./waits.ts";
 import type { World } from "./world.ts";
@@ -21,7 +22,7 @@ type MainInfo = Exclude<ReturnType<World["main"]>, string>;
 type Parsed = ReturnType<typeof checkRoadmap>["parsed"];
 type Step = Parsed["steps"][number];
 type StepState = StepStatus;
-type Note = (kind: Decision["kind"], reason: string, step?: string) => void;
+type Note = (kind: Decision["kind"], reason: string, step?: string, machine?: string) => void;
 
 /** What every part of one project's tick needs. */
 interface Tick {
@@ -342,7 +343,7 @@ function startStep(s: Starting, step: Step): boolean {
     }
     const err = addStepTask(s, step, host, worker, reviewer);
     if (err) {
-      note("skip", `task add failed: ${err}`, step.id);
+      note("skip", `task add failed: ${err}`, step.id, host ?? THIS_MACHINE);
       return false;
     }
     state.models[step.id] = worker;
@@ -414,8 +415,8 @@ export function tickProject(
 ): Decision[] {
   const out: Decision[] = [];
   const time = world.now().toISOString();
-  const note: Note = (kind, reason, step) => {
-    out.push({ time, project: name, step, kind, reason });
+  const note: Note = (kind, reason, step, machine) => {
+    out.push({ time, project: name, step, kind, reason, ...(machine === undefined ? {} : { machine }) });
   };
   const t: Tick = { name, settings, world, state, dryRun, env, note };
   const project = readProject(t);
@@ -436,7 +437,7 @@ export function tickProject(
     state,
     world.now().getTime(),
     (host) => world.room?.(host, settings.space) ?? "this world cannot reach other machines",
-    (host, why) => note("skip", why, `machine:${host}`),
+    (host, why) => note("skip", why, `machine:${host}`, host),
   );
   bindStarts(state, tasks);
   const stallArgs = { project: name, settings, world, state, dryRun, waits, tasks, steps: parsed.steps, offered, note, env };

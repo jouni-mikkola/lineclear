@@ -292,6 +292,7 @@ test("a machine that cannot be reached is skipped and noted, and the local steps
   expect(d.map((x) => `${x.step}:${x.kind}`)).toEqual(["machine:farbox:skip", "A:start"]);
   expect(d[0]!.reason).toContain("machine farbox skipped");
   expect(d[0]?.reason).toContain("cannot be reached");
+  expect(d[0]?.machine).toBe("farbox");
   expect(t.local()).toContain("task add A Title A");
 });
 
