@@ -1,76 +1,9 @@
-// An agent that stopped, or runs on files Lineclear no longer starts it with, is started again: what counts as wrong,
-// and that tries are spaced out and end, so a start that keeps failing never loops.
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+// An agent that stopped is started again: tries are spaced out and end, so a start that keeps failing never loops.
 import { describe, expect, test } from 'bun:test'
-import { paneWrong, Revivals, staleFlag } from '../server/live/revive.ts'
-
-const want = { '--settings': '/h/.lineclear/helper/hooks/shep-x.settings.json', '--append-system-prompt-file': '/h/.lineclear/helper/prompts/shep-x.md' }
-const running = (argv: string[]) => ({ shell_pid: 10, foreground_process_group_id: 20, foreground_processes: [{ argv, pid: 20 }] })
-
-describe('what is wrong with a pane', () => {
-  test('a pi pane started with --append-system-prompt is fine, by path or by content', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'revive-'))
-    const mine = join(dir, 'a.md')
-    const copy = join(dir, 'b.md')
-    writeFileSync(mine, 'be good')
-    writeFileSync(copy, 'be good')
-    const w = { '--append-system-prompt': mine }
-    expect(paneWrong('pi', running(['pi', '--append-system-prompt', mine, '--model', 'x']), w)).toBeUndefined()
-    expect(paneWrong('pi', running(['pi', '--append-system-prompt', copy]), w)).toBeUndefined()
-    expect(paneWrong('pi', running(['pi', '--append-system-prompt', 'be good']), w)).toBeUndefined()
-    writeFileSync(copy, 'other')
-    expect(paneWrong('pi', running(['pi', '--append-system-prompt', copy]), w)).toBe('stale')
-    rmSync(dir, { recursive: true, force: true })
-  })
-
-  test('a pi that shows no arguments, as pi names its own process, is not taken for stale', () => {
-    expect(paneWrong('pi', running(['pi']), { '--append-system-prompt': '/h/p.md' })).toBeUndefined()
-  })
-
-  test('its CLI on the files it would start with now is fine', () => {
-    expect(
-      paneWrong(
-        'claude',
-        running(['claude', '--resume', 'abc', '--settings', want['--settings'], '--append-system-prompt-file', want['--append-system-prompt-file']]),
-        want,
-      ),
-    ).toBeUndefined()
-  })
-
-  test('the command herdr restored from before the helper moved is stale', () => {
-    const old = [
-      'claude',
-      '--resume',
-      'abc',
-      '--settings',
-      '/h/.lineclear/hooks/shep-x.settings.json',
-      '--append-system-prompt-file',
-      '/h/.lineclear/prompts/shep-x.md',
-    ]
-    expect(paneWrong('claude', running(old), want)).toBe('stale')
-    // no hooks at all
-    expect(paneWrong('claude', running(['claude', '--resume', 'abc']), want)).toBe('stale')
-  })
-
-  test('pi hides its flags, so a bare pi is fine; a bare claude is stale and names the flag', () => {
-    expect(paneWrong('pi', running(['pi']), { '--append-system-prompt': '/p.md' })).toBeUndefined()
-    expect(staleFlag('claude', running(['claude', '--resume', 'abc']), want)).toBe('--settings')
-  })
-
-  test('the shell at its prompt: the CLI exited', () => {
-    expect(paneWrong('claude', { shell_pid: 10, foreground_process_group_id: 10, foreground_processes: [{ argv: ['bash'], pid: 10 }] }, want)).toBe('exited')
-  })
-
-  test('something else in the foreground, or a CLI with no files to check, is left alone', () => {
-    expect(paneWrong('claude', running(['vim', 'x.ts']), want)).toBeUndefined()
-    expect(paneWrong('codex', running(['node', '/usr/lib/bin/codex', 'resume', 'id']), {})).toBeUndefined()
-  })
-})
+import { Revivals } from '../server/live/revive.ts'
 
 describe('tries at starting it again', () => {
-  const times = { grace: 20, gaps: [0, 60, 300], steady: 600, loop: 3600 }
+  const times = { grace: 20, gaps: [0, 60, 300], steady: 600 }
 
   test('only once it was seen wrong a while, then further apart, then given up once', () => {
     const r = new Revivals(times)
@@ -113,27 +46,8 @@ describe('tries at starting it again', () => {
     expect(r.seen('a', 2200)).toBeUndefined()
   })
 
-  test('the same stale reason twice within the hour starts once, then stops once', () => {
-    const r = new Revivals(times)
-    r.seen('a', 0, '--settings')
-    expect(r.seen('a', 20, '--settings')).toBe('go')
-    r.seen('a', 100, '--settings')
-    expect(r.seen('a', 130, '--settings')).toBe('loop')
-    expect(r.seen('a', 200, '--settings')).toBeUndefined()
-  })
-
-  test('another reason, or the same one after the hour, starts again', () => {
-    const r = new Revivals(times)
-    r.seen('a', 0, '--settings')
-    expect(r.seen('a', 20, '--settings')).toBe('go')
-    r.seen('a', 100, '--model')
-    expect(r.seen('a', 130, '--model')).toBe('go')
-    r.seen('a', 4000, '--model')
-    expect(r.seen('a', 4030, '--model')).toBe('go')
-  })
-
   test('given up, it starts again only once it ran well for a while (the human restarted it)', () => {
-    const r = new Revivals({ grace: 0, gaps: [0], steady: 100, loop: 3600 })
+    const r = new Revivals({ grace: 0, gaps: [0], steady: 100 })
     expect(r.seen('a', 0)).toBe('go')
     expect(r.seen('a', 1)).toBe('give-up')
     r.fine('a', 50)

@@ -101,4 +101,31 @@ describe('revive on herdr events', () => {
     expect(r.wait('k', 20_999)).toBe(1)
     expect(r.seen('k', 21_000)).toBe('go')
   })
+
+  test('an agent killed three times in an hour is restarted after the grace each time, then left', () => {
+    const r = new Revivals()
+    const starts: number[] = []
+    for (let t = 0; t <= 3_600_000 && starts.length < 3; t += 1000) {
+      if (r.seen('k', t) === 'go') starts.push(t)
+    }
+    expect(starts[0]).toBe(20_000)
+    expect(starts.length).toBe(3)
+    const last = starts[2]
+    expect(r.seen('k', last + 1000)).toBeUndefined()
+    expect(r.seen('k', last + 21_000)).toBe('give-up')
+    for (let t = last + 22_000; t < 3_600_000; t += 1000) expect(r.seen('k', t)).toBeUndefined()
+  })
+
+  test('an RPC agent is never compared through herdr', async () => {
+    const { a, loose } = fixture()
+    const calls = spyOn(herdr, 'processInfo').mockImplementation(async () => tree(['pi']))
+    try {
+      ;(a as unknown as { rpcs: Map<string, unknown> }).rpcs.set('t0/Agent', {})
+      loose.take(listing((i) => `w:p${i}`))
+      expect(await a.wrong('t0/Agent')).toBeUndefined()
+      expect(calls).not.toHaveBeenCalled()
+    } finally {
+      calls.mockRestore()
+    }
+  })
 })

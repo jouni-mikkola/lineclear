@@ -6,7 +6,7 @@ import type { TaskRec } from './engine/engine.ts'
 import { BOX } from './box.ts'
 import { HOST, placeId } from './places.ts'
 import { relaunchedLine } from './prompts.ts'
-import { logLoop, type Wrong } from './revive.ts'
+import type { Wrong } from './revive.ts'
 import { OVERVIEW_MAX, REPLY_AFTER_CARD } from './source-helpers.ts'
 import { LiveSourceCli } from './source-cli.ts'
 
@@ -81,7 +81,7 @@ export class LiveSourceUpkeep extends LiveSourceCli {
       }
       if (!why) this.revivals.fine(key, now)
       else {
-        const go = this.revivals.seen(key, now, why === 'stale' ? why : '')
+        const go = this.revivals.seen(key, now)
         if (go === 'go') void this.relaunch(key, why)
         else if (go) void this.gaveUp(key, why)
         next = Math.min(next, this.revivals.wait(key, now) ?? Infinity)
@@ -111,7 +111,7 @@ export class LiveSourceUpkeep extends LiveSourceCli {
   protected async gaveUp(key: string, why: Wrong) {
     // one that still runs on other settings keeps its task working: it is told to carry on, with no card
     if (why === 'stale') {
-      void logLoop(key, this.agents.record(key), this.agents.info(key)?.pane_id, (r) => this.agents.filesOf(r))
+      console.error(`lineclear: restart loop on outdated settings: ${key}'s agent still differs after starting it again, so it is left running`)
       if (this.agents.wasWorking(key) || this.revivals.wasWorking(key)) await this.agents.send(key, hidden(relaunchedLine(), 'restart')).catch(() => undefined)
       return
     }
