@@ -40,6 +40,7 @@ import {
 import { fastGates } from "./fast-gates.ts";
 import { describeFailure, type Failure, outsideChange, parseFailures } from "./failures.ts";
 import { changedSince } from "./gates/tools.ts";
+import { judge, QUARANTINE_FILE, quarantineKey, readQuarantine, writeQuarantine } from "./quarantine.ts";
 
 // Every step but the server's (below) runs with TMPDIR in a folder of this run, on disk. Each test process clears its own
 // folder inside it (tmp-scope.ts), so anything left in it when the steps end was left by a process that did not get
@@ -220,6 +221,36 @@ async function run(step: Step): Promise<{ code: number; failing: Failure[]; outp
   return { code: await p.exited, failing: [...parseFailures(out), ...parseFailures(err)], output: out + err };
 }
 
+/** Runs one failed test alone, in its step's folder: true when it passes. */
+async function passesAlone(step: Step, f: Failure): Promise<boolean> {
+  if (f.file === "") return false;
+  const escaped = f.test.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const p = Bun.spawn(["bun", "test", "--timeout", "120000", `./${f.file.replace(/^\.\//, "")}`, "-t", `^${escaped}$`], {
+    cwd: step.cwd,
+    stdin: "ignore",
+    stdout: "ignore",
+    stderr: "ignore",
+    env: step.cwd === "server" ? { ...serverEnv, LINECLEAR_TEST_RUNNER: "1" } : env,
+  });
+  return (await p.exited) === 0;
+}
+
+/** A failed test step reruns its failures alone: the ones that pass are flakes, tolerated while the quarantine has room (scripts/quarantine.ts). Returns the failures that still fail the step. */
+async function afterRerun(step: Step, failing: Failure[]): Promise<Failure[]> {
+  const alone = new Map<Failure, boolean>();
+  await Promise.all(failing.map(async (f) => alone.set(f, await passesAlone(step, f))));
+  const folder = step.cwd ?? ".";
+  const list = readQuarantine();
+  const verdict = judge(folder, failing, (f) => alone.get(f) === true, list);
+  if (verdict.added.length > 0) {
+    const fix = process.env.LINECLEAR_FLAKE_FIX ?? "unfiled";
+    writeQuarantine([...list, ...verdict.added.map((f) => ({ test: quarantineKey(folder, f), fix }))]);
+  }
+  for (const f of verdict.added) console.error(`check: flaky, passed alone, added to ${QUARANTINE_FILE}: ${describeFailure(f)}`);
+  for (const f of verdict.tolerated) console.error(`check: flaky, quarantined: ${describeFailure(f)}`);
+  return verdict.broken;
+}
+
 // read again once the steps are through: the machine may have got busy while they ran
 const measure = loadFactorMeter();
 let factor = measure();
@@ -233,9 +264,15 @@ async function runStep(step: Step): Promise<boolean> {
   await null;
   for (const need of step.needs ?? []) if (!(await outcome.get(need))) return false;
   const at = performance.now();
-  const { code, failing, output } = await run(step);
+  const first = await run(step);
+  const { code, output } = first;
+  let { failing } = first;
   const isTests = step.name.startsWith("tests");
-  const ok = code === 0;
+  let ok = code === 0;
+  if (!ok && failing.length > 0 && (isTests || step.name === "server tests")) {
+    failing = await afterRerun(step, failing);
+    ok = failing.length === 0;
+  }
   times.push({ step: step.name, seconds: (performance.now() - at) / 1000, ok });
   if (!ok) {
     console.error(
