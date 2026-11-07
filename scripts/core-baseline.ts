@@ -6,11 +6,12 @@
 //   gh     [n=20]       GitHub check time on main per job, from the last n runs of check.yml
 //   time <n> <cmd...>   wall time of a command, n runs
 //   snapshot <url> [n=7]  wall time and size of GET <url>/api/snapshot, n runs
+//   worker [n=3]        resident memory of an idle worker, n starts
 //   chat-tokens [n=20]  tokens per session of the coordinator and the Dispatcher, from their last n session files
 import { spawnSync } from "node:child_process";
 import { decisionsSince } from "../src/decisions-store.ts";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { basename, join } from "node:path";
 
 type Task = {
@@ -198,6 +199,41 @@ async function snapshot(url: string, n: number): Promise<void> {
   line(`GET /api/snapshot (${(bytes / 1e6).toFixed(1)} MB)`, secs, "s", 2);
 }
 
+/** A worker (server/main.ts with LINECLEAR_BOX) on an empty home, idle 5 s after it is ready: its resident memory. */
+async function worker(n: number): Promise<void> {
+  const mb: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const home = mkdtempSync(join(tmpdir(), "lc-worker-"));
+    const box = { label: "baseline", target: "baseline.invalid", session: "default", herdr: "herdr", home, path: process.env.PATH ?? "", os: "Linux" };
+    const p = Bun.spawn([process.execPath, join(import.meta.dir, "../server/server/main.ts")], {
+      cwd: join(import.meta.dir, "../server"),
+      env: {
+        ...process.env,
+        LINECLEAR_HOME: home,
+        LINECLEAR_MAIN_HOME: home,
+        LINECLEAR_PORT: "0",
+        LINECLEAR_BOX: JSON.stringify(box),
+        LINECLEAR_TOKEN: "baseline",
+      },
+      stdout: "pipe",
+      stderr: "ignore",
+    });
+    await p.stdout.getReader().read();
+    await Bun.sleep(5000);
+    mb.push(
+      Number(
+        spawnSync("ps", ["-o", "rss=", "-p", String(p.pid)])
+          .stdout.toString()
+          .trim(),
+      ) / 1024,
+    );
+    p.kill();
+    await p.exited;
+    rmSync(home, { recursive: true, force: true });
+  }
+  line("worker resident memory", mb, "MB", 0);
+}
+
 function chatTokens(n: number): void {
   const dirOf = (cwd: string) => join(SESSIONS, `--${cwd.slice(1).replaceAll("/", "-").replaceAll("_", "-")}--`);
   const spacesFile = join(BOARD, "spaces.json");
@@ -257,4 +293,5 @@ else if (mode === "gh") gh(Number(a ?? 20));
 else if (mode === "time") time(Number(a), rest);
 else if (mode === "snapshot") await snapshot(a ?? "", Number(rest[0] ?? 7));
 else if (mode === "chat-tokens") chatTokens(Number(a ?? 20));
-else console.log("usage: bun scripts/core-baseline.ts <start|tokens|stalls|gh|time|snapshot|chat-tokens> [args]");
+else if (mode === "worker") await worker(Number(a ?? 3));
+else console.log("usage: bun scripts/core-baseline.ts <start|tokens|stalls|gh|time|snapshot|chat-tokens|worker> [args]");

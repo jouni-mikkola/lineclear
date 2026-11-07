@@ -6,7 +6,6 @@ import { Emitter } from '../source.ts'
 import { readJson } from '../store.ts'
 import { boxInfo } from './install.ts'
 import type { BoxInfo } from './box.ts'
-import type { Kept } from './kept.ts'
 import { type Events, type Link, dirOf } from './machines-helpers.ts'
 import { saveWaiting } from './waiting.ts'
 import { running, type Worker } from './worker-process.ts'
@@ -20,13 +19,11 @@ export const workerRecord = (label: string) =>
 export abstract class LinkPoll extends Emitter<Events> {
   protected links = new Map<string, Link>()
   protected stopped = false
-  protected pendingResume = new Map<string, Kept>()
 
   abstract start(l: Link, force?: boolean): Promise<void>
-  protected abstract keep(l: Link): void
 
   protected active(l: Link) {
-    return !this.stopped && !this.pendingResume.has(l.saved.label) && l.saved.enabled !== false && this.links.get(l.saved.label) === l
+    return !this.stopped && l.saved.enabled !== false && this.links.get(l.saved.label) === l
   }
 
   protected own(l: Link, w: Worker) {
@@ -76,7 +73,6 @@ export abstract class LinkPoll extends Emitter<Events> {
       if (!this.active(l)) return
       l.rec.lastSeen = Date.now()
       l.connecting = false
-      this.keep(l)
       // the socket is made even with herdr off: it says when herdr is back
       const herdrUp = this.seen(l, snap)
       this.connect(l)
@@ -180,7 +176,6 @@ export abstract class LinkPoll extends Emitter<Events> {
       const m = JSON.parse(String(e.data))
       if (m.type === 'chat') {
         l.chats.set(m.chat.key, m.chat)
-        this.keep(l)
         this.emit('chat', m.chat.key, m.chat)
       } else if (m.type === 'terminal') this.emit('terminal', m.chat, { ansi: m.ansi, cols: m.cols, rows: m.rows })
       else if (m.type === 'snapshot') {
@@ -188,7 +183,6 @@ export abstract class LinkPoll extends Emitter<Events> {
         l.connecting = false
         l.rec.lastSeen = Date.now()
         this.seen(l, m.snapshot)
-        this.keep(l)
         this.emit('snapshot')
         if (l.reachable && !was) void this.flush(l)
       } else if (m.type === 'alert') this.emit('alert', m.alert)

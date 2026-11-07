@@ -151,3 +151,15 @@ Lost agent time on this board, from `tasks.json` and `decisions.jsonl` (all of t
 - The shard `full check (5/8)` took up to 189 s while the others took 43 s or less.
 - One start of this task failed with "No model is set for pi".
 - `decisions.jsonl` holds 4519 `run` lines in 10 hours (648 KB), 450 per hour of no signal.
+
+## Worker memory
+
+Limit: at most 150 MB resident. A worker on an empty home, 5 s after it is ready, 3 starts, on a Linux machine
+(`bun scripts/core-baseline.ts worker 3`):
+
+```
+resident memory  68 MB median, 68 MB worst
+```
+
+The main server keeps no copy of a machine: nothing is written under `machines/`, and the folder an older version
+kept is removed at start.

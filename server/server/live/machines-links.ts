@@ -1,14 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import { mkdirSync, openSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
-import type { Chat } from '../../shared/types.ts'
-import { HOME, writeJson } from '../store.ts'
+import { HOME } from '../store.ts'
 import { boxInfo, helperVersion, installHelper, lacks, machineStatus, probe, savedMachines, type Probe, type Saved } from './install.ts'
 import { MERGE_DEADLINE } from './engine/engine.ts'
-import type { Kept } from './kept.ts'
 import { LinkPoll, workerRecord } from './link-poll.ts'
 import { loadWaiting } from './waiting.ts'
-import { CONNECTING_FOR, type Link, dirOf, fits, machineHome, sameBox, workerHome } from './machines-helpers.ts'
+import { CONNECTING_FOR, type Link, fits, sameBox, workerHome } from './machines-helpers.ts'
 import { codeVersion, readAddress, running, type Worker } from './worker-process.ts'
 
 export class MachinesLinks extends LinkPoll {
@@ -21,24 +19,19 @@ export class MachinesLinks extends LinkPoll {
 
   protected timers: NodeJS.Timeout[] = []
 
-  /** this server stops: the workers go on (the next start takes them back), and what each machine showed is kept */
+  /** this server stops: the workers go on and the next start takes them back */
   stop() {
     this.stopped = true
     this.timers.forEach(clearInterval)
     for (const l of this.links.values()) {
       clearTimeout(l.retryTimer)
       l.ws?.close()
-      this.keep(l, true)
     }
   }
 
-  /** a machine as it was before a restart: shown as connecting, its worker taken back when its code is the same */
-  protected resume(k: Kept) {
-    if (k.saved.enabled === false) return
-    const l = this.links.get(k.saved.label) ?? this.link(k.saved)
-    l.probe = k.probe
-    for (const c of k.chats ?? []) l.chats.set(c.key, c)
-    const was = workerRecord(k.saved.label)
+  /** a machine's worker from before a restart: taken back when its code is the same */
+  protected resume(l: Link) {
+    const was = workerRecord(l.saved.label)
     const w = running(was.pid, was.token)
     if (!w) return
     if (was.port && was.code === codeVersion()) {
@@ -80,28 +73,6 @@ export class MachinesLinks extends LinkPoll {
     return l
   }
 
-  /** what a machine shows is kept on disk, a few seconds after it changes (at once as this server stops) */
-  protected keepTimers = new Map<string, ReturnType<typeof setTimeout>>()
-  protected keep(l: Link, now = false) {
-    if (!this.saved || (!now && !this.active(l))) return
-    const write = () => {
-      this.keepTimers.delete(l.rec.machine)
-      if (this.links.get(l.saved.label) !== l || l.saved.enabled === false) return
-      const chats = l.watching.chats.map((k) => l.chats.get(k)).filter((c): c is Chat => !!c)
-      try {
-        writeJson(join('machines', dirOf(l.rec.machine), 'last.json'), { saved: l.saved, probe: l.probe, chats } satisfies Kept)
-      } catch (e) {
-        console.error((e as Error).message)
-      }
-    }
-    const t = this.keepTimers.get(l.rec.machine)
-    if (now) {
-      if (t) clearTimeout(t)
-      return write()
-    }
-    if (!t) this.keepTimers.set(l.rec.machine, setTimeout(write, 5000))
-  }
-
   protected syncing = false
 
   /** the machines herdr has saved: a new one is set up and started, a removed one stopped */
@@ -117,13 +88,9 @@ export class MachinesLinks extends LinkPoll {
         if (!l) {
           l = this.link(m)
           this.emit('snapshot')
+          this.resume(l)
         }
         l.saved = m
-        const pending = this.pendingResume.get(m.label)
-        if (pending) {
-          this.pendingResume.delete(m.label)
-          this.resume({ ...pending, saved: m })
-        }
         const st = status[m.label]
         if (st && st.status !== 'reachable' && !l.worker) {
           l.state = `herdr can't reach it: ${st.error ?? st.status}`
@@ -133,18 +100,19 @@ export class MachinesLinks extends LinkPoll {
         }
         if (!l.worker && !l.busy) void this.start(l)
       }
+      // a disabled machine's worker left from before a restart has no link: it stops too
+      for (const m of saved.filter((m) => m.enabled === false && !this.links.has(m.label))) {
+        const rec = workerRecord(m.label)
+        running(rec.pid, rec.token)?.kill()
+      }
       for (const [label, l] of this.links)
         if (!saved.some((m) => m.label === label && m.enabled !== false)) {
-          this.pendingResume.delete(label)
-          clearTimeout(this.keepTimers.get(label))
-          this.keepTimers.delete(label)
           clearTimeout(l.retryTimer)
           l.ws?.close()
           const rec = workerRecord(label)
           const worker = l.worker ?? running(rec.pid, rec.token)
           worker?.kill()
           this.links.delete(label)
-          rmSync(join(machineHome(label), 'last.json'), { force: true })
           this.emit('snapshot')
         }
     } finally {
@@ -224,7 +192,6 @@ export class MachinesLinks extends LinkPoll {
       p.helper = await installHelper(l.saved.target, p)
       if (!this.active(l)) return null
     }
-    this.keep(l)
     return p
   }
 

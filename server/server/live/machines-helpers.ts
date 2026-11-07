@@ -52,11 +52,8 @@ export interface Link {
 /** a machine not reached within this long of the start is out of reach, no longer connecting */
 export const CONNECTING_FOR = 60_000
 
-/** a machine's own folder of records on this machine */
-export const machineHome = (label: string) => join(HOME, 'machines', dirOf(label))
-
 /** the folder of a machine's own worker and its store: tasks.json, server.json, worker.log. Nothing in it is a copy
- *  of that machine's tasks kept by this server (machines/<label> holds only last.json) */
+ *  of that machine's tasks kept by this server (machines/ holds nothing) */
 export const workerHome = (label: string) => join(HOME, 'workers', dirOf(label))
 
 /** a machine's folder name under machines/ */
