@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 import { Machines } from '../server/live/machines.ts'
 import type { Snapshot } from '../shared/types.ts'
+import { until } from './until.ts'
 
 type Inner = {
   stale: Set<unknown>
@@ -46,13 +47,13 @@ test('workers on older code update one at a time, the one with a working task la
   }
   try {
     inner.stepUpdates()
-    await until(() => log.includes('start c'))
+    await until(() => log.includes('start c'), 'the second update')
     expect(log).toEqual(['a', 'start a', 'c', 'start c'])
     expect(most).toBe(1)
     // the busy one goes once its task is done
     links[1].snap = snap('done')
     inner.stepUpdates()
-    await until(() => log.includes('start busy'))
+    await until(() => log.includes('start busy'), 'the busy one to update')
     expect(log.slice(4)).toEqual(['busy', 'start busy'])
     expect(most).toBe(1)
 
@@ -67,8 +68,3 @@ test('workers on older code update one at a time, the one with a working task la
     m.stop()
   }
 })
-
-async function until(ok: () => boolean) {
-  for (let i = 0; i < 200 && !ok(); i++) await Bun.sleep(10)
-  expect(ok()).toBe(true)
-}
