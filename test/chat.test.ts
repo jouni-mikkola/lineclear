@@ -110,6 +110,20 @@ test("POST /api/chat/files saves a file through Lineclear for the Dispatcher, ch
   }
 });
 
+test("a reply to a card keeps the Dispatcher's session, a new request starts a new one", async () => {
+  const fake = startFakeLineclear();
+  try {
+    const { handle } = api(fake.url);
+    await viewWhen(handle, (v) => v.state === "ready");
+    await handle(req("/api/chat", { text: "kauppa", reply: "Which project is this for?" }));
+    expect(fake.actions.map((a: any) => a.text)).toEqual(["kauppa"]);
+    await handle(req("/api/chat", { text: "add a login page" }));
+    expect(fake.actions.map((a: any) => a.text)).toEqual(["kauppa", "/new", "add a login page"]);
+  } finally {
+    fake.stop();
+  }
+});
+
 test("a message and its files reach the Dispatcher's chat in Lineclear, with each file's path", async () => {
   const fake = startFakeLineclear();
   try {
@@ -119,9 +133,12 @@ test("a message and its files reach the Dispatcher's chat in Lineclear, with eac
     const r = await handle(req("/api/chat", { text: "  Read this, please  ", files: [up.id], cid: "c1" }));
     expect(r.status).toBe(202);
     const path = decodeURIComponent(up.url.replace("/api/chat/file?path=", ""));
-    expect(fake.actions).toEqual([{ type: "send", chat: DISPATCHER_KEY, text: "Read this, please", attachments: [path], cid: "c1" }]);
+    expect(fake.actions).toEqual([
+      { type: "send", chat: DISPATCHER_KEY, text: "/new" },
+      { type: "send", chat: DISPATCHER_KEY, text: "Read this, please", attachments: [path], cid: "c1" },
+    ]);
     // the Dispatcher reads it where the path says, in Lineclear's inbox
-    expect(readFileSync(fake.actions[0].attachments[0], "utf8")).toBe("# Plan\n");
+    expect(readFileSync(fake.actions[1].attachments[0], "utf8")).toBe("# Plan\n");
     expect(dirname(dirname(path))).toBe(fake.inbox);
 
     // the chat comes back as the page draws it: yours, your file, then the answer

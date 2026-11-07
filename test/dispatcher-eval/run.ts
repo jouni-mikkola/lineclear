@@ -21,6 +21,9 @@ type Raw = any;
 const TIMEOUT_S = 240;
 const GOAL = 100;
 const FLOOR = 95;
+/** Requests the owner makes on a day of 30 tasks or more, with room to spare, and the input tokens that day may cost. */
+const BUSY_DAY_REQUESTS = 100;
+const DAY_BUDGET = 5_000_000;
 
 const arg = (name: string) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -49,6 +52,11 @@ interface Result {
 }
 
 const READ_ONLY = /^\s*(ls|cat|head|tail|grep|rg|echo|pwd|find|wc|for|while|lineclear)\b/;
+
+/** The environment without the running agent's Lineclear variables, so the model sees only the stand-ins. */
+function cleanEnv(): NodeJS.ProcessEnv {
+  return Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith("LINECLEAR_")));
+}
 
 function parseEvent(line: string): Raw {
   if (!line.startsWith("{")) return undefined;
@@ -115,6 +123,8 @@ async function answer(c: Case, root: string, bin: string, prompt: string, model:
       "-p",
       "--no-session",
       "--no-context-files",
+      "--no-skills",
+      "--no-prompt-templates",
       "--mode",
       "json",
       "--append-system-prompt",
@@ -127,7 +137,7 @@ async function answer(c: Case, root: string, bin: string, prompt: string, model:
       stdin: "ignore",
       stdout: "pipe",
       stderr: "ignore",
-      env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, EVAL_LOG: log, LINECLEAR_ROLE: "dispatcher", LINECLEAR_HOME: join(dir, "store") },
+      env: { ...cleanEnv(), PATH: `${bin}:${process.env.PATH}`, EVAL_LOG: log, LINECLEAR_ROLE: "dispatcher", LINECLEAR_HOME: join(dir, "store") },
     },
   );
   const events = await new Response(p.stdout).text();
@@ -170,6 +180,8 @@ const mean = (f: (r: Result) => number) => Math.round(results.reduce((s, r) => s
 console.log("");
 console.log(`right: ${results.length - wrong.length} of ${results.length} = ${share.toFixed(1)} % (goal ${GOAL} %, never below ${FLOOR} %)`);
 console.log(`tokens per answer: ${mean((r) => r.tokens)} in all, ${mean((r) => r.output)} written; ${mean((r) => r.seconds)} s`);
+const day = mean((r) => r.tokens) * BUSY_DAY_REQUESTS;
+console.log(`a busy day of ${BUSY_DAY_REQUESTS} requests: ${(day / 1e6).toFixed(1)}M tokens (budget ${DAY_BUDGET / 1e6}M)`);
 if (wrong.length > 0) {
   console.log("\nwrong:");
   for (const r of wrong) console.log(`  ${r.c.id}  "${r.c.text}"\n    ${r.why}`);
@@ -183,4 +195,4 @@ if (arg("save"))
       2,
     ),
   );
-process.exit(share < FLOOR ? 1 : 0);
+process.exit(share < FLOOR || day > DAY_BUDGET ? 1 : 0);

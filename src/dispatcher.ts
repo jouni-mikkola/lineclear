@@ -150,7 +150,7 @@ export function dispatcherPrompt(): string {
   return `${readFileSync(join(import.meta.dir, "..", "templates", "dispatcher.md"), "utf8").trimEnd()}\n\n${ownerDirection()}\n`;
 }
 
-/** The smallest model that keeps `bun run dispatcher:eval` at 95 % or more (haiku-5-5 scored 90 % at best). */
+/** The smallest model that keeps `bun run dispatcher:eval` at 95 % or more (sonnet-5-5 scored 98 %, haiku-5-5 90 % at best). */
 export const DISPATCHER_MODEL = "claude-bridge/claude-sonnet-5-5";
 
 /** True when the space stores `value` for `key` itself, as `lineclear show` prints it. */

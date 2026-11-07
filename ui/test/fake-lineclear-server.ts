@@ -100,6 +100,8 @@ async function answerCard(f: Fake, a: Raw): Promise<Response> {
 }
 
 async function send(f: Fake, a: Raw): Promise<Response> {
+  // a slash command goes into the CLI, not the chat (the web chat sends /new before each Dispatcher request)
+  if (typeof a.text === "string" && a.text.startsWith("/")) return Response.json({ waiting: false, at: Date.now() });
   if (a.text === "fail please") return Response.json({ ok: false, error: "The Dispatcher could not take it." });
   const mine = [
     ...(a.text ? [{ id: `y${++f.n}`, who: "you", text: a.text, cid: a.cid, at: Date.now() }] : []),
