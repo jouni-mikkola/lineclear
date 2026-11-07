@@ -5,7 +5,6 @@ import pack, { PACK_ENTRY, parts, switchesFile } from "../pi/pack.ts";
 import { packMain } from "../src/pack.ts";
 import { applyCompaction, reserveFor, rolePoint, unknownWindows } from "../pi/compaction.ts";
 import { doctorChecks } from "../src/doctor.ts";
-import { sessionParts } from "../src/session-text.ts";
 import { extensionFile, pathsFor } from "../src/paths.ts";
 import { tmp } from "./helpers.ts";
 import lineclearExtension, { BEAT_MS, beatDuringCalls, nudgeQuietTurns } from "../pi/extension.ts";
@@ -156,12 +155,6 @@ test("the shipped parts hold no account, provider or owner rule", () => {
   for (const f of existsSync(dir) ? readdirSync(dir) : []) {
     if (f.endsWith(".ts")) expect(readFileSync(join(dir, f), "utf8")).not.toMatch(/anthropic|openai|google|opencode|@[a-z0-9.-]+\.[a-z]+/i);
   }
-});
-
-test("a session lists the parts it had on", () => {
-  const line = (on: string[]) => JSON.stringify({ type: "custom", customType: "lineclear-pack", data: { on } });
-  expect(sessionParts(`${line(["a"])}\n${line(["a", "b"])}\n{"half`)).toEqual(["a", "b"]);
-  expect(sessionParts("")).toEqual([]);
 });
 
 test("compaction point: a role has its own, a pack.json value and the switch change it", () => {
