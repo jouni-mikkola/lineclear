@@ -68,11 +68,9 @@ export class LiveSourceTaskWords extends LiveSourceRestartWords {
         await validateBase(pr.path, one(p, 'base') ?? pr.base)
         const commits = stepId && one(p, 'reopened') !== 'true' ? await commitsOf(pr.path, one(p, 'base') ?? pr.base) : []
         const open = this.engine.tasks.filter((x) => x.project === placeId.space(pr.name) && !x.archived && !ended(x))
-        const elsewhere = (this.peers?.list() ?? []).flatMap((l) =>
-          (l.snap?.tasks ?? [])
-            .filter((x) => x.status !== 'done' && !x.archived && x.place === placeId.space(pr.name))
-            .map((x) => ({ id: `${l.rec.machine}:${x.id}`, title: x.name })),
-        )
+        const elsewhere = this.tasksOnPeers()
+          .filter((x) => x.status !== 'done' && !x.archived && x.place === placeId.space(pr.name))
+          .map((x) => ({ id: `${x.machine}:${x.id}`, title: x.name }))
         const refused = whyStepRefused(title, [...open, ...elsewhere], commits)
         if (refused) throw new Error(refused)
         const after = p.opts.after ?? []
@@ -112,7 +110,7 @@ export class LiveSourceTaskWords extends LiveSourceRestartWords {
       // archived tasks only with --archived, and then only they
       const shown = (t: { archived?: unknown }) => !!t.archived === p.flags.has('archived')
       const ts = this.engine.tasks.filter((t) => (!pr || t.project === placeId.space(pr.name)) && shown(t)).map((t) => this.engine.view(t))
-      const others = pr ? [] : (this.peers?.list() ?? []).flatMap((l) => (l.snap?.tasks ?? []).filter(shown).map((t) => ({ ...t, machine: l.rec.machine })))
+      const others = pr ? [] : this.tasksOnPeers().filter(shown)
       const all = doneNewestFirst<Task>([...ts, ...others])
       if (p.flags.has('json')) return taskListJson(all, (id) => this.engine.tasks.some((r) => r.id === id && r.stopped))
       const rows = all.map(taskListRow)

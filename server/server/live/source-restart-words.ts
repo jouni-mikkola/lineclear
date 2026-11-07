@@ -20,7 +20,7 @@ export class LiveSourceRestartWords extends LiveSourceSecrets {
       return runOn(this.peers!, l, ['restart', ref.id, ...rest], undefined)
     }
     const t = this.engine.task(target)
-    const peer = t ? undefined : (this.peers?.list() ?? []).flatMap((l) => l.snap?.tasks ?? []).find((x) => x.id.toUpperCase() === target.toUpperCase())
+    const peer = t ? undefined : this.taskOnPeers(target)
     const place = t || peer ? undefined : this.placeNamed(target)
     const key = t ? `${t.id}/Agent` : peer ? `${peer.id}/Agent` : place?.id
     if (!key) throw new Error(`No space or task ${target}; ${usage}`)

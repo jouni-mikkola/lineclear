@@ -41,7 +41,6 @@ export async function mainCli(args: string[], chat?: string): Promise<{ out: str
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ args, chat }),
-      signal: AbortSignal.timeout(20_000),
     })
     return (await r.json()) as { out: string; code: number }
   } catch {

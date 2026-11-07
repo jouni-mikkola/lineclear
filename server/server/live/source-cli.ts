@@ -188,13 +188,7 @@ export class LiveSourceCli extends LiveSourceSubcommands {
         const t = one(p, 'task') ? this.engine.task(one(p, 'task')!) : undefined
         // another machine's task (the main machine's home space keeps every machine's overview): it opens on that task,
         // and while it waits on you it buzzes as the task's own alert would
-        const far =
-          one(p, 'task') && !t
-            ? this.peers
-                ?.list()
-                .flatMap((l) => l.snap?.tasks ?? [])
-                .find((x) => x.id.toUpperCase() === one(p, 'task')!.toUpperCase())
-            : undefined
+        const far = one(p, 'task') && !t ? this.taskOnPeers(one(p, 'task')!) : undefined
         const waits = far && (far.status === 'need' || far.status === 'ready') ? { tag: far.id, task: true as const } : {}
         // about a task: it opens on its card. While the task waits on you, it says what the task needs as its own alert
         // does (the choices first, then the coordinator's why) and takes that alert's place

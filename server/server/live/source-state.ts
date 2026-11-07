@@ -72,6 +72,16 @@ export class LiveSourceState extends Emitter<SourceEvents> {
     if (this.peers) this.engine.setMachines(this.peers.boxes())
   }
 
+  /** every task other machines last showed, each with the machine it is on */
+  protected tasksOnPeers() {
+    return (this.peers?.list() ?? []).flatMap((l) => (l.snap?.tasks ?? []).map((t) => ({ ...t, machine: l.rec.machine })))
+  }
+
+  /** one of those by its id */
+  protected taskOnPeers(id: string) {
+    return this.tasksOnPeers().find((t) => t.id.toUpperCase() === id.toUpperCase())
+  }
+
   /* ---------- names ---------- */
 
   chatName(key: string) {
