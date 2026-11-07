@@ -2,6 +2,7 @@ import { clock } from '../../shared/time.ts'
 import { slugify, type Machine, type Place } from '../../shared/types.ts'
 import type { Agents } from './agents.ts'
 import type { Engine } from './engine/engine.ts'
+import { room } from './herdr-forward.ts'
 import type { Machines } from './machines.ts'
 import { HOST, NAME, placeId, type Places } from './places.ts'
 
@@ -36,6 +37,7 @@ export function listing({ places: own, engine, agents, peers: links, asks, healt
       status: up ? 'idle' : 'off',
       unreachableSince: up ? undefined : gone,
       health,
+      room: room(),
       herdrDown: up ? undefined : gone,
     },
   ]

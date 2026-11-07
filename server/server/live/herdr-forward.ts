@@ -1,10 +1,9 @@
-// The adapter's other half: herdr's own forwarding to a machine saved in herdr, and the small ssh read of a machine's room.
+// The adapter's other half: herdr's own forwarding to a machine saved in herdr, and this machine's room.
 // A call is the same call with `--machine <label-or-id>`; Lineclear keeps no script for it.
 import { readFileSync } from 'node:fs'
-import { availableParallelism, loadavg } from 'node:os'
-import { sshTo } from './box.ts'
+import { availableParallelism, freemem, loadavg, totalmem } from 'node:os'
+import type { Room } from '../../shared/types.ts'
 import { adapter, type Call, HerdrError, rpc } from './herdr.ts'
-import { savedMachines } from './install.ts'
 
 /** the same call on a machine saved in herdr: `herdr --machine <label-or-id> <command>`, herdr's own forwarding over its
  *  saved SSH connection. A method the command line has no command for (ping) is refused */
@@ -106,60 +105,18 @@ export function forwardArgs(method: string, p: Record<string, unknown>): string[
   }
 }
 
-/** what a machine has room for: its 1-minute load, its cores, and its free and total memory in kB */
-export interface Room {
-  load: number
-  cores: number
-  freeKb: number
-  totalKb: number
-}
-
 /** the room from a load, the text of /proc/meminfo and a core count */
-function parseRoom(load: number, meminfo: string, cores: number): Room | undefined {
+export function parseRoom(load: number, meminfo: string, cores: number): Room | undefined {
   const kb = (key: string) => Number(new RegExp(`^${key}:\\s+(\\d+)`, 'm').exec(meminfo)?.[1])
   const [freeKb, totalKb] = [kb('MemAvailable'), kb('MemTotal')]
   return Number.isNaN(load + freeKb + totalKb + cores) ? undefined : { load, cores, freeKb, totalKb }
 }
 
-/** this machine's room, from its own /proc */
-function localRoom(): Room | undefined {
+/** this machine's room, for its snapshot: /proc on Linux, the os module's counts elsewhere (macOS has no /proc) */
+export function room(platform: string = process.platform): Room | undefined {
   try {
-    return parseRoom(loadavg()[0], readFileSync('/proc/meminfo', 'utf8'), availableParallelism())
-  } catch {
-    return undefined
-  }
-}
-
-/** runs a command line on a saved machine and returns its output; undefined when it failed */
-type Remote = (machine: string, script: string) => Promise<string | undefined>
-
-const targets = new Map<string, string>()
-
-/** a saved machine's SSH target; herdr is asked once per machine */
-async function targetOf(machine: string): Promise<string | undefined> {
-  const known = targets.get(machine)
-  if (known) return known
-  const saved = (await savedMachines()).find((m) => m.label === machine || m.id === machine)
-  if (saved) targets.set(machine, saved.target)
-  return saved?.target
-}
-
-const overSsh: Remote = async (machine, script) => {
-  const target = await targetOf(machine)
-  if (!target) return undefined
-  const p = Bun.spawn(sshTo(target, script), { stdin: 'ignore', stdout: 'pipe', stderr: 'ignore', timeout: 10_000, killSignal: 'SIGKILL' })
-  const [out, code] = await Promise.all([new Response(p.stdout).text(), p.exited])
-  return code === 0 ? out : undefined
-}
-
-/** a machine's room: this one from /proc, a saved one by one ssh read of its /proc over the shared connection (no tab) */
-export async function room(machine?: string, remote: Remote = overSsh): Promise<Room | undefined> {
-  if (!machine) return localRoom()
-  try {
-    const out = await remote(machine, 'cat /proc/loadavg /proc/meminfo; getconf _NPROCESSORS_ONLN')
-    if (!out) return undefined
-    const lines = out.trim().split('\n')
-    return parseRoom(Number(lines[0]?.split(' ')[0]), out, Number(lines.at(-1)))
+    if (platform === 'linux') return parseRoom(loadavg()[0], readFileSync('/proc/meminfo', 'utf8'), availableParallelism())
+    return { load: loadavg()[0], cores: availableParallelism(), freeKb: Math.round(freemem() / 1024), totalKb: Math.round(totalmem() / 1024) }
   } catch {
     return undefined
   }

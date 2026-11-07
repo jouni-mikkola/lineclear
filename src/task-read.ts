@@ -58,6 +58,12 @@ export function readers<R>(run: (cmd: string[]) => R) {
   };
 }
 
+/** The tasks the one server keeps for another machine, from the list a tick has read already; a text when it cannot be read. */
+export function readMachineTasks(env: Env, host: string): { tasks: Listed[] } | { why: string } {
+  const all = readList([], env);
+  return "tasks" in all ? { tasks: all.tasks.filter((t) => t.machine === host) } : all;
+}
+
 /**
  * This machine's tasks of one space, or of every space. The all-spaces list is read once and filtered here. A board
  * that does not name the space in its tasks (an older one, a stand-in), or fails to list them all, is asked for the

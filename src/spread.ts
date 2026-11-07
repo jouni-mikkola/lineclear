@@ -1,5 +1,6 @@
 import { machineLimits } from "../server/server/live/engine/machine.ts";
 import { serverBin } from "./paths.ts";
+import { readMachineTasks } from "./task-read.ts";
 import { listProjectNames, projectsDir, readSettings } from "./project.ts";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -13,7 +14,6 @@ type Env = Record<string, string | undefined>;
 // A project's steps may run on other machines. There is one server and one task store: a machine's room is what the
 // server says of it (herdr's read, its tasks at work, its slots). A machine that cannot be reached is a text, never a throw.
 
-const TIMEOUT_MS = 40_000;
 /** A machine with less memory free than this takes no new task. */
 const MIN_FREE_KB = 1024 * 1024;
 
@@ -113,44 +113,30 @@ export function roomLack(r: Room): string | undefined {
   return undefined;
 }
 
-/** What `lineclear room <machine>` says: the adapter's read of the machine, with its tasks at work and its slots from the one store. */
-interface RoomRead {
-  load: number;
-  cores: number;
-  freeKb: number;
-  working: number;
-  max: number | null;
+/** What a machine row of the main server's snapshot says: its worker's room and the slots the one store counts. */
+interface MachineRow {
+  machine: string;
+  room?: { load: number; cores: number; freeKb: number };
+  slots?: { working: number; max: number | null };
 }
 
-/** Runs one command of the one server and parses its JSON; a text when it fails. */
-function serverJson<T>(env: Env, args: string[]): T | string {
-  try {
-    const p = Bun.spawnSync([serverBin(env as NodeJS.ProcessEnv), ...args], { stdin: "ignore", timeout: TIMEOUT_MS, env: env as Record<string, string> });
-    const text = p.stdout.toString();
-    if (p.exitCode !== 0) return (p.stderr.toString() || text).trim().split("\n").at(-1) || `exit ${p.exitCode}`;
-    return JSON.parse(text) as T;
-  } catch (e) {
-    return (e as Error).message;
-  }
-}
-
-/** One machine's room and its tasks now, from the one server (herdr's read and the task store); a text when it cannot be reached. */
-export function readRoom(host: string, space: string, env: Env = process.env): Room | string {
-  const read = serverJson<RoomRead>(env, ["room", host]);
-  if (typeof read === "string") return `${host} cannot be reached: ${read}`;
-  const list = serverJson<(Task & { machine?: string })[]>(env, ["task", "list", "--space", space, "--json"]);
-  if (typeof list === "string") return `${host}: task list failed: ${list}`;
-  const { loadLimit } = machineLimits({ ...env, LINECLEAR_CORES: String(read.cores) });
+/** One machine's room and its tasks now, from the server's snapshot (its worker's own read, no process started) and the tick's task list; a text when it cannot be reached. */
+export function readRoom(host: string, space: string, snapshot: unknown, env: Env = process.env): Room | string {
+  const row = ((snapshot as { machines?: MachineRow[] } | undefined)?.machines ?? []).find((m) => m.machine === host);
+  if (!row?.room || !row.slots) return `${host} cannot be reached: its worker has not reported its room`;
+  const list = readMachineTasks(env, host);
+  if ("why" in list) return `${host}: task list failed: ${list.why}`;
+  const { loadLimit } = machineLimits({ ...env, LINECLEAR_CORES: String(row.room.cores) });
   return {
     host,
-    tasks: list
-      .filter((t) => t.machine === host)
+    tasks: list.tasks
+      .filter((t) => t.space === undefined || t.space === space)
       .map((t) => ({ ...t, ...(t.id ? { id: `${t.id}@${host}` } : {}), sub: t.sub ? `${t.sub} · on ${host}` : `on ${host}` })),
-    working: read.working,
-    max: read.max ?? undefined,
-    load: read.load,
+    working: row.slots.working,
+    max: row.slots.max ?? undefined,
+    load: row.room.load,
     loadLimit,
-    freeKb: read.freeKb,
+    freeKb: row.room.freeKb,
   };
 }
 
