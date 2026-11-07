@@ -1,7 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { lineOfRoadmap } from "./roadmap-view.ts";
-import { lineclearTasks } from "./roadmap-source.ts";
+import { lineclearTasks, roadmapFolderText } from "./roadmap-source.ts";
 import { statusesOf } from "./task-steps.ts";
 import { stepText } from "./brief.ts";
 import { checkRoadmap, formErrors, resultOf, type RoadmapError, type Step, type StepStatus, type Task } from "./roadmap.ts";
@@ -19,12 +17,9 @@ const USAGE = [
 ];
 
 function readRoadmap(repo: string, out: Out): { text: string; file: string } | undefined {
-  const file = join(repo, "docs", "ROADMAP.md");
-  if (!existsSync(file)) {
-    out(`${file}: no such file`);
-    return undefined;
-  }
-  return { text: readFileSync(file, "utf8"), file };
+  const road = roadmapFolderText(repo);
+  if (!road) out(`${repo}/docs/ROADMAP.md: no such file`);
+  return road;
 }
 
 function mainCommits(repo: string, ref = mainRefs(repo)[0]): { subject: string; body: string }[] | string {

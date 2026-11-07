@@ -1,4 +1,4 @@
-import { readFileSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 // Reads that Home repeats every second, kept until a file they come from changes (its inode, size or time), so 1000
@@ -50,5 +50,13 @@ export function refsKey(repo: string): string | undefined {
     return undefined;
   }
   const files = ["HEAD", "packed-refs", "refs/heads/main", "refs/remotes/origin/main"].map((f) => join(git, f));
-  return [...files, join(repo, "docs", "ROADMAP.md")].map(fileKey).join("|");
+  const folder = join(repo, "docs", "roadmap");
+  const steps = (() => {
+    try {
+      return readdirSync(folder).map((f) => join(folder, f));
+    } catch {
+      return [];
+    }
+  })();
+  return [...files, join(repo, "docs", "ROADMAP.md"), folder, ...steps].map(fileKey).join("|");
 }
