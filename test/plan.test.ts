@@ -58,6 +58,7 @@ function setup() {
     LINECLEAR_CONFIG: config,
     LINECLEAR_SERVER_BIN: join(bin, "lineclear"),
     LINECLEAR_TASK: "LIN-5",
+    LINECLEAR_ROLE: "dispatcher",
     LINECLEAR_STEPCHECK: join(bin, "model"),
   };
   const says = (text: string) => writeFileSync(answer, text);

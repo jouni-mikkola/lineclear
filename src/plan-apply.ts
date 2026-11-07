@@ -34,14 +34,21 @@ function serverMerge(task: string, env: NodeJS.ProcessEnv): string | undefined {
   return m.exitCode === 0 ? undefined : (m.stderr.toString() || m.stdout.toString()).trim() || "merge failed";
 }
 
+/** Merges a Dispatcher plan's branch into main with git. Only when main is checked out and clean, and a conflict is undone. */
+function mergePlanBranch(task: string, repo: string): string | undefined {
+  if (gitAsLineclear(repo, "rev-parse", "--abbrev-ref", "HEAD").out.trim() !== "main" || gitAsLineclear(repo, "status", "--porcelain").out.trim() !== "")
+    return "main is not checked out clean in the project folder, so the plan was not merged";
+  const m = gitAsLineclear(repo, "merge", "--no-ff", "--no-edit", "-m", `${task}: roadmap plan`, `plan/${task}`);
+  if (!m.ok) gitAsLineclear(repo, "merge", "--abort");
+  return gitFailure(m);
+}
+
 /** Merges a plan's task by the server, or a Dispatcher plan's branch by git. Returns the main commits it added, or an error line. */
 export function mergeTask(task: string, repo: string, env = process.env): { base: string; commit: string; commits?: string[] } | string {
   const base = tip(repo);
   const ref = planRef(task);
   const subjects = new Set((ref ? gitAsLineclear(repo, "log", "--format=%s", `main..${ref}`).out.trim().split("\n") : []).filter(Boolean));
-  const failure = isPlanId(task)
-    ? gitFailure(gitAsLineclear(repo, "merge", "--no-ff", "--no-edit", "-m", `${task}: roadmap plan`, `plan/${task}`))
-    : serverMerge(task, env);
+  const failure = isPlanId(task) ? mergePlanBranch(task, repo) : serverMerge(task, env);
   if (failure !== undefined) return failure;
   const commit = tip(repo);
   // another task may have merged in between: keep only this task's own commits for an undo

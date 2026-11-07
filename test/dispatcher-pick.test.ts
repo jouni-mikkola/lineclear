@@ -68,7 +68,7 @@ function dispatcher(env: NodeJS.ProcessEnv) {
   };
   const words = (t: string) => new Set(t.toLowerCase().match(/[a-z]{4,}/g) ?? []);
   const plan = (project: string, goal: string) => {
-    const said = run((o) => planMain([project, goal], o, env));
+    const said = run((o) => planMain([project, goal], o, env) as number);
     const live = said.find((l) => l.startsWith("live: "))!.slice(6);
     return `I picked **${project}**. I write the steps; they come back to you as one approval.\n\n[See the steps live](${live})`;
   };
@@ -283,11 +283,14 @@ test("rejecting a plan sends it back once with your note, and a second rejection
   }
 });
 
-test("a plan started outside the Dispatcher is kept too, but not as the Dispatcher's", () => {
+test("a plan started outside the Dispatcher is kept too, but not as the Dispatcher's, and its goal goes to the chat", async () => {
   const w = world();
   const { LINECLEAR_ROLE: _, ...env } = w.env;
   const lines: string[] = [];
-  expect(planMain(["recipes", "Add a weekly menu"], (l) => lines.push(l), env, "/tmp")).toBe(0);
+  const sent: string[] = [];
+  const send = async (text: string) => void sent.push(text);
+  expect(await planMain(["recipes", "Add a weekly menu"], (l) => lines.push(l), env, "/tmp", undefined, send)).toBe(0);
+  expect(sent[0]).toContain("Goal: Add a weekly menu");
   expect(lines).toContain("live: /recipes/roadmap/track?plan=PLAN-1");
   expect(readRequests(env)).toMatchObject([{ task: "PLAN-1", by: "cli" }]);
 });

@@ -95,6 +95,7 @@ function deliverAnswer(item: Item, choice: string, note: string | undefined, res
 function answeredLine(item: Item, choice: string, resend: boolean): string {
   if (item.kind !== "plan") return item.task === "-" ? `answered: ${choice}` : `${item.task} was told: ${choice}`;
   if (choice === "Approve") return `${item.task} was merged`;
+  if (isPlanId(item.task)) return `${item.task} was rejected, the Dispatcher reads the note in its status`;
   return resend ? `${item.task} was told to change the plan` : `${item.task} was closed`;
 }
 

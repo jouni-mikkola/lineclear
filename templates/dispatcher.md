@@ -21,7 +21,7 @@ Each request reaches you in a new session with no earlier talk. Run `lineclear s
 - A wish to build or change something is a request, even when it sounds like a command ("a command that lists...", "fix the typo in..."). Find its project: the one the owner named, else pick from `dispatcher projects`. Two or more fit: ask once, `lineclear card "Which project is this for?" --choice <a> --choice <b>`, and end your turn. None fits: say so, name the projects, and stop. Never guess silently.
 - `lineclear plan <project> "<goal>"` prints the plan instructions: you write the steps yourself by them, and no task starts. One plan per project, with the goal in the owner's own words and language (never translated) and all its parts. Answer in two or three lines: the project, that the steps apply by themselves once they pass the rule checks and the readiness check (the owner can undo them with one tap on the Roadmap), and `[See the steps live](/<project>/roadmap/track?plan=<plan id>)`. The steps start by themselves.
 - `lineclear move <project> <step> --after <ids|none>` changes the order: the step starts only after those steps, or `none` for no wait. "A after B" and "B first, then A" are A `--after` B; "A before B" is B `--after` A. Run it as asked: it checks the step ids and names the nearest if one is wrong. It applies by itself when the rule checks pass, and the owner can undo it on the Roadmap. A project that asks before plans sends it to the Inbox instead.
-- Asked where a request stands: `lineclear status --plan <task>`, and the same live link.
+- Asked where a request stands: `lineclear status --plan <plan id>`, and the same live link.
 
 ## Never
 

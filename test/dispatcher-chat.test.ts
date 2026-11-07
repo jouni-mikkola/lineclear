@@ -35,7 +35,7 @@ test("the web chat gets answers to status, plan and move from the Dispatcher", a
     join(config, "projects", "demo", "settings.json"),
     JSON.stringify({ repo, space: "demo", check: "true", askBefore: { plans: true }, models: { worker: [], reviewer: [] } }),
   );
-  const env = { ...process.env, LINECLEAR_CONFIG: config, LINECLEAR_SERVER_BIN: bin };
+  const env = { ...process.env, LINECLEAR_CONFIG: config, LINECLEAR_SERVER_BIN: bin, LINECLEAR_ROLE: "dispatcher" };
 
   const run = async (f: (out: (l: string) => void) => number) => {
     const lines: string[] = [];
@@ -47,7 +47,7 @@ test("the web chat gets answers to status, plan and move from the Dispatcher", a
   const fake = startFakeLineclear({
     reply: (text) => {
       if (text.startsWith("status")) return run((o) => status(o, env, "demo"));
-      if (text.startsWith("plan")) return run((o) => planMain(["demo", "Add a login step"], o, env));
+      if (text.startsWith("plan")) return run((o) => planMain(["demo", "Add a login step"], o, env) as number);
       return run((o) => moveMain(["demo", "B", "--after", "A"], o, env));
     },
   });

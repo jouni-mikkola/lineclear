@@ -125,6 +125,7 @@ export function planStatus(out: (l: string) => void, env: Env = process.env, tas
   for (const v of shown) {
     const item = v.state === "approve" && v.item ? ` (Inbox ${v.item.n})` : "";
     out(`${v.task}  ${v.project}  "${v.goal}": ${SAID[v.state]}${item}. Live: ${v.live}`);
+    if (v.state === "planning" && v.item?.note) out(`  the owner sent it back: ${v.item.note}`);
     if (v.steps.length === 0) continue;
     if (v.state !== "approved") {
       out(`  steps: ${v.steps.join(", ")}`);

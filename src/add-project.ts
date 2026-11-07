@@ -196,10 +196,14 @@ export async function saveProject(
   // own processes, as the commands: the Dispatcher leans on the loop, whose web pages call this
   const lineclear = (...args: string[]) =>
     Bun.spawnSync([process.execPath, join(import.meta.dir, "..", "bin", "lineclear"), ...args], { env: env as NodeJS.ProcessEnv, stdin: "ignore" });
+  // the plan runs as the Dispatcher's own: the command prints its instructions and this function sends them to the chat
   // the chat's Dispatcher comes with the first project; setting it up again changes nothing
   lineclear("dispatcher", "setup");
   if (existsSync(join(repo, "docs", "ROADMAP.md"))) return { name };
-  const plan = lineclear("plan", name, FIRST_ROADMAP);
+  const plan = Bun.spawnSync([process.execPath, join(import.meta.dir, "..", "bin", "lineclear"), "plan", name, FIRST_ROADMAP], {
+    env: { ...env, LINECLEAR_ROLE: "dispatcher" } as NodeJS.ProcessEnv,
+    stdin: "ignore",
+  });
   // the Dispatcher writes the plan: hand it the instructions `lineclear plan` printed
   const failed = plan.exitCode === 0 ? await send(plan.stdout.toString(), env) : `${plan.stdout.toString()} ${plan.stderr.toString()}`;
   if (failed) return { error: `${name} is added, but its first roadmap did not start. ${sentence(failed.replace(/\s+/g, " ").trim())}`, status: 502 };

@@ -8,6 +8,7 @@ import { addItem, isOpen, readItems } from "./inbox.ts";
 import { readSettings } from "./project.ts";
 import { looseNote, resolveProject } from "./resolve.ts";
 import { liveLink, readRequests, recordRequest } from "./requests.ts";
+import { sendToDispatcher } from "./chat.ts";
 import { planBrief } from "./plan-brief.ts";
 import { checkRoadmap } from "./roadmap.ts";
 import { checkSteps, NOGO_ROUNDS, type StepCheck, type StepCheckInput, type StepVerdict } from "./stepcheck.ts";
@@ -30,7 +31,14 @@ function serverIsDown(env: NodeJS.ProcessEnv): boolean {
 
 const lineclear = serverBin;
 /** `lineclear plan <project> "<goal>"` hands the goal to the Dispatcher, which writes the steps. No task starts. `lineclear plan submit` sends its roadmap change to the Inbox. */
-export function planMain(raw: string[], out: (l: string) => void, baseEnv = process.env, cwd = process.cwd(), now: () => Date = () => new Date()): number {
+export function planMain(
+  raw: string[],
+  out: (l: string) => void,
+  baseEnv = process.env,
+  cwd = process.cwd(),
+  now: () => Date = () => new Date(),
+  send: (text: string, env: NodeJS.ProcessEnv) => Promise<string | undefined> = sendToDispatcher,
+): number | Promise<number> {
   // the flag first, then the environment, then the data folder's record: the server's own command reads the last two
   const at = raw.indexOf("--url");
   if (at >= 0 && !raw[at + 1]) return (USAGE.forEach((l) => out(l)), 2);
@@ -45,15 +53,20 @@ export function planMain(raw: string[], out: (l: string) => void, baseEnv = proc
   const name = project.name;
   const settings = readSettings(name, env);
   if (typeof settings === "string") return (out(`lineclear plan: ${settings}`), 1);
-  const id = `PLAN-${readRequests(env).length + 1}`;
+  const id = `PLAN-${Math.max(0, ...readRequests(env).map((r) => Number(/^PLAN-(\d+)$/.exec(r.task)?.[1] ?? 0))) + 1}`;
   const dir = dispatcherDir(env);
   const by = env.LINECLEAR_ROLE === "dispatcher" || cwd === dir || cwd.startsWith(`${dir}/`) ? "dispatcher" : "cli";
   recordRequest({ task: id, project: name, goal: goal.trim(), since: now().toISOString(), by }, env);
   // The Dispatcher writes the steps itself: the brief goes back to its chat as this command's answer, and no task starts.
-  out(planBrief(name, goal.trim(), settings.repo, id));
-  out(`live: ${liveLink(name, id)}`);
-  out(`where it stands: lineclear status --plan ${id}${looseNote([[rawName, name]])}`);
-  return 0;
+  const brief = planBrief(name, goal.trim(), settings.repo, id);
+  const tell = () => {
+    out(`live: ${liveLink(name, id)}`);
+    out(`where it stands: lineclear status --plan ${id}${looseNote([[rawName, name]])}`);
+    return 0;
+  };
+  if (by === "dispatcher") return (out(brief), tell());
+  // from the command line the Dispatcher's chat gets the goal; the Dispatcher's own run reads this command's output
+  return send(brief, env).then((failed) => (failed ? (out(`lineclear plan: the Dispatcher was not reached: ${failed}`), 1) : tell()));
 }
 
 function submit(out: (l: string) => void, env: NodeJS.ProcessEnv, cwd: string, now: () => Date): number {
