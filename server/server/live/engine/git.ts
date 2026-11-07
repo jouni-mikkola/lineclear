@@ -133,7 +133,12 @@ export async function conflictMarkers(wt: string, base: string) {
   const paths = changed.out.split('\0').filter(Boolean)
   if (!changed.ok || !paths.length) return []
   const g = await git(wt, 'grep', '-lzE', '-e', '^(<<<<<<<|>>>>>>>)( |$)', 'HEAD', '--', ...paths)
-  return g.code === 0 ? g.out.split('\0').filter(Boolean).map((f) => f.slice('HEAD:'.length)) : []
+  return g.code === 0
+    ? g.out
+        .split('\0')
+        .filter(Boolean)
+        .map((f) => f.slice('HEAD:'.length))
+    : []
 }
 
 export async function mergeBase(wt: string, base: string) {
