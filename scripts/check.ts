@@ -118,11 +118,13 @@ const WHOLE_STEPS: [string, number][] = [
   ["roadmap", 1],
 ];
 const SERVER_TESTS_S = 44;
+// the first jobs get the slow install tests (10 to 25 s each, one file): no server tests and no whole step beside them
+const INSTALL_JOBS = 3;
 const shardLoads = (n: number) => {
-  const loads = Array.from({ length: n }, () => SERVER_TESTS_S / n);
+  const loads = Array.from({ length: n }, (_, i) => (i < INSTALL_JOBS ? 0 : SERVER_TESTS_S / (n - INSTALL_JOBS)));
   const homes = new Map<string, number>();
   for (const [name, seconds] of WHOLE_STEPS) {
-    const at = loads.indexOf(Math.min(...loads));
+    const at = loads.indexOf(Math.min(...loads.slice(INSTALL_JOBS)), INSTALL_JOBS);
     loads[at] = (loads[at] ?? 0) + seconds;
     homes.set(name, at);
   }
@@ -184,13 +186,18 @@ const serverInstalled = () => {
 const serverNeeds = () => (onlyChanged && serverInstalled() ? [] : ["server install"]);
 
 function serverSteps(): Step[] {
-  if (!inServer) return [];
+  if (!inServer || (shard && shard.i <= INSTALL_JOBS)) return [];
   return [
     ...(serverNeeds().length ? [SERVER_INSTALL] : []),
     { name: "server types", cmd: ["bun", "run", full || known === undefined ? "typecheck" : "typecheck:changed"], cwd: "server", needs: serverNeeds() },
     {
       name: "server tests",
-      cmd: ["bun", "scripts/test.ts", full || known === undefined ? "--force" : "changed", ...(shard ? [`--shard=${shard.i}/${shard.n}`] : [])],
+      cmd: [
+        "bun",
+        "scripts/test.ts",
+        full || known === undefined ? "--force" : "changed",
+        ...(shard ? [`--shard=${shard.i - INSTALL_JOBS}/${shard.n - INSTALL_JOBS}`] : []),
+      ],
       cwd: "server",
       needs: serverNeeds(),
     },
