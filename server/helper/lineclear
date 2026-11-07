@@ -6,12 +6,8 @@ use strict;
 use warnings;
 use Cwd ();
 use File::Basename ();
-use File::Spec ();
 use Fcntl qw(O_WRONLY O_CREAT O_EXCL O_TRUNC);
-use IO::Select;
-use IO::Socket::INET;
-use IO::Socket::UNIX;
-use Encode ();
+use Socket ();
 use JSON::PP;
 
 my $dir = File::Basename::dirname(Cwd::abs_path($0));
@@ -64,7 +60,16 @@ if ($secret eq 'run') {
 }
 # the words that take a text on stdin: a secret to keep (never secret run's: that is its command's)
 if (@args && ($secret eq 'set') && !-t STDIN) { local $/; $stdin = <STDIN>; }
-my $u = sub { Encode::decode('UTF-8', $_[0]) };
+# Encode costs 20 ms to load: only text that is not valid UTF-8 needs it
+my $u = sub { my $t = $_[0]; return $t if utf8::decode($t); require Encode; Encode::decode('UTF-8', $_[0]) };
+# one connection with the core Socket module: IO::Socket costs another 20 ms per call
+my $connect = sub {
+  socket(my $c, $sock ? Socket::AF_UNIX() : Socket::AF_INET(), Socket::SOCK_STREAM(), 0) or return;
+  my $addr = $sock ? Socket::pack_sockaddr_un($sock) : do { my $ip = Socket::inet_aton($host) or return; Socket::pack_sockaddr_in($port, $ip) };
+  connect($c, $addr) or return;
+  select((select($c), $| = 1)[0]);
+  return $c;
+};
 my %body = (args => [map { $u->($_) } @args], cwd => $u->(Cwd::getcwd()));
 $body{chat} = $u->($ENV{LINECLEAR_CHAT}) if $ENV{LINECLEAR_CHAT};
 $body{stdin} = $u->($stdin) if defined $stdin;
@@ -79,7 +84,7 @@ my $began = time;
 my $down = 0;   # since when it could not connect: a Lineclear that restarts is waited for 120 s, no longer
 my $res;
 while (1) {
-  my $s = $sock ? IO::Socket::UNIX->new(Type => SOCK_STREAM(), Peer => $sock) : IO::Socket::INET->new(PeerAddr => $host, PeerPort => $port, Proto => 'tcp');
+  my $s = $connect->();
   if ($s) {
     $down = 0;
     print $s "POST /api/cli HTTP/1.0\r\nHost: lineclear\r\n${authorization}Content-Type: application/json\r\nContent-Length: " . length($json) . "\r\n\r\n$json";
@@ -131,6 +136,8 @@ exit($j->{code} // 0);
 # lineclear secret run: the command, with the values in its environment; what it prints comes through with each value
 # masked, as 1Password's op run does (values under 4 characters aren't: they would garble the rest)
 sub run_masked {
+  require Encode;
+  require IO::Select;
   my ($secrets) = @_;
   my @values = sort { length($b) <=> length($a) } grep { length($_) >= 4 } map { Encode::encode('UTF-8', $_) } values %$secrets;
   pipe(my $or, my $ow) or die "pipe: $!";
@@ -180,6 +187,7 @@ sub env_file {
     elsif ($args[$i] eq '--file') { $name = $args[$i + 1] // '' }
   }
   return ("lineclear secret env NAME [NAME …] [--file .env]\n", 1) unless length $name;
+  require File::Spec;
   my $file = File::Spec->rel2abs($name);
   my $dir = File::Basename::dirname($file);
   # git, quietly: its exit code (127: no git here)

@@ -4,7 +4,6 @@
 use strict;
 use warnings;
 use JSON::PP;
-use File::Path qw(make_path);
 use Fcntl qw(O_WRONLY O_CREAT O_EXCL);
 use Cwd qw(getcwd abs_path);
 
@@ -25,6 +24,9 @@ sub process_identity {
   return ($1, $2) if $s =~ /^\s*(\d+)\s+(.+?)\s*$/;
   return;
 }
+
+# File::Path costs 20 ms to load: only a new binding writes a folder
+sub make_dir { require File::Path; File::Path::make_path(@_) }
 
 sub route_dir { return "$ENV{HOME}/.lineclear/helper/routes"; }
 
@@ -175,7 +177,7 @@ sub bind_route {
   }
   my $d = route_dir();
   die "Unsafe route directory\n" if -l $d;
-  make_path($d, { mode => 0700 });
+  make_dir($d, { mode => 0700 });
   die "Unsafe route directory owner\n" unless (stat($d))[4] == $<;
   chmod(0700, $d) or die "route directory permissions: $!";
   prune_dead_routes($d);
@@ -188,7 +190,7 @@ sub bind_route {
     my $base = "$ENV{HOME}/.lineclear/helper/credentials";
     die "Invalid credential path\n" unless $file =~ m{^\Q$base\E/[a-f0-9-]{36}$};
     die "Unsafe credential directory\n" if -l $base;
-    make_path($base, { mode => 0700 });
+    make_dir($base, { mode => 0700 });
     die "Unsafe credential owner\n" unless (stat($base))[4] == $<;
     chmod(0700, $base) or die "credential permissions: $!";
     my $tmp = "$file.$$.tmp";
