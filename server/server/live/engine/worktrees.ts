@@ -5,7 +5,7 @@
 // unless you have started using it.
 import { boxHome } from '../box.ts'
 import { existsSync } from '../mfs.ts'
-import { herdr, type WorkspaceInfo, type WorktreeSpace } from '../herdr.ts'
+import { herdr, HerdrError, type WorkspaceInfo, type WorktreeSpace } from '../herdr.ts'
 import * as G from './git.ts'
 import * as I from './install.ts'
 import * as GH from './github.ts'
@@ -41,6 +41,18 @@ export interface PutAway {
   kept: string[]
   /** something still runs in its space (or herdr didn't answer): nothing was touched, try again later */
   busy?: boolean
+}
+
+/** herdr says the thing is not there: what was to be closed or removed is done */
+const isGone = (e: unknown) => (e instanceof HerdrError ? /not_found/.test(e.code) : /no such|not found/i.test((e as Error).message))
+
+/** a herdr call whose target may be gone already: gone counts as done, any other failure (a timeout above all) is thrown */
+async function undone(call: Promise<unknown>) {
+  try {
+    await call
+  } catch (e) {
+    if (!isGone(e)) throw e
+  }
 }
 
 const tilde = (p: string) => (p.startsWith(boxHome()) ? `~${p.slice(boxHome().length)}` : p)
@@ -120,7 +132,7 @@ export class Worktrees {
     // one worktree. A tab of another name is the human's own, and stays.
     const shells = root ? [root] : await idleShells(this.h, ws, o.wt, o.tab)
     const pane = (await this.h.createTab(ws, o.tab, o.wt, o.env)).root_pane.pane_id
-    for (const old of shells) await this.h.closePane(old).catch(() => undefined)
+    for (const old of shells) await undone(this.h.closePane(old))
     return pane
   }
 
@@ -143,12 +155,15 @@ export class Worktrees {
     closeAgent: () => Promise<unknown>
   }): Promise<PutAway> {
     const where = o.wt ? tilde(o.wt) : `${o.label}'s space`
-    let space: WorkspaceInfo | undefined
     try {
-      space = await this.spaceOf(o.wt, o.label)
-    } catch {
-      return { kept: [`${where} (herdr does not answer)`], busy: true }
+      return await this.putAwayFrom(o, where, await this.spaceOf(o.wt, o.label))
+    } catch (e) {
+      if (!(e instanceof HerdrError)) throw e
+      return { kept: [`${where} (herdr: ${e.message})`], busy: true }
     }
+  }
+
+  private async putAwayFrom(o: Parameters<Worktrees['putAway']>[0], where: string, space: WorkspaceInfo | undefined): Promise<PutAway> {
     if (space && (await busy(this.h, space.workspace_id, o.agentPane))) return { kept: [`${where} (something still runs in its herdr space)`], busy: true }
     const there = !!o.wt && existsSync(o.wt)
     const branch = !!o.branch && (await G.branchExists(o.repo, o.branch))
@@ -163,11 +178,11 @@ export class Worktrees {
       if (err) kept.push(`${where} (${err})`)
     }
     await o.closeAgent()
-    space = await this.spaceOf(o.wt, o.label).catch(() => undefined)
-    if (space) await this.h.closeWorkspace(space.workspace_id).catch(() => undefined)
+    if (space) await undone(this.h.closeWorkspace(space.workspace_id))
     await G.git(o.repo, 'worktree', 'prune')
     if (committedOnly) {
-      const err = await this.dropFolder(o.repo, wt, space)
+      // its space is closed above: herdr has nothing to remove for it
+      const err = await this.dropFolder(o.repo, wt, undefined)
       if (err) kept = [`${where} (${err})`]
     }
     if (branch && !kept.length) {
@@ -180,7 +195,7 @@ export class Worktrees {
 
   /** remove a worktree folder through herdr, else git (never forced); why it stays, or undefined once it is gone */
   private async dropFolder(repo: string, wt: string, space: WorkspaceInfo | undefined): Promise<string | undefined> {
-    if (space?.worktree) await this.h.worktreeRemove(space.workspace_id).catch(() => undefined)
+    if (space?.worktree) await undone(this.h.worktreeRemove(space.workspace_id))
     if (!existsSync(wt)) return undefined
     const r = await G.removeWorktree(repo, wt)
     return r.ok ? undefined : (r.err || r.out).split('\n')[0] || 'git could not remove it'
@@ -204,16 +219,19 @@ export class Worktrees {
    */
   async remove(o: { repo: string; wt?: string; branch?: string; label: string }): Promise<string[]> {
     const left: string[] = []
-    const space = await this.spaceOf(o.wt, o.label).catch(() => undefined)
-    if (o.wt && existsSync(o.wt)) {
-      if (space?.worktree) await this.h.worktreeRemove(space.workspace_id, true).catch(() => undefined)
-      if (existsSync(o.wt)) {
-        const r = await G.removeWorktree(o.repo, o.wt, true)
-        if (!r.ok && existsSync(o.wt)) left.push(`${tilde(o.wt)} (${(r.err || r.out).split('\n')[0] || 'git could not remove it'})`)
-      }
+    let space: WorkspaceInfo | undefined
+    try {
+      space = await this.spaceOf(o.wt, o.label)
+    } catch (e) {
+      if (!(e instanceof HerdrError)) throw e
+      return [`${o.wt ? tilde(o.wt) : `${o.label}'s space`} (herdr: ${e.message})`]
     }
-    const still = await this.spaceOf(o.wt, o.label).catch(() => undefined)
-    if (still) await this.h.closeWorkspace(still.workspace_id).catch(() => undefined)
+    try {
+      await this.removeFrom(o, space, left)
+    } catch (e) {
+      if (!(e instanceof HerdrError)) throw e
+      left.push(`${o.wt ? tilde(o.wt) : `${o.label}'s space`} (herdr: ${e.message})`)
+    }
     await G.git(o.repo, 'worktree', 'prune')
     if (o.branch && (await G.branchExists(o.repo, o.branch))) {
       const d = await G.git(o.repo, 'branch', '-D', o.branch)
@@ -221,6 +239,17 @@ export class Worktrees {
     }
     await this.spaces.close(o.repo)
     return left
+  }
+
+  private async removeFrom(o: { repo: string; wt?: string; label: string }, space: WorkspaceInfo | undefined, left: string[]) {
+    if (o.wt && existsSync(o.wt)) {
+      if (space?.worktree) await undone(this.h.worktreeRemove(space.workspace_id, true))
+      if (existsSync(o.wt)) {
+        const r = await G.removeWorktree(o.repo, o.wt, true)
+        if (!r.ok && existsSync(o.wt)) left.push(`${tilde(o.wt)} (${(r.err || r.out).split('\n')[0] || 'git could not remove it'})`)
+      }
+    }
+    if (space) await undone(this.h.closeWorkspace(space.workspace_id))
   }
 
   closeRepoSpaces() {
