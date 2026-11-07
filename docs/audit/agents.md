@@ -35,7 +35,7 @@ Yes, and it removes most of what follows. Today every task agent is a TUI in a h
 **Recommendation.** Task agents and reviewers run as `pi --mode rpc` children of the server of the machine they run on.
 The server spawns with the agent's environment (`agentEnv`), so the route and secret capability are bound at spawn and
 `route.pl --bind <pid>` (`agents-state.ts:172`) goes. A coordinator and the Dispatcher stay in herdr panes until the human
-can talk to a task agent from the chat page alone (they are the ones a person types into). Trade-offs to decide in L500: the
+can talk to a task agent from the chat page alone (they are the ones a person types into). Trade-offs to decide in L509: the
 owner can no longer type into a task agent's pane (the chat is the way; "take over" becomes a message or an `abort`),
 and a server restart ends the children, so they resume from `--session-id` (the session file is on disk) instead of
 surviving in herdr. Remote machines: the machine's own server spawns the child; main receives the events it already
@@ -49,17 +49,17 @@ Tags: PATCH = hides a cause; SCALE = does not hold at 45 agents; DUP = second wa
 
 | # | file:line | what it does | why | replacement |
 |---|---|---|---|---|
-| A1 | `agents-state.ts:271-277` `put`, `agents-delivery.ts:437` | hands a message over with `herdr.prompt` (typed text plus Enter) | PATCH: the input channel is a screen. Whether the text arrived is unknown, so A2-A8 exist. `agent.prompt` has a 20 s timeout and a stalled prompt "does not prove no input was sent" (herdr docs) | RPC `prompt` / `steer` / `follow_up`: the response says `started | queued | handled` (L501) |
-| A2 | `agents-state.ts:279-282` `untilReady` | polls `interactive_ready` every 100 ms up to 30 s | PATCH, poll where an event exists: up to 300 wakeups per starting agent; at 45 starts, 13,500 timers (est.) | RPC child is ready when `get_state` answers; no wait (L501) |
-| A3 | `agents-state.ts:323-344` `submitted` | after a send, polls status every 100 ms for 5 s, up to 5 tries, reads the screen (`herdr.visible`) and presses Enter again | PATCH: guesses from the screen that Enter was swallowed. Up to 25 s and 5 screen reads and 5 Enters per agent; Enter into a menu can choose an option | remove; `prompt` response is the receipt (L501) |
-| A4 | `paste-watch.ts:8-25,29-45` | regex on another tool's screen (`[paste #`, prompt marks `❯›>`) to find an unsent paste; re-reads every 5 s while fresh (120 s) | PATCH (regex on another tool's output) and SCALE: 45 fresh agents = 9 `pane.read` per second for 2 minutes (est.) | delete the file (L501) |
-| A5 | `agents-state.ts:285-296` `typeIntoPane` | after `paneAfter` (10 s) types the brief into the pane with `pane.send_text` + `enter` | PATCH: a second way to send (also A1) used when the first fails; into a shell it would run the text, so it checks `paneIdle` first | none needed; RPC has one way (L501) |
-| A6 | `agents-helpers.ts:109-125` `holdFrom`, `ownOldPane` | classify herdr errors by regex on the message (`not an active named agent`, `already used`) | PATCH: regex on another tool's error text; a herdr wording change silently turns a hold into a failure | RPC child has no name to clash with; errors are typed (L501, L502) |
-| A7 | `agents-delivery.ts:455-456` | after each delivered item `await sleep(1500); await refresh()` "to give the CLI a moment" | PATCH + blocks: a brief of 3 items holds the delivery loop 4.5 s and does 3 whole-session reads; 45 agents = 135 s of loop time and 135 snapshots (est.) | RPC `prompt` is acknowledged; send the next at once (L501) |
-| A8 | `agents-delivery.ts:466-488` `deliveryFailed`, `:34` `STARTING_RETRY_MS`, `agents-state.ts:93-97` `unreadyFor/paneAfter/briefFor/readyMs/submitMs/strandAfter/backoffMs/backoffMax` | exponential backoff, a 300 ms re-try timer, a 60 s "unready" window, a 5 min give-up for briefs, a 30 s "stranded" fail | PATCH: eight tuning knobs around "the agent may not be listening yet". 77 retry sites in the repo come from this shape | with RPC the child accepts a prompt once spawned; a failure is a process exit, handled once (L501) |
+| A1 | `agents-state.ts:271-277` `put`, `agents-delivery.ts:437` | hands a message over with `herdr.prompt` (typed text plus Enter) | PATCH: the input channel is a screen. Whether the text arrived is unknown, so A2-A8 exist. `agent.prompt` has a 20 s timeout and a stalled prompt "does not prove no input was sent" (herdr docs) | RPC `prompt` / `steer` / `follow_up`: the response says `started | queued | handled` (L510) |
+| A2 | `agents-state.ts:279-282` `untilReady` | polls `interactive_ready` every 100 ms up to 30 s | PATCH, poll where an event exists: up to 300 wakeups per starting agent; at 45 starts, 13,500 timers (est.) | RPC child is ready when `get_state` answers; no wait (L510) |
+| A3 | `agents-state.ts:323-344` `submitted` | after a send, polls status every 100 ms for 5 s, up to 5 tries, reads the screen (`herdr.visible`) and presses Enter again | PATCH: guesses from the screen that Enter was swallowed. Up to 25 s and 5 screen reads and 5 Enters per agent; Enter into a menu can choose an option | remove; `prompt` response is the receipt (L510) |
+| A4 | `paste-watch.ts:8-25,29-45` | regex on another tool's screen (`[paste #`, prompt marks `❯›>`) to find an unsent paste; re-reads every 5 s while fresh (120 s) | PATCH (regex on another tool's output) and SCALE: 45 fresh agents = 9 `pane.read` per second for 2 minutes (est.) | delete the file (L510) |
+| A5 | `agents-state.ts:285-296` `typeIntoPane` | after `paneAfter` (10 s) types the brief into the pane with `pane.send_text` + `enter` | PATCH: a second way to send (also A1) used when the first fails; into a shell it would run the text, so it checks `paneIdle` first | none needed; RPC has one way (L510) |
+| A6 | `agents-helpers.ts:109-125` `holdFrom`, `ownOldPane` | classify herdr errors by regex on the message (`not an active named agent`, `already used`) | PATCH: regex on another tool's error text; a herdr wording change silently turns a hold into a failure | RPC child has no name to clash with; errors are typed (L510, L502) |
+| A7 | `agents-delivery.ts:455-456` | after each delivered item `await sleep(1500); await refresh()` "to give the CLI a moment" | PATCH + blocks: a brief of 3 items holds the delivery loop 4.5 s and does 3 whole-session reads; 45 agents = 135 s of loop time and 135 snapshots (est.) | RPC `prompt` is acknowledged; send the next at once (L510) |
+| A8 | `agents-delivery.ts:466-488` `deliveryFailed`, `:34` `STARTING_RETRY_MS`, `agents-state.ts:93-97` `unreadyFor/paneAfter/briefFor/readyMs/submitMs/strandAfter/backoffMs/backoffMax` | exponential backoff, a 300 ms re-try timer, a 60 s "unready" window, a 5 min give-up for briefs, a 30 s "stranded" fail | PATCH: eight tuning knobs around "the agent may not be listening yet". 77 retry sites in the repo come from this shape | with RPC the child accepts a prompt once spawned; a failure is a process exit, handled once (L510) |
 | A9 | `agents-delivery.ts:421-463` `deliver` | one loop per key; `await this.put` can block; `beforeInput` hook reads startup menus | SCALE: sequential per key, but each item costs A7's sleep | same as A7 |
-| A10 | `agents-sending.ts:166-175` `keys`, `text`; `:223-226` `interrupt` | keys and text through `pane.send_keys` / `agent.send_keys` (by pane id and by name) | DUP: three ways to reach the agent's input (`prompt`, `pane.send_*`, `agent.send_keys`) | RPC `abort`; `get_commands` for slash commands (L501) |
-| A11 | `agents-sending.ts:211-221` `stopTurn` | after `esc`, polls every 500 ms up to 15 s and calls `refresh()` each time | PATCH: 30 whole-session snapshots per restart; `agent_settled` says the turn ended | RPC `abort` waits "for the session to become idle before responding" (L501) |
+| A10 | `agents-sending.ts:166-175` `keys`, `text`; `:223-226` `interrupt` | keys and text through `pane.send_keys` / `agent.send_keys` (by pane id and by name) | DUP: three ways to reach the agent's input (`prompt`, `pane.send_*`, `agent.send_keys`) | RPC `abort`; `get_commands` for slash commands (L510) |
+| A11 | `agents-sending.ts:211-221` `stopTurn` | after `esc`, polls every 500 ms up to 15 s and calls `refresh()` each time | PATCH: 30 whole-session snapshots per restart; `agent_settled` says the turn ended | RPC `abort` waits "for the session to become idle before responding" (L510) |
 
 ### B. Starting an agent
 
@@ -68,7 +68,7 @@ Tags: PATCH = hides a cause; SCALE = does not hold at 45 agents; DUP = second wa
 | B1 | `agents-delivery.ts:300-322` | `for (i<=8)` loop around `herdr.start`: swallows `agent_not_ready` (breaks as success), closes the old pane on "already used", sleeps 750 ms "a new pane needs a moment before its shell is at the prompt" | PATCH: a retry and a timer around something that should not fail; up to 8 x (60 s start timeout + 750 ms) = 8 min blocked per agent; `agent_not_ready` treated as ok hides a blocked start | spawn the child: success or exit code (L502) |
 | B2 | `agents-delivery.ts:338-340` | three `setTimeout`s per start: `deliver` at 250 ms, `discoverLog` at 3 s and 15 s | PATCH: guessed times for "the log file should exist by now"; 3 timers x 45 = 135 per burst | pi RPC `get_state` returns the session file path at once (L502) |
 | B3 | `agents-state.ts:248-258` `discoverLog`, `agents-delivery.ts:198-211` `follow` | scan pi's session folder for a log newer than a time; `follow` re-scans at 1.5, 5, 15, 60, 180 s after a slash command | PATCH + DUP (three ways to learn the log: `learnSession`, `discoverLog`, `follow`): 5 timers and 5 directory scans per command | `get_state.sessionFile` after `new_session` / `switch_session` responses (L502) |
-| B4 | `agents-state.ts:148-186` `bindRoute` | after start, `processInfo` then spawns `perl route.pl --bind <pid>` (5 s timeout), signature in a map | SCALE: one perl process per start; binds by pid because a pane's env can be stale (comment 148) | env set at spawn; capability issued with the child's pid (L500) |
+| B4 | `agents-state.ts:148-186` `bindRoute` | after start, `processInfo` then spawns `perl route.pl --bind <pid>` (5 s timeout), signature in a map | SCALE: one perl process per start; binds by pid because a pane's env can be stale (comment 148) | env set at spawn; capability issued with the child's pid (L509) |
 | B5 | `agents-state.ts:189-215` `repairRoutes` | runs after every `take()` (every list-changing event) over all records; failed binds retried every 30 s | PATCH: an event-driven loop with a time-based retry; 131 records scanned per event | not needed after B4 (L502) |
 | B6 | `agents-delivery.ts:281-293` `paneFor` | to start a coordinator: lists tabs, creates a tab, lists panes and agents, `paneIdle` per pane, closes dead tabs | SCALE: 4+N herdr calls (N panes in the space) per coordinator start | not for RPC agents; coordinators keep it (kept in L502) |
 | B7 | `agents-delivery.ts:154-161` | lists unnamed agents and renames them with `herdr.rename(...).catch(() => undefined)` | PATCH: herdr lists an agent "without its name" and Lineclear gives it back; the catch hides a failed rename, so the brief waits forever | no herdr agent name for RPC agents (L502) |
@@ -81,7 +81,7 @@ Tags: PATCH = hides a cause; SCALE = does not hold at 45 agents; DUP = second wa
 | C1 | `herdr.ts:297-303` `Subscription.set`, `:305-361` `reopen`; `agents-delivery.ts:106-111` `take` | one socket subscribes to 6 pane events plus one `pane.agent_status_changed` per agent pane (`paneEvents`, `:267`); when the pane list changes the socket is destroyed and reopened with the whole list | SCALE: 45 agents = 51 subscriptions rebuilt on every start and stop; each reopen is followed by a whole-session read; 90 reopens for a 45-start burst with the stop of the old ones (est.) | an extra connection for only the new pane (additive), or one unscoped subscription if herdr offers one; with RPC agents the list is the coordinators only (L504) |
 | C2 | `agents-delivery.ts:92-126` `refresh` | `session.snapshot` of everything on open, on every `read` verdict of `listAfter`, and 2+ times per start/finish/deliver | SCALE: the snapshot carries every agent (45+ in each); est. 6 snapshots per start (pane_created, agent_detected, post-start, 3 deliveries) = 270 per 45-start burst | RPC events keep state; herdr read only on open (L504) |
 | C3 | `agent-events.ts:11-12` | `pane_created`, `pane_agent_detected`, `pane_exited`, `pane_moved` return `'read'` | PATCH: events that carry no data force a whole read each time | fewer panes (C1) and use event payloads where herdr sends the pane (L504) |
-| C4 | `agents-delivery.ts:49-57` | `setInterval(2000)` runs `settle()` "upkeep of what herdr does not push" | poll where an event exists: 0.5 ticks/s forever; per tick loops `byName`, `records` (131), `outbox`, `checkStranded` | settle on events (`agent_settled`, process exit) and one timer per deadline (L501) |
+| C4 | `agents-delivery.ts:49-57` | `setInterval(2000)` runs `settle()` "upkeep of what herdr does not push" | poll where an event exists: 0.5 ticks/s forever; per tick loops `byName`, `records` (131), `outbox`, `checkStranded` | settle on events (`agent_settled`, process exit) and one timer per deadline (L510) |
 | C5 | `terminal-clock.ts:21-24`, `agents-state.ts:362-371` `screen` | reads each watched pane as ansi, 300 lines, every 500 ms (1500 ms on a box) and its layout every 3 s | SCALE: 45 watched panes = 90 `pane.read` a second, each up to 300 rows (est.); it exists because "herdr sends no event when a pane's output changes" | an RPC agent has no screen: the page draws `message_update` deltas; keep the clock for the 1-2 coordinator panes on screen (L504) |
 | C6 | `agents-sending.ts:12-25` `wrong`, `revive.ts:15-52` | `pane.process_info` per agent per upkeep pass, plus two sha256 reads of the prompt file, to find "exited" or "stale" (flags differ) | PATCH: asks the OS what is running to learn what a `close` event would say; reads two files per check; pi renames its process, so `staleFlag` skips it (`revive.ts:46`) and compares nothing for the only agent kind that matters | child `exit` event; stale = hash of the launch spec stored in the record (L508) |
 | C7 | `revive.ts:65-127` `Revivals` | grace 20 s, gaps 0/60 s/5 min, steady 10 min, loop 1 h | timers on top of C6; needed only because detection is by polling | keep a small restart-with-backoff on exit event (L508) |
@@ -113,7 +113,7 @@ Tags: PATCH = hides a cause; SCALE = does not hold at 45 agents; DUP = second wa
 
 | # | file:line | what it does | why | replacement |
 |---|---|---|---|---|
-| F1 | `agents-state.ts` (371 lines), `agents-delivery.ts` (516), `agents-sending.ts` (227), `agents.ts` | one class `AgentsState -> AgentsDelivery -> AgentsSending` with `protected` members across three files | "a file split only to stay under 600 lines": the three files share ~50 fields; nothing is testable alone | after L501-L503 the class is: registry (records), channel (RPC child), outbox; each its own module (L503) |
+| F1 | `agents-state.ts` (371 lines), `agents-delivery.ts` (516), `agents-sending.ts` (227), `agents.ts` | one class `AgentsState -> AgentsDelivery -> AgentsSending` with `protected` members across three files | "a file split only to stay under 600 lines": the three files share ~50 fields; nothing is testable alone | after L510, L502 and L503 the class is: registry (records), channel (RPC child), outbox; each its own module (L503) |
 | F2 | `herdr.ts:182-199` `herdrCli` and `herdrCliSync` | two ways to run the `herdr` command (async and `spawnSync`, 3 s) | DUP + blocking call: `spawnSync` blocks the loop up to 3 s | one async (L504) |
 | F3 | `herdr.ts:182-199` `catch { return undefined }`, `herdr.ts:315,342` | empty catches: herdr missing, bad frame | hides the cause (is herdr missing, or is the JSON bad?) | typed `HerdrError` for each (L504) |
 | F4 | `herdr.ts:67-74` `send` | on `closed` asks once more | PATCH: retry around something that should not fail; a closed socket mid-call may repeat a non-idempotent call (`pane.send_text`) | retry only reads (`snapshot`, `list`), never sends (L504) |
@@ -130,83 +130,10 @@ Tags: PATCH = hides a cause; SCALE = does not hold at 45 agents; DUP = second wa
 
 ## Steps
 
-Locks: `agent-rpc`, `agent-delivery`, `herdr-link`, `herdr-forward`, `worktrees`, `pi-ext`, `revive`. L501-L503 share
-`agent-delivery` so they run one after the other; the rest run at once once L500 is done (L504, L505 start at once).
-
-### L500 Task agent is a pi RPC process
-Result: A task's agent runs as a `pi --mode rpc` child of its machine's server, with its events read from the pipe, not a herdr pane.
-- why: A1-A11, B1-B7, C5-C7 all come from driving a TUI by keys; pi's RPC gives start, prompt, abort, state and `agent_settled` as records (rpc.md, json.md).
-- done when: One new task starts, takes its brief, works and ends with 0 herdr calls for that agent (counted in a test with a stand-in herdr), its first event is read within 3 s of the spawn, and `lineclear task add` in the existing contract tests passes on GitHub. Coordinators and the Dispatcher still start in panes.
-- locks: agent-rpc
-- after: none
-- files: server/server/live/agent-rpc.ts, server/server/live/agent-process.ts, server/server/live/agents.ts
-
-### L501 Prompts go in by RPC
-Result: A message to a task agent is one RPC prompt that says if it started, was queued or was handled; nothing is typed into a screen.
-- why: A1-A11 and C4: eight tuning knobs, a paste watcher and a 1.5 s sleep per delivered item exist because the input is a screen.
-- done when: `paste-watch.ts` is deleted; `untilReady`, `submitted`, `typeIntoPane`, `giveUpOnBriefs`, `holdFrom` and `deliveryFailed` are gone from `agents-state.ts` and `agents-delivery.ts`; a brief of 3 items is in the agent in under 1 s (was 4.5 s plus 3 snapshots); a test sends while the agent works and sees `queued`; the 2 s `settle` interval is gone (0 `setInterval` in the three agent files).
-- locks: agent-delivery
-- after: L500
-- files: server/server/live/agents-delivery.ts, server/server/live/agents-state.ts, server/server/live/agents-sending.ts, server/server/live/agents-helpers.ts, server/server/live/paste-watch.ts
-
-### L502 Start has no retry or timer
-Result: A task agent's start is one spawn that succeeds or exits; its log file and route come with it.
-- why: B1-B8: an 8-try loop, a 750 ms sleep, three start timers, a perl route binder and five log-scan timers guess at a pane being ready.
-- done when: `launch` has no loop and no `setTimeout` (0 timers in the function, 3 today); `follow`, `discoverLog` and `repairRoutes` are gone, and the session file comes from `get_state`; `route.pl --bind` is not spawned for RPC agents; a start of 45 tasks in a test makes 0 herdr snapshots and 0 perl processes.
-- locks: agent-delivery
-- after: L501
-- files: server/server/live/agents-delivery.ts, server/server/live/agents-state.ts, server/server/live/readers/find.ts
-
-### L503 One module per agent job
-Result: Agent records and the outbox are written as rows, not as two files rewritten whole, and the three-file class is split by job.
-- why: D1, D2, F1: `agents.json` (424 KB) is rewritten for every launch step and `typed.json` (170 KB) for every delivered item, about 118 MB per 45-start burst (est.).
-- done when: A save writes bytes in proportion to the record changed (a test changes one record of 131 and sees under 8 KB written, 424 KB today); `typed.json` and `requested-news-receipts.json` are gone; no file of `agents*.ts` is over 300 lines and no `protected` field is shared across files; `bun run gates` is green.
-- locks: agent-delivery
-- after: L502
-- files: server/server/live/agents-state.ts, server/server/live/agents-delivery.ts, server/server/live/agents-sending.ts, server/server/live/engine/cold.ts
-
-### L504 One held herdr link
-Result: The coordinator panes' state comes over one held herdr connection that is never rebuilt, and no call retries a send.
-- why: C1-C3, C5, F2-F5: 51 subscriptions are rebuilt and the whole session is re-read on every pane change; every call opens a socket or spawns a process.
-- done when: Starting and stopping 45 panes causes 0 subscription reopens and at most 1 `session.snapshot` (est. 90 and 270 today), counted in a test with a stand-in socket; `herdrCliSync` is gone (0 `spawnSync` in `herdr.ts`); `send` never repeats a `pane.send_*` or `agent.prompt`; `terminal-clock.ts` reads at most 2 panes a second.
-- locks: herdr-link
-- after: none
-- files: server/server/live/herdr.ts, server/server/live/agent-events.ts, server/server/live/terminal-clock.ts
-
-### L505 Machine room by one ssh read
-Result: Another machine's load and memory come from one ssh call, with no tab opened on it.
-- why: F6: `room` opens a tab, types a `printf`, polls the terminal 25 times and matches the text with a regex.
-- done when: `room(machine)` makes 1 process call (was 5-7 forwarded calls plus up to 25 reads) and returns in under 1 s on a warm ControlMaster; `ROOM_LINE`, the 25-read loop and the regex are gone; a test reads `/proc` text from a stand-in ssh.
-- locks: herdr-forward
-- after: none
-- files: server/server/live/herdr-forward.ts
-
-### L506 Worktrees without herdr spaces
-Result: A task's worktree is made and removed by git alone, and a done task's folder is put away even when herdr is down.
-- why: D3, E1-E6: 18 swallowed errors, two ways to remove a folder, a shared JSON file and two guessing timers.
-- done when: `worktrees.ts` has 0 empty catches (18 today) and is under 150 lines (332); `repo-spaces.json` is gone; `agentPane`, `idleShells`, `busy` and `closeRepoSpace` are gone; `settleSoon` and the `BRIEF_WAIT` timer are replaced by `agent_settled` and the prompt response; a test ends a task with herdr stopped and the worktree is removed.
-- locks: worktrees
-- after: L500
-- files: server/server/live/engine/worktrees.ts, server/server/live/engine/engine-launch.ts
-
-### L507 Pi extension: no timer or regex
-Result: An agent shows it is alive from its own events, and a quiet turn is answered by the server, not by a regex in the agent.
-- why: C8-C11: a process is spawned every 4 minutes per busy agent, a regex reads the model's prose, and whole session files are read for a limit message.
-- done when: `pi/extension.ts` has 0 `setInterval`/`execFile` (2 today), `pi/nudge.ts` is deleted or under 15 lines (41) with the nudge sent by the server from `agent_settled`, `src/harness-pi.ts` reads no session file (0 `readFileSync`), `account-fallback.ts` has 0 `execFileSync`; the nudge test ends a turn with no question and sees one `follow_up`.
-- locks: pi-ext
-- after: L500
-- files: pi/extension.ts, pi/nudge.ts, pi/account-fallback.ts, src/harness-pi.ts
-
-### L508 Revival from the exit event
-Result: An agent whose process ended is started again from the exit event, with a limit, and a stale one is known by its launch hash.
-- why: C6, C7: `pane.process_info` and two sha256 file reads per agent per pass find what an exit event says.
-- done when: `paneWrong`, `staleFlag`, `hashOf`, `sameValue` and `logLoop` are gone from `revive.ts` (under 60 lines, 136 today); `wrong()` makes 0 herdr calls for an RPC agent; a test kills an agent's process and sees one restart after the grace and none after 3 in an hour.
-- locks: revive
-- after: L500
-- files: server/server/live/revive.ts, server/server/live/recovery.ts
+The open steps of this file are in [ROADMAP.md](../ROADMAP.md).
 
 ## Order
 
-L504 and L505 start now. L500 starts now too. After L500: L501 then L502 then L503 (one lock), and L506, L507, L508 in
+L504 and L505 start now. L509 starts now too. After L509: L510 then L502 then L503 (one lock), and L506, L507, L508 in
 parallel with them. Open steps this touches: L430 (stall nudge, lock `stall-check`) shares L507's idea and can go first;
 L443 and L472 (pi only) shrink L502's `args` and branches; no file listed here is in their files.
