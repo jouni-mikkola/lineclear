@@ -2,15 +2,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { cpus } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_ROUNDS, fill, stepBrief, template } from "./brief.ts";
-import { CHECKS_PER_TICK, type ProveTools, missingItem, needsProof, testOf } from "./doneproof.ts";
+import { testOf } from "./doneproof.ts";
 import { ownerStepItem } from "./owner-steps.ts";
-import { overStartLimit, recordStepStart, START_LIMIT, startsInDay } from "./start-limit.ts";
-import { placeHeld } from "./held.ts";
 import { stepHeld } from "./parts.ts";
 import { company } from "./company.ts";
 import type { Settings } from "./project.ts";
 import { checkRoadmap, closedSteps, doneIds, isFrozen, resultFlag, type StepStatus, type Task } from "./roadmap.ts";
-import { mergedSteps, statusesFrom, stepInputs } from "./task-steps.ts";
+import { statusesFrom, stepInputs } from "./task-steps.ts";
 import type { Decision, State } from "./rules.ts";
 import { askMachines, type Candidate, mostRoom, type Room, roomLack } from "./spread.ts";
 import { routineWorker } from "./routine.ts";
@@ -119,13 +117,6 @@ function checkHealth(t: Tick, main: MainInfo, overloaded: boolean) {
   else startHealthFix(t, main, h.output, settings.health);
 }
 
-function proveTools(t: Tick): ProveTools {
-  const { env, world } = t;
-  return {
-    available: (model) => availability(model, env, world.now()) === "ok",
-  };
-}
-
 /**
  * A step closed with nothing to merge is done for good, so it is never restarted. Its named test runs once; when it
  * fails the tick says so (it is recorded already, so this runs once per step).
@@ -136,44 +127,6 @@ function proveClosed(t: Tick, step: Step) {
   if (cmd === undefined) return;
   const r = world.health(settings.repo, cmd);
   if (!r.ok) t.note("skip", `${step.id}: closed with nothing to merge, but its test fails now: ${cmd}`, step.id);
-}
-
-/**
- * Has the independent checker read the `done when` of each merged step that has no current record, a few per tick. A
- * step the checker found a false item for is unproven: not done, and started again (see `restartUnproven`). Returns
- * step id to its first unproven item. A world with no checker proves nothing and no step is unproven.
- */
-function proveMerged(t: Tick, steps: Step[], merged: Set<string>, head: string): Map<string, string> {
-  const { settings, world, state, dryRun, note } = t;
-  state.proofTried ??= {};
-  const tried = state.proofTried;
-  const unproven = new Map<string, string>();
-  if (!world.proofs || !world.proveStep) return unproven;
-  const records = world.proofs(settings.repo);
-  let asked = 0;
-  for (const step of steps) {
-    if (!merged.has(step.id) || step.dropped) continue;
-    const lastTry = tried[step.id] ?? 0;
-    if (!dryRun && asked < CHECKS_PER_TICK && world.now().getTime() - lastTry >= RETRY_MS && needsProof(step, records[step.id], head)) {
-      asked += 1;
-      tried[step.id] = world.now().getTime();
-      const got = world.proveStep(settings, step, head, proveTools(t));
-      // a checker that did not answer is asked again in half an hour, and says nothing meanwhile
-      if (typeof got !== "string") {
-        records[step.id] = got;
-        const bad = missingItem(got);
-        note(
-          bad === undefined ? "close" : "skip",
-          bad === undefined ? `${step.id} is proven: every done-when item is true` : `${step.id} is merged, unproven: ${bad}`,
-          step.id,
-        );
-      }
-    }
-    const record = records[step.id];
-    const missing = record && missingItem(record);
-    if (missing !== undefined) unproven.set(step.id, missing);
-  }
-  return unproven;
 }
 
 /** Each step's state from main, the tasks and the other machines, and the locks the working steps hold. */
@@ -189,9 +142,7 @@ function stepStates(t: Tick, steps: Step[], main: MainInfo, tasks: Task[], remot
     }
     closed[step] = task;
   }
-  const closedHere = closedSteps(steps, tasks, state.taskSteps, remote).keys();
-  const proven = proveMerged(t, steps, new Set([...mergedSteps(steps, main.commits, closed), ...closedHere]), main.head);
-  const inputs = stepInputs(steps, main.commits, { local: tasks, remote }, settings.repo, env, { state: { ...state, closedSteps: closed }, unproven: proven });
+  const inputs = stepInputs(steps, main.commits, { local: tasks, remote }, settings.repo, env, { state: { ...state, closedSteps: closed } });
   const status = statusesFrom(steps, inputs);
   const byId = new Map(steps.map((s) => [s.id, s]));
   const held = new Map<string, string>();
@@ -340,8 +291,7 @@ function whyStale(s: Starting, step: Step): string | undefined {
   world.fetch(settings.repo);
   const main = world.main(settings.repo);
   if (typeof main === "string") return `main cannot be read again: ${main}`;
-  const unproven = s.status.some((x) => x.id === step.id && x.state === "unproven");
-  if (!step.reopened && !unproven && doneIds(main.commits, new Set([step.id])).has(step.id)) return "it is merged on origin/main already";
+  if (!step.reopened && doneIds(main.commits, new Set([step.id])).has(step.id)) return "it is merged on origin/main already";
   const here = world.tasks(settings.space);
   if (typeof here === "string") return `its tasks cannot be read again: ${here}`;
   const remote: Task[] = [];
@@ -360,7 +310,6 @@ function whyStale(s: Starting, step: Step): string | undefined {
 function startStep(s: Starting, step: Step): boolean {
   const { t, cap, limit } = s;
   const { settings, world, state, dryRun, note, env } = t;
-  if (overStartLimit({ ...t, space: settings.space }, step, START_LIMIT)) return false;
   // A routine step (docs, tests, baselines) starts on the cheapest worker model that has room; the stall ladder moves it back after two failed checks.
   const cheap = routineWorker(step, s.picked().workers, env, (m) => availability(m, env, world.now()) === "ok");
   const worker = cheap ?? (s.picked().worker as string);
@@ -398,7 +347,6 @@ function startStep(s: Starting, step: Step): boolean {
     }
     state.models[step.id] = worker;
     if (cheap) (state.cheap ??= []).push(step.id);
-    recordStepStart(state, step.id, world.now());
     if (host === undefined) recordStart(state, `${step.id} ${step.title}`, step.id);
     const same = company(reviewer) === company(worker) ? " (same company: no other company has room, a different model reviews with a fresh context)" : "";
     const on = `${cheap ? `routine step on the cheap worker model ${cheap}; ` : ""}worker ${worker}`;
@@ -421,12 +369,11 @@ function startStep(s: Starting, step: Step): boolean {
 
 /**
  * A reopened step whose task merged after its Reopened line was added kept the line: starting it again would loop. It
- * gets one Fix task instead, and nothing more until the line is gone, unless the limit is reached: a Fix task is a start too. Returns whether the step was handled here.
+ * gets one Fix task instead, and nothing more until the line is gone. Returns whether the step was handled here.
  */
 function refileReopened(s: Starting, step: Step): boolean {
   const { t } = s;
   const { settings, world, note } = t;
-  if (overStartLimit({ ...t, space: settings.space }, step, START_LIMIT)) return true;
   const line = (step.fields["done when"]?.more ?? []).find((l) => /^\s+- Reopened: /.test(l));
   const since = line === undefined ? undefined : world.commitsSince?.(settings.repo, line);
   if (line !== undefined && since === undefined) {
@@ -438,33 +385,14 @@ function refileReopened(s: Starting, step: Step): boolean {
   return true;
 }
 
-const RETRY_MS = 30 * 60_000;
-
-/**
- * A merged step with an unproven item starts again with that item as the brief: twice in 24 hours at most. After that
- * it waits. Returns whether the step should start now.
- */
-function restartUnproven(s: Starting, step: Step, item: string): boolean {
-  const { settings, world, state, note } = s.t;
-  // A restart that merged since the last reading is not judged yet: wait for the checker to read the new main.
-  const main = world.main(settings.repo);
-  if (typeof main !== "string" && world.proofs?.(settings.repo)[step.id]?.head !== main.head) return false;
-  const list = world.tasks(settings.space);
-  const n = startsInDay(state, step.id, world.now(), typeof list === "string" ? [] : list);
-  if (n < START_LIMIT) return true;
-  note("skip", `${step.id} is still unproven after ${n} starts in 24 hours: item ${item}`, step.id);
-  return false;
-}
-
 function startReadySteps(s: Starting) {
   const skipped = new Set<string>();
   const reserved = reservedLocks(s.status, s.byId, s.t.state.lockWaits);
   for (const st of s.status) {
-    if (st.state !== "ready" && st.state !== "unproven") continue;
+    if (st.state !== "ready") continue;
     const step = s.byId.get(st.id) as Step;
     if (isFrozen(step) || (step.ownerOnly && ownerStepItem(s.t, step))) continue;
-    const held = st.unproven !== undefined && !restartUnproven(s, step, st.unproven);
-    if (held || (step.reopened && refileReopened(s, step))) continue;
+    if (step.reopened && refileReopened(s, step)) continue;
     const why = whyNotStart(s, step, reserved);
     if (why) s.t.note("skip", why, step.id);
     else startStep(s, step);
@@ -524,21 +452,5 @@ export function tickProject(
     return out;
   }
   startReadySteps({ t, text, commits: main.commits, steps: parsed.steps, status, byId, held, cap, rooms, limit, picked: workerPicker(t, offered), offered });
-  // A task made by hand that waits for a slot here goes where there is room.
-  state.placed ??= {};
-  placeHeld(
-    {
-      world,
-      settings,
-      project: name,
-      tasks,
-      remote: [...(state.remoteSeen ? Object.values(state.remoteSeen).flat() : [])],
-      stepIds: parsed.steps.map((x) => x.id),
-      free: cap.remoteFree,
-      dryRun,
-      note: (reason, task) => note("start", reason, task),
-    },
-    state.placed,
-  );
   return out;
 }

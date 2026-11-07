@@ -1,6 +1,5 @@
 import type { Settings } from "./project.ts";
-import type { ProveTools, StepProof } from "./doneproof.ts";
-import type { Step, Task } from "./roadmap.ts";
+import type { Task } from "./roadmap.ts";
 import type { Room } from "./spread.ts";
 import type { ChatCard, StallCard } from "./stalls.ts";
 import type { StartState } from "./starts.ts";
@@ -19,10 +18,6 @@ export interface World {
    * item), or undefined when no commit did.
    */
   commitsSince?(repo: string, line: string): number | undefined;
-  /** The checker's records, by step id. A world without it proves nothing: every merged step counts as done. */
-  proofs?(repo: string): Record<string, StepProof>;
-  /** Has the independent checker read the step's `done when` against the merged tree (head of main) and record it. A text is why it could not. */
-  proveStep?(settings: Settings, step: Step, head: string, tools: ProveTools): StepProof | string;
   /** Fetches, then fast-forwards the repo folder when it is clean and on main. */
   fetch(repo: string): void;
   /** The roadmap as origin/main has it, or undefined when it has none. */
@@ -38,8 +33,6 @@ export interface World {
   addTask(space: string, title: string, brief: string, extra: string[]): string | undefined;
   /** What another machine of the project says about its room and its tasks, or why it cannot be reached. */
   room?(host: string, space: string): Room | string;
-  /** The brief of a task as Lineclear holds it, or undefined when it cannot be read. */
-  briefOf?(id: string): string | undefined;
   /** Makes a task on another machine (cloning the repo there once). Returns an error text, or undefined. */
   addTaskOn?(host: string, settings: Settings, title: string, brief: string, extra: string[], project?: string): string | undefined;
   /** The machine's one-minute load average. */
@@ -59,8 +52,6 @@ export interface World {
   mergeTask(id: string): string | undefined;
   /** The `work/<n>-...` branch of a task, if the repo still has it. */
   branchOf(repo: string, task: string): string | undefined;
-  pushBranch(repo: string, branch: string): string | undefined;
-  commitsAhead(repo: string, branch: string): number;
   /** The "may be stuck" cards of a space, oldest first. */
   stallCards(space: string, repo: string): StallCard[];
   /** How far the task's start got: whether its agent answered its brief (see starts.ts). */

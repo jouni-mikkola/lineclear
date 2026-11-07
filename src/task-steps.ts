@@ -51,7 +51,7 @@ export function titledByStep<T extends { id?: string; title: string }>(repo: str
 }
 
 /** The steps merged to main (the commits' subjects) or closed with nothing to merge. */
-export function mergedSteps(steps: Step[], commits: Commits, closed: Record<string, string> | undefined): Set<string> {
+function mergedSteps(steps: Step[], commits: Commits, closed: Record<string, string> | undefined): Set<string> {
   const ids = new Set(steps.map((s) => s.id));
   const merged = doneIds(commits, ids);
   for (const id of Object.keys(closed ?? {})) if (ids.has(id)) merged.add(id);
