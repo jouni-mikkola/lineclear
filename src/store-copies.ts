@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite";
 import { readTasksKept } from "./tasks-kept.ts";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { closeSync, copyFileSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, rmSync, writeSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { writeAtomic } from "../pi/atomic.ts";
@@ -179,7 +179,7 @@ export function restoreCopy(name: string, env: Env = process.env): number {
       const dest = join(to, row.path);
       mkdirSync(dirname(dest), { recursive: true });
       if (row.path === IDS_DB) for (const side of ["-wal", "-shm"]) rmSync(`${dest}${side}`, { force: true });
-      writeFileSync(`${dest}.tmp`, Bun.gunzipSync(row.body));
+      writeBytes(`${dest}.tmp`, Bun.gunzipSync(row.body));
       renameSync(`${dest}.tmp`, dest);
     }
     if (meta(db, "store") === "1") restoreStoreFile(c.file, to);
@@ -187,6 +187,17 @@ export function restoreCopy(name: string, env: Env = process.env): number {
     db.close();
   }
   return c.tasks;
+}
+
+/** A file's bytes; the caller renames it into place. */
+function writeBytes(file: string, bytes: Uint8Array): void {
+  const fd = openSync(file, "w");
+  try {
+    writeSync(fd, bytes);
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
 }
 
 /** The store file back as it was, without the tables a copy adds. The old file's write-ahead log goes, or it would replay over the copy. */
