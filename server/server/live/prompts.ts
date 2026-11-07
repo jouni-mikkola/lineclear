@@ -2,7 +2,6 @@
 // Settings block Lineclear adds to the end of every new task's brief.
 import { join } from 'node:path'
 import { SET_BY, SETTINGS_HEAD, type SetBy } from '../../shared/brief.ts'
-import type { Mode } from '../../shared/types.ts'
 import { ROOT } from '../root.ts'
 import { has } from '../plugins.ts'
 import { BOX, helperDir } from './box.ts'
@@ -134,7 +133,7 @@ export function settingsBlock(id: string, t: Told) {
 /** a space's coordinator: its space's work; a home space's also its machine's (health, load and disk news, its
  *  processes, adding spaces); the main machine's home space's also every machine's overview (what needs the human,
  *  which alerts reach the phone, machine-wide alerts), as it can see every machine */
-export function coordinatorPrompt(place: { role: 'space' | 'home' | 'main'; name: string; path?: string; machine: string; chat?: string }, mode: Mode) {
+export function coordinatorPrompt(place: { role: 'space' | 'home' | 'main'; name: string; path?: string; machine: string; chat?: string }) {
   const who = `the coordinator of the space ${place.name} on ${place.machine} (${place.path})`
   const duties =
     place.role === 'space'
@@ -142,9 +141,7 @@ export function coordinatorPrompt(place: { role: 'space' | 'home' | 'main'; name
       : place.role === 'home'
         ? `\n\nThis is ${place.machine}'s home space: you also look after the machine (its health, load and disk news, its processes) and add spaces on it when asked (lineclear space add).`
         : `\n\nThis is the home space of the main machine, ${place.machine}: you also look after this machine (its health, load and disk news, its processes, adding spaces with lineclear space add), and you keep the overview of every machine: what needs the human across them all (lineclear task list shows every machine's tasks), which alerts reach the phone, and machine-wide alerts.`
-  return `${base(who, 'lineclear-coordinator')}\n\n${commandLine(place.chat ?? place.name)}${duties}
-
-Coordinator timer is ${mode === 'autopilot' ? 'on' : 'off'} now. With the coordinator timer on you get a heartbeat while idle, on its trigger: lineclear heartbeat shows your complete Heartbeat and when it wakes. On an coordinator timer wake, inspect Lineclear, act within the Heartbeat and runtime permission profile, then save progress/next step with lineclear progress.`
+  return `${base(who, 'lineclear-coordinator')}\n\n${commandLine(place.chat ?? place.name)}${duties}`
 }
 
 export function taskPrompt(t: { id: string; branch: string; base: string }, times = '') {

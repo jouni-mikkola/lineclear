@@ -57,7 +57,6 @@ export class DemoWorldState extends Emitter<SourceEvents> {
   /** each machine's defaults at their levels, as live */
   stores = D.settingStores()
   /** each place's HEARTBEAT.md as edited here */
-  checklists: Record<string, string> = {}
   pluginsOff: string[] = []
   bases: Record<string, string> = Object.fromEntries(this.places.filter((p) => p.level === 2 && !p.id.endsWith(':~')).map((p) => [p.id, 'main']))
   sections = D.settings(this.stores)
@@ -163,7 +162,7 @@ export class DemoWorldState extends Emitter<SourceEvents> {
     if (bad) throw new Error(bad)
     const id = `p:${req.machine}:${name}`
     // the snapshot sorts it among its machine's others
-    this.places = [...this.places, { id, name, machine: req.machine, level: 2, status: 'idle', mode: 'regular', chat: id, githubRemote: false }]
+    this.places = [...this.places, { id, name, machine: req.machine, level: 2, status: 'idle', chat: id, githubRemote: false }]
     this.addedAt[id] = info.repo ?? at
     this.chats[id] = { key: id, cli: 'Claude Code', messages: [], controls: CLAUDE_CONTROLS() }
     this.emit('snapshot')

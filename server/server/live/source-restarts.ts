@@ -17,40 +17,10 @@ import { chatDir } from './source-helpers.ts'
 import { LiveSourceSpaces } from './source-spaces.ts'
 
 export class LiveSourceRestarts extends LiveSourceSpaces {
-  protected async replacePilots(level?: string) {
-    for (const p of this.placeList())
-      if (p.mode === 'autopilot' && (!level || level === 'all' || level.startsWith('m:') || level === p.id))
-        await this.switchPilot(p.id, 'autopilot', false, true)
-  }
-
-  protected async wakePilot(place: string, reason: string, now = Date.now()) {
-    if (this.pilots.busy(place)) throw new Error('The coordinator is changing.')
-    const r = this.pilotOf(place)
-    if (!r) throw new Error('Turn coordinator timer on first.')
-    this.pilots.wake(r, reason, now)
-    const text = this.heartbeats.beat(place, this.roleOf(place), now)
-    if (!text) {
-      this.pilots.outcome(r, 'Heartbeat is empty', true)
-      return
-    }
-    try {
-      const sent = await this.agents.send(place, hidden(text, 'heartbeat'), { ensure: () => this.coordinator(place), idle: true, generation: r.id })
-      this.pilots.outcome(r, sent.waiting ? 'Queued until idle' : 'Delivered')
-    } catch (e) {
-      this.pilots.outcome(r, `Failed: ${(e as Error).message}`, true)
-      throw e
-    }
-    this.emit('snapshot')
-  }
-
   /** a coordinator started again on this CLI, model and effort: the same CLI resumes its session, another takes over
    *  with its role's prompt and the chat's last words. Its tasks go on as they are; a card in its chat marks it */
   protected async restartCoordinator(id: string, to: Harness) {
     if (!this.places.coordinator(id)) throw new Error(`No place ${id}`)
-    if (this.places.mode(id) === 'autopilot') {
-      await this.switchPilot(id, 'autopilot', false, true, to)
-      return harnessWords(to)
-    }
     if (!this.engine.installed(to.kind)) throw new Error(`${CLI_NAME[to.kind] ?? to.kind} isn't installed on this machine.`)
     const h = fitHarness(to)
     const words = harnessWords(h)

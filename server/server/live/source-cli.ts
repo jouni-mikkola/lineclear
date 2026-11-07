@@ -1,19 +1,14 @@
 import { randomUUID } from 'node:crypto'
-import { existsSync } from 'node:fs'
 import { age } from '../../shared/time.ts'
-import { readJson, writeJson } from '../store.ts'
-import { pilotCommand, type PilotRun } from './autopilot.ts'
 import { modelsOf } from './models.ts'
 import { HELP, one, parseArgs, summaryOpts, type Parsed } from './args.ts'
 import type { Automation } from './automations.ts'
-import { heartbeatFile } from './heartbeat.ts'
-import { eventRules, eventsText, eventWords, nextWords, runWords, timeRule, timeWords, triggerWords } from './trigger.ts'
+import { eventRules, eventsText, nextWords, timeRule, triggerWords } from './trigger.ts'
 import { checkTitle, ended, type TaskRec } from './engine/engine.ts'
 import { answerCard } from './answer.ts'
-import * as G from './engine/git.ts'
 import { room } from './herdr-forward.ts'
 import { BOX, boxHome, forwardTask, machineRef } from './box.ts'
-import { asMode, HOST, NAME, placeId } from './places.ts'
+import { HOST, NAME, placeId } from './places.ts'
 import { settingsBlock } from './prompts.ts'
 import { CATALOG, CLI_NAME, CLIS, kindOf, type Level } from './settings.ts'
 import { summary } from './health.ts'
@@ -21,90 +16,6 @@ import { harnessOf, mainCli } from './source-helpers.ts'
 import { LiveSourceSubcommands } from './source-subcommands.ts'
 
 export class LiveSourceCli extends LiveSourceSubcommands {
-  protected async resumePilots(cut: PilotRun[]) {
-    // herdr may still be coming up after a restart: give it up to 40 s before the coordinator is asked for
-    for (let i = 0; i < 40 && !this.agents.reachable; i++) await new Promise((done) => setTimeout(done, 1000))
-    for (const r of cut) {
-      if (this.places.mode(r.place) !== 'autopilot' || this.pilots.current(r.place) !== r) continue
-      try {
-        await this.switchPilot(r.place, 'autopilot', false, true, undefined, r)
-      } catch (e) {
-        console.error(`lineclear: ${r.place}'s coordinator timer did not start again after the restart: ${(e as Error).message}`)
-      }
-    }
-  }
-
-  protected async pilotCli(r: PilotRun, args: string[], ctx: { chat: string; cwd: string; stdin?: string }) {
-    try {
-      this.pilots.check(r, -1)
-      pilotCommand(r, ctx.chat, args)
-      const p = parseArgs(args)
-      if (args[0] === 'task' && args[1] === 'add') {
-        const project = this.placeOfCommand(p, ctx)
-        if (placeId.space(project?.name ?? '') !== r.place) throw new Error('New tasks must stay in this coordinator timer space.')
-        this.pilots.check(r, this.activePilotTasks(r))
-      }
-      if (args[0] === 'secret' && ['run', 'env'].includes(args[1])) {
-        const names = p.words.slice(2)
-        if (names.some((n) => !r.config.secrets.includes(n))) throw new Error('That secret is outside this permission profile.')
-        const chain = [r.place, placeId.machine(), 'all']
-        return { out: '', code: 0, secrets: this.secretValues(names, chain) }
-      }
-      if (args[0] === 'checkpoint') {
-        const t = this.engine.task(ctx.chat.split('/')[0])
-        if (!t?.worktree || t.pilot !== r.id || args.length !== 2 || !args[1].trim())
-          throw new Error('Use lineclear checkpoint "commit message" from your owned task.')
-        const safe = ['git', '-c', 'core.hooksPath=/dev/null', '-c', 'core.fsmonitor=false', '-C', t.worktree]
-        for (const op of [
-          ['add', '--all'],
-          ['commit', '-m', args[1]],
-        ]) {
-          const result = await G.sh([...safe, ...op], t.worktree, { timeoutMs: 30000, env: { GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' } })
-          if (result.code) throw new Error(result.err || result.out)
-        }
-        return { out: 'Saved commit.\n', code: 0 }
-      }
-      if (args[0] === 'complete') {
-        if (ctx.chat !== r.place || args.length !== 2 || !args[1].trim()) throw new Error('Use lineclear complete "goal evidence" from the coordinator.')
-        const saved = readJson<Record<string, string>>('autopilot-progress.json', {})
-        saved[r.place] = args[1].slice(0, 20000)
-        writeJson('autopilot-progress.json', saved)
-        this.pilots.outcome(r, `Finished: ${args[1].slice(0, 160)}`, true)
-        await this.switchPilot(r.place, 'regular')
-        return { out: 'coordinator timer finished.\n', code: 0 }
-      }
-      if (args[0] === 'progress') {
-        if (args.length !== 1 && args.length !== 2) throw new Error('Use lineclear progress ["progress and next step"].')
-        const saved = readJson<Record<string, string>>('autopilot-progress.json', {})
-        if (args[1] !== undefined) {
-          saved[r.place] = args[1].slice(0, 20000)
-          writeJson('autopilot-progress.json', saved)
-        }
-        return { out: `${saved[r.place] ?? '(none yet)'}\n`, code: 0 }
-      }
-      return await this.cli(args, ctx)
-    } catch (e) {
-      return { out: `${(e as Error).message}\n`, code: 1 }
-    }
-  }
-
-  protected async monitorPilots() {
-    for (const r of this.pilots.runs.filter((r) => r.state === 'on' || r.state === 'workers')) {
-      // Chat usage is provider-reported and delayed. It is a stop threshold, never an exact billing cap.
-      r.used = Math.max(r.used, (r.carried ?? 0) + this.pilotUsage.tokens(r.id))
-      this.pilots.save()
-      try {
-        this.pilots.check(r, -1)
-      } catch (e) {
-        r.state = 'failed'
-        r.error = (e as Error).message
-        this.pilots.save()
-        await this.stopPilotAgents(r, false)
-        this.emit('snapshot')
-      }
-    }
-  }
-
   /* ---------- the lineclear command ---------- */
 
   async cli(
@@ -192,17 +103,6 @@ export class LiveSourceCli extends LiveSourceSubcommands {
           return `Removed ${shown} from Lineclear; ${pr.path} and its code stay on disk. lineclear space add ${pr.path} --name ${shown} brings it back with its open tasks and chat.`
         }
         throw new Error('lineclear space add|list|rename|remove')
-      }
-      case 'mode': {
-        const place = this.placeNamed(a1)
-        const mode = asMode(rest[0])
-        if (!place || !mode) throw new Error('lineclear mode <place> autopilot|regular')
-        // an agent's or script's shell carries LINECLEAR_CHAT or a credential: only the owner's own terminal turns coordinator timer on
-        if (mode === 'autopilot' && (ctx.chat || ctx.proof))
-          throw new Error('coordinator timer is switched on only by the owner, on the screen or in their own terminal.')
-        const switched = (await this.act({ type: 'mode', place: place.id, mode, by: 'terminal' })) as { ok?: boolean; error?: string }
-        if (switched.error) throw new Error(switched.error)
-        return `${place.name}: Coordinator timer ${mode === 'autopilot' ? 'on' : 'off'}.`
       }
       case 'task': {
         // a task the list shows "(on desktop)" is run by that machine's worker: its show, tell, close, merge and delete go there
@@ -332,9 +232,6 @@ export class LiveSourceCli extends LiveSourceSubcommands {
         const pr = this.placeOfCommand(p, ctx)?.name
         const now = `${this.health.last ? `\n\n${NAME} now: ${summary(this.health.last)} · ${this.workingLine()}` : ''}`
         const head = `Defaults for ${pr ? `${this.places.nameOf(placeId.space(pr))} on ${NAME}` : NAME} (a space's own win over its machine's, which win over Everywhere; in brackets where each comes from):`
-        const h = this.settings.heartbeat(pr ? { space: pr } : 'machine')
-        const next = nextWords(h.time, h.zone)
-        const beat = `\n\nHeartbeat on coordinator timer: ${timeWords(h.time, h.zone)}${next.length ? ` (next ${next.join(', ')})` : ''}; news that wakes it at once: ${eventWords(h.on).toLowerCase()}, the rest waits for the heartbeat. Each brings the place's HEARTBEAT.md, its standing checklist: lineclear heartbeat [<place>] shows it, lineclear heartbeat set [<place>] < file changes it.`
         const block = settingsBlock('<id>', {
           ways: this.settings.ways(pr),
           reviewer: this.settings.harness('reviewer', pr),
@@ -342,7 +239,7 @@ export class LiveSourceCli extends LiveSourceSubcommands {
           by: this.settings.setBy(pr),
         })
         const repo = pr ? this.places.byName(pr) : undefined
-        return `${head}${repo ? `\nBase branch: ${repo.base} (new tasks; per-task override: --base <branch>)` : ''}\n${this.settings.lines(pr, NAME)}${beat}${now}\n\nEvery new task's brief${pr ? ` in ${pr}` : ''} ends with:\n${block}\n\nFor one task, set any of these with task add: --set review.rounds=1 --set merge="ask me first" (--set agent=codex, model, effort, reviewer, reviewer.model, reviewer.effort too), or say so in its brief, which wins.`
+        return `${head}${repo ? `\nBase branch: ${repo.base} (new tasks; per-task override: --base <branch>)` : ''}\n${this.settings.lines(pr, NAME)}${now}\n\nEvery new task's brief${pr ? ` in ${pr}` : ''} ends with:\n${block}\n\nFor one task, set any of these with task add: --set review.rounds=1 --set merge="ask me first" (--set agent=codex, model, effort, reviewer, reviewer.model, reviewer.effort too), or say so in its brief, which wins.`
       }
       case 'models': {
         const kinds = a1 ? [kindOf(a1)] : ['claude', 'codex', 'pi']
@@ -392,11 +289,10 @@ export class LiveSourceCli extends LiveSourceSubcommands {
           if (!r.ok) throw new Error(r.error)
         }
         this.settingChanged(a1)
-        if (a1.startsWith('autopilot.') || /^coordinator\.(agent|model|effort)$/.test(a1)) await this.replacePilots()
         const where = pr ? `${named}'s` : level === 'machine' ? `${NAME}'s` : "Everywhere's"
         const now = this.settings.get(a1, pr)
         // a trigger in words too, to tell the human
-        return `${a0 === 'unset' ? `${a1}: ${where} own is unset; it is ${now} now.` : `${a1} = ${now} (${where})`}${this.settings.words(a1, now).replace(/^\n\s*/, '\nIn words: ')}${a1.endsWith('.instructions') ? '\nUsed at the next start or restart; running agents are unchanged. Reviewer changes need a new or restarted task agent.' : ''}`
+        return `${a0 === 'unset' ? `${a1}: ${where} own is unset; it is ${now} now.` : `${a1} = ${now} (${where})`}${a1.endsWith('.instructions') ? '\nUsed at the next start or restart; running agents are unchanged. Reviewer changes need a new or restarted task agent.' : ''}`
       }
       case 'automation': {
         const op = a1 ?? 'list'
@@ -469,45 +365,6 @@ export class LiveSourceCli extends LiveSourceSubcommands {
             )
             .join('\n') || 'No automations.'
         )
-      }
-      case 'heartbeat': {
-        // a space by its name, else the coordinator asking, else the space of its folder, else the home space. Its
-        // checklist is printed and changed here, never named by path: the file is on the machine Lineclear runs from
-        const set = a1 === 'set'
-        const name = set ? rest[0] : a1
-        const named = name ? this.placeNamed(name) : undefined
-        if (name && !named) throw new Error(`No place ${name}`)
-        const at =
-          named ??
-          this.placeList().find((x) => x.id === ctx.chat) ??
-          this.placeList().find((x) => this.placeOfCommand(p, ctx) && x.id === placeId.space(this.placeOfCommand(p, ctx)!.name)) ??
-          this.placeList().find((x) => x.id === placeId.home())!
-        if (this.peers?.owner(at.id)) throw new Error(`${at.name} is on another machine: ask there`)
-        if (set) {
-          if (ctx.stdin === undefined)
-            throw new Error('Give the whole new HEARTBEAT.md on stdin: lineclear heartbeat set [<place>] < file, or with a heredoc. Empty stops the heartbeat.')
-          this.heartbeats.write(at.id, ctx.stdin.trim() ? ctx.stdin : '')
-          if (this.places.mode(at.id) === 'autopilot') await this.switchPilot(at.id, 'autopilot', false, true)
-          this.emit('snapshot')
-          return ctx.stdin.trim()
-            ? `${at.name}'s HEARTBEAT.md is saved: the next heartbeat goes through it.`
-            : `${at.name}'s HEARTBEAT.md is empty now: no heartbeat until it has a checklist again.`
-        }
-        const h = this.settings.heartbeat(this.levelOf(at.id))
-        const last = this.heartbeats.last(at.id)
-        // on coordinator timer, the next one counts from the last; else the rule's next three
-        const due = at.mode === 'autopilot' && last ? this.heartbeats.next(at.id, h.time, h.zone) : undefined
-        const times = due !== undefined ? [runWords(due, h.zone)] : nextWords(h.time, h.zone)
-        const when = `${timeWords(h.time, h.zone)}${due !== undefined ? `; last ${age(last!)} ago` : ''}${times.length ? `; next ${times.join(', ')}${due !== undefined ? ' once idle' : ''}` : ''}`
-        const held = this.heartbeats.held(at.id)
-        const list = this.heartbeats.read(at.id, this.roleOf(at.id)).trim()
-        return [
-          `${at.name}: Coordinator timer ${at.mode === 'autopilot' ? 'on' : 'off'}; heartbeat: ${when}. Wakes at once on: ${eventWords(h.on).toLowerCase()}${held.length ? ` (${held.length} news waiting for the heartbeat)` : ''}. (Settings: heartbeat.when, heartbeat.on, time.zone.)`,
-          list
-            ? `HEARTBEAT.md${existsSync(heartbeatFile(at.id)) ? '' : ' (the starting checklist: none saved yet)'}:\n${list}`
-            : 'HEARTBEAT.md is empty: no heartbeat until it has a checklist.',
-          `Change it: lineclear heartbeat set${named ? ` ${at.name}` : ''} < file (the whole new text on stdin; empty stops the heartbeat), or the human in Settings → coordinator timer.`,
-        ].join('\n\n')
       }
       case 'doctor': {
         if (BOX) throw new Error(`lineclear doctor checks every machine from the main one: run it there (${HOST} is run from it over SSH).`)

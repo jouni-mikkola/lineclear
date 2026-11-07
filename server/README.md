@@ -40,7 +40,7 @@ Each space's chat is in the middle and its tasks on the right, by what they need
 
 ### 🧩 Make it yours: everything is a plugin
 
-Places, chats, tasks, artifacts, the terminal, the browser, voice, alerts, coordinator timer: every part of Lineclear is a plugin, and yours sit beside them in `~/.lineclear/plugins/<name>/`. Write one yourself or ask an agent to build it. Change or replace any built-in plugin's server part by giving yours its name (copy it there and edit it), and switch any plugin off in Settings → Plugins. Updates never touch that folder, so you keep every new release without a fork: save a file and Lineclear rebuilds and restarts in seconds, and a plugin that breaks is set aside with its error while the rest runs. [Plugins](docs/plugins.md) has a hello world.
+Places, chats, tasks, artifacts, the terminal, the browser, voice, alerts: every part of Lineclear is a plugin, and yours sit beside them in `~/.lineclear/plugins/<name>/`. Write one yourself or ask an agent to build it. Change or replace any built-in plugin's server part by giving yours its name (copy it there and edit it), and switch any plugin off in Settings → Plugins. Updates never touch that folder, so you keep every new release without a fork: save a file and Lineclear rebuilds and restarts in seconds, and a plugin that breaks is set aside with its error while the rest runs. [Plugins](docs/plugins.md) has a hello world.
 
 ### ⚡ Stop briefing every agent yourself
 
@@ -109,7 +109,7 @@ Only the ones it made. Every task works in its own worktree, on its own branch `
 
 ### Where do my tasks live?
 
-In `~/.lineclear/` on the main machine (`LINECLEAR_HOME` to move it): your spaces, tasks, chats, artifacts, settings, coordinator timer checklists and your own plugins. Other machines get only a small helper folder. [Develop](docs/develop.md) and [Plugins](docs/plugins.md) cover the code and how to change Lineclear's plugins for yourself.
+In `~/.lineclear/` on the main machine (`LINECLEAR_HOME` to move it): your spaces, tasks, chats, artifacts, settings and your own plugins. Other machines get only a small helper folder. [Develop](docs/develop.md) and [Plugins](docs/plugins.md) cover the code and how to change Lineclear's plugins for yourself.
 
 ### Can I use several machines?
 
@@ -121,11 +121,11 @@ Mostly. The app has no new-task button: you ask a space's coordinator in your ow
 
 ### What if the safety settings aren't enough?
 
-They are soft. A task's review, merge and rules are lines in its brief, and its agent follows them. Codex runs with full access and every agent has a shell: one can do anything you can, a review is another agent's judgement and not a proof, and coordinator timer and automations run with nobody watching. Set Merge to "ask me first" for a yes before anything lands, and keep coordinator timer off where you want to decide every step.
+They are soft. A task's review, merge and rules are lines in its brief, and its agent follows them. Codex runs with full access and every agent has a shell: one can do anything you can, a review is another agent's judgement and not a proof, and automations run with nobody watching. Set Merge to "ask me first" for a yes before anything lands,.
 
 ### What does it cost?
 
-Lineclear is free and [MIT licensed](LICENSE). Your agent CLI's usual usage charges still apply: every task is a full agent session plus a review, each coordinator spends tokens on each message and on coordinator timer's heartbeat, and voice calls use your ElevenLabs account.
+Lineclear is free and [MIT licensed](LICENSE). Your agent CLI's usual usage charges still apply: every task is a full agent session plus a review, each coordinator spends tokens on each message, and voice calls use your ElevenLabs account.
 
 ## Open Lineclear in three steps
 

@@ -87,7 +87,7 @@
   by the agent), and when waiting for GitHub's checks they run on that commit before it merges. For a few hours after
   a task merges through its pull request, Lineclear watches GitHub's runs on main: once one fails, the space's
   coordinator hears it once (news), with the failing run, the end of its log and the tasks merged since main was last
-  green, and decides on a fix-forward task (Coordinator timer adds one by itself). It hears again only after main was green. GitHub's
+  green, and decides on a fix-forward task. It hears again only after main was green. GitHub's
   merge queue would test each one on top of the others, but it needs an organisation's repo. Elsewhere it is rebased
   and squash-merged into main here (and main pushed when there is a remote). Then the task is marked merged. Once the
   agent's turn ends, the task is put away through herdr: the worktree removed (which closes its space and agent), then

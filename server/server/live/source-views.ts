@@ -5,7 +5,6 @@ import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { BODY_MAX, clip, lastReply, openCards, TITLE_MAX } from '../../shared/alerts.ts'
 import type { Action, Alert, Artifact, CardAsk, Chat, Question, Snapshot } from '../../shared/types.ts'
-import type { PilotRun } from './autopilot.ts'
 import { hidden } from './agents.ts'
 import { excerpt, line } from './chatlines.ts'
 import { rememberReply } from './chats.ts'
@@ -66,7 +65,6 @@ export class LiveSourceViews extends LiveSourceState {
   }
 
   stop() {
-    for (const box of this.pilotSandboxes.values()) void box.close()
     this.peers?.stop()
     this.mirror?.stop()
     this.timers.forEach(clearInterval)
@@ -193,10 +191,8 @@ export class LiveSourceViews extends LiveSourceState {
           HOST,
           ['~', ...this.places.spaces.map((p) => p.name)],
           NAME,
-          (id) => this.heartbeats.read(id, this.roleOf(id)),
           this.pushWarnings(),
         )
-        .map((section) => this.pilotSection(section))
         .concat(
           this.places.spaces.map((p) => {
             const id = placeId.space(p.name)
@@ -374,52 +370,6 @@ export class LiveSourceViews extends LiveSourceState {
     if (!chat.includes('/')) return chat
     const t = this.engine.task(chat.split('/')[0])
     return t && !ended(t) ? chat : a.place
-  }
-
-  protected pilotSection(section: import('../../shared/types.ts').SettingSection) {
-    if (section.name !== 'Coordinator timer' || !section.level?.startsWith('p:')) return section
-    const place = section.level,
-      r = this.pilots.current(place) ?? this.pilots.runs.findLast((run) => run.place === place)
-    let instructions: string
-    try {
-      instructions = this.pilotWords(r?.state === 'on' ? r : ({ place, config: this.settings.pilot(this.spaceKey(place)) } as PilotRun))
-    } catch (e) {
-      instructions = (e as Error).message
-    }
-    const h = this.settings.heartbeat(this.levelOf(place))
-    const next = this.places.mode(place) === 'autopilot' && r?.state === 'on' ? this.heartbeats.next(place, h.time, h.zone) : undefined
-    return {
-      ...section,
-      rows: section.rows
-        .map((row) => (row.doc ? { ...row, instructions } : row))
-        .concat([
-          {
-            label: 'State',
-            key: '',
-            value: this.pilots.busy(place) ? 'Changing coordinator; messages wait' : (r?.error ?? (this.places.mode(place) === 'autopilot' ? 'On' : 'Off')),
-            fixed: true,
-            group: 'Wake-up',
-          },
-          { label: 'Time zone', key: '', value: h.zone, fixed: true, group: 'Wake-up' },
-          {
-            label: 'Next',
-            key: '',
-            value: next ? new Date(next).toLocaleString('en-GB', { timeZone: h.zone }) : 'No scheduled wake',
-            fixed: true,
-            group: 'Wake-up',
-          },
-          {
-            label: 'Last run',
-            key: '',
-            value: r?.last
-              ? `${new Date(r.last.at).toLocaleString('en-GB', { timeZone: h.zone })} · ${r.last.reason} · ${r.last.outcome}${r.last.ended ? ` · ${Math.round((r.last.ended - r.last.at) / 1000)} s` : ''}`
-              : 'No runs yet',
-            fixed: true,
-            group: 'Wake-up',
-          },
-          { label: 'Shared usage', key: '', value: `${r?.used ?? 0} reported tokens`, fixed: true, group: 'Access and limits' },
-        ]),
-    }
   }
 
   /** a coordinator (its place id) or a task's agent (ID/Agent) restarted: its role and space, what it runs on, what

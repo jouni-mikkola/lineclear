@@ -5,7 +5,6 @@ import { asksMain } from "./asks.ts";
 import { storeMain } from "./store-copies.ts";
 import { dispatcherMain, moveMain } from "./dispatcher.ts";
 import { doctor, herdrUnsaved, herdrVersions, realProbe, testedHerdr } from "./doctor.ts";
-import { fixAll } from "./retire.ts";
 import { askMain } from "./inbox.ts";
 import { inboxMain } from "./inbox-answer.ts";
 import { exportMain, inboxAll, statusAll } from "./export.ts";
@@ -36,8 +35,7 @@ import { recordReviewCall } from "./task-work.ts";
 
 export const commands: Record<string, string> = {
   export: "Print what this machine holds as JSON, for the machine that shows all of them",
-  doctor:
-    "Check each part and name the command that fixes a problem (--fix removes the old install's plugin and skills and test folders older than a day, on every machine; --here limits either to this one)",
+  doctor: "Check each part and name the command that fixes a problem (--here checks only this machine)",
   pack: "List the token pack's parts, or turn one on or off (pack on <part>, pack off <part>)",
   machine: "Add a machine by its SSH host (installs Lineclear there and runs its doctor), list, remove or update machines",
   project: "Add, list, change, remove and check projects",
@@ -51,8 +49,6 @@ export const commands: Record<string, string> = {
   ready: 'A task\'s agent says its change is ready: ready <id> --summary "..."',
   merge: "Merge a task's change: merge <id>",
   artifact: "Make, update or list a task's artifacts (a report, a dashboard)",
-  mode: "Set a space's coordinator to regular (its timer stays off): mode <space> regular",
-  heartbeat: "Show or change a space's heartbeat checklist: heartbeat [<space>]",
   pr: "Push a task's branch and open its pull request: pr <id>",
   models: "List each agent program's models and effort levels: models [<program>]",
   checks: "Wait for GitHub's checks on a task's pull request: checks <id>",
@@ -215,11 +211,6 @@ async function installCommand(name: "doctor" | "uninstall", rest: string[], out:
   const paths = pathsFor();
   if (name === "doctor") {
     const probe = realProbe(paths);
-    if (rest.includes("--fix")) {
-      const bad = rest.find((a) => a !== "--fix" && a !== "--here");
-      if (bad !== undefined) return (out(`lineclear: doctor --fix takes only --here, not '${bad}'`), 2);
-      return await fixAll(probe, out, process.env, rest.includes("--here"));
-    }
     const here = rest.includes("--here");
     const hosts = here ? [] : readMachines().map((m) => m.host);
     if (probe.which("herdr")) probe.herdr = { tested: testedHerdr(), machines: herdrVersions(probe.run, here), unsaved: herdrUnsaved(probe.run, hosts) };

@@ -1,13 +1,10 @@
-import { hostList, pilotProblem, type PilotConfig } from './autopilot.ts'
-import { modelArg } from './models.ts'
 import { chatProblem } from './readers/index.ts'
 import { cpus, totalmem } from 'node:os'
-import type { SettingSection, TriggerRow } from '../../shared/types.ts'
+import type { SettingSection } from '../../shared/types.ts'
 import { readJson, writeJson } from '../store.ts'
 import type { SetBy } from '../../shared/brief.ts'
 import { settingsBlock, settingsLines, type Said, type Ways } from './prompts.ts'
 import { effortFor, effortsOf, findModel, knowsModels, modelsOf } from './models.ts'
-import { eventRules, eventsText, eventWords, nextWords, timeRule, timeWords } from './trigger.ts'
 import {
   type MachineLimits,
   defaultMaxTasks,
@@ -28,13 +25,9 @@ import {
   type Role,
   roleKind,
   ROLES,
-  type Heartbeat,
   CATALOG,
-  HEARTBEAT_PRESETS,
-  NEWS_PRESETS,
   type Section,
   agentRow,
-  AUTOPILOT,
 } from './settings-catalog.ts'
 
 /** under a machine's rows: why the defaults are what they are, in this machine's own numbers */
@@ -136,18 +129,12 @@ export class Settings {
     if (value !== null && LINECLEAR_MODELS.has(key))
       return { ok: false, error: "Set in Lineclear's Settings > Models: its ordered lists pick the worker, reviewer and backup models." }
     if (value !== null) {
-      const chat =
-        key === 'task.agent' ||
-        key === 'coordinator.agent' ||
-        (key === 'autopilot.agent' && value !== 'inherit') ||
-        (key === 'task.fallback' && value.trim().toLowerCase() !== 'off')
+      const chat = key === 'task.agent' || key === 'coordinator.agent' || (key === 'task.fallback' && value.trim().toLowerCase() !== 'off')
       const err = refuse(key, value) ?? (chat ? chatProblem(kindOf(value) ?? value) : undefined) ?? this.unfit(key, value, l)
       if (err) return { ok: false, error: err }
       const num = numOf(key)
       // a number is kept with its unit, however it was written ("13", "1.5x", "80 %")
       if (num) value = numValue(num, value)!
-      else if (key === 'heartbeat.when') value = timeRule(value)
-      else if (key === 'heartbeat.on') value = eventsText(eventRules(value))
       else if (key === 'time.zone') value = value.trim()
       // a CLI is kept by its name, however it was written
       else if (key === 'task.fallback' && value.trim().toLowerCase() === 'off') value = 'off'
@@ -252,38 +239,6 @@ export class Settings {
     return `Private instructions for ${role} (from ${scope}):\n${p.value.trim() || '(none)'}`
   }
 
-  /** Coordinator timer's heartbeat at a level */
-  heartbeat(l: Level = 'machine'): Heartbeat {
-    return { time: this.pick('heartbeat.when', l).value, on: eventRules(this.pick('heartbeat.on', l).value), zone: this.zone() }
-  }
-
-  pilot(space?: string): PilotConfig {
-    const get = (key: string) => this.get(`autopilot.${key}`, space)
-    const base = this.harness('coordinator', space)
-    const kind = get('agent') === 'inherit' ? base.kind : kindOf(get('agent'))!
-    const problem = pilotProblem(kind)
-    if (problem) throw new Error(problem)
-    const model = get('model') === 'inherit' ? base.model : modelArg(kind, get('model'))
-    if (model && knowsModels(kind) && !findModel(kind, model))
-      throw new Error(`Choose a model for ${CLI_NAME[kind]}, or set its coordinator timer model to default.`)
-    const effort = get('effort') === 'inherit' ? base.effort : get('effort') === 'default' ? undefined : get('effort')
-    if (effort && !effortsOf(kind, model).includes(effort)) throw new Error(`${CLI_NAME[kind]} does not support ${effort} effort with this model.`)
-    const num = (key: string) => Number.parseFloat(get(key)) || undefined
-    return {
-      harness: { kind, model, effort },
-      reviewer: this.harness('reviewer', space),
-      hosts: hostList(get('hosts')),
-      secrets: get('secrets')
-        .split(/[\s,]+/)
-        .filter(Boolean),
-      approvals: get('approvals') === 'none' ? [] : ['merge'],
-      traffic: num('traffic') ? num('traffic')! * 1048576 : undefined,
-      tokens: num('tokens'),
-      runtime: num('runtime') ? num('runtime')! * 60000 : undefined,
-      parallel: num('parallel') ?? 3,
-    }
-  }
-
   /** the time zone of every time rule */
   zone() {
     return this.pick('time.zone', 'all').value
@@ -349,35 +304,14 @@ export class Settings {
           .filter((r) => r.key !== 'alerts')
           .map((r) => {
             const p = this.pick(r.key, l)
-            // a trigger in words, as the human hears it; the rule as kept under it, for an agent to change
-            const words = this.words(r.key, p.value)
-            return words
-              ? `${r.key.padEnd(22)} ${words.trim()}  (${name[p.from]})\n${''.padEnd(23)}as written: ${p.value}`
-              : `${r.key.padEnd(22)} ${p.value}  (${name[p.from]})`
+            return `${r.key.padEnd(22)} ${p.value}  (${name[p.from]})`
           }),
       )
     return `What agents are told (private launch instructions and new briefs):\n${keys(true).join('\n')}\n\nHow Lineclear runs:\n${keys(false).join('\n')}`
   }
 
-  /** a trigger setting in plain words, on a line after its value; nothing for the others */
-  words(key: string, value: string) {
-    if (key === 'heartbeat.when') {
-      const next = nextWords(value, this.zone())
-      return `\n${''.padEnd(23)}${timeWords(value, this.zone())}${next.length ? `; next ${next.join(', ')}` : ''}`
-    }
-    return key === 'heartbeat.on' ? `\n${''.padEnd(23)}${eventWords(eventRules(value))}` : ''
-  }
-
-  /** a trigger row as Settings shows it: in words, its next runs, and its few ready-made picks */
-  private triggerRow(key: string, value: string): { trigger?: TriggerRow } {
-    if (key === 'heartbeat.when') return { trigger: { words: timeWords(value, this.zone()), next: nextWords(value, this.zone()), presets: HEARTBEAT_PRESETS } }
-    if (key === 'heartbeat.on') return { trigger: { words: eventWords(eventRules(value)), next: [], presets: NEWS_PRESETS } }
-    return {}
-  }
-
   /** the pages of every level this machine holds: Everywhere (the main machine's, which its others share), this
-   *  machine, and each of its spaces. `checklist`: the HEARTBEAT.md of a level's place (its id), shown last under
-   *  Coordinator timer */
+   *  machine, and each of its spaces */
   sections(
     devices: string[],
     machines: { name: string; state: string }[],
@@ -385,7 +319,6 @@ export class Settings {
     host = 'this machine',
     spaces: string[] = [],
     name = host,
-    checklist?: (place: string) => string,
     pushWarnings: string[] = [],
   ): SettingSection[] {
     const levels: { l: Level; id: string }[] = [
@@ -425,7 +358,6 @@ export class Settings {
         return {
           ...agentRow({ ...r, value: p.value }, (k) => this.pick(k, l).value),
           ...(lines[r.key] ? { line: lines[r.key] } : {}),
-          ...this.triggerRow(r.key, p.value),
           ...(here
             ? { inherits: { value: back.value, from: back.from === 'default' && l === 'all' ? 'Default' : fromName(back.from) } }
             : l === 'all'
@@ -442,20 +374,15 @@ export class Settings {
           }
         : s.name === 'How tasks work'
           ? { note: settingsBlock('<id>', { ways: this.waysAt(l), reviewer: this.harnessAt('reviewer', l), by: this.setByAt(l) }) }
-          : s.name === AUTOPILOT
-            ? {}
-            : s.name === 'Machine'
-              ? machineNote(this.machine(l === 'all' ? 'all' : 'machine'))
-              : {}
-    // each space's own HEARTBEAT.md, after the heartbeat's rows: a file, not a default its levels pass down
-    const withChecklist = (s: Section, list: SettingSection['rows'], id: string): SettingSection['rows'] =>
-      s.name === AUTOPILOT && checklist && id.startsWith('p:') ? [{ label: 'Heartbeat', key: 'heartbeat.md', value: checklist(id), doc: true }, ...list] : list
+          : s.name === 'Machine'
+            ? machineNote(this.machine(l === 'all' ? 'all' : 'machine'))
+            : {}
     return [
       ...levels.flatMap(({ l, id }) =>
         CATALOG.filter((s) => (s.levels ?? ['all', 'machine', 'space']).includes(kindOfLevel(l))).map((s) => ({
           name: s.name,
           about: s.about,
-          rows: withChecklist(s, rows(s, l), id),
+          rows: rows(s, l),
           ...note(s, l),
           level: id,
           ...(s.levels?.length === 1 ? { global: true } : {}),

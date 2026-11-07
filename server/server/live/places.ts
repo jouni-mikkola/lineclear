@@ -7,7 +7,7 @@ import { hostname } from 'node:os'
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 import { setOrder, type PlaceOrder, type SectionDefs } from '../../shared/order.ts'
-import { nameProblem, slugify, type Mode } from '../../shared/types.ts'
+import { nameProblem, slugify } from '../../shared/types.ts'
 import { HOME, readJson, writeJson } from '../store.ts'
 import { Agents } from './agents.ts'
 import { boxHome } from './box.ts'
@@ -26,12 +26,6 @@ export interface Space {
   added: number
   /** the repo's folder on another machine, by that machine's label (`~/` is that machine's home); left out: the same path */
   machines?: Record<string, string>
-}
-
-/** a mode read from disk, the CLI or another machine, any case */
-export const asMode = (m: unknown): Mode | undefined => {
-  const w = typeof m === 'string' ? m.trim().toLowerCase() : ''
-  return w === 'regular' || w === 'autopilot' ? w : undefined
 }
 
 export const HOST = (process.env.LINECLEAR_MACHINE ?? hostname()).split('.')[0]
@@ -94,12 +88,6 @@ export class Places {
   /** Historical task prefixes, including deleted tasks; supplied by the owning engine. */
   takenTaskKeys?: () => string[]
   spaces: Space[] = this.loadSpaces()
-  // kept under their old names too (manual and ping, suggest, auto): read as today's, saved so on the next save
-  modes: Record<string, Mode> = Object.fromEntries(
-    Object.entries(readJson<Record<string, unknown>>('modes.json', {})).flatMap(([id, m]) => (asMode(m) ? [[id, asMode(m)!]] : [])),
-  )
-  /** who switched each space's coordinator timer on, and when: kept beside modes.json, whose shape other tools read */
-  switches: Record<string, { by: 'screen' | 'terminal'; who: string; at: number }> = readJson('autopilot-switch.json', {})
   /** the sidebar's order the human dragged, of every machine's places (see shared/order.ts) */
   order: PlaceOrder = readJson('order.json', {})
   /** the names the human gave machines and spaces in the sidebar, by id, every machine's: only what shows changes,
@@ -158,7 +146,6 @@ export class Places {
 
   save() {
     writeJson('spaces.json', this.spaces)
-    writeJson('modes.json', this.modes)
   }
 
   /** the name each of this machine's spaces shows, the home space first: as given, by the space rules, each its own */
@@ -205,23 +192,6 @@ export class Places {
       this.save()
     }
     return g
-  }
-
-  mode(id: string): Mode {
-    // every space starts regular: it wakes on news and does what the human asked
-    return asMode(this.modes[id]) ?? 'regular'
-  }
-
-  setMode(id: string, m: Mode) {
-    this.modes[id] = m
-    this.save()
-  }
-
-  /** Coordinator timer switched on by the owner (or off, which forgets it) */
-  recordSwitch(id: string, m: Mode, by?: { by: 'screen' | 'terminal'; who: string; at: number }) {
-    if (m === 'autopilot' && by) this.switches[id] = by
-    else delete this.switches[id]
-    writeJson('autopilot-switch.json', this.switches)
   }
 
   /** a repo space by its id (the home space is none) */

@@ -45,8 +45,6 @@ export async function serveMain(args: string[], out: (line: string) => void): Pr
 const BOARD_COMMANDS = [
   "space",
   "task",
-  "mode",
-  "heartbeat",
   "show",
   "ready",
   "merge",

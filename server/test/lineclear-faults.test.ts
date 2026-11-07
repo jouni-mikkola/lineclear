@@ -10,7 +10,6 @@ process.env.CLAUDE_CONFIG_DIR = mkdtempSync(join(tmpdir(), 'shep-claude-'))
 const { canResume } = await import('../server/live/agent-start.ts')
 const { claudeLogPath } = await import('../server/live/readers/find.ts')
 const { cutCardId, isAllowance, resetAt, Retries, wakePlan } = await import('../server/live/retry.ts')
-const { overviewWakes } = await import('../server/live/trigger.ts')
 const { writeJson } = await import('../server/store.ts')
 const { Worktrees } = await import('../server/live/engine/worktrees.ts')
 void Engine
@@ -200,15 +199,6 @@ describe('(g) an agent idle at 0% context', () => {
     const before = w.sent.length
     w.engine.briefLate(w.engine.task(t.id)!)
     expect(w.sent.length).toBe(before)
-  })
-})
-
-describe('(h) the home coordinator is not woken by every space', () => {
-  test('off coordinator timer another space’s news costs it no model turn', () => {
-    expect(overviewWakes('regular', 'ready')).toBe(false)
-    expect(overviewWakes('regular', 'need')).toBe(false)
-    expect(overviewWakes('autopilot', 'need')).toBe(true)
-    expect(overviewWakes('regular', 'health')).toBe(true)
   })
 })
 

@@ -5,7 +5,6 @@
     "worktree",
     "browser",
     "health",
-    "alerts",
-    "autopilot"
+    "alerts"
   ]
 }

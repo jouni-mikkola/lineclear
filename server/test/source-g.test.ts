@@ -160,7 +160,6 @@ describe('machine health', () => {
     const sent: { key: string; text: string }[] = []
     const send = src.agents.send
     src.agents.send = (async (key: string, text: string) => (sent.push({ key, text }), { waiting: false })) as typeof send
-    src.places.setMode(machine, 'regular')
     const reach = src.agents.reachable
     mon.take = () => ({
       at: 0,
@@ -232,7 +231,6 @@ describe('machine health', () => {
       browsers.sweep = sweep
       src.agents.send = send
       src.agents.reachable = reach
-      src.places.setMode(machine, 'regular')
       mon.take = take
       mon.last = undefined
     }

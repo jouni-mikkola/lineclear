@@ -111,9 +111,6 @@ export async function installMachine(host: string, env: Env = process.env, say: 
       const saved = await run(herdrArgv(["machine", "add", host]), undefined, 120_000, env);
       say(saved.code === 0 ? `Saved ${host} in herdr` : `herdr could not save ${host}; run: herdr machine add ${host}`);
     }
-    say(`Fixing what is safe to fix on ${host}`);
-    const fixed = await run(sshArgs(env, host, `${LINECLEAR} doctor --fix --here`), undefined, 120_000, env);
-    for (const l of fixed.lines) say(`  ${l}`);
     say(`Cloning the project repos on ${host}`);
     const cloneFailed = cloneProjects(host, env, say);
     say(`Running lineclear doctor on ${host}`);
@@ -287,10 +284,6 @@ export function machinesView(env: Env = process.env, now = () => Date.now(), bus
       };
     });
     return [here, ...others];
-  };
-  // after a fix, the next read looks again instead of waiting out the minute
-  view.recheck = () => {
-    doctor = undefined;
   };
   return view;
 }

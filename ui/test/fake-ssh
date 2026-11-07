@@ -15,10 +15,6 @@ case "$cmd" in
     echo "Lineclear: installing main"
     echo "Done. Run 'lineclear doctor' to check it."
     ;;
-  *"doctor --fix --here")
-    echo "$host doctor --fix --here" >> "$log"
-    echo "Nothing to remove."
-    ;;
   *"lineclear\" doctor")
     echo "$host doctor" >> "$log"
     echo "ok     git"

@@ -558,14 +558,12 @@ the agent's own question. A `[lineclear]` line with no kind, and any `<lineclear
 | `server/server/live/engine/engine.ts` `tell`, `source.ts` `send` | The owner or a coordinator runs `lineclear task tell` or writes in a task's chat | Owner. A coordinator is an AI, so there is none by default |
 | `server/server/live/source.ts` `relaunch` | An agent that was working stopped (herdr restarted, its CLI exited) and is started again | Resume: a `restart` line, once per restart. `measure` counts it |
 | `server/server/live/source.ts` browsers `tell` | The human took the shared browser over or handed it back | Step: a `browser` line. `measure` counts it |
-| `server/server/live/source.ts` `wakePilot` | A coordinator's heartbeat by its schedule, or the owner's Run now (the coordinator timer, off unless `LINECLEAR_COORDINATOR_TIMER=on`) | Owner or schedule: its own checklist, no news in it |
 
 What does not reach an agent, and where it goes:
 
 | Where | Event | What happens |
 |---|---|---|
 | `server/server/live/quiet.ts`, `Agents.send` | A `news` or `health` line from any caller: machine load or memory or disk (`onHealth`), another task's status (`overview`, requested news), "the human answered", and the same left in an old outbox | Held back before the outbox. Nothing goes into any pane. A task that wants to hear that another is done declares `lineclear wait`, which a rule resumes |
-| `server/server/live/source.ts` `wakes` | A news event that would have woken a coordinator on a timer | It does not. The news is not kept for the next heartbeat either |
 | `src/rules.ts` `tickProject` | Load above the limit | No new task starts; the decision log says so |
 | `src/stalls.ts` `markLimitedReviewers` | A reviewer reports a usage limit | The account is marked out until its reset. Nobody is told |
 | `src/stalls.ts` `serviceStalls` | A model call failed on a full account | The account is marked, the task is handed on to the next model, or waits for the reset and is resumed once by `serviceWaits` |

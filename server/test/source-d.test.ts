@@ -1,7 +1,5 @@
-import { stopSource, placeId, Places, herdr, hidden, src } from './source-fixture.ts'
+import { stopSource, placeId, herdr, hidden, src } from './source-fixture.ts'
 import { afterAll, describe, expect, test } from 'bun:test'
-import { readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
 
 describe('what you send shows at once', () => {
   /** the chat's own record under a name, its outbox emptied; `record` is what it was, to put back */
@@ -344,30 +342,6 @@ describe('what you send shows at once', () => {
         .messages.filter((m) => m.cid === 'c2')
         .map((m) => m.file?.path),
     ).toEqual([shot])
-  })
-})
-
-describe('modes: regular and coordinator timer', () => {
-  test('a saved mode that is neither loads as regular and is dropped', () => {
-    writeFileSync(
-      join(process.env.LINECLEAR_HOME!, 'modes.json'),
-      JSON.stringify({ 'p:h:old': 'manual', 'p:h:co': 'copilot', 'p:h:auto': 'autopilot', 'p:h:reg': 'Regular' }),
-    )
-    const places = new Places()
-    expect([places.mode('p:h:old'), places.mode('p:h:co'), places.mode('p:h:auto'), places.mode('p:h:reg'), places.mode('p:h:new')]).toEqual([
-      'regular',
-      'regular',
-      'autopilot',
-      'regular',
-      'regular',
-    ])
-    places.save()
-    expect(JSON.parse(readFileSync(join(process.env.LINECLEAR_HOME!, 'modes.json'), 'utf8'))).toEqual({ 'p:h:auto': 'autopilot', 'p:h:reg': 'regular' })
-  })
-  test('lineclear mode takes regular and autopilot, any case', async () => {
-    expect((await src.cli(['mode', 'home', 'AUTOPILOT'], {})).out).toContain('repository space')
-    expect((await src.cli(['mode', 'home', 'regular'], {})).out.trim()).toBe('home: Coordinator timer off.')
-    for (const m of ['copilot', 'manual', 'sleepy']) expect((await src.cli(['mode', 'home', m], {})).code).toBe(1)
   })
 })
 

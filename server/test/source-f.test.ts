@@ -339,34 +339,4 @@ describe("a task row's menu, and pin from the command", () => {
   })
 })
 
-describe('coordinator timer from the command', () => {
-  test('one Heartbeat with schedule, agent and shared access/limits; old budget forms stay absent', async () => {
-    const { place } = await workedTask('piloting')
-    src.places.setMode(place, 'autopilot')
-    try {
-      // the coordinator, on its own: Lineclear adds what it asks; the machine's max tasks at once bounds the rest
-      expect((await src.cli(['task', 'add', 'Fix the typo', '--desc', 'Fix it.'], { chat: place })).out).toContain('Added')
-      expect((await src.cli(['task', 'add', 'Fix the link', '--desc', 'Fix it.'], { chat: place })).out).toContain('Added')
-      for (const s of src.snapshot().settings.filter((x) => x.name === 'Coordinator timer')) {
-        const keys = s.rows.map((r) => r.key)
-        expect(keys).toContain('heartbeat.when')
-        expect(keys).toContain('heartbeat.on')
-        expect(keys).toContain('autopilot.agent')
-        expect(keys).toContain('autopilot.parallel')
-        expect(keys).toContain('autopilot.traffic')
-        expect(keys).toContain('autopilot.tokens')
-        expect(s.rows.filter((r) => r.doc)).toHaveLength(s.level?.startsWith('p:') ? 1 : 0)
-        expect(s.rows.some((r) => r.label === 'Checklist')).toBe(false)
-      }
-      const show = (await src.cli(['show'], {})).out
-      expect(show).toContain('heartbeat.when')
-      expect(show).toContain('heartbeat.on')
-      expect(show).toContain('time.zone')
-      expect(show).not.toMatch(/tasksPerDay|wake\.|used today|budget/)
-    } finally {
-      src.places.setMode(place, 'regular')
-    }
-  })
-})
-
 afterAll(stopSource)

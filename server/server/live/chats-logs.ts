@@ -1,12 +1,10 @@
 import { existsSync, rmSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { join } from 'node:path'
 import type { ActivityAnswer, ActivityAsk, ChatControls, Question } from '../../shared/types.ts'
 import { HOME, readJson, writeJson } from '../store.ts'
 import { stripHidden, type Agents, type OutItem } from './agents.ts'
 import { agentLines } from './chatlines.ts'
 import { herdr } from './herdr.ts'
-import { capturedTranscript, privateRuntimePath } from './autopilot-sandbox.ts'
-import { homedir } from 'node:os'
 import { logKind } from './readers/find.ts'
 import { LogTail, readerFor } from './readers/index.ts'
 import type { LogEvent } from './readers/types.ts'
@@ -124,8 +122,6 @@ export class ChatsLogs {
     const where = this.where.get(key) ?? new Map<string, number>()
     for (const f of r.logs) {
       if (!existsSync(f)) continue
-      const privateHome = f.match(/^(.*\/autopilot-runtime\/[^/]+\/[^/]+\/captures)\//)?.[1]
-      if (privateHome && !privateRuntimePath(privateHome, f)) continue
       let t = this.tails.get(f)
       if (!t) {
         // each by its own CLI's reader: a backup agent's logs follow the first one's
@@ -138,12 +134,6 @@ export class ChatsLogs {
       const ev = t.read(left)
       left -= Math.max(0, t.done - was)
       for (const e of ev) {
-        if (privateHome && e.kind === 'job') {
-          const mapped = (path?: string) =>
-            path ? privateRuntimePath(privateHome, capturedTranscript(privateHome, r.kind, relative(homedir(), path))) : undefined
-          e.log = mapped(e.log)
-          e.output = mapped(e.output)
-        }
         // a reply read in two pieces comes again with the same id and the full text: it replaces the first
         const id = e.kind === 'agent' || e.kind === 'usage' ? `${e.kind}:${e.id}` : undefined
         const i = id === undefined ? undefined : where.get(id)
@@ -368,7 +358,7 @@ export class ChatsLogs {
     if (heads.length) list = list.filter((j) => j.kind !== 'shell' || !/\b(codex (exec|e)|(claude|pi)\b.* (-p|--print))\b/.test(j.title))
     list.push(...heads)
     for (const j of list) {
-      if (j.kind === 'agent' && !j.log && r?.kind === 'codex' && !r.isolation) {
+      if (j.kind === 'agent' && !j.log && r?.kind === 'codex') {
         const f = this.threadLogs.get(j.id) ?? codexThreadLog(j.id)
         if (f) this.threadLogs.set(j.id, (j.log = f))
       }

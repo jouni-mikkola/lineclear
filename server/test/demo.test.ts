@@ -63,30 +63,6 @@ describe('Queued', () => {
   })
 })
 
-describe("a place's mode", () => {
-  test('switching it changes only that place', async () => {
-    const w = new DemoWorld()
-    const [all, other] = w.snapshot().places
-    for (const m of ['autopilot', 'regular'] as const) {
-      expect(await w.act({ type: 'mode', place: all.id, mode: m })).toEqual({})
-      expect(w.snapshot().places[0].mode).toBe(m)
-    }
-    expect(w.snapshot().places[1].mode).toBe(other.mode)
-  })
-  test('each switch posts one small card in its chat: Coordinator timer on or off, and what that means', async () => {
-    const w = new DemoWorld()
-    const all = w.snapshot().places[0]
-    const cards = () => w.chat(all.chat).messages.filter((m) => m.card?.mode)
-    expect(cards()).toEqual([])
-    await w.act({ type: 'mode', place: all.id, mode: 'autopilot' })
-    await w.act({ type: 'mode', place: all.id, mode: 'autopilot' })
-    await w.act({ type: 'mode', place: all.id, mode: 'regular' })
-    expect(cards().map((m) => m.text)).toEqual(['Coordinator timer on · works on its own', 'Coordinator timer off · does what you ask'])
-    expect(cards()[1].card).toMatchObject({ mode: 'autopilot', text: 'off · does what you ask' })
-    expect(cards()[1].card!.task).toBeUndefined()
-  })
-})
-
 describe('attachments', () => {
   test('each file sent is a message of its own after the text, served only from where it was attached', async () => {
     const w = new DemoWorld()

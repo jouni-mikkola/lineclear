@@ -10,8 +10,7 @@ import * as task from './mfs.ts'
 import { mirrored } from './mfs.ts'
 import { agentEnv, BOX } from './box.ts'
 import { ROOT } from '../root.ts'
-import { privateRuntimePath } from './autopilot-sandbox.ts'
-import { isolatedReady, isolatedShell, carryClaudeSession, holdFrom, canResume } from './agent-start.ts'
+import { carryClaudeSession, holdFrom, canResume } from './agent-start.ts'
 import { type AgentRecord, type Spec, HOOKS_DIR, promptPath, hidden } from './agents-helpers.ts'
 import { addLog } from './log-list.ts'
 import { AgentsState } from './agents-state.ts'
@@ -48,7 +47,7 @@ export class AgentsDelivery extends AgentsState {
 
   start() {
     this.refresh()
-    // upkeep of what herdr does not push: files of codex runs and isolated runs, stranded sends, background expiry.
+    // upkeep of what herdr does not push: files of codex runs, stranded sends, background expiry.
     // It never asks herdr for anything.
     this.timer = setInterval(() => {
       // the subscription is open while herdr is reachable: that is its contact
@@ -93,7 +92,7 @@ export class AgentsDelivery extends AgentsState {
   runtimeHook(key: string) {
     const r = this.records[key]
     if (!r?.hooks || r.kind !== 'claude' || !this.info(key)) return undefined
-    const h = this.hooks.read(r.isolation ? (privateRuntimePath(r.isolation.home, r.hooks) ?? '') : mirrored(r.hooks)).runtime
+    const h = this.hooks.read(mirrored(r.hooks)).runtime
     return h && h.at >= r.started && (!h.session || h.session === r.sessionId) ? h : undefined
   }
 
@@ -212,10 +211,7 @@ export class AgentsDelivery extends AgentsState {
     // learn log files herdr names (its agent integrations report them)
     for (const [name, key] of this.byName) this.learnSession(key, this.live.get(name))
     // and the session its hooks say it is in now, which herdr doesn't name: a /clear starts another
-    for (const key of this.byName.values()) {
-      this.followSession(key)
-      if (this.records[key]?.isolation) this.discoverLog(key)
-    }
+    for (const key of this.byName.values()) this.followSession(key)
     // what waits goes in as soon as its agent can take it
     for (const key of new Set(this.outbox.map((o) => o.key))) if (!this.heldBy(key)) this.deliver(key)
     this.checkStranded()
@@ -239,10 +235,6 @@ export class AgentsDelivery extends AgentsState {
     const r = this.records[key]
     if (!r || (r.kind === 'claude' && r.hooks)) return
     const look = () => {
-      if (r.isolation) {
-        this.discoverLog(key)
-        return
-      }
       const f = findLog(r.kind, r.cwd, since - 1000)
       if (!f || !addLog(r, f)) return
       // Claude Code and pi resume by the id in its name; Codex by its last log
@@ -317,7 +309,6 @@ export class AgentsDelivery extends AgentsState {
     const r: AgentRecord = old ?? { ...spec, logs: [], started: Date.now() }
     const changedPrompt = old?.system !== spec.system
     const from = old?.cwd
-    r.isolation = spec.isolation
     if (fresh) {
       r.model = ''
       r.effort = ''
@@ -335,27 +326,17 @@ export class AgentsDelivery extends AgentsState {
     this.save()
     task.mkdirSync(r.cwd, { recursive: true })
     // it starts in another folder now: its session goes with it, where --resume looks for it
-    if (resume && !r.isolation && r.kind === 'claude' && r.sessionId && from !== r.cwd) {
+    if (resume && r.kind === 'claude' && r.sessionId && from !== r.cwd) {
       const id = r.sessionId
       const log = carryClaudeSession(id, r.cwd)
       if (log) r.logs = [...r.logs.filter((f) => !f.endsWith(`/${id}.jsonl`)), log]
     }
     const unset = chooseModel(r.kind, r.model)
     if (unset) throw new Error(unset)
-    const pane = place && !r.isolation ? await place() : await this.paneFor(r, was)
+    const pane = place ? await place() : await this.paneFor(r, was)
     this.startedIn.set(r.key, pane)
     const args = this.args(r, !!resume)
     this.save()
-    if (r.isolation) {
-      try {
-        await isolatedShell(pane, r.isolation.path)
-      } catch (e) {
-        r.finished = true
-        this.save()
-        await herdr.closePane(pane).catch(() => undefined)
-        throw e
-      }
-    }
     // a new pane needs a moment before its shell is at the prompt
     for (let i = 0; ; i++) {
       try {
@@ -363,7 +344,7 @@ export class AgentsDelivery extends AgentsState {
         break
       } catch (e) {
         const code = (e as { code?: string }).code
-        if (code === 'agent_not_ready' && !r.isolation) break
+        if (code === 'agent_not_ready') break
         if (i >= 8) {
           console.error(`lineclear: could not start ${r.name}: ${(e as Error).message}`)
           r.finished = true
@@ -375,21 +356,6 @@ export class AgentsDelivery extends AgentsState {
       }
     }
     await this.refresh()
-    if (r.isolation) {
-      // agent.start only enqueues a terminal command. Never report a successful mode
-      // change until the selected adapter is really accepting chat input.
-      try {
-        await isolatedReady(r.kind, async () => {
-          await this.refresh()
-          return this.live.get(r.name)
-        })
-      } catch (e) {
-        r.finished = true
-        this.save()
-        await herdr.closePane(pane).catch(() => undefined)
-        throw e
-      }
-    }
     await this.bindRoute(r, pane)
     // CLIs without an option for extra instructions get them first, hidden from the chat. Both wait until the CLI is
     // ready, ahead of what you sent meanwhile (a restart)
@@ -419,12 +385,9 @@ export class AgentsDelivery extends AgentsState {
       if (resume && r.sessionId) a.push('--resume', r.sessionId)
       else if (r.sessionId) a.push('--session-id', r.sessionId)
       // its hooks tell Lineclear what it does (readers/hooks.ts), from a settings file of its own: yours stay untouched
-      if (!r.isolation) {
-        const h = hookSettings(HOOKS_DIR, r.name)
-        r.hooks = h.events
-        a.push('--settings', h.settings)
-      }
-      if (r.isolation) a.push('--dangerously-skip-permissions')
+      const h = hookSettings(HOOKS_DIR, r.name)
+      r.hooks = h.events
+      a.push('--settings', h.settings)
       if (r.system) a.push('--append-system-prompt-file', this.promptFile(r))
       if (model) a.push('--model', model)
       if (effort) a.push('--effort', effort)
@@ -436,14 +399,7 @@ export class AgentsDelivery extends AgentsState {
     } else if (r.kind === 'codex') {
       // Codex tools have their own environment policy. Set the owner explicitly even on resume;
       // do not depend on the pane's login shell or its stale inherited environment.
-      const env = r.isolation
-        ? {
-            LINECLEAR_CHAT: r.key,
-            LINECLEAR_COMMAND: '/run/lineclear/bin/lineclear',
-            LINECLEAR_URL: 'http://127.0.0.1:18765',
-            PATH: '/run/lineclear/bin:/usr/local/bin:/usr/bin:/bin',
-          }
-        : { ...r.env, ...agentEnv(r.key, ROOT) }
+      const env = { ...r.env, ...agentEnv(r.key, ROOT) }
       a.push(
         '-c',
         `shell_environment_policy.set={${Object.entries(env)
@@ -464,7 +420,7 @@ export class AgentsDelivery extends AgentsState {
 
   /** instructions go in a file: long text with quotes and newlines can't travel as a shell argument */
   protected promptFile(r: AgentRecord) {
-    const f = r.isolation ? join(r.isolation.control, `${r.name}.prompt.md`) : promptPath(r.name)
+    const f = promptPath(r.name)
     task.mkdirSync(dirname(f), { recursive: true })
     task.writeFileSync(f, r.system ?? '')
     return f
@@ -473,7 +429,6 @@ export class AgentsDelivery extends AgentsState {
   /** the files Lineclear starts its CLI with now, by flag: its hooks' settings and its instructions. One started with
    *  others (herdr restored an older command after it restarted) runs without them */
   filesOf(r: AgentRecord): Record<string, string> {
-    if (r.isolation) return {} // host paths differ from the namespace; the wrapper is verified before every launch
     if (r.kind === 'claude')
       return { '--settings': join(HOOKS_DIR, `${r.name}.settings.json`), ...(r.system ? { '--append-system-prompt-file': promptPath(r.name) } : {}) }
     if (r.kind === 'pi' && r.system) return { '--append-system-prompt': promptPath(r.name) }

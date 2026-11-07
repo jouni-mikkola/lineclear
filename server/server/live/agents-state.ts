@@ -1,7 +1,6 @@
 import { LinkBackoff } from './recovery.ts'
-import { homedir } from 'node:os'
-import { statSync, type FSWatcher } from 'node:fs'
-import { join, relative } from 'node:path'
+import type { FSWatcher } from 'node:fs'
+import { join } from 'node:path'
 import { Emitter } from '../source.ts'
 import { readJson, writeJson } from '../store.ts'
 import { ColdAgents } from './engine/cold.ts'
@@ -9,7 +8,7 @@ import { addLog } from './log-list.ts'
 import type { AgentHerdr, TermScreen } from '../../shared/types.ts'
 import { herdr, type Subscription, type AgentInfo, type AgentStatus } from './herdr.ts'
 import { ClaudeSessions, Reviewers, screenBackground, sessionBackground, type Background } from './readers/background.ts'
-import { claudeLogPath, findClaudeLog, findCodexLog, findPiLog, mainCodexLog } from './readers/find.ts'
+import { claudeLogPath, findClaudeLog, findCodexLog, findPiLog } from './readers/find.ts'
 import { PasteWatch } from './paste-watch.ts'
 import { TerminalClock } from './terminal-clock.ts'
 import { machineNews } from './quiet.ts'
@@ -18,7 +17,6 @@ import { mirrored } from './mfs.ts'
 import { agentEnv, BOX, helperDir, run } from './box.ts'
 import { ROOT } from '../root.ts'
 import { inputHoldsText, leftAtPrompt } from './commands.ts'
-import { capturedTranscript, privateRuntimePath } from './autopilot-sandbox.ts'
 import { SecretAccess } from './secret-access.ts'
 import { isAgentProcess } from './agent-process.ts'
 import { type AgentRecord, type OutItem, type Hold, type Sent, ROUTING_FAILURE, type Events, SAID_MS } from './agents-helpers.ts'
@@ -180,7 +178,7 @@ export class AgentsState extends Emitter<Events> {
     const now = Date.now()
     const c = this.saidAt.get(key)
     if (c && now - c.at < SAID_MS) return c.said
-    let said = this.hooks.read(r.isolation ? (privateRuntimePath(r.isolation.home, r.hooks) ?? '') : mirrored(r.hooks)).said
+    let said = this.hooks.read(mirrored(r.hooks)).said
     if (said && said.state !== 'idle' && this.endedSince?.(key, said.at))
       said = { state: 'idle', turnAt: said.turnAt, at: said.at, last: said.last, helper: said.helper, paused: said.paused }
     this.saidAt.set(key, { at: now, said })
@@ -189,13 +187,6 @@ export class AgentsState extends Emitter<Events> {
 
   /** Bind the actual CLI process, not HERDR_PANE_ID (old shells can inherit another pane's id). */
   protected async bindRoute(r: AgentRecord, pane: string) {
-    if (r.isolation) {
-      if (!r.finished) {
-        this.routes.set(r.key, `isolated:${r.isolation.run}`)
-        this.emit('routed', r.key)
-      }
-      return
-    }
     const p = await herdr.processInfo(pane)
     const proc = p.foreground_processes?.find((x) => x.pid && isAgentProcess(r.kind, x.argv))
     if (!proc?.pid || r.finished || this.records[r.key]?.finished || this.stopping.has(r.key)) {
@@ -286,7 +277,7 @@ export class AgentsState extends Emitter<Events> {
   protected ranOn(key: string): Background | undefined {
     const r = this.records[key]
     const st = this.status(key)
-    if (r?.kind !== 'claude' || r.isolation || st === 'working' || st === 'blocked' || st === 'gone') return undefined
+    if (r?.kind !== 'claude' || st === 'working' || st === 'blocked' || st === 'gone') return undefined
     const file = this.sessions.status(r.sessionId, r.cwd)
     // its hooks said what still ran as its turn ended; its session file is newer once that work is gone, or once a
     // subagent runs again (one that paused on shells of its own woke)
@@ -305,12 +296,7 @@ export class AgentsState extends Emitter<Events> {
       const pane = this.info(key)?.pane_id
       if (this.pasteDue.delete(key)) void this.paste.look(key, r?.started ?? 0, () => this.info(key)?.pane_id)
       const reads =
-        r?.kind === 'claude' &&
-        !r.isolation &&
-        pane &&
-        (st === 'idle' || st === 'done') &&
-        !this.said(key) &&
-        this.sessions.status(r.sessionId, r.cwd) === undefined
+        r?.kind === 'claude' && pane && (st === 'idle' || st === 'done') && !this.said(key) && this.sessions.status(r.sessionId, r.cwd) === undefined
       if (!reads) this.screens.delete(key)
       else if (this.screenDue.delete(key)) {
         const seen = screenBackground(await herdr.visible(pane).catch(() => ''))
@@ -346,14 +332,11 @@ export class AgentsState extends Emitter<Events> {
     const r = this.records[key]
     const s = a?.agent_session
     if (!r || !s) return
-    if (s.kind === 'path' && addLog(r, r.isolation ? this.isolatedPath(r, s.value) : mirrored(s.value))) {
+    if (s.kind === 'path' && addLog(r, mirrored(s.value))) {
       this.save()
       this.emit('logs', key)
     } else if (s.kind === 'id' && r.kind === 'claude') {
-      const p = r.isolation
-        ? this.isolatedPath(r, join(homedir(), '.claude/projects', r.cwd.replace(/[^a-zA-Z0-9-]/g, '-'), `${s.value}.jsonl`))
-        : claudeLogPath(r.cwd, s.value)
-      if (addLog(r, p)) {
+      if (addLog(r, claudeLogPath(r.cwd, s.value))) {
         r.sessionId = s.value
         this.save()
         this.emit('logs', key)
@@ -366,25 +349,14 @@ export class AgentsState extends Emitter<Events> {
   followSession(key: string) {
     const r = this.records[key]
     if (r?.kind !== 'claude' || !r.hooks) return
-    const s = this.hooks.read(r.isolation ? (privateRuntimePath(r.isolation.home, r.hooks) ?? '') : mirrored(r.hooks)).session
+    const s = this.hooks.read(mirrored(r.hooks)).session
     // another machine's copy of its events may still be an earlier run's, until the new run's first event comes
     if (!s || s.id === r.sessionId || s.at < r.started - 5000) return
-    const log = r.isolation
-      ? this.isolatedPath(r, s.log ?? join(homedir(), '.claude/projects', r.cwd.replace(/[^a-zA-Z0-9-]/g, '-'), `${s.id}.jsonl`))
-      : s.log
-        ? mirrored(s.log)
-        : claudeLogPath(r.cwd, s.id)
+    const log = s.log ? mirrored(s.log) : claudeLogPath(r.cwd, s.id)
     r.sessionId = s.id
     addLog(r, log)
     this.save()
     this.emit('logs', key)
-  }
-
-  protected isolatedPath(r: AgentRecord, file: string) {
-    if (!r.isolation) return file
-    if (!r.isolation.captures) return ''
-    const mapped = capturedTranscript(r.isolation.captures, r.kind, relative(homedir(), file))
-    return privateRuntimePath(r.isolation.captures, mapped) ?? ''
   }
 
   /** find a log file this CLI started since the agent (re)started, when herdr didn't name one */
@@ -392,24 +364,6 @@ export class AgentsState extends Emitter<Events> {
     const r = this.records[key]
     if (!r) return
     const since = r.started - 5000
-    if (r.isolation) {
-      const dir = join(
-        r.isolation.captures ?? r.isolation.home,
-        r.kind === 'claude' ? '.claude/projects' : r.kind === 'codex' ? '.codex/sessions' : '.pi/agent/sessions',
-      )
-      if (!r.isolation.captures || !privateRuntimePath(r.isolation.captures, dir)) return
-      const files = Array.from(new Bun.Glob('**/*.jsonl').scanSync({ cwd: dir, absolute: true, onlyFiles: true, throwErrorOnBrokenSymlink: false }))
-        .filter((f) => privateRuntimePath(r.isolation!.captures!, f) && statSync(f).mtimeMs >= since)
-        .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)
-      const f = files.find(
-        (f) => !f.includes('/subagents/') && (r.kind === 'codex' ? mainCodexLog(f, r.cwd, true) : !r.sessionId || f.endsWith(`${r.sessionId}.jsonl`)),
-      )
-      if (f && addLog(r, f)) {
-        this.save()
-        this.emit('logs', key)
-      }
-      return
-    }
     const f =
       r.kind === 'claude'
         ? r.sessionId

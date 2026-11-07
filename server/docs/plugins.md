@@ -1,6 +1,6 @@
 # Plugins
 
-The base plugins are reactions, artifacts, worktree, browser, health, alerts and autopilot, in `plugins/<name>/` and named
+The base plugins are reactions, artifacts, worktree, browser, health and alerts, in `plugins/<name>/` and named
 in [plugins.json](../plugins.json). A task's side panel takes its items from plugins too (Files, Diff and Pull request
 from worktree; Browser from browser). A plugin is a `server.ts`.
 
@@ -30,8 +30,3 @@ export default definePlugin({ name: 'hello', about: 'Says hello' })
 
 **The contract.** `definePlugin` in `server/plugin-api.ts`: `definePlugin({ name, about })` runs when the server starts.
 A plugin folder sits where a base one does, so a base plugin's relative imports (`../../server/plugin-api.ts`) work in a copy too.
-
-Coordinator timer adds the `autopilot-run` action and optional `keepWorkers` on the existing `mode` action.
-`SettingRow.instructions` optionally supplies complete generated launch settings as plain text after Heartbeat.
-These additions preserve existing plugin names, `definePlugin` and registry slots. See [coordinator timer](coordinator-timer.md)
-for the runtime capability matrix and the `autopilot.*` settings.

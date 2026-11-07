@@ -165,21 +165,12 @@ const prefsRoute: Route = async (c, req, url) => {
   return problem ? json({ error: `${sentence(problem)}.` }, 400) : json({ saved: true });
 };
 
-async function fixLocal(c: Ctx): Promise<Response> {
-  const done = (await c.aside("fix").catch(() => ({ code: 1, fixed: [] }))) as { code: number; fixed: string[] };
-  c.machines.recheck();
-  if (done.code !== 0) return json({ error: `${done.fixed.at(-1) ?? "The fix did not finish."} Try again in a minute.`, fixed: done.fixed }, 500);
-  if (!done.fixed.length) return json({ note: "Lineclear cannot fix this by itself. Details says what is wrong.", fixed: [] });
-  return json({ fixed: done.fixed });
-}
-
 const machinesRoute: Route = async (c, req, url) => {
   if (req.method !== "POST" || url.pathname !== "/api/machines") return undefined;
   if (!ownPage(req, url, c.env)) return json({ error: "Machines change only from Lineclear's own pages." }, 403);
   const body = await asJson(req);
   if (typeof body.remove === "string")
     return removeMachine(body.remove, c.env) ? json({ removed: body.remove }) : json({ error: `There is no machine ${body.remove}.` }, 404);
-  if (body.fix === "local") return fixLocal(c);
   const host = typeof body.add === "string" ? body.add.trim() : "";
   if (!HOST.test(host)) return json({ error: "Give an SSH host, such as build-box or me@10.0.0.5." }, 400);
   if (readMachines(c.env).some((m) => m.host === host && m.state === "installing")) return json({ error: `${host} is being installed already.` }, 409);

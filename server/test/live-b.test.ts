@@ -1,45 +1,10 @@
-import { T, CATALOG, Settings, effortFor, Heartbeats, heartbeatFile, pastTimes, span, readJson, writeJson } from './live-fixture.ts'
+import { CATALOG, Settings, effortFor, pastTimes, span, readJson, writeJson } from './live-fixture.ts'
 import { describe, expect, test } from 'bun:test'
-import { readFileSync } from 'node:fs'
 import { seedModels } from './model-fixture.ts'
 
 seedModels()
 
-describe('heartbeat', () => {
-  const min = 60_000
-  const Z = 'Europe/Stockholm'
-  const every30 = T.timeRule('FREQ=MINUTELY;INTERVAL=30')
-  test('on its time rule after coordinator timer went on, in the time zone; off: none; outside its hours: none', () => {
-    const h = new Heartbeats()
-    const t0 = Date.UTC(2026, 9, 26, 11, 0) // 12:00 in Stockholm, a Monday
-    h.switched('p:x:hb', true, t0)
-    expect(h.due('p:x:hb', every30, Z, t0 + 29 * min)).toBe(false)
-    expect(h.due('p:x:hb', every30, Z, t0 + 30 * min)).toBe(true)
-    expect(h.due('p:x:hb', 'off', Z, t0 + 90 * min)).toBe(false)
-    // only 8:00-10:00: the next is tomorrow morning
-    expect(h.due('p:x:hb', T.timeRule('FREQ=MINUTELY;INTERVAL=30;BYHOUR=8,9'), Z, t0 + 30 * min)).toBe(false)
-    expect(h.next('p:x:hb', T.timeRule('FREQ=MINUTELY;INTERVAL=30;BYHOUR=8,9'), Z)).toBe(Date.UTC(2026, 9, 27, 7, 0))
-    h.beat('p:x:hb', 'space', t0 + 30 * min)
-    expect(h.due('p:x:hb', every30, Z, t0 + 59 * min)).toBe(false)
-    expect(h.due('p:x:hb', every30, Z, t0 + 60 * min)).toBe(true)
-    // one first seen (on coordinator timer before a restart) starts counting then
-    expect(h.due('p:x:new', every30, Z, t0)).toBe(false)
-    expect(h.due('p:x:new', every30, Z, t0 + 30 * min)).toBe(true)
-  })
-  test('the prompt: its HEARTBEAT.md and the quiet marker; an empty checklist is skipped', () => {
-    const h = new Heartbeats()
-    const text = h.beat('p:x:news', 'space')!
-    // the checklist itself, not its path: the coordinator may run on another machine
-    expect(text).toContain('Your HEARTBEAT.md:\n# Heartbeat')
-    expect(text).toContain('- Tasks stuck or stalled')
-    expect(text).not.toContain(heartbeatFile('p:x:news'))
-    expect(text).not.toContain('News')
-    expect(text).toEndWith('reply with only <no-reply>heartbeat: nothing to do</no-reply>.')
-    // the first beat wrote the starting checklist, for the coordinator to read and edit
-    expect(readFileSync(heartbeatFile('p:x:news'), 'utf8')).toContain('Tasks stuck or stalled')
-    h.write('p:x:news', '')
-    expect(h.beat('p:x:news', 'space')).toBeUndefined()
-  })
+describe('browser settings', () => {
   test('Settings: an idle browser closes after 10 min; a space or machine sets its own, or off', () => {
     const s = new Settings()
     expect(s.get('browser.idleClose')).toBe('10 min')
@@ -57,46 +22,6 @@ describe('heartbeat', () => {
     s.set('browser.idleClose', null, 'machine')
     s.set('browser.idleClose', null)
   })
-
-  test('news never waits for a heartbeat: it brings the checklist only, and nothing with an empty one', () => {
-    const h = new Heartbeats()
-    h.hold('p:x:held', 'SHE-1 is ready to merge')
-    expect(h.held('p:x:held')).toEqual([])
-    const text = h.beat('p:x:held', 'space')!
-    expect(text).not.toContain('News since the last heartbeat')
-    expect(text).not.toContain('SHE-1')
-    h.write('p:x:held', '')
-    h.hold('p:x:held', 'SHE-2 needs you')
-    expect(h.beat('p:x:held', 'space')).toBeUndefined()
-  })
-  test('Settings: every 30 minutes, all news; a rule or events it can not read are refused', () => {
-    const s = new Settings()
-    expect(s.heartbeat()).toEqual({ time: every30, on: [{ event: 'news' }], zone: T.OWN_ZONE })
-    expect(s.set('heartbeat.when', 'FREQ=MINUTELY;INTERVAL=30;BYHOUR=8,9,10;BYDAY=MO,TU,WE,TH,FR').ok).toBe(true)
-    expect(s.get('heartbeat.when')).toBe('DTSTART:20260101T000000 RRULE:FREQ=MINUTELY;INTERVAL=30;BYHOUR=8,9,10;BYDAY=MO,TU,WE,TH,FR')
-    expect(s.set('heartbeat.when', 'nights').error).toContain('iCalendar RRULE')
-    expect(s.set('heartbeat.on', 'needs you, failed').ok).toBe(true)
-    expect(s.get('heartbeat.on')).toBe('needs-you, failed')
-    expect(s.set('heartbeat.on', 'lunch').error).toContain('No event')
-    expect(s.set('time.zone', 'Europe/Stockholm').ok).toBe(true)
-    expect(s.heartbeat().zone).toBe('Europe/Stockholm')
-    expect(s.set('time.zone', 'Mars/Olympus').ok).toBe(false)
-    // the old interval and quiet hours are gone
-    for (const k of ['heartbeat.every', 'heartbeat.quiet']) expect(s.set(k, '30').ok).toBe(false)
-    for (const k of ['heartbeat.when', 'heartbeat.on', 'time.zone']) s.set(k, null)
-  })
-  test('Settings → coordinator timer shows the rule in words, its next runs and presets, never the rule; lineclear show too', () => {
-    const s = new Settings()
-    s.set('time.zone', 'Europe/Stockholm')
-    const page = s.sections([], [], null).find((x) => x.name === 'Coordinator timer' && x.level === 'all')!
-    const when = page.rows.find((r) => r.key === 'heartbeat.when')!
-    expect(when.trigger!.words).toBe('Every 30 minutes (Stockholm)')
-    expect(when.trigger!.next).toHaveLength(3)
-    expect(when.trigger!.presets.map((p) => p.label)).toEqual(['15 min', '30 min', '1 hour', 'Workdays'])
-    expect(page.rows.find((r) => r.key === 'heartbeat.on')!.trigger!.words).toBe('All news')
-    expect(s.lines()).toContain('Every 30 minutes (Stockholm); next ')
-    s.set('time.zone', null)
-  })
 })
 
 describe('settings', () => {
@@ -106,20 +31,7 @@ describe('settings', () => {
     expect(s.get('coordinator.agent')).toBe('Claude Code')
     expect(s.get('brief.review')).toBe('on')
     expect(s.get('brief.merge')).toBe('on its own')
-    // Schedule, optional agent overrides and the shared runtime permission/usage boundary.
-    const pilot = CATALOG.find((x) => x.name === 'Coordinator timer')!.rows.map((r) => r.key)
-    for (const key of [
-      'heartbeat.when',
-      'heartbeat.on',
-      'autopilot.agent',
-      'autopilot.access',
-      'autopilot.traffic',
-      'autopilot.tokens',
-      'autopilot.runtime',
-      'autopilot.parallel',
-    ])
-      expect(pilot).toContain(key)
-    // what the model judges for itself is no setting: tasks a day, retries, time per task, when to hand back, tasks at once
+    // what the model judges for itself is no setting
     for (const k of [
       'autopilot.tasksPerDay',
       'autopilot.hours',
@@ -248,17 +160,6 @@ describe('settings', () => {
     expect(row('Tasks', 'Model')).toMatchObject({ value: "Qwen's own", fixed: true })
     expect(row('Backup', 'Model').options![1]).toBe('GPT-6.1-Sol')
     for (const k of ['task.agent', 'task.model', 'task.effort']) s.set(k, null)
-  })
-  test("Coordinator timer's old limits and wake picks leave the saved file as soon as it is read", () => {
-    writeJson('settings.json', {
-      everywhere: { 'autopilot.tasksPerDay': '3', 'wake.merged': 'now', 'heartbeat.every': '45 min' },
-      machine: { 'wake.health': 'next heartbeat' },
-      projects: { gtm: { 'wake.added': 'now', 'heartbeat.quiet': '22:00-07:00' } },
-    })
-    const s = new Settings()
-    // the old interval and quiet hours are dropped with the other old keys
-    expect(readJson('settings.json', {})).toEqual({ everywhere: {}, machine: {}, spaces: {} })
-    expect(s.get('heartbeat.when')).toBe(T.timeRule('FREQ=MINUTELY;INTERVAL=30'))
   })
   test("an older settings file keeps its app settings; its one CLI becomes the tasks' and the coordinators'", () => {
     writeJson('settings.json', {
@@ -430,24 +331,5 @@ describe("this project's own numbers, for a task's time left", () => {
   })
   test('times read short', () => {
     expect([span(0.2), span(25), span(60), span(80), span(130)]).toEqual(['1m', '25m', '1h', '1h20m', '2h10m'])
-  })
-})
-
-describe('a wake is bounded', () => {
-  test('a long HEARTBEAT.md is cut, and a second wake within minutes is refused', async () => {
-    const h = new Heartbeats()
-    h.write('p:x:long', 'x'.repeat(50_000))
-    const text = h.beat('p:x:long', 'space')!
-    expect(text.length).toBeLessThan(5_000)
-    expect(text).toContain('[cut: HEARTBEAT.md is 50000 characters')
-    const { PilotRuns } = await import('../server/live/autopilot.ts')
-    const pilots = new PilotRuns()
-    pilots.runs = []
-    const run = pilots.begin('p:x:wakes', { harness: { kind: 'claude' }, hosts: [], secrets: [], approvals: [], parallel: 1 })
-    run.state = 'on'
-    pilots.wake(run, 'Schedule', 1_000_000)
-    expect(() => pilots.wake(run, 'Schedule', 1_000_000 + 60_000)).toThrow('woke a moment ago')
-    expect(() => pilots.wake(run, 'Run now', 1_000_000 + 60_000)).not.toThrow()
-    expect(() => pilots.wake(run, 'Schedule', 1_000_000 + 6 * 60_000)).not.toThrow()
   })
 })

@@ -85,8 +85,7 @@ function firstLine(f: string, max = 1 << 20): string | undefined {
 
 const ymd = (d: Date, utc: boolean) => (utc ? [d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate()] : [d.getFullYear(), d.getMonth() + 1, d.getDate()])
 
-/** Reuse the native rollout identity checks for host-owned isolated captures. */
-export function mainCodexLog(file: string, cwd: string, interactiveOnly = false) {
+function mainCodexLog(file: string, cwd: string) {
   try {
     const meta = JSON.parse(firstLine(file) ?? '')
     const p = meta?.type === 'session_meta' ? meta.payload : undefined
@@ -95,8 +94,7 @@ export function mainCodexLog(file: string, cwd: string, interactiveOnly = false)
       typeof p.cwd === 'string' &&
       trimSlash(p.cwd) === trimSlash(cwd) &&
       p.thread_source !== 'subagent' &&
-      !(p.source && typeof p.source === 'object' && 'subagent' in p.source) &&
-      (!interactiveOnly || p.source === 'cli')
+      !(p.source && typeof p.source === 'object' && 'subagent' in p.source)
     )
   } catch {
     return false
@@ -172,11 +170,6 @@ export function findLog(cli: string, cwd: string, sinceMs?: number): string | un
 
 /** which CLI wrote this log, by where it lies: an agent a backup took over from has logs of two CLIs */
 export function logKind(file: string): string | undefined {
-  if (file.includes('/autopilot-runtime/')) {
-    if (file.includes('/.claude/')) return 'claude'
-    if (file.includes('/.codex/')) return 'codex'
-    if (file.includes('/.pi/')) return 'pi'
-  }
   const under = (dir: string) => file.startsWith(`${trimSlash(dir)}/`)
   if (under(join(claudeHome(), 'projects'))) return 'claude'
   if (under(join(codexHome(), 'sessions'))) return 'codex'

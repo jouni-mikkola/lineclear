@@ -6,11 +6,10 @@ import { isCommand } from './commands.ts'
 import { line } from './chatlines.ts'
 import { BOX } from './box.ts'
 import { boxDir } from './mfs.ts'
-import { asMode, NAME, placeId } from './places.ts'
+import { NAME, placeId } from './places.ts'
 import { restartInfo } from './restart.ts'
 import { CLI_NAME, kindOf } from './settings.ts'
-import { has, PLUGIN_KEY, setPluginOn } from '../plugins.ts'
-import { timerRefused } from './timer-off.ts'
+import { PLUGIN_KEY, setPluginOn } from '../plugins.ts'
 import { heldWords, chatDir } from './source-helpers.ts'
 import { LiveSourceRestarts } from './source-restarts.ts'
 
@@ -114,33 +113,6 @@ export class LiveSourceActions extends LiveSourceRestarts {
         } catch (e) {
           return { ok: false, error: (e as Error).message }
         }
-      case 'mode': {
-        const mode = asMode(a.mode)
-        if (!mode) return { ok: false, error: 'No such mode.' }
-        if (mode === 'autopilot' && !has('autopilot')) return { ok: false, error: 'coordinator timer is not in the plugin list.' }
-        const refused = timerRefused(mode)
-        if (refused) return { ok: false, error: refused }
-        try {
-          this.places.recordSwitch(a.place, mode, { by: a.by ?? 'screen', who: this.user, at: Date.now() })
-          try {
-            await this.switchPilot(a.place, mode, a.keepWorkers)
-          } catch (e) {
-            if (mode === 'autopilot' && this.places.mode(a.place) !== 'autopilot') this.places.recordSwitch(a.place, 'regular')
-            throw e
-          }
-          return { ok: true }
-        } catch (e) {
-          return { ok: false, error: (e as Error).message }
-        }
-      }
-      case 'autopilot-run': {
-        try {
-          await this.wakePilot(a.place, 'Run now')
-          return { ok: true }
-        } catch (e) {
-          return { ok: false, error: (e as Error).message }
-        }
-      }
       case 'model':
       case 'effort':
         return { ok: false, error: 'Use the + menu agent controls and Restart to apply model or effort changes. Chat and work are preserved.' }
@@ -173,22 +145,12 @@ export class LiveSourceActions extends LiveSourceRestarts {
           if (r.ok) this.emit('snapshot')
           return r
         }
-        // a space's HEARTBEAT.md: its own file
-        if (a.key === 'heartbeat.md') {
-          const at = this.placeList().find((p) => p.id === a.place)
-          if (!at) return { ok: false, error: 'No such place.' }
-          this.heartbeats.write(at.id, a.value ?? '')
-          if (this.places.mode(at.id) === 'autopilot') await this.switchPilot(at.id, 'autopilot', false, true)
-          this.emit('snapshot')
-          return { ok: true }
-        }
         // its level: Everywhere (all, or none), this machine (its m: id), or one of its spaces
         const pr = a.place?.startsWith('p:') ? this.spaceKey(a.place) : undefined
         if (a.place?.startsWith('p:') && !pr) return { ok: false, error: 'No such space.' }
         const r = this.settings.set(a.key, a.value, pr ? { space: pr } : a.place?.startsWith('m:') ? 'machine' : 'all')
         if (r.ok) {
           this.settingChanged(a.key)
-          if (a.key.startsWith('autopilot.') || /^coordinator\.(agent|model|effort)$/.test(a.key)) await this.replacePilots(a.place)
         }
         return r
       }

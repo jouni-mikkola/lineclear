@@ -54,9 +54,9 @@ export function trimCache(dir: string, maxBytes = COMPILE_CACHE_MAX_BYTES): numb
   return freed;
 }
 
-/** The folders Lineclear's tests (and the browsers they start) make in the temp folder. Folders of live work (the pi extension's `lineclear-notes-` and `lineclear-cut-`, an autopilot's `shep-pilot-gateway-`) are not among them: their own time does not move while they are used. */
+/** The folders Lineclear's tests (and the browsers they start) make in the temp folder. Folders of live work (the pi extension's `lineclear-notes-` and `lineclear-cut-`) are not among them: their own time does not move while they are used. */
 const TEST_FOLDER =
-  /^(shep-(?!pilot-gateway-)|fake-lineclear-inbox-|lineclear-(?!notes-|cut-)|lc-|lane-config|doctor-old-|playwright_chromiumdev_profile-|playwright-artifacts-)/;
+  /^(shep-|fake-lineclear-inbox-|lineclear-(?!notes-|cut-)|lc-|lane-config|doctor-old-|playwright_chromiumdev_profile-|playwright-artifacts-)/;
 
 const FINISHED_RUN_MS = 2 * 3_600_000;
 
@@ -141,7 +141,7 @@ function processesIn(dirs: string[]): number[] {
 
 const STALE_MS = 6 * 3_600_000;
 
-/** Test and check folders (`lc-test-*`, `lc-check-*` and the other test folders) in the temp folders older than 6 h that no process uses: what a killed run left, and what doctor --fix clears. */
+/** Test and check folders (`lc-test-*`, `lc-check-*` and the other test folders) in the temp folders older than 6 h that no process uses: what a killed run left. */
 export function staleFolders(env: Env = process.env, now = Date.now()): string[] {
   const found = [...new Set([env.TMPDIR || tmpdir(), "/tmp", diskTmpRoot(env)])].flatMap((dir) => testFolders(dir, STALE_MS, now));
   return found.filter((f) => processesIn([f]).length === 0);

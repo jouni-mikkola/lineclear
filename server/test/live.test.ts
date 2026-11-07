@@ -354,7 +354,6 @@ describe('triggers', () => {
     const r = T.eventRules('ready, merged branch=release/* title="fix it"')
     expect(r).toEqual([{ event: 'ready' }, { event: 'merged', branch: 'release/*', title: 'fix it' }])
     expect(T.eventsText(r)).toBe('ready, merged branch=release/* title="fix it"')
-    expect(T.eventWords(T.eventRules('needs you or main red space=gtm'))).toBe('When a task needs you or main goes red in gtm')
     // a quoted title keeps its commas and its "and"
     expect(T.eventRules('merged title="salt and pepper, please"')).toEqual([{ event: 'merged', title: 'salt and pepper, please' }])
     expect(T.eventRules(T.eventsText(T.eventRules('merged title="salt,pepper"')))).toEqual([{ event: 'merged', title: 'salt,pepper' }])

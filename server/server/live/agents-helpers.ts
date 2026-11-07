@@ -7,8 +7,6 @@ import { boxDir } from './mfs.ts'
 export interface AgentRecord {
   /** Identity for startup instructions; every replacement invalidates the old ones. */
   launch?: string
-  /** Trusted isolation metadata; never set by a prompt. */
-  isolation?: { run: string; home: string; captures?: string; control: string; path: string }
   /** chat key */
   key: string
   /** herdr agent name */

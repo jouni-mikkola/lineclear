@@ -172,8 +172,6 @@ export function startApp({ source, push, port, host = '127.0.0.1', updates, log 
           }
           if (path === '/api/action' && req.method === 'POST') {
             const a = (await req.json()) as Action
-            // `by` is the command's to set, from the owner's own terminal: a posted one is dropped
-            if (a.type === 'mode') delete a.by
             return json((await source.act(a)) ?? {})
           }
           // an artifact: its page wrapped for a sealed frame, its data alone (pushed into open frames when only that

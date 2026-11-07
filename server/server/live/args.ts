@@ -56,15 +56,8 @@ Spaces (a folder on a machine with a name and its own coordinator; each machine 
                                                  never the home space
   lineclear answer <card id> "<answer>" --space NAME
                                                  answer a choice card of the space's coordinator chat in words
-  lineclear mode <space> regular                  keep a space's coordinator timer off
-  lineclear heartbeat [<space>]                  a coordinator's heartbeat on coordinator timer: its trigger in words (when:
-                                                 heartbeat.when, the news that wakes it at once: heartbeat.on), when
-                                                 last and next, and its HEARTBEAT.md (the standing checklist each
-                                                 heartbeat brings)
-  lineclear heartbeat set [<space>] < file       change its HEARTBEAT.md: the whole new text on stdin (empty stops
-                                                 the heartbeat); the human edits it in Settings → coordinator timer too
 
-Tasks (coordinators add them; only when the human asks, or on coordinator timer)
+Tasks (coordinators add them, only when the human asks)
   lineclear room [MACHINE]    a machine's load, cores, free memory, tasks at work and slots, as JSON
   lineclear task add "<title>" --brief "<the brief>" [--result "<one sentence: what the owner sees or does once it lands>"] [--space NAME] [--base BRANCH] [--after SHE-12,SHE-13] [--later] [--on MACHINE]
                                                  [--set KEY=VALUE ...] [--agent CLI] [--model ID] [--effort LEVEL]
@@ -193,8 +186,7 @@ Artifacts (one self-contained HTML file, optional JSON data; checked at phone wi
 
 Settings and automations
   lineclear show [--space NAME]                the app's few settings (how tasks work, each agent's CLI, model and
-                                                 effort, auto-archive, coordinator timer's heartbeat in words with its next
-                                                 runs, the time zone, this machine's
+                                                 effort, auto-archive, the time zone, this machine's
                                                  limits and numbers now, alerts)
                                                  as they are where it runs (its space, else this machine),
                                                  each with where it comes from, and the lines every brief ends with
@@ -212,18 +204,18 @@ Settings and automations
   lineclear automation edit "<name>" [--name "<new name>"] [--task …] [--brief …] [--when … | off] [--on … | none]
                          [--agent …]
 
-  Triggers: automations and coordinator timer's heartbeat (lineclear set heartbeat.when / heartbeat.on) take the same ones,
+  Triggers: automations take a time rule, events, or both,
   their times in time.zone (Everywhere). Write them from the human's words; show them back in the words Lineclear
   prints, never as written.
-      time rule (--when, heartbeat.when): an iCalendar RRULE (RFC 5545), with DTSTART and EXDATE lines where needed
+      time rule (--when): an iCalendar RRULE (RFC 5545), with DTSTART and EXDATE lines where needed
           FREQ=MINUTELY;INTERVAL=30                       every 30 minutes
           FREQ=MINUTELY;INTERVAL=30;BYHOUR=8,9,…,21;BYDAY=MO,TU,WE,TH,FR    every 30 min, 8:00-22:00, weekdays
           FREQ=WEEKLY;INTERVAL=2;BYDAY=FR;BYHOUR=16;BYMINUTE=0           every other Friday at 16:00
           FREQ=MONTHLY;BYDAY=-1FR;BYHOUR=9;BYMINUTE=0                    the last Friday of the month at 9:00
           DTSTART:20261201T090000 RRULE:FREQ=DAILY;COUNT=10 EXDATE:20261206T090000   from, how many, skip dates
         or once 2026-11-02 9:00, or off. Without DTSTART it counts from 2026-01-01 0:00 (every other week, every 7 min)
-      events (--on, heartbeat.on): all news, none, or some split by commas, each with optional filters
-          added · ready · failed · needs-you · merged · stalled · main-red · health (heartbeat only)
+      events (--on): all news, none, or some split by commas, each with optional filters
+          added · ready · failed · needs-you · merged · stalled · main-red
           space=<name> · branch=<glob, * any> · title=<words in the title>       ready, merged branch=release/*
         an automation hears its own space's news unless a rule names another space=
   lineclear automation pause|resume|run|remove "<name>" [--space NAME]

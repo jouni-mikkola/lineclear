@@ -12,7 +12,6 @@ export const { HOST, NAME, placeId, Places } = await import('../server/live/plac
 export const { herdr } = await import('../server/live/herdr.ts')
 export const { hidden } = await import('../server/live/agents.ts')
 const { isAgentProcess } = await import('../server/live/agent-process.ts')
-export const { heartbeatFile } = await import('../server/live/heartbeat.ts')
 export const { carryOn } = await import('../server/live/retry.ts')
 const { Worktrees } = await import('../server/live/engine/worktrees.ts')
 const { fakeHerdr } = await import('./fake-herdr.ts')

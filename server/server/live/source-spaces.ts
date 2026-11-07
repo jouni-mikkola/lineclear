@@ -1,10 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { dirname, join, sep } from 'node:path'
-import { modeCard, STATUS_MAX, type ActivityAnswer, type ActivityAsk, type AddSpace, type Folders, type WorktreeAsk } from '../../shared/types.ts'
-import { readJson } from '../store.ts'
-import type { PilotRun } from './autopilot.ts'
-import { killSandbox } from './autopilot-sandbox.ts'
-import { hidden } from './agents.ts'
+import { STATUS_MAX, type ActivityAnswer, type ActivityAsk, type AddSpace, type Folders, type WorktreeAsk } from '../../shared/types.ts'
 import { one, type Parsed } from './args.ts'
 import { line } from './chatlines.ts'
 import { ended } from './engine/engine.ts'
@@ -15,7 +11,6 @@ import { fileType } from '../../shared/files.ts'
 import { boxDir } from './mfs.ts'
 import * as task from './mfs.ts'
 import { HOST, NAME, placeId } from './places.ts'
-import { recentChat, type Harness } from './restart.ts'
 import { SECRET_NAME } from './secrets.ts'
 import { diffFiles, diffPatch, listFiles, pullRequest, readFile } from './worktree.ts'
 import { has } from '../plugins.ts'
@@ -265,94 +260,6 @@ export class LiveSourceSpaces extends LiveSourceViews {
   protected placeOfCommand(p: Parsed, ctx: { chat?: string; cwd?: string }) {
     if (one(p, 'space') || (ctx.chat?.startsWith('p:') && this.places.space(ctx.chat)) || ctx.chat?.includes('/')) return this.projectFor(p, ctx)
     return ctx.cwd ? this.places.forPath(ctx.cwd) : undefined
-  }
-
-  protected activePilotTasks(r: PilotRun, except?: string) {
-    return this.engine.tasks.filter((t) => t.pilot === r.id && t.id !== except && !ended(t) && !t.stopped && !t.todo && !t.held && !t.paused).length
-  }
-
-  protected async stopPilotAgents(r: PilotRun, keepWorkers: boolean) {
-    const records = Object.values(this.agents.records)
-      .filter((record) => record.isolation?.run === r.id && (!keepWorkers || record.key === r.place))
-      .map((record) => record.key)
-    const runtimes = [...this.pilotSandboxes].filter(([key, box]) => box.run === r.id && (!keepWorkers || key === r.place)).map(([key]) => key)
-    const tasks = keepWorkers ? [] : this.engine.tasks.filter((t) => t.pilot === r.id && !ended(t)).map((t) => `${t.id}/Agent`)
-    for (const key of new Set([...records, ...runtimes, ...tasks])) {
-      const isolation = this.agents.record(key)?.isolation
-      if (isolation) killSandbox(isolation.control)
-      await this.agents.finish(key)
-      const box = this.pilotSandboxes.get(key)
-      if (box) {
-        await box.close()
-        this.pilotSandboxes.delete(key)
-      }
-    }
-  }
-
-  protected async switchPilot(place: string, mode: 'autopilot' | 'regular', keepWorkers = false, replace = false, harness?: Harness, from?: PilotRun) {
-    if (!this.places.coordinator(place)) throw new Error('No such place.')
-    // a heartbeat edit, a setting or a restart starts coordinator timer again, never by itself: it needs the owner's switch on record
-    if (mode === 'autopilot' && !this.places.switches[place]) throw new Error('coordinator timer was not switched on by the owner: switch it on again.')
-    // coordinator timer asked for again on a failed run is its retry
-    if (!replace && this.places.mode(place) === mode && !(mode === 'autopilot' && this.pilots.current(place)?.state === 'failed')) return
-    await this.pilots.transition(place, async () => {
-      this.agents.pauseDelivery(place, true)
-      try {
-        let next: PilotRun | undefined
-        if (mode === 'autopilot') {
-          const config = this.settings.pilot(this.spaceKey(place))
-          if (harness) config.harness = harness
-          if (!this.places.space(place)) throw new Error('coordinator timer needs a repository space; home spaces are not isolated projects.')
-          await this.pilotRuntime.available()
-          if (!this.engine.installed(config.harness.kind)) throw new Error(`${config.harness.kind} is not installed.`)
-          next = this.pilots.begin(place, config, Date.now(), from)
-        }
-        const old = this.pilots.runs.findLast((r) => r.place === place && r !== next && ['starting', 'on', 'failed'].includes(r.state))
-        if (old) old.state = 'stopping'
-        this.heartbeats.switched(place, false)
-        try {
-          await this.agents.stopTurn(place)
-          const history = recentChat(this.chats.chat(place).messages, 'Coordinator')
-          if (old) {
-            await this.stopPilotAgents(old, keepWorkers && mode === 'regular')
-            old.state = keepWorkers && mode === 'regular' ? 'workers' : 'stopped'
-          }
-          this.places.setMode(place, mode)
-          const to = mode === 'autopilot' ? next!.config.harness : this.settings.harness('coordinator', this.spaceKey(place))
-          await this.coordinator(place, {
-            as: to,
-            restart: async () =>
-              hidden(
-                `Fresh ${mode === 'autopilot' ? 'Coordinator timer' : 'regular'} coordinator. Same chat and saved progress.\n\nRecent chat:\n${history}\n\n${mode === 'autopilot' ? 'Read Heartbeat, inspect Lineclear using its tools, act within the permission profile, and save progress/next step with lineclear progress.' : `coordinator timer is off. Do only what the human asks; do not act on Heartbeat or earlier wakes. Saved progress: ${readJson<Record<string, string>>('autopilot-progress.json', {})[place] ?? '(none)'}. Nothing needs a reply: respond only <no-reply>regular coordinator ready</no-reply>.`}`,
-                'mode',
-              ),
-          })
-          if (next) {
-            next.state = 'on'
-            this.heartbeats.switched(place, true)
-          }
-          this.pilots.save()
-          const id = `mode:${mode}:${Date.now()}`
-          this.chats.post(place, { id, card: modeCard(id, mode) })
-        } catch (e) {
-          if (next) {
-            this.places.setMode(place, 'autopilot')
-            next.state = 'failed'
-            next.error = `coordinator timer did not start: ${(e as Error).message}`
-          }
-          if (old) old.state = 'failed'
-          this.pilots.save()
-          if (next) await this.stopPilotAgents(next, false)
-          await this.agents.finish(place)
-          throw e
-        } finally {
-          this.emit('chat', place)
-          this.emit('snapshot')
-        }
-      } finally {
-        this.agents.pauseDelivery(place, false)
-      }
-    })
   }
 
   /** a slash command you typed: into the CLI as typed, once its turn is over, and no answer to a card or go for a

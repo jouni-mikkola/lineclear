@@ -25,13 +25,12 @@ test("the loop removes temp folders of finished runs older than 2 h and keeps ne
   const other = plant(tmpRoot, "not-ours", 9);
   // live state of the pi extension: its folder's own time does not move when a task writes inside it
   const live = plant(tmpRoot, "lineclear-notes-1000", 9);
-  const gateway = plant(tmpRoot, "shep-pilot-gateway-abc", 9);
   const env = { ...process.env, LINECLEAR_CONFIG: join(dir, "config"), TMPDIR: tmpRoot, XDG_CACHE_HOME: cache };
   const world = { now: () => new Date() } as World;
   const decisions = tick(world, false, env);
   expect(decisions.map((d) => d.reason)).toEqual(["removed 2 temp folders of finished runs older than 2 h"]);
   expect(existsSync(oldInTmp) || existsSync(oldOnDisk)).toBe(false);
-  expect(existsSync(fresh) && existsSync(other) && existsSync(live) && existsSync(gateway)).toBe(true);
+  expect(existsSync(fresh) && existsSync(other) && existsSync(live)).toBe(true);
   // the next tick does not look again
   expect(tick(world, false, env)).toEqual([]);
 });
@@ -58,7 +57,7 @@ test("the sweep ends a server left running from a test folder it removes", async
   }
 });
 
-test("doctor --fix clears lc-test and lc-check folders older than 6 h that no process uses, and only those", async () => {
+test("the stale-folder sweep finds lc-test and lc-check folders older than 6 h that no process uses, and only those", async () => {
   const dir = tmp("stale");
   const names = { oldTest: "lc-test-aaaa", oldCheck: "lc-check-bbbb", inUse: "lc-test-used", fresh: "lc-check-fresh", other: "not-ours" };
   for (const n of Object.values(names)) mkdirSync(join(dir, n));

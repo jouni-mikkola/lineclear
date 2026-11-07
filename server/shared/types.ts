@@ -1,5 +1,4 @@
 export type {
-  Mode,
   Place,
   Section,
   HealthLevel,
@@ -37,7 +36,6 @@ export type {
   Chat,
   RestartCli,
   RestartInfo,
-  TriggerRow,
   SettingSection,
   Alert,
   FolderEntry,
@@ -45,7 +43,7 @@ export type {
   AddSpace,
   TreeFiles,
 } from './types-chat.ts'
-export { apart, doneNewestFirst, modeCard, cardMessage } from './types-chat.ts'
+export { apart, doneNewestFirst, cardMessage } from './types-chat.ts'
 export type {
   FileText,
   DiffFile,

@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { machineMain } from "../src/machines.ts";
@@ -33,8 +33,7 @@ function setup() {
     `${needBun}
 echo "lineclear $*" >> "${log}"
 case "$*" in
-  "doctor --fix --here") echo "Removed the skill $HOME/.pi/agent/skills/lineclear"; touch "$HOME/fixed" ;;
-  doctor) if [ -f "$HOME/fixed" ]; then echo "ok     skills"; else echo "FAILED old install skills removed: old skills"; echo "       fix: lineclear doctor --fix"; exit 1; fi ;;
+  doctor) echo "ok     skills" ;;
 esac`,
   );
   // the remote shell: a bare PATH, as a non-interactive SSH login has
@@ -50,7 +49,7 @@ HOME="${home}" PATH=/usr/bin:/bin exec sh -c "$c"`,
   return { home, log, env, origin };
 }
 
-test("a machine with a bare PATH and no repos ends ready, with the repos cloned and the safe fixes done", async () => {
+test("a machine with a bare PATH and no repos ends ready, with the repos cloned ", async () => {
   const t = setup();
   const out: string[] = [];
   expect(await machineMain(["add", "desktop"], (l) => out.push(l), t.env)).toBe(0);
@@ -61,8 +60,6 @@ test("a machine with a bare PATH and no repos ends ready, with the repos cloned 
       .stdout.toString()
       .trim(),
   ).toBe(t.origin);
-  const log = readFileSync(t.log, "utf8");
-  expect(log.indexOf("doctor --fix --here")).toBeLessThan(log.lastIndexOf("lineclear doctor"));
   expect(out.at(-1)).toBe("desktop is ready: doctor passed there.");
 });
 
