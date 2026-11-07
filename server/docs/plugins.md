@@ -1,6 +1,6 @@
 # Plugins
 
-The base plugins are reactions, artifacts, worktree, health and alerts, in `plugins/<name>/` and named
+The base plugins are reactions, worktree, health and alerts, in `plugins/<name>/` and named
 in [plugins.json](../plugins.json). A task's side panel takes its items from plugins too (Files, Diff and Pull request
 from worktree). A plugin is a `server.ts`.
 

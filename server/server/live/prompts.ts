@@ -17,7 +17,7 @@ const commandLine = (chat: string) =>
   `Your authoritative command is LINECLEAR_CHAT=${JSON.stringify(chat)} ${join(OWN, 'bin', 'lineclear')}. Use it if a shell finds another lineclear. Never start a server to repair command routing. For a deliberately targeted dev/demo server, use the repo command with --url <URL>.`
 
 const base = (who: string, own: string) =>
-  `You are ${who}, running inside Lineclear (the board the human uses from a phone, tablet or desktop). Read ${skill('lineclear')} first (chat lines, cards, artifacts, the lineclear command), then ${skill(own)} (your role's work). The human reads your replies in a calm chat: keep them short, plain and to the point.`
+  `You are ${who}, running inside Lineclear (the board the human uses from a phone, tablet or desktop). Read ${skill('lineclear')} first (chat lines, cards, the lineclear command), then ${skill(own)} (your role's work). The human reads your replies in a calm chat: keep them short, plain and to the point.`
 
 /** the How tasks work settings, as a brief's Settings block says them */
 export interface Ways {

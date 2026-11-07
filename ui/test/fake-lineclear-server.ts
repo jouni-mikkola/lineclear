@@ -13,38 +13,12 @@ type Raw = any;
 export const DISPATCHER_KEY = "p:box:dispatcher";
 export const TASK_KEY = "t:box:WEB-3";
 
-/** What the snapshot adds with `task: true`: a task with an agent chat and two artifacts, one of another task's. */
+/** What the snapshot adds with `task: true`: a task with an agent chat. */
 const TASK_SNAPSHOT = {
   tasks: [{ id: "WEB-3", agent: { chat: TASK_KEY } }],
-  artifacts: [
-    {
-      id: "a1",
-      title: "Cart report",
-      v: 2,
-      at: 2,
-      when: "3m",
-      by: "WEB-3 agent",
-      thumb: true,
-      chats: [TASK_KEY],
-      versions: [
-        { n: 2, when: "3m", by: "WEB-3 agent", note: "Totals fixed", html: 2 },
-        { n: 1, when: "9m", by: "WEB-3 agent", html: 1 },
-      ],
-    },
-    {
-      id: "a2",
-      title: "Other task",
-      v: 1,
-      at: 1,
-      when: "1h",
-      by: "WEB-9 agent",
-      chats: ["t:box:WEB-9"],
-      versions: [{ n: 1, when: "1h", by: "WEB-9 agent", html: 1 }],
-    },
-  ],
 };
 
-/** Lineclear's snapshot: the home space, the Dispatcher's unless `dispatcher` is false, and a task with artifacts for `task`. */
+/** Lineclear's snapshot: the home space, the Dispatcher's unless `dispatcher` is false, and a task for `task`. */
 const snapshotOf = (o: { dispatcher?: boolean; task?: boolean }) => ({
   host: "box",
   places: [
@@ -56,14 +30,6 @@ const snapshotOf = (o: { dispatcher?: boolean; task?: boolean }) => ({
 
 /** The screen the fake terminal sends a watcher. */
 const TERMINAL_FRAME = JSON.stringify({ type: "terminal", chat: TASK_KEY, ansi: "\x1b[32m$\x1b[0m ready", cols: 80, rows: 24 });
-
-/** An artifact's picture or sealed page, as Lineclear serves them. */
-const artifactReply = (url: URL) =>
-  url.pathname.endsWith("/thumb")
-    ? new Response("<svg xmlns='http://www.w3.org/2000/svg'/>", { headers: { "content-type": "image/svg+xml" } })
-    : new Response(`<p>frame v${url.searchParams.get("v")}</p>`, {
-        headers: { "content-type": "text/html", "content-security-policy": "sandbox allow-scripts; frame-ancestors 'self'" },
-      });
 
 /** What the fake Dispatcher says: words, or a card with choices. */
 export type Reply = string | { question: { title: string; choices: string[] } };
@@ -202,7 +168,6 @@ export function startFakeLineclear(
       const url = new URL(req.url);
       if (url.pathname === "/api/ws") return srv.upgrade(req, { data: { watch: false } }) ? undefined : new Response("no", { status: 400 });
       if (url.pathname === "/api/snapshot") return Response.json(snapshotOf(o));
-      if (url.pathname.startsWith("/api/artifacts/")) return artifactReply(url);
       if (url.pathname === "/api/upload" && req.method === "POST") return upload(fake, req);
       if (url.pathname === "/api/file") return fileReply(inbox, url);
       if (url.pathname === "/api/action" && req.method === "POST") return act(fake, (await req.json()) as Raw);

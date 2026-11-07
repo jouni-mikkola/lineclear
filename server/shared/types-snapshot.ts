@@ -1,4 +1,4 @@
-import type { Place, Machine, Task, Artifact, Section } from './types-core.ts'
+import type { Place, Machine, Task, Section } from './types-core.ts'
 import type { SettingSection, Chat } from './types-chat.ts'
 
 /** one file of a task's worktree */
@@ -71,8 +71,6 @@ export interface Snapshot {
   /** the machines, as headings over their spaces, in the sidebar's order */
   machines: Machine[]
   tasks: Task[]
-  /** every artifact, of every machine */
-  artifacts: Artifact[]
   /** open coordinator questions, by place id (a choice card's id, or "blocked" on the CLI's own menu): counted as waiting on you */
   asks: Record<string, string>
   /** Unanswered request IDs by original chat, never forwarded copies. Optional for older machines/plugins. */
@@ -106,14 +104,6 @@ export type Action =
   /** fromAlert: a notification's button, which answers only the card the chat still waits on (an old alert's can't
       answer what came after, or a card already settled in words) */
   | { type: 'answer'; chat: string; question: string; choice: number; choices?: number[]; note?: string; other?: string; fromAlert?: boolean; space?: string }
-  | { type: 'page-send'; chat: string; page: string; text: string }
-  | { type: 'page-note'; chat: string; page: string; note: string; target?: string }
-  /** an artifact's page sent something, you noted on it, or wrote about it in its viewer: to its keeper. By its place,
-      so another machine's goes there */
-  | { type: 'artifact-send'; place: string; artifact: string; v: number; text: string }
-  | { type: 'artifact-note'; place: string; artifact: string; v: number; note: string; target?: string }
-  | { type: 'artifact-say'; place: string; artifact: string; v: number; text: string }
-  | { type: 'artifact-delete'; place: string; artifact: string }
   | { type: 'model'; chat: string; model: string }
   | { type: 'effort'; chat: string; effort: string }
   | { type: 'keys'; chat: string; keys: string[] }

@@ -312,7 +312,6 @@ view still needed lived in Lineclear's UI. Each part gets one word: "Lineclear h
 | Task chat | moves, now `/task/<id>` | Reading what a task's agent says, and answering it, is how you steer a task. It is a per-task page that opens from a token on the line (U58). |
 | Reactions | moves, now on each message of `/task/<id>` | A reaction is the cheapest answer to an agent. It is one tap on a message in the task chat (U58). |
 | Terminal | moves, now `/task/<id>?tab=terminal` | Watching an agent's live screen is the way to see why it is stuck. It is a tab of the task view (U59). |
-| Artifacts | moves, now `/task/<id>?tab=artifacts` | Agents show plans, boards and mock-ups as artifacts. Each version is a card that opens sealed off, full screen (U59). |
 | Worktree | moves, now `/task/<id>?tab=changes` | Review needs a task's diff against its base and its pull request. It is a read only tab of the task view, file by file (U60). |
 | Browser | Lineclear has it | `/browsers` lists every agent's browser, lets you watch one and take it over. |
 | Settings | Lineclear has it | `/settings` has machines, commands and secret names; the order of the models per role and the chat address have a card each. Settings the new product does not have do not move. |

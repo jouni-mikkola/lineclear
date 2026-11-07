@@ -61,8 +61,8 @@ const taskChatRoute: Route = (c, req, url) => {
 };
 
 const taskLiveRoute: Route = (c, req, url) => {
-  const live = new RegExp(`^/api/task/(${ID})(/(?:terminal|artifacts)(?:/.*)?)$`).exec(url.pathname);
-  return live ? taskLiveApi(req, url, live[1] ?? "", live[2] ?? "", c.taskTerminals, ownPage(req, url, c.env), c.env) : undefined;
+  const live = new RegExp(`^/api/task/(${ID})(/terminal(?:/.*)?)$`).exec(url.pathname);
+  return live ? taskLiveApi(req, live[1] ?? "", live[2] ?? "", c.taskTerminals, ownPage(req, url, c.env)) : undefined;
 };
 
 const changesRoute: Route = (c, req, url) => {

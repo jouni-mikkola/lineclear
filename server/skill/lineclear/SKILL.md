@@ -1,6 +1,6 @@
 ---
 name: lineclear
-description: Lineclear's house conventions for every agent it starts, coordinators and task agents alike - the chat lines it sends and reads (reactions, files, answers, replies, artifact notes, the no-reply marker), its own lines in tags, choice cards and plans, artifacts, secrets (API keys, tokens), alerts, and the lineclear command. Use when talking to the human through Lineclear, reading a chat line or a tagged Lineclear line, asking the human something, needing or using a secret, or making or updating an artifact. Not for making, queuing, merging or closing tasks or coordinator timer (lineclear-coordinator), and not for taking one task from brief to merged (lineclear-agent).
+description: Lineclear's house conventions for every agent it starts, coordinators and task agents alike - the chat lines it sends and reads (reactions, files, answers, replies, the no-reply marker), its own lines in tags, choice cards and plans, secrets (API keys, tokens), alerts, and the lineclear command. Use when talking to the human through Lineclear, reading a chat line or a tagged Lineclear line, asking the human something or needing or using a secret. Not for making, queuing, merging or closing tasks or coordinator timer (lineclear-coordinator), and not for taking one task from brief to merged (lineclear-agent).
 ---
 
 # Lineclear
@@ -44,18 +44,12 @@ The human reads your replies in a chat on a phone, tablet or desktop, never this
     <reaction-removed from="Elias" emoji="👍" to="PR #52 is ready to merge"/>
     <attachment from="Elias" name="screenshot.png" path="~/.lineclear/inbox/screenshot.png"/>
     <reaction from="Elias" emoji="👍" file="screenshot.png" path="~/.lineclear/inbox/screenshot.png"/>
-    <reaction from="Elias" emoji="👍" title="Weekly board" artifact="wk3n" version="2"/>
     <answer from="Elias" question="Rerun CI on main?">Rerun it</answer>
     <secret from="Elias" name="GITHUB_TOKEN" for="api"/>
-    <artifact-sent from="Elias" title="Weekly board" artifact="wk3n" version="2">Pinned colour: Accent</artifact-sent>
-    <artifact-comment from="Elias" title="Weekly board" artifact="wk3n" version="2">Make the bars blue</artifact-comment>
-    <artifact-note from="Elias" title="Weekly board" artifact="wk3n" version="2" on="“Send” (button.primary in Board)">Make it say "Save".</artifact-note>
     <reply from="Elias" to="Tests pass on the branch. Want me to merge?">Yes, merge it</reply>
-    <reply from="Elias" to="Weekly board · v2" artifact="wk3n">Make the bars blue</reply>
 
 Double quotes inside a value come as curly ones; words between tags may run over several lines. An attached file is
-on this machine at its path. A reply quotes the start of the message it answers. With `artifact`, a reaction or reply
-is to that artifact's card (its title and version): a reply asking for a change is answered with an update.
+on this machine at its path. A reply quotes the start of the message it answers.
 
 ### Chat lines you write
 
@@ -82,38 +76,6 @@ when unsure; unmarked cards keep pick-then-Send. `--multi` always keeps Send.
 `--other` allows a typed answer, `--multi` several picks, `--desc "<choice>=<one line>"` explains a choice. A plan for
 the human's yes is `lineclear plan <id> --step "…" --step "…"`, then end your turn.
 
-### Artifacts
-
-Anything richer than text (a report, a dashboard, a deck, a draft screen, a small app) is an artifact: one
-self-contained HTML file and an optional JSON data file. It shows in the chat as a card, opens full screen on a tap,
-and stays in its space's Artifacts list. Don't describe it in your reply: the human sees it.
-
-    lineclear artifact new board.html --title "Weekly board" [--data board.json]
-    lineclear artifact update wk3n [board.html] [--data board.json] [--note "bars by week"]
-
-- **Checked.** Each version is opened at phone width, light and dark; a script error or anything it tries to load
-  refuses it with the list; media too big for phone width is named, not refused: fix it. It prints pictures: look at
-  them. `lineclear artifact check <file>` checks without showing.
-- **Sealed.** No network and no app: styles, scripts, fonts and pictures all inline. `<img src="/abs/path.png">` on
-  this machine goes in for you. At most 2 MB. Web links open in a new tab.
-- **Update, don't repeat.** A change is a new version of the same artifact; any agent here may update any artifact
-  (`lineclear artifact list`, `lineclear artifact show <id>`).
-- **Data.** `window.lineclear.data` holds the JSON. An update with only `--data` redraws open views without a reload:
-  draw again on `document.addEventListener('lineclear:data', e => draw(e.detail))`.
-- **Looks.** It sits on Lineclear's background and font: no page background, outer card or frame of your own. Colours:
-  `--bg --fg --fg2 --fg3 --line --line2 --well --bubble --accent --need --ready --work`, `--chart-1` to `--chart-5`.
-  `<html>` has `lineclear-dark` or `lineclear-light` (the human's pick; style your own dark colours under
-  `.lineclear-dark`), `full` when full screen and `phone` on a phone. Pictures, videos, canvases and SVGs fit by
-  themselves unless you size them. The body has 12px padding (`body{padding:0}` to reach the edges). In the chat it is
-  as tall as its content, up to most of the screen: never `100vh`. Size charts in px.
-- **Fixed-size designs.** A slide, poster or card says its size, `<meta name="lineclear-size" content="1200x630">`:
-  laid out at that size and scaled to fit whole; a deck of them shows one slide at a time.
-- **Act.** A form's submit sends its fields to the artifact's keeper as one `<artifact-sent>` line;
-  `window.lineclear.send(text)` sends any text. Both only right after the human tapped or typed in it, at most once
-  every two seconds (`lineclear.sent`, the `lineclear:sent` event). The keeper is the agent that made the latest
-  version, or its space's coordinator once that task is over.
-- **Talk back.** `<artifact-comment>` and `<artifact-note>` name the version the human saw: answer with an update.
-
 ### Secrets
 
 API keys, tokens and passwords are the human's secrets: use them by name, never by value.
@@ -136,7 +98,7 @@ API keys, tokens and passwords are the human's secrets: use them by name, never 
   words need it, let that command's own shell read it, in single quotes:
   `lineclear secret run API_KEY -- sh -c 'curl -H "Authorization: Bearer $API_KEY" …'`. A tool that needs a
   file gets `secret env` (refused unless git ignores the file). Never print, echo, log, commit or write a secret
-  anywhere else, never put it in a command's words, a brief, an artifact or a chat, and keep `set -x` and verbose flags
+  anywhere else, never put it in a command's words, a brief or a chat, and keep `set -x` and verbose flags
   off where one goes by.
 - **Name it plainly**, as its tool expects (`OPENAI_API_KEY`). The human adds, replaces and removes them in Settings →
   Secrets, Everywhere, for a machine or for a space; the most specific one wins.
@@ -154,7 +116,7 @@ checkout.
 
 ## Outputs
 
-Short, plain replies in the chat; cards, plans, artifacts and alerts through the `lineclear` command.
+Short, plain replies in the chat; cards, plans and alerts through the `lineclear` command.
 
 ## Exceptions
 

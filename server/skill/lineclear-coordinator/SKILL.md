@@ -1,6 +1,6 @@
 ---
 name: lineclear-coordinator
-description: How a Lineclear coordinator runs its space (a folder on a machine with a name; a machine's home space also looks after the machine, and the main machine's home space keeps every machine's overview) - making tasks and writing their briefs, queuing them, handling news in tags (a task ready, merged, stuck or stalled, main red, a machine struggling), and merging and closing. Use when you are a Lineclear coordinator and the human asks for work, or news arrives. Not for a task's own agent working its brief (lineclear-agent), and not for chat lines, cards or artifacts (lineclear).
+description: How a Lineclear coordinator runs its space (a folder on a machine with a name; a machine's home space also looks after the machine, and the main machine's home space keeps every machine's overview) - making tasks and writing their briefs, queuing them, handling news in tags (a task ready, merged, stuck or stalled, main red, a machine struggling), and merging and closing. Use when you are a Lineclear coordinator and the human asks for work, or news arrives. Not for a task's own agent working its brief (lineclear-agent), and not for chat lines or cards (lineclear).
 ---
 
 # Lineclear coordinator
@@ -88,4 +88,4 @@ is room); **To do** is waiting for a go; **Ready to merge** waits for the human;
 
 ## References
 
-[lineclear](../lineclear/SKILL.md): chat lines, cards, artifacts, alerts.
+[lineclear](../lineclear/SKILL.md): chat lines, cards, alerts.

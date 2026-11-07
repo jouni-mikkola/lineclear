@@ -1,14 +1,12 @@
 import { taskIdsSection } from './task-ids.ts'
 import { coordinatorRequestIds } from '../../shared/attention.ts'
-import { age } from '../../shared/time.ts'
 import { randomUUID } from 'node:crypto'
 import { BODY_MAX, clip, lastReply, openCards, TITLE_MAX } from '../../shared/alerts.ts'
-import type { Action, Alert, Artifact, CardAsk, Chat, Question, Snapshot } from '../../shared/types.ts'
+import type { Action, Alert, CardAsk, Chat, Question, Snapshot } from '../../shared/types.ts'
 import { hidden } from './agents.ts'
 import { excerpt, line } from './chatlines.ts'
 import { rememberReply } from './chats.ts'
 import { ended } from './engine/engine.ts'
-import type { ArtifactRec } from './artifacts.ts'
 import { BOX } from './box.ts'
 import { HOST, NAME, placeId } from './places.ts'
 import { restartHint, type Harness } from './restart.ts'
@@ -157,9 +155,6 @@ export class LiveSourceViews extends LiveSourceState {
         ...this.engine.tasks.filter((t) => this.places.space(t.project)).map((t) => this.engine.view(t)),
         ...peers.flatMap((l) => this.peers!.tasksOf(l)),
       ],
-      artifacts: [...Object.values(this.artifacts.list).map((a) => this.artifactView(a)), ...peers.flatMap((l) => l.snap?.artifacts ?? [])].sort(
-        (a, b) => b.at - a.at,
-      ),
       asks,
       attentionRequests,
       last: Object.assign({}, ...peers.map((l) => l.snap?.last ?? {}), this.unread.last),
@@ -324,42 +319,6 @@ export class LiveSourceViews extends LiveSourceState {
     )
   }
 
-  /* ---------- artifacts ---------- */
-
-  protected artifactView(a: ArtifactRec): Artifact {
-    const last = this.artifacts.latest(a)
-    return {
-      id: a.id,
-      title: a.title,
-      place: a.place,
-      at: last.at,
-      v: last.n,
-      when: age(last.at),
-      by: last.by,
-      keeper: this.chatName(this.keeperOf(a)),
-      thumb: a.thumb,
-      chats: [...new Set(a.versions.flatMap((v) => (v.chat ? [v.chat] : [])))],
-      versions: [...a.versions].reverse().map((v) => ({
-        n: v.n,
-        when: age(v.at),
-        by: v.by,
-        note: v.note,
-        html: v.html,
-        what: v.html === v.n ? undefined : v.data === v.n ? ('data' as const) : ('title' as const),
-      })),
-    }
-  }
-
-  /** who hears from an artifact: the agent that made its latest version, while it has a task to come back to; its
-   *  place's coordinator after that (or when it came from a terminal) */
-  protected keeperOf(a: ArtifactRec) {
-    const chat = this.artifacts.latest(a).chat
-    if (!chat) return a.place
-    if (!chat.includes('/')) return chat
-    const t = this.engine.task(chat.split('/')[0])
-    return t && !ended(t) ? chat : a.place
-  }
-
   /** a coordinator (its place id) or a task's agent (ID/Agent) restarted: its role and space, what it runs on, what
    *  Settings say for it now and what Settings said when it last started on them */
   protected restartable(key: string) {
@@ -423,10 +382,9 @@ export class LiveSourceViews extends LiveSourceState {
   protected replying(key: string, text: string, reply?: string) {
     if (!reply) return text
     const m = this.chats.chat(key).messages.find((x) => x.id === reply)
-    const art = !m?.text && m?.artifact && this.artifacts.get(m.artifact.id)
     const quoted = m?.text ?? m?.file?.name
-    if (!quoted && !art) return text
-    const l = art ? line.replyArtifact(this.user, line.artifact(art.title, art.id, m.artifact!.v), text) : line.reply(this.user, quoted!, text)
+    if (!quoted) return text
+    const l = line.reply(this.user, quoted, text)
     rememberReply(l, reply)
     return l
   }

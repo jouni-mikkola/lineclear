@@ -173,15 +173,6 @@ Secrets (API keys, tokens, passwords: used by name, never seen or printed)
                                                  for the human: keep one (its value on stdin) or remove it, Everywhere
                                                  (none), for this machine or one space; the most specific one wins
 
-Artifacts (one self-contained HTML file, optional JSON data; checked at phone width, then shown in your chat)
-  lineclear artifact new <file.html> --title "<title>" [--data <file.json>] [--space NAME]
-  lineclear artifact update <id> [<file.html>] [--data <file.json>] [--title "<title>"] [--note "<what changed>"]
-                                                 a new version of the same one; --data alone changes only its data
-  lineclear artifact check <file.html> [--data <file.json>]   pictures and errors, without showing it
-  lineclear artifact list [--space NAME]
-  lineclear artifact show <id>                   its versions and the files of its latest, to edit
-  lineclear artifact rm <id>
-
 Settings
   lineclear show [--space NAME]                the app's few settings (how tasks work, each agent's CLI, model and
                                                  effort, auto-archive, the time zone, this machine's

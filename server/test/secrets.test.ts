@@ -1,7 +1,7 @@
 // Agents' secrets: kept at a level (Everywhere, a machine, a space) in a file only you can read, picked most specific
 // first, asked for with a masked card, and never in a snapshot, a chat or the command's printed answer.
 import { afterAll, describe, expect, test } from 'bun:test'
-import { mkdtempSync, readFileSync, statSync, symlinkSync, mkdirSync, copyFileSync, unlinkSync } from 'node:fs'
+import { mkdtempSync, readFileSync, statSync, mkdirSync, copyFileSync, unlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawn } from 'node:child_process'
@@ -254,15 +254,6 @@ describe('the lineclear secret command', () => {
       socket.stop(true)
       server.stop(true)
     }
-  })
-
-  test('artifact imports cannot publish vaults or credentials, even through links', async () => {
-    const { Artifacts } = await import('../server/live/artifacts.ts')
-    const dir = mkdtempSync(join(tmpdir(), 'shep-import-'))
-    const vault = join(process.env.LINECLEAR_HOME!, 'vault.json')
-    symlinkSync(vault, join(dir, 'innocent.json'))
-    expect(() => Artifacts.read(undefined, vault, dir)).toThrow('Private Lineclear')
-    expect(() => Artifacts.read(undefined, 'innocent.json', dir)).toThrow('Private Lineclear')
   })
 
   test('the human sets and removes one from a terminal, its value on stdin', async () => {

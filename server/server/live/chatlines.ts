@@ -5,14 +5,9 @@
 //   <reaction from="Elias" emoji="👍" to="PR #52 is ready to merge"/>
 //   <reaction-removed from="Elias" emoji="👍" to="PR #52 is ready to merge"/>
 //   <reaction from="Elias" emoji="👍" file="screenshot.png" path="~/inbox/screenshot.png"/>   (a file: by its path)
-//   <reaction from="Elias" emoji="👍" title="Weekly board" artifact="wk3n" version="2"/>   (an artifact card)
 //   <attachment from="Elias" name="screenshot.png" path="~/inbox/screenshot.png"/>
 //   <answer from="Elias" question="Rerun CI on main?">Rerun it</answer>
-//   <artifact-sent from="Elias" title="Weekly board" artifact="wk3n" version="2">Pinned colour: Accent</artifact-sent>
-//   <artifact-comment from="Elias" title="Weekly board" artifact="wk3n" version="2">Make the bars blue</artifact-comment>
-//   <artifact-note from="Elias" title="Weekly board" artifact="wk3n" version="2" on="“Send” (button.primary in Board)">Make it say “Send event”.</artifact-note>
 //   <reply from="Elias" to="Tests pass on the branch">Merge it then</reply>     (the start of the message it answers)
-//   <reply from="Elias" to="Weekly board · v2" artifact="wk3n">Bars in blue</reply>     (an artifact card)
 //   agent → <react emoji="👀" to="What needs me today?"/>   or   <react emoji="👀" file="screenshot.png" path="~/inbox/screenshot.png"/>
 //   agent → <reply to="What needs me today?"/>      a line of its own, then its reply
 //   agent → <no-reply>SHE-72 merged, nothing to do</no-reply>   a reply that is only this shows nothing (news with nothing to say)
@@ -21,7 +16,6 @@
 // [square bracket] lines still read back, from agents started before the change and from old chat logs.
 
 import { excerpt } from '../../shared/excerpt.ts'
-import { artifactQuote, type ArtifactPost } from '../../shared/types.ts'
 
 export { excerpt }
 
@@ -41,42 +35,26 @@ export function tag(name: string, attrs: Record<string, string | number | undefi
   return body === undefined ? `<${name}${a}/>` : `<${name}${a}>${body}</${name}>`
 }
 
-/** an artifact by its title, id and the version shown, so its keeper knows what to update */
-type Art = { title: string; artifact: string; version: number }
-
 export const line = {
   react: (user: string, emoji: string, text: string) => tag('reaction', { from: user, emoji, to: excerpt(text) }),
   unreact: (user: string, emoji: string, text: string) => tag('reaction-removed', { from: user, emoji, to: excerpt(text) }),
   /** a file by its path, which no other file has: two files may share a name */
   reactFile: (user: string, emoji: string, name: string, path: string) => tag('reaction', { from: user, emoji, file: name, path }),
   unreactFile: (user: string, emoji: string, name: string, path: string) => tag('reaction-removed', { from: user, emoji, file: name, path }),
-  reactArtifact: (user: string, emoji: string, art: Art) => tag('reaction', { from: user, emoji, ...art }),
-  unreactArtifact: (user: string, emoji: string, art: Art) => tag('reaction-removed', { from: user, emoji, ...art }),
   attach: (user: string, name: string, path: string) => tag('attachment', { from: user, name, path }),
   answer: (user: string, title: string, answer: string) => tag('answer', { from: user, question: title }, answer),
   /** a secret you gave, by its name and where it is kept: never its value */
   secret: (user: string, name: string, where: string) => tag('secret', { from: user, name, for: where }),
-  artifact: (title: string, id: string, v: number): Art => ({ title, artifact: id, version: v }),
-  artifactSend: (user: string, art: Art, text: string) => tag('artifact-sent', { from: user, ...art }, text),
-  artifactSay: (user: string, art: Art, text: string) => tag('artifact-comment', { from: user, ...art }, text),
-  /** a note on the artifact, or on one element of it (`on`: its words and where it is) */
-  note: (user: string, art: Art, on: string | undefined, note: string) => tag('artifact-note', { from: user, ...art, on }, note),
   /** your words in reply to a message (a file by its name): the words may run over several lines */
   reply: (user: string, quoted: string, text: string) => tag('reply', { from: user, to: excerpt(quoted) }, text),
-  /** your words in reply to an artifact's card: by its title and version, and its id */
-  replyArtifact: (user: string, art: Art, text: string) =>
-    tag('reply', { from: user, to: artifactQuote(art.title, art.version), artifact: art.artifact }, text),
 }
 
 export type Parsed =
-  | { kind: 'react'; emoji: string; to: string; path?: string; artifact?: ArtifactPost }
-  | { kind: 'unreact'; emoji: string; to: string; path?: string; artifact?: ArtifactPost }
+  | { kind: 'react'; emoji: string; to: string; path?: string }
+  | { kind: 'unreact'; emoji: string; to: string; path?: string }
   | { kind: 'attach'; name: string; path: string }
   | { kind: 'answer'; title: string; answer: string }
   | { kind: 'secret'; name: string; where: string }
-  | { kind: 'artifact-send'; title: string; text: string }
-  | { kind: 'artifact-say'; title: string; text: string }
-  | { kind: 'note'; target: string; note: string }
 
 /** a whole tag on its own: <name a="…"/> or <name a="…">words</name>; a value may hold a stray " (one an agent quoted
  *  by hand) */
@@ -88,13 +66,8 @@ function tagOf(s: string): { name: string; a: Record<string, string>; body?: str
   return { name: m[1], a, body: m[3] }
 }
 
-/** a reaction's quote: a message's start, a file by its name and path, or an artifact's card by its id and version */
-const quoteOf = (a: Record<string, string>) =>
-  a.artifact && a.version
-    ? { to: a.title ?? '', artifact: { id: a.artifact, v: Number(a.version) } }
-    : a.path
-      ? { to: a.file ?? a.to ?? '', path: a.path }
-      : { to: a.to ?? a.file ?? '' }
+/** a reaction's quote: a message's start, or a file by its name and path */
+const quoteOf = (a: Record<string, string>) => (a.path ? { to: a.file ?? a.to ?? '', path: a.path } : { to: a.to ?? a.file ?? '' })
 
 /** the [square bracket] lines from before tags: still read back, from old chat logs and agents started before */
 const OLD = {
@@ -104,9 +77,6 @@ const OLD = {
   unreactFile: /^\[(.+?) removed (\S+) from ([^":]+?): (.+)\]$/u,
   attach: /^\[(.+?) attached (.+?): (.+)\]$/u,
   answer: /^\[(.+?) answered "(.*?)": ([\s\S]*)\]$/u,
-  artifactSend: /^\[(.+?) sent from "(.*?)"(?: \(artifact [\w-]+ v\d+\))?: ([\s\S]*)\]$/u,
-  artifactSay: /^\[(.+?) wrote about "(.*?)" \(artifact [\w-]+ v\d+\): ([\s\S]*)\]$/u,
-  note: /^\[(.+?) noted on (.*?): ([\s\S]*)\]$/u,
   reply: /^\[(.+?) replied to "(.*?)": ([\s\S]*)\]$/u,
   agentReact: /^\[react (\S+) to "(.*)"\]$/u,
   agentReply: /^\[reply to "(.*)"\]$/u,
@@ -125,9 +95,6 @@ export function parseUserLine(l: string): Parsed | null {
     if (t.name === 'attachment' && a.path) return { kind: 'attach', name: a.name ?? a.path.split('/').pop()!, path: a.path }
     if (t.name === 'answer') return { kind: 'answer', title: a.question ?? '', answer: body }
     if (t.name === 'secret' && a.name) return { kind: 'secret', name: a.name, where: a.for ?? '' }
-    if (t.name === 'artifact-sent') return { kind: 'artifact-send', title: a.title ?? '', text: body }
-    if (t.name === 'artifact-comment') return { kind: 'artifact-say', title: a.title ?? '', text: body }
-    if (t.name === 'artifact-note') return { kind: 'note', target: a.on ? `${a.on} in "${a.title ?? ''}"` : `"${a.title ?? ''}"`, note: body }
     return null
   }
   let m: RegExpMatchArray | null
@@ -136,15 +103,12 @@ export function parseUserLine(l: string): Parsed | null {
   if ((m = s.match(OLD.reactFile))) return { kind: 'react', emoji: m[2], to: m[3], path: m[4] }
   if ((m = s.match(OLD.unreactFile))) return { kind: 'unreact', emoji: m[2], to: m[3], path: m[4] }
   if ((m = s.match(OLD.answer))) return { kind: 'answer', title: m[2], answer: m[3] }
-  if ((m = s.match(OLD.artifactSend))) return { kind: 'artifact-send', title: m[2], text: m[3] }
-  if ((m = s.match(OLD.artifactSay))) return { kind: 'artifact-say', title: m[2], text: m[3] }
-  if ((m = s.match(OLD.note))) return { kind: 'note', target: m[2], note: m[3] }
   if ((m = s.match(OLD.attach))) return { kind: 'attach', name: m[2], path: m[3] }
   return null
 }
 
 /** the tags whose words may run over several lines */
-const LONG = /^<(answer|artifact-sent|artifact-comment|artifact-note|reply)[\s>]/
+const LONG = /^<(answer|reply)[\s>]/
 
 /** what you sent, line by line, a tag whose words run over several lines kept whole */
 export function userLines(text: string): string[] {
@@ -180,14 +144,11 @@ function withFiles(text: string) {
 }
 
 /** your reply to a message, read back from the log: the reply line, then any files that came with it */
-export function parseReply(text: string): { to: string; text: string; rest: string[]; line: string; artifact?: string } | null {
+export function parseReply(text: string): { to: string; text: string; rest: string[]; line: string } | null {
   // files go on lines of their own after the words
   const { head: line, rest } = withFiles(text)
   const t = line.startsWith('<') ? tagOf(line) : null
-  if (t)
-    return t.name === 'reply' && t.a.from !== undefined
-      ? { to: t.a.to ?? t.a.file ?? '', text: (t.body ?? '').trim(), rest, line, ...(t.a.artifact ? { artifact: t.a.artifact } : {}) }
-      : null
+  if (t) return t.name === 'reply' && t.a.from !== undefined ? { to: t.a.to ?? t.a.file ?? '', text: (t.body ?? '').trim(), rest, line } : null
   const m = line.match(OLD.reply)
   return m ? { to: m[2], text: m[3].trim(), rest, line } : null
 }

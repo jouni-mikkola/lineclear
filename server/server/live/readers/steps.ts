@@ -156,10 +156,6 @@ export function commandSay(cmd: string): Said {
         'task new': 'Make a task',
         'task tell': 'Tell a task',
         'task queue': 'Queue a task',
-        'artifact new': 'Share an artifact',
-        'artifact update': 'Update an artifact',
-        'artifact check': 'Check an artifact',
-        'artifact list': 'List the artifacts',
       }
       const S1: Record<string, string> = {
         status: 'Report how far it got',
@@ -359,8 +355,6 @@ export function claudeStep(name: string, input: Json): Said | undefined {
       return { step: 'other', ...words(`Use the ${short(i.skill ?? i.command, 40)} skill`) }
     case 'TodoWrite':
       return { step: 'other', ...words('Update the to-do list') }
-    case 'Artifact':
-      return { step: 'other', ...words(i.action === 'read' ? 'Read an artifact' : 'Publish an artifact') }
   }
   // an MCP server's tool, or one it doesn't know: its own name in words
   return { step: 'other', ...words(`Use ${toolWords(name)}`) }

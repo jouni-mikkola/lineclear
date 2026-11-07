@@ -37,10 +37,6 @@ export interface Source extends Emitter<SourceEvents> {
   chatStatus?(key: string): string
   chat(key: string): Chat | undefined
   act(a: Action): Promise<unknown>
-  /** an artifact's page, data and what it sent, at a version (its latest when none) */
-  artifact(id: string, v?: number): Promise<{ html: string; data?: unknown; sent?: string } | undefined>
-  /** the check's picture of an artifact's latest version, for the list */
-  artifactThumb(id: string, dark: boolean): Promise<Blob | null>
   /** which chats and terminal are on someone's screen: read them while they are */
   watch(chats: string[], terms: string[]): void
   upload(chat: string, name: string, data: Uint8Array): Promise<string>

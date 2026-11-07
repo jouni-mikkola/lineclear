@@ -49,7 +49,7 @@ export interface Place {
   machine: string
   /** the machine's home space */
   home?: boolean
-  /** what its Tasks and Artifacts list: 2 its own; 1 its machine's (a home space); 0 every machine's (the main
+  /** what its Tasks list: 2 its own; 1 its machine's (a home space); 0 every machine's (the main
    *  machine's home space, where there are more machines) */
   level: 0 | 1 | 2
   status: Status
@@ -284,50 +284,6 @@ export interface Question {
   elsewhere?: { label: string; chat: string; name: string }
 }
 
-interface ArtifactVersion {
-  n: number
-  when: string
-  by: string
-  note?: string
-  /** the version whose HTML it shows: one that only brought new data shows the HTML before it */
-  html: number
-  /** what it brought, when not a new page: only data, or only a title */
-  what?: 'data' | 'title'
-}
-
-/** an artifact: what an agent shows beyond words, kept in its place and updated as new versions */
-export interface Artifact {
-  id: string
-  title: string
-  /** the place it lives in */
-  place: string
-  /** its latest version, and when that came (ms) */
-  v: number
-  at: number
-  /** when that came, short ("2m"), and who made it ("SHE-56 agent") */
-  when: string
-  by: string
-  /** who its Send, notes and messages go to: the agent that made the latest version, or the place's coordinator once
-   *  that agent's task is over */
-  keeper: string
-  /** the check's picture of it, for the list */
-  thumb?: boolean
-  /** the chats its kept versions came from (a chat's ⋯ → Artifacts) */
-  chats?: string[]
-  /** newest first */
-  versions: ArtifactVersion[]
-}
-
-/** an artifact as posted in a chat: the version it came with. A message of its own (words posted with it come just
- *  before it), so it takes reactions and replies like any message */
-export interface ArtifactPost {
-  id: string
-  v: number
-}
-
-/** how a reaction or a reply names an artifact: its title and the version posted ("Weekly board · v2") */
-export const artifactQuote = (title: string, v: number) => `${title} · v${v}`
-
 export interface Reaction {
   emoji: string
   by: 'me' | 'them' | 'both'
@@ -340,10 +296,9 @@ export interface ReplyQuote {
   /** none when that message is no longer in the chat (only the quote is known) */
   id?: string
   who?: 'you' | 'agent'
-  /** the start of its words, a file's name, or an artifact's title and version */
+  /** the start of its words, or a file's name */
   text: string
   file?: boolean
-  artifact?: boolean
 }
 
 /** what a needs-you card asks, from its task's chat: its question cards, or the agent's plain question */

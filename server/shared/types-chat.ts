@@ -1,4 +1,4 @@
-import type { Question, ArtifactPost, Reaction, ReplyQuote, UpdateCard, Task } from './types-core.ts'
+import type { Question, Reaction, ReplyQuote, UpdateCard, Task } from './types-core.ts'
 
 /** what kind of step a tool call is, for its icon and its row */
 export type StepKind = 'run' | 'read' | 'edit' | 'search' | 'web' | 'agent' | 'other'
@@ -94,7 +94,6 @@ export interface Message {
   answered?: string
   /** answered on the question's copy in a space's chat: a link there */
   elsewhere?: Question['elsewhere']
-  artifact?: ArtifactPost
   question?: Question
   reactions?: Reaction[]
   /** waits to go in: the agent shows a menu or permission prompt, or is still starting (a busy one takes it at once) */
@@ -119,22 +118,6 @@ export interface Message {
   secret?: SecretAsk
   at?: number
 }
-
-/** an artifact posted with words becomes a message of its own right after them, as a file does; a question that came
- *  with it goes after it, the last thing the chat waits on */
-export const apart = (msgs: Message[]): Message[] =>
-  msgs.flatMap((m) => {
-    if (!m.artifact || !(m.text || m.question || m.file)) return [m]
-    const { artifact, question, ...words } = m
-    const card = { id: `${m.id}:art`, who: m.who, at: m.at, artifact }
-    if (!question) return [words, card]
-    return words.text || words.file
-      ? [words, card, { id: `${m.id}:q`, who: m.who, at: m.at, question }]
-      : [
-          { ...card, id: m.id },
-          { id: `${m.id}:q`, who: m.who, at: m.at, question },
-        ]
-  })
 
 /** Work an agent started in the background that still runs */
 export interface Job {

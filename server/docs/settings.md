@@ -8,7 +8,7 @@
   taking it its own way) and tasks' backup agent, when Done tasks archive themselves, the time zone of every schedule, each machine's limits, Notifications and Voice. Notifications gathers scoped delivery rules and device enrolment; device delivery is Everywhere. Space menus still offer Notify. Its
   defaults are set Everywhere, for a machine or for a space (`lineclear set <key> <value> [--machine | --space NAME]`, from any machine);
   the most specific one set wins. Editing above the content names the scope; its searchable hierarchy handles many machines and spaces. Values set here are highlighted, with their inherited value, source and Reset beside them. And, kept on each device, its Appearance: System (the device's own light
-  or dark), Light or Dark, set before the first paint, with the browser's bar and artifacts following it. A phone
+  or dark), Light or Dark, set before the first paint, with the browser's bar following it. A phone
   lists the sections in groups, as iOS's Settings does, and opens one over the list; a wider screen keeps the list
   down its side.
 - Secrets (How Lineclear runs) holds the keys, tokens and passwords agents use, by name: add, replace and remove them

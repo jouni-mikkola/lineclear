@@ -49,7 +49,6 @@ const BOARD_COMMANDS = [
   "ready",
   "merge",
   "pr",
-  "artifact",
   "secret",
   "checks",
   "alert",

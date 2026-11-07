@@ -1,9 +1,9 @@
-// The UI bar on a task's terminal, artifacts and changes (`/task/<id>?tab=`), served by `lineclear run`. The pictures use the
+// The UI bar on a task's terminal and changes (`/task/<id>?tab=`), served by `lineclear run`. The pictures use the
 // sample states (`?state=`).
 import { expect, test } from "@playwright/test";
 import { PAGE_STATES } from "./bar.ts";
 
-for (const tab of ["terminal", "artifacts", "changes"]) {
+for (const tab of ["terminal", "changes"]) {
   test(`a task's ${tab} in every state, at this width`, async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     for (const state of PAGE_STATES) {
@@ -28,16 +28,6 @@ test("the terminal takes words and keys, and the tab stays in the address", asyn
   await expect(page).not.toHaveURL(/tab=/);
 });
 
-test("an artifact opens full screen in a sealed frame and closes", async ({ page }) => {
-  await page.goto("/task/WEB-3?tab=artifacts&state=filled");
-  await page.locator("[data-artifact]").first().click();
-  const frame = page.locator("[data-artifact-full] iframe");
-  await expect(frame).toBeVisible();
-  await expect(frame).toHaveAttribute("sandbox", "allow-scripts allow-forms");
-  await page.getByRole("button", { name: "Close" }).click();
-  await expect(frame).toHaveCount(0);
-});
-
 test("the changes open file by file and link to the pull request", async ({ page }) => {
   await page.goto("/task/WEB-3?tab=changes&state=filled");
   await expect(page.locator("[data-pr]")).toHaveAttribute("href", /pull\/52$/);
@@ -51,7 +41,7 @@ test("keys pick a task's tab", async ({ page }) => {
   await page.goto("/task/WEB-3?state=filled");
   await page.waitForSelector("[data-task-tabs]");
   await expect(async () => {
-    await page.keyboard.press("4");
+    await page.keyboard.press("3");
     await expect(page).toHaveURL(/tab=changes/, { timeout: 300 });
   }).toPass();
   await page.keyboard.press("1");
@@ -77,6 +67,6 @@ test("a tab pick fades in, and nothing moves under reduced motion", async ({ pag
   await page.emulateMedia({ reducedMotion: "reduce" });
   const before = seen.length;
   await page.keyboard.press("3");
-  await expect(page.locator('[data-task-live="artifacts"]')).toBeVisible();
+  await expect(page.locator('[data-task-live="changes"]')).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { __fades: string[] }).__fades.length)).toBe(before);
 });

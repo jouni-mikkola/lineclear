@@ -4,18 +4,14 @@ import { join } from 'node:path'
 import { taskAlert } from '../../shared/alerts.ts'
 import { age } from '../../shared/time.ts'
 import { doneNewestFirst, type RestartInfo } from '../../shared/types.ts'
-import { HOME } from '../store.ts'
 import { one, summaryOpts, type Parsed } from './args.ts'
 import { checkTitle, type TaskRec } from './engine/engine.ts'
 import { validateBase } from './engine/git.ts'
 import { checkResult } from './engine/result.ts'
-import { Artifacts, type ArtifactRec } from './artifacts.ts'
 import { BOX, machineRef, noTasks, runOn } from './box.ts'
-import * as task from './mfs.ts'
-import { NAME, placeId } from './places.ts'
+import { placeId } from './places.ts'
 import { CLI_NAME, CLIS, kindOf, setForTask } from './settings.ts'
 import { SECRET_NAME } from './secrets.ts'
-import { has } from '../plugins.ts'
 import { statusLine, harnessOf, reviewerOf, fit, taskAddArgs } from './source-helpers.ts'
 import { LiveSourceActions } from './source-actions.ts'
 
@@ -94,131 +90,6 @@ export class LiveSourceSubcommands extends LiveSourceActions {
     throw new Error(
       'lineclear secret list | ask NAME --why "…" | run NAME … -- <command> | env NAME … [--file .env] | set NAME [--machine | --space NAME] | rm NAME [--machine | --space NAME]',
     )
-  }
-
-  /** where an artifact made here lives: the task's space, the coordinator's own space, the space you are in, else the
-   *  home space */
-  protected artifactPlace(p: Parsed, ctx: { chat?: string; cwd?: string }) {
-    if (one(p, 'space')) return placeId.space(this.projectFor(p, ctx).name)
-    if (ctx.chat?.includes('/')) return this.engine.task(ctx.chat.split('/')[0])?.project ?? placeId.home()
-    if (ctx.chat) return ctx.chat
-    const here = ctx.cwd ? this.places.forPath(ctx.cwd) : undefined
-    return here ? placeId.space(here.name) : placeId.home()
-  }
-
-  /** opens it at phone width, light and dark; refuses it when its scripts break or it reaches for the network */
-  protected async checkArtifact(html: string, data: unknown, missing: string[]) {
-    const c = await this.checker(html, data)
-    const errors = [...missing.map((m) => `no picture at ${m} (or it isn't one under 1 MB)`), ...c.errors]
-    // the pictures are taken here, on the main machine: an agent on another machine gets copies on its own
-    let shots = c.shots
-    // and never the main machine's own error, which names its paths
-    let skipped = c.skipped && BOX ? 'the main machine could not open its browser (lineclear doctor there says why)' : c.skipped
-    try {
-      if (shots) shots = { light: task.forAgent(shots.light, 'checks'), dark: task.forAgent(shots.dark, 'checks') }
-    } catch (e) {
-      shots = undefined
-      skipped = `they could not be copied to ${NAME} (${(e as Error).message})`
-    }
-    const pics = shots ? `Pictures at phone width: ${shots.light} (dark: ${shots.dark}). Look at them.` : `No pictures: ${skipped ?? 'no browser here'}.`
-    const warn = c.warnings.length ? `\nIt logged: ${c.warnings.join(' · ')}` : ''
-    const media = c.media?.length
-      ? `\nDoesn't fit at phone width (cut off, or it scrolls): ${c.media.join(' · ')}. Drop its fixed width or height: the frame fits media by itself.`
-      : ''
-    return {
-      ok: !errors.length,
-      c,
-      report: errors.length ? `Problems:\n- ${errors.join('\n- ')}\n${pics}${warn}${media}` : `No errors. ${pics}${warn}${media}`,
-    }
-  }
-
-  protected async artifactCommand(sub: string | undefined, rest: string[], p: Parsed, ctx: { chat?: string; cwd?: string }): Promise<string> {
-    if (!has('artifacts')) throw new Error('Artifacts are not in the plugin list')
-    const cwd = ctx.cwd ?? HOME
-    const by = ctx.chat ? this.chatName(ctx.chat) : this.user
-    const post = (a: ArtifactRec, n: number) => {
-      if (!ctx.chat) return
-      this.chats.post(ctx.chat, { id: `artifact:${a.id}:${n}`, artifact: { id: a.id, v: n } })
-      this.emit('chat', ctx.chat)
-    }
-    const find = (id: string | undefined) => {
-      const a = id ? this.artifacts.get(id) : undefined
-      if (!a) throw new Error(`No artifact ${id ?? ''} on this machine; lineclear artifact list shows them`)
-      return a
-    }
-    const dataOf = (r: { data?: string }) => (r.data !== undefined ? JSON.parse(r.data) : undefined)
-    switch (sub) {
-      case 'new': {
-        const title = one(p, 'title')?.trim()
-        if (!rest[0] || !title) throw new Error('lineclear artifact new <file.html> --title "<title>" [--data <file.json>]')
-        const r = Artifacts.read(rest[0], one(p, 'data'), cwd)
-        const check = await this.checkArtifact(r.html!, dataOf(r), r.missing)
-        if (!check.ok) throw new Error(`Not shown: fix these, then run it again.\n${check.report}`)
-        const a = this.artifacts.create({ title, place: this.artifactPlace(p, ctx), by, chat: ctx.chat, html: r.html!, data: r.data, note: one(p, 'note') })
-        if (check.c.shots) this.artifacts.setThumbs(a, check.c.shots)
-        post(a, 1)
-        this.emit('snapshot')
-        return `Shown: artifact ${a.id} “${a.title}” v1${ctx.chat ? ', in your chat' : ''}, kept in ${this.chatName(a.place)}'s Artifacts. ${check.report}\nUpdate it, rather than making a new one: lineclear artifact update ${a.id} [<file.html>] [--data <file.json>] [--note "<what changed>"]. Don't describe it in your reply: the human sees it.`
-      }
-      case 'update': {
-        const a = find(rest[0])
-        const r = Artifacts.read(rest[1], one(p, 'data'), cwd)
-        if (!r.html && r.data === undefined && !one(p, 'title'))
-          throw new Error(`lineclear artifact update ${a.id} [<file.html>] [--data <file.json>] [--title "<title>"] [--note "<what changed>"]`)
-        let check: Awaited<ReturnType<typeof this.checkArtifact>> | undefined
-        if (r.html || r.data !== undefined) {
-          check = await this.checkArtifact(r.html ?? this.artifacts.html(a) ?? '', r.data !== undefined ? dataOf(r) : this.artifacts.data(a), r.missing)
-          if (!check.ok) throw new Error(`Not updated: fix these, then run it again.\n${check.report}`)
-        }
-        const v = this.artifacts.update(a, { by, chat: ctx.chat, html: r.html, data: r.data, note: one(p, 'note'), title: one(p, 'title')?.trim() })
-        if (check?.c.shots) this.artifacts.setThumbs(a, check.c.shots)
-        post(a, v.n)
-        this.emit('snapshot')
-        return `Updated: artifact ${a.id} “${a.title}” is v${v.n}${r.html ? '' : r.data !== undefined ? ' (same page, new data)' : ' (same page, new title)'}; open views of it change now. ${check?.report ?? ''}`.trim()
-      }
-      case 'check': {
-        if (!rest[0]) throw new Error('lineclear artifact check <file.html> [--data <file.json>]')
-        const r = Artifacts.read(rest[0], one(p, 'data'), cwd)
-        return (await this.checkArtifact(r.html!, dataOf(r), r.missing)).report
-      }
-      case 'show': {
-        const a = find(rest[0])
-        const last = this.artifacts.latest(a)
-        const lines = [
-          `${a.id} “${a.title}” in ${this.chatName(a.place)}: v${last.n}, ${age(last.at)} ago by ${last.by}. Its Send and notes go to ${this.chatName(this.keeperOf(a))}.`,
-          // kept on the main machine: an agent on another machine gets copies on its own
-          `HTML: ${task.forAgent(this.artifacts.file(a.id, last.html, 'html'), 'artifacts', `${a.id}-v${last.html}.html`)}`,
-          last.data ? `Data: ${task.forAgent(this.artifacts.file(a.id, last.data, 'json'), 'artifacts', `${a.id}-v${last.data}.json`)}` : 'Data: none',
-          `Copy them to edit; lineclear artifact update ${a.id} makes the new version.`,
-          'Versions:',
-          ...[...a.versions]
-            .reverse()
-            .map(
-              (v) =>
-                `  v${v.n}  ${age(v.at)}  ${v.by}${v.html !== v.n ? (v.data === v.n ? '  (data only)' : '  (title only)') : ''}${v.note ? `  ${v.note}` : ''}`,
-            ),
-        ]
-        return lines.join('\n')
-      }
-      case 'list':
-      case undefined: {
-        const pr = one(p, 'space') ? placeId.space(this.projectFor(p, ctx).name) : null
-        const all = Object.values(this.artifacts.list).filter((a) => !pr || a.place === pr)
-        return (
-          all
-            .sort((a, b) => b.at - a.at)
-            .map((a) => `${a.id}  v${this.artifacts.latest(a).n}  ${a.title}  · ${this.chatName(a.place)} · ${age(a.at)}`)
-            .join('\n') || 'No artifacts here yet.'
-        )
-      }
-      case 'rm': {
-        const a = find(rest[0])
-        this.artifacts.remove(a.id)
-        this.emit('snapshot')
-        return `Deleted ${a.id} “${a.title}”.`
-      }
-    }
-    throw new Error('lineclear artifact new|update|check|list|show|rm')
   }
 
   protected async taskCommand(sub: string | undefined, rest: string[], p: Parsed, ctx: { chat?: string; cwd?: string }) {

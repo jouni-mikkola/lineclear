@@ -9,13 +9,11 @@ export type {
   AgentHerdr,
   Task,
   Question,
-  Artifact,
-  ArtifactPost,
   Reaction,
   CardAsk,
   UpdateCard,
 } from './types-core.ts'
-export { NAME_MAX, asEmoji, slugify, nameProblem, TITLE_MAX, STATUS_MAX, SUMMARY_MAX, splitFacts, artifactQuote } from './types-core.ts'
+export { NAME_MAX, asEmoji, slugify, nameProblem, TITLE_MAX, STATUS_MAX, SUMMARY_MAX, splitFacts } from './types-core.ts'
 export type {
   StepKind,
   StepRow,
@@ -40,7 +38,7 @@ export type {
   AddSpace,
   TreeFiles,
 } from './types-chat.ts'
-export { apart, doneNewestFirst, cardMessage } from './types-chat.ts'
+export { doneNewestFirst, cardMessage } from './types-chat.ts'
 export type {
   FileText,
   DiffFile,

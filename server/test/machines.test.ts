@@ -34,63 +34,6 @@ describe('the helper', () => {
 describe('a machine run from the main one', () => {
   // fails on ebb17d5 too; L20 fixes it
 
-  test.skip("an agent's artifact commands there name no path of the main machine: the pictures and pages are copied over", () => {
-    const home = mkdtempSync(join(tmpdir(), 'shep-worker-'))
-    const there = mkdtempSync(join(tmpdir(), 'shep-there-'))
-    const files = mkdtempSync(join(tmpdir(), 'shep-there-files-'))
-    writeFileSync(join(files, 'board.html'), '<h1>Board</h1>')
-    // ssh to the machine runs its command here, so its files are these folders
-    const bin = mkdtempSync(join(tmpdir(), 'shep-ssh-'))
-    writeFileSync(join(bin, 'ssh'), '#!/bin/sh\nfor a; do last=$a; done\nexec /bin/sh -c "$last"\n', { mode: 0o755 })
-    const box: BoxInfo = {
-      label: 'vm-demo',
-      target: 'vm-demo',
-      session: 'default',
-      herdr: '/nonexistent/herdr',
-      home: there,
-      path: `${bin}:/usr/bin:/bin`,
-      os: 'Linux',
-    }
-    const code = `
-      const { mkdirSync, writeFileSync } = await import('node:fs')
-      const { LiveSource } = await import(${JSON.stringify(join(root, 'server/live/source.ts'))})
-      const src = new LiveSource()
-      const shot = (n) => { mkdirSync(${JSON.stringify(join(home, 'checks'))}, { recursive: true }); const f = ${JSON.stringify(join(home, 'checks'))} + '/' + n; writeFileSync(f, 'png ' + n); return f }
-      src.checker = async () => ({ errors: [], warnings: [], shots: { light: shot('a.png'), dark: shot('a-dark.png') } })
-      const cwd = ${JSON.stringify(files)}
-      const outs = [(await src.cli(['artifact', 'check', 'board.html'], { cwd })).out]
-      const made = (await src.cli(['artifact', 'new', 'board.html', '--title', 'Board'], { cwd })).out
-      const id = made.match(/artifact (\\w+)/)[1]
-      outs.push(made, (await src.cli(['artifact', 'update', id, 'board.html'], { cwd })).out, (await src.cli(['artifact', 'show', id], { cwd })).out)
-      // no browser on the main machine: its error names its own paths
-      src.checker = async () => ({ errors: [], warnings: [], skipped: 'could not open a browser here (no chrome at ' + ${JSON.stringify(join(home, 'chrome'))} + ')' })
-      outs.push((await src.cli(['artifact', 'check', 'board.html'], { cwd })).out)
-      console.log(JSON.stringify(outs))
-      process.exit(0)`
-    const r = spawnSync(process.execPath, ['-e', code], {
-      encoding: 'utf8',
-      env: {
-        ...process.env,
-        PATH: `${bin}:${process.env.PATH}`,
-        LINECLEAR_BOX: JSON.stringify(box),
-        LINECLEAR_HOME: home,
-        LINECLEAR_MACHINE: 'vm-demo',
-        HERDR_SOCKET_PATH: join(home, 'no-herdr.sock'),
-      },
-    })
-    const outs = JSON.parse(r.stdout) as string[]
-    for (const out of outs) expect(out).not.toContain(home)
-    const checks = join(there, '.lineclear', 'helper', 'checks')
-    for (const out of outs.slice(0, 3)) expect(out).toContain(`Pictures at phone width: ${checks}/a.png (dark: ${checks}/a-dark.png)`)
-    expect(readFileSync(join(checks, 'a-dark.png'), 'utf8')).toBe('png a-dark.png')
-    const page = outs[3].match(/HTML: (\S+)/)![1]
-    expect(page.startsWith(`${join(there, '.lineclear', 'helper', 'artifacts')}/`)).toBe(true)
-    expect(readFileSync(page, 'utf8')).toBe('<h1>Board</h1>')
-    expect(outs[4]).toContain('No pictures: the main machine could not open its browser')
-  })
-
-  // fails on ebb17d5 too; L20 fixes it
-
   test.skip("its lineclear set and unset for Everywhere run on the main machine; its machine's own stays here", async () => {
     const home = mkdtempSync(join(tmpdir(), 'shep-worker-'))
     const main = mkdtempSync(join(tmpdir(), 'shep-main-'))
