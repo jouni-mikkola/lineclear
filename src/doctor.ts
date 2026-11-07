@@ -1,3 +1,4 @@
+import { leftoverChecks, realLeftovers, type Leftovers } from "./doctor-leftovers.ts";
 import { storedTaskIds, taskIdsUnique } from "./doctor-task-ids.ts";
 import { existsSync, lstatSync, readFileSync, readlinkSync } from "node:fs";
 import { herdrArgv, herdrVersionOf } from "./herdr.ts";
@@ -67,6 +68,8 @@ export interface Probe {
   runFrom?: RunFrom;
   /** Every id and alias in the live task store. Without it the ids are not checked. */
   taskIds?: () => string[];
+  /** The worktrees, branches, sessions and panes on this machine, and the live tasks. Without it they are not counted. */
+  leftovers?: () => Leftovers;
   /** A CI runner: its checkout has no origin main to read. */
   ci?: boolean;
   /** The failed starts of the last 24 hours, one entry per machine. */
@@ -93,6 +96,7 @@ export function realProbe(paths: Paths, env: Record<string, string | undefined> 
     store: copiesProblem(env),
     runFrom: runFrom(paths, env),
     taskIds: () => storedTaskIds(dataDir(env)),
+    leftovers: () => realLeftovers(paths.app, dataDir(env), env),
     ci: env.CI === "true",
     user: env.USER ?? userInfo().username,
     free: freeBytes,
@@ -396,6 +400,7 @@ export function doctorChecks(probe: Probe): Check[] {
       skip: !p.runBy,
     },
     taskIdsUnique(p),
+    ...leftoverChecks(p),
     ...(p.starts ?? []).map((m) => ({ name: "failed starts", problem: "", fix: "", info: startsLine(m).replace(/^failed starts /, "") })),
   ];
 }
