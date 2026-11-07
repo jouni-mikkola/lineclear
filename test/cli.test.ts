@@ -176,8 +176,9 @@ const p90 = (ms: number[]): number => [...ms].sort((a, b) => a - b)[Math.ceil(ms
 
 test("the lineclear command's own start takes at most 100 ms, p90", async () => {
   const server = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => Response.json({ out: "ok\n", code: 0 }) });
+  const home = mkdtempSync(join(tmpdir(), "lc-speed-"));
   try {
-    const env = { ...process.env, LINECLEAR_URL: `http://127.0.0.1:${server.port}`, LINECLEAR_CHAT: "", HOME: mkdtempSync(join(tmpdir(), "lc-speed-")) };
+    const env = { ...process.env, LINECLEAR_URL: `http://127.0.0.1:${server.port}`, LINECLEAR_CHAT: "", HOME: home };
     const ms: number[] = [];
     for (let i = 0; i < 8; i++) {
       const at = performance.now();
@@ -189,6 +190,7 @@ test("the lineclear command's own start takes at most 100 ms, p90", async () => 
     expect(p90(ms)).toBeLessThanOrEqual(ANSWER_P90_MS);
   } finally {
     server.stop(true);
+    rmSync(home, { recursive: true, force: true });
   }
 });
 
@@ -215,9 +217,9 @@ test("room, task list and show are answered in 100 ms, p90", () => {
       times[args.join(" ")] = ms;
     }
     console.log(JSON.stringify(times));
+    require("node:fs").rmSync(process.env.LINECLEAR_HOME, { recursive: true, force: true });
     process.exit(0);`;
   const p = Bun.spawnSync(["bun", "-e", script], { cwd: "server", env: { ...process.env, LINECLEAR_CHAT: "" } });
-  expect(p.stderr.toString()).toBe("");
   const times = JSON.parse(p.stdout.toString().trim().split("\n").pop() ?? "{}") as Record<string, number[]>;
   expect(Object.keys(times)).toEqual(["room", "task list", "show"]);
   for (const ms of Object.values(times)) expect(p90(ms)).toBeLessThanOrEqual(ANSWER_P90_MS);

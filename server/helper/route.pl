@@ -218,6 +218,7 @@ unless (caller) {
   # in this process, not a second perl: a start costs the modules' load time again
   $0 = $local;
   my $path = $local =~ m{^/} ? $local : "./$local";
+  -r $path or die "perl: $path: $!\n";
   do $path;
   die $@ if $@;
   exit 0;

@@ -120,7 +120,8 @@ function localRoom(): Room | undefined {
   try {
     const meminfo = readFileSync('/proc/meminfo', 'utf8')
     const kb = (key: string) => Number(new RegExp(`^${key}:\\s+(\\d+)`, 'm').exec(meminfo)?.[1])
-    return { load: loadavg()[0], cores: availableParallelism(), freeKb: kb('MemAvailable'), totalKb: kb('MemTotal') }
+    const [freeKb, totalKb] = [kb('MemAvailable'), kb('MemTotal')]
+    return Number.isNaN(freeKb + totalKb) ? undefined : { load: loadavg()[0], cores: availableParallelism(), freeKb, totalKb }
   } catch {
     return undefined
   }
