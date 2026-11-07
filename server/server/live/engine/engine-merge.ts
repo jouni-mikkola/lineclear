@@ -103,6 +103,17 @@ export class EngineMerge extends EngineLand {
 
   protected redMain = new RedMainWatch()
 
+  /**
+   * While main is red on GitHub only its fix merges: a burst of merges on a red main is one failure, not ten. The red
+   * is looked at again first, so a main that turned green frees the merge at once.
+   */
+  protected override async heldByRedMain(t: TaskRec, p: Space): Promise<string | undefined> {
+    if (!this.data.red?.[p.path] || t.by === 'main-green') return
+    await this.watchMain(p).catch(() => undefined)
+    const sha = this.data.red?.[p.path]
+    if (sha) return `Held: ${p.base} is red on GitHub at ${sha.slice(0, 7)}. Nothing was merged: merge ${t.id} again once ${p.base} is green.`
+  }
+
   /** A revert commit of the sha pushed to the base, made in a scratch worktree so no checkout is touched. */
   private async revertOnBase(p: Space, sha: string): Promise<boolean> {
     const dir = mkdtempSync(join(tmpdir(), 'red-main-'))
