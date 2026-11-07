@@ -77,7 +77,7 @@ export class AgentsSending extends AgentsDelivery {
     return p
   }
 
-  protected async sendNow(key: string, text: string, { reaction, ensure, cid, idle, command, generation }: SendOpts): Promise<Sent> {
+  protected async sendNow(key: string, text: string, { reaction, ensure, cid, idle, generation }: SendOpts): Promise<Sent> {
     // before any herdr call: a done task has no pane, so a send would only end in "pane not found"
     const over = this.taskEnded?.(key)
     if (over) throw new Error(over)
@@ -103,7 +103,6 @@ export class AgentsSending extends AgentsDelivery {
       at: Date.now(),
       ...(cid ? { cid } : {}),
       ...(idle ? { idle } : {}),
-      ...(command ? { command } : {}),
     }
     if ((item.launch && item.launch !== this.records[key]?.launch) || (this.acceptInput && !this.acceptInput(item))) return { waiting: false, item }
     if (this.status(key) === 'gone' && ensure && cid && !this.deliveryPaused.has(key)) {

@@ -13,7 +13,7 @@ import { machineNews } from './quiet.ts'
 import { mirrored } from './mfs.ts'
 import { agentEnv, BOX, helperDir, run } from './box.ts'
 import { ROOT } from '../root.ts'
-import { inputHoldsText, leftAtPrompt } from './commands.ts'
+import { inputHoldsText } from './paste-watch.ts'
 import { SecretAccess } from './secret-access.ts'
 import { isAgentProcess } from './agent-process.ts'
 import { type AgentRecord, type OutItem, type Hold, type Sent, ROUTING_FAILURE, type Events, holdFrom } from './agents-helpers.ts'
@@ -267,26 +267,11 @@ export class AgentsState extends Emitter<Events> {
     return undefined
   }
 
-  /** one thing into the CLI. A slash command is checked: a CLI may take its Enter for a pick in the list of commands
-   *  it shows as you type, so while it still sits in the input, Enter goes again; one that never runs is wiped from
-   *  the input and fails, so the chat says so instead of waiting on it. */
+  /** one thing into the CLI */
   protected async put(key: string, item: OutItem) {
     if (this.info(key)?.interactive_ready === false) await this.untilReady(key)
     await herdr.prompt(this.records[key].name, item.text)
-    if (!item.command) return void this.submitted(key)
-    const pane = this.info(key)?.pane_id
-    if (!pane) return
-    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
-    const read = async () => leftAtPrompt(await herdr.read(pane, 'text', 30).catch(() => ''), item.text)
-    // twice, a moment apart: a screen not yet redrawn must not get an Enter that picks from the menu it opened
-    const left = async () => (await read()) && (await sleep(this.commandMs / 2), await read())
-    for (let i = 0; i < 3; i++) {
-      await sleep(this.commandMs)
-      if (!(await left())) return
-      if (i < 2) await herdr.paneKeys(pane, ['enter'])
-    }
-    await herdr.paneKeys(pane, Array(item.text.length + 2).fill('backspace')).catch(() => undefined)
-    throw new Error(`${item.text.trim().split(/\s/)[0]} didn't run in the terminal.`)
+    this.submitted(key)
   }
 
   /** a CLI just started takes no input yet: wait (at most readyMs) until herdr says it is ready, so the text is not
@@ -298,7 +283,7 @@ export class AgentsState extends Emitter<Events> {
 
   /** herdr's named agent never came up: after paneAfter the text is typed into the task's pane, so a brief always arrives */
   protected async typeIntoPane(key: string, item: OutItem, e: unknown) {
-    if (holdFrom(e) !== 'start' || item.command || item.idle) return false
+    if (holdFrom(e) !== 'start' || item.idle) return false
     const since = this.unready.get(key) ?? Date.now()
     this.unready.set(key, since)
     const pane = this.info(key)?.pane_id ?? this.startedIn.get(key)
@@ -359,9 +344,6 @@ export class AgentsState extends Emitter<Events> {
 
   /** how long a CLI has to take what was put in before it is looked at */
   submitMs = 5000
-
-  /** how long a CLI has to run a slash command before its input is looked at */
-  commandMs = 800
 
   protected went(item: OutItem) {
     const now = Date.now()

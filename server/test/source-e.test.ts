@@ -1,7 +1,7 @@
-import { stopSource, HOST, placeId, src, until, workedTask } from './source-fixture.ts'
-import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
+import { stopSource, placeId, src, until, workedTask } from './source-fixture.ts'
+import { afterAll, describe, expect, test } from 'bun:test'
 import { execSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync } from 'node:fs'
+import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -218,72 +218,6 @@ describe("every machine's news reaches the main machine's home space", () => {
     } finally {
       off()
       src.agents.send = send
-    }
-  })
-})
-
-describe('adding a space from the sidebar', () => {
-  const home = mkdtempSync(join(tmpdir(), 'shep-home-'))
-  const realHome = process.env.HOME
-  beforeAll(() => {
-    process.env.HOME = home
-  })
-  afterAll(() => {
-    process.env.HOME = realHome
-  })
-
-  // fails on ebb17d5 too; L20 fixes it
-
-  test.skip('on this machine: a new folder becomes a repo and a space, like lineclear space add', async () => {
-    const r = await src.addSpace({ machine: HOST, path: '~/dev/fresh', name: 'fresh-app', create: true })
-    expect(r.place).toBe(placeId.space('fresh-app'))
-    expect(src.places.byName('fresh-app')?.path).toEndWith('/dev/fresh')
-    expect(src.snapshot().places.some((p) => p.id === r.place)).toBe(true)
-    const f = await src.folders(HOST, '~/dev')
-    expect(f.entries).toEqual([{ name: 'fresh', path: '~/dev/fresh', repo: true, added: true }])
-  })
-  test('a folder that is not a repo is not added without create; nothing outside home either', async () => {
-    mkdirSync(join(home, 'plain'))
-    await expect(src.addSpace({ machine: HOST, path: '~/plain' })).rejects.toThrow('not a git repository')
-    await expect(src.addSpace({ machine: HOST, path: '/etc', create: true })).rejects.toThrow('Only folders in your home')
-    await expect(src.addSpace({ machine: HOST, path: '~/plain', name: 'a/b', create: true })).rejects.toThrow()
-  })
-  test('another machine: folders and adding pass through to its copy; one unknown or out of reach says so', async () => {
-    const got: { path: string; body?: unknown }[] = []
-    const far = Bun.serve({
-      port: 0,
-      hostname: '127.0.0.1',
-      async fetch(req) {
-        const u = new URL(req.url)
-        got.push({ path: u.pathname + u.search, body: req.method === 'POST' ? await req.json() : undefined })
-        if (u.pathname === '/api/snapshot')
-          return Response.json({
-            name: 'S',
-            host: 'far',
-            places: [{ id: 'p:far:~', name: 'home', machine: 'far', home: true, level: 1, status: 'idle', mode: 'manual', chat: 'p:far:~' }],
-            machines: [{ id: 'm:far', machine: 'far', name: 'far', status: 'idle' }],
-            tasks: [],
-            asks: {},
-            settings: [],
-            overrides: {},
-            user: 'u',
-          })
-        if (u.pathname === '/api/folders') return Response.json({ path: u.searchParams.get('path'), exists: true, dir: true, repo: null, entries: [] })
-        if (u.pathname === '/api/spaces') return Response.json({ error: 'Another space on far has that name.' }, { status: 500 })
-        return new Response('no', { status: 404 })
-      },
-    })
-    try {
-      src.peers!.adopt('far', `http://127.0.0.1:${far.port}`)
-      for (let i = 0; i < 50 && !src.peers!.list().find((l) => l.rec.machine === 'far')?.reachable; i++) await new Promise((r) => setTimeout(r, 20))
-      expect(src.snapshot().machines.find((m) => m.id === 'm:far')?.status).toBe('idle')
-      expect((await src.folders('far', '~/dev')).path).toBe('~/dev')
-      expect(got.some((g) => g.path === `/api/folders?machine=far&path=${encodeURIComponent('~/dev')}`)).toBe(true)
-      await expect(src.addSpace({ machine: 'far', path: '~/x', name: 'x' })).rejects.toThrow('Another space on far has that name.')
-      expect(got.find((g) => g.path === '/api/spaces')?.body).toEqual({ machine: 'far', path: '~/x', name: 'x' })
-      await expect(src.folders('nowhere', '~')).rejects.toThrow('No machine called nowhere')
-    } finally {
-      far.stop(true)
     }
   })
 })

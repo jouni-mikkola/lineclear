@@ -65,40 +65,6 @@ describe('removing a space', () => {
   })
 })
 
-describe('the order of places', () => {
-  test('A to Z until dragged; the order is kept on disk, and a new space slots in A to Z', async () => {
-    const add = async (name: string) => {
-      const dir = mkdtempSync(join(tmpdir(), 'shep-src-order-'))
-      execSync('git init -q -b main', { cwd: dir })
-      await src.places.add(dir, name)
-    }
-    await add('order-zed')
-    await add('order-alpha')
-    const mine = () =>
-      src
-        .snapshot()
-        .places.filter((p) => p.name.startsWith('order-'))
-        .map((p) => p.name)
-    expect(mine()).toEqual(['order-alpha', 'order-zed'])
-    const machine = placeId.machine()
-    const ids = src
-      .snapshot()
-      .places.filter((p) => !p.home && p.machine === HOST)
-      .map((p) => p.id)
-    const dragged = [placeId.space('order-zed'), ...ids.filter((id) => id !== placeId.space('order-zed'))]
-    expect(await src.act({ type: 'order', under: machine, ids: dragged })).toEqual({ ok: true })
-    expect(mine()).toEqual(['order-zed', 'order-alpha'])
-    // the machine's home space is always first, then its spaces in their order
-    const places = src.snapshot().places
-    expect(places.find((p) => p.machine === HOST)?.id).toBe(placeId.home())
-    expect(places.findIndex((p) => p.name === 'order-zed')).toBe(places.findIndex((p) => p.id === placeId.home()) + 1)
-    expect(new Places().order[machine]).toEqual(dragged)
-    await add('order-beta')
-    expect(mine()).toEqual(['order-zed', 'order-alpha', 'order-beta'])
-    expect(await src.act({ type: 'order', under: machine, ids: 'nope' } as never)).toEqual({ ok: false, error: 'No order to keep.' })
-  })
-})
-
 describe('renaming places', () => {
   test("only the name that shows changes, kept on disk; its id, folder and task key stay; a space's name follows the rules", async () => {
     const dir = mkdtempSync(join(tmpdir(), 'shep-src-rename-'))

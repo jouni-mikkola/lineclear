@@ -22,8 +22,6 @@ export function existsSync(p: string) {
 
 export const statSync = fs.statSync
 
-export const lstatSync = fs.lstatSync
-
 export function readFileSync(p: string): Buffer
 export function readFileSync(p: string, enc: 'utf8'): string
 export function readFileSync(p: string, enc?: 'utf8'): Buffer | string {
@@ -31,28 +29,6 @@ export function readFileSync(p: string, enc?: 'utf8'): Buffer | string {
   const r = sh(`cat ${q(p)}`)
   if (r.code) fail(p, r.err)
   return enc ? r.out.toString('utf8') : r.out
-}
-
-/** the first n bytes of a file */
-export function readHead(p: string, n: number): Uint8Array {
-  if (local(p)) {
-    const buf = new Uint8Array(n)
-    const fd = fs.openSync(p, 'r')
-    try {
-      let at = 0
-      while (at < n) {
-        const got = fs.readSync(fd, buf, at, n - at, at)
-        if (!got) break
-        at += got
-      }
-      return buf.subarray(0, at)
-    } finally {
-      fs.closeSync(fd)
-    }
-  }
-  const r = sh(`head -c ${Math.max(0, Math.floor(n))} ${q(p)}`)
-  if (r.code) fail(p, r.err)
-  return new Uint8Array(r.out)
 }
 
 export function writeFileSync(p: string, data: string | Uint8Array, o?: { mode?: number }) {

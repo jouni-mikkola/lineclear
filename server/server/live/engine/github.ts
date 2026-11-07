@@ -95,16 +95,16 @@ export type PrChecks = {
 }
 
 /** a check as gh pr checks buckets it: pass, fail, pending, skipping or cancel */
-export type Check = { name: string; bucket: string; link?: string }
+type Check = { name: string; bucket: string; link?: string }
 
 /** gh was refused GitHub's checks: a fine-grained token can't read them on a private repo (it can read Actions) */
-export const noChecksAccess = (said: string) => /not accessible by personal access token/i.test(said)
+const noChecksAccess = (said: string) => /not accessible by personal access token/i.test(said)
 
 /**
  * The jobs GitHub Actions ran on a commit, read through the Actions API, for a token that may read Actions but not
  * checks; null when GitHub did not answer.
  */
-export async function actionJobs(g: GitHub, cwd: string, sha: string): Promise<Check[] | null> {
+async function actionJobs(g: GitHub, cwd: string, sha: string): Promise<Check[] | null> {
   const runs = await gh(g, cwd, 'api', '--paginate', '--jq', '.workflow_runs[].id', `repos/${g.repo}/actions/runs?head_sha=${sha}&per_page=100`)
   if (!runs.ok) return null
   const jobs = await Promise.all(

@@ -537,7 +537,7 @@ the agent's own question. A `[lineclear]` line with no kind, and any `<lineclear
 | `src/starts.ts` `serviceStarts` | A start whose agent has not answered its brief: the nudge typed into its pane (2 min), a restart (4 min) | Resume, at most twice |
 | `src/asks.ts` `routeAsks` | An open need card a rule can answer (a refused merge, a stored login) | Answer, once per card |
 | `src/inbox.ts` `answer` | The owner answers an Inbox item | Owner |
-| `server/server/live/source.ts` `send`, `slashCommand`, `react` | The owner writes, reacts or answers a card in the chat | Owner |
+| `server/server/live/source.ts` `send`, `react` | The owner writes, reacts or answers a card in the chat | Owner |
 | `server/server/live/engine/engine.ts` `go`, `tell`, `youWrote` | A task starts, or the owner writes to a task not started | Step / owner |
 | `server/server/live/engine/engine.ts` github, queue, `sendBack` | News of the task's own pull request (a failed check, a review), a queue line when the owner or a coordinator queues the task, a refused merge sent back | Step. github and queue lines are counted by `measure`; `sendBack` is plain text, so it is not |
 | `server/server/live/engine/engine.ts` `tell`, `source.ts` `send` | The owner or a coordinator runs `lineclear task tell` or writes in a task's chat | Owner. A coordinator is an AI, so there is none by default |

@@ -1,5 +1,5 @@
 // A source fills the view model and carries out actions. The live source reads herdr and the CLIs' logs.
-import type { Action, ActivityAnswer, ActivityAsk, AddSpace, Alert, Chat, Folders, Snapshot, TermScreen, WorktreeAsk } from '../shared/types.ts'
+import type { Action, Alert, Chat, Snapshot, TermScreen } from '../shared/types.ts'
 
 export type SourceEvents = {
   snapshot: []
@@ -42,15 +42,6 @@ export interface Source extends Emitter<SourceEvents> {
   upload(chat: string, name: string, data: Uint8Array): Promise<string>
   /** a file attached in a chat, by the path its chat line gives; only those, never anything else on the machine */
   attachment(chat: string, path: string): Promise<Blob | null>
-  /** a machine's folders, for adding a project: only folders in the human's home on it */
-  folders?(machine: string, path: string): Promise<Folders>
-  /** add a project from the sidebar, as `lineclear project add` does (made a new repo first with create); its place */
-  addSpace?(req: AddSpace): Promise<{ place: string }>
-  /** a task's worktree, read only, for its side panel: its files, a file, its diff against its base, a file's diff,
-   *  its pull request. Never anything outside that worktree. */
-  worktree?(ask: WorktreeAsk): Promise<unknown>
-  /** a chat's activity: a turn's steps, a step's raw output, a background job's steps or output */
-  activity?(ask: ActivityAsk): Promise<ActivityAnswer>
   /** before it stops: what must not be cut halfway (a merge) finishes; true when it waited for something */
   drain?(): Promise<boolean>
   stop?(): void

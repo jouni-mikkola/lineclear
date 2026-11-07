@@ -1,9 +1,8 @@
 import { chooseModel } from '../../../src/models.ts'
 import { randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
-import { sortPlaces } from '../../shared/order.ts'
 import { clock } from '../../shared/time.ts'
-import { slugify, type Alert, type Machine, type Place, type Section } from '../../shared/types.ts'
+import { slugify, type Alert, type Machine, type Place } from '../../shared/types.ts'
 import { Emitter, type SourceEvents } from '../source.ts'
 import { HOME, readJson, writeJson } from '../store.ts'
 import { ROOT } from '../root.ts'
@@ -20,7 +19,6 @@ import { Revivals } from './revive.ts'
 import { Settings, type Level } from './settings.ts'
 import { Vault } from './secrets.ts'
 import { RequestedNewsMailbox } from './requested-news.ts'
-import { Unread } from './unread.ts'
 import { Monitor, meters, procLines, summary, topProcs, type HealthEvent, type Kind } from './health.ts'
 import { REPLY_AFTER_CARD } from './source-helpers.ts'
 
@@ -48,8 +46,8 @@ export class LiveSourceState extends Emitter<SourceEvents> {
   )
   /** what the last look at each other machine found (source-views.ts readBoxes) */
   protected boxes = new Map<string, { read?: { busy?: 'cpu' | 'memory'; herdr: boolean }; at: number; reading: boolean }>()
-  /** when each chat last had something new, and how far you have read each (on the main machine) */
-  unread = new Unread()
+  /** when each coordinator chat's newest message was seen, so a message buzzes once */
+  protected newestSeen = new Map<string, number>()
   /** when this server started: only what comes after it buzzes as a new message */
   protected born = Date.now()
   protected requestedNews = new RequestedNewsMailbox(process.env.LINECLEAR_MAIN_HOME ?? HOME)
@@ -95,8 +93,8 @@ export class LiveSourceState extends Emitter<SourceEvents> {
   }
 
   /** every space and every machine, as the sidebar shows them: this machine's, then the others' as they last showed
-   *  themselves (just after a start, while they connect, as before it), the names the human gave them, in their order */
-  protected listed(): { places: Place[]; machines: Machine[]; sections: Section[] } {
+   *  themselves (just after a start, while they connect, as before it), the names the human gave them */
+  protected listed(): { places: Place[]; machines: Machine[] } {
     const ts = this.engine.tasks
     const status = (ids: string[], coord: string[]): Place['status'] => {
       const mine = ts.filter((t) => ids.includes(t.project) && !t.archived).map((t) => this.engine.statusOf(t))
@@ -169,7 +167,7 @@ export class LiveSourceState extends Emitter<SourceEvents> {
       const want = this.places.names[p.id] && slugify(this.places.names[p.id])
       if (want && !places.some((x) => x !== p && x.machine === p.machine && x.name === want)) p.name = want
     }
-    return sortPlaces(places, machines, this.places.order, this.places.sections)
+    return { places, machines }
   }
 
   /** open coordinator questions by place: a choice card not answered yet, or the CLI's own menu (a permission) it waits on */

@@ -1,14 +1,7 @@
 // What a CLI's own log file says, in one shape for every CLI. One reader per CLI turns its log into these.
 // Readers keep only what the chat shows: what the human typed, the agent's replies, the CLI's own questions, where a
-// session starts, and its tool steps and background work cut down to a few words each (the chat folds them into one
-// line per turn; their output stays in the log, read again from where it is only when the human opens one).
-import type { AgentRuntime, Job, StepKind, StepWords } from '../../../shared/types.ts'
-
-/** where a step's raw output is: a line of a log file */
-export interface OutputAt {
-  file: string
-  offset: number
-}
+// session starts and its errors.
+import type { AgentRuntime } from '../../../shared/types.ts'
 
 interface CliChoice {
   label: string
@@ -47,17 +40,6 @@ export type LogEvent =
   | { kind: 'turn-end'; id: string; at: number }
   /** the model's provider cut the turn off: its words, and the CLI's own code and HTTP status for it where it has them */
   | { kind: 'error'; id: string; at: number; text: string; code?: string; status?: number }
-  /** a tool call of the agent itself (not a subagent's): what kind, its tool, what it did in words. A CLI that logs a
-   *  step only once it is over sends it with its end (and a test run's outcome) */
-  | ({ kind: 'step'; id: string; at: number; step: StepKind; tool: string; end?: number; failed?: boolean; result?: string; out?: OutputAt } & StepWords)
-  /** the step with this id is over; where its output is; a test run's outcome. `drop`: it only stood for the steps its CLI logs one by one
-   *  once over (Codex's code mode runs several commands in one call): it goes, they stay */
-  | { kind: 'step-end'; id: string; at: number; failed?: boolean; out?: OutputAt; drop?: boolean; result?: string }
-  /** work it started in the background: a subagent, a shell, a monitor. `log` is a subagent's own log, `output` a
-   *  shell's output file; `step` the step that started it */
-  | { kind: 'job'; id: string; at: number; job: Job['kind']; title: string; step?: string; log?: string; output?: string }
-  /** that background work is over (done, failed or stopped) */
-  | { kind: 'job-end'; id: string; at: number }
 
 export interface Reader {
   /** herdr's agent kind this reader is for: claude, codex, pi */

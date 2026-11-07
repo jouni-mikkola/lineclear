@@ -1,6 +1,6 @@
 import { existsSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
-import type { ActivityAnswer, ActivityAsk, ChatControls, Question } from '../../shared/types.ts'
+import type { ChatControls, Question } from '../../shared/types.ts'
 import { HOME, readJson, writeJson } from '../store.ts'
 import { stripHidden, type Agents, type OutItem } from './agents.ts'
 import { agentLines } from './chatlines.ts'
@@ -9,7 +9,6 @@ import { logKind } from './readers/find.ts'
 import { LogTail, readerFor } from './readers/index.ts'
 import type { LogEvent } from './readers/types.ts'
 import { replyOnScreen } from './streaming.ts'
-import { activityOf, cutOutput, lastLine, outputAt, shown as shownStep, tailOf, type JobRec } from './activity.ts'
 import { yours, turnOf, replying, type Shown, type Posted, type ChatLog, safe, type ScreenMenu, parseMenu, sawReply, PIECE } from './chats-helpers.ts'
 
 export class ChatsLogs {
@@ -211,11 +210,10 @@ export class ChatsLogs {
     return s.on
   }
 
-  /** a blocked agent's terminal menu, or one a slash command opened, read from its screen (refreshed at most every
-   *  2s) */
+  /** a blocked agent's terminal menu, read from its screen (refreshed at most every 2s) */
   async readMenu(key: string, force = false): Promise<boolean> {
     const st = this.agents.status(key)
-    if (!force && (st === 'working' || st === 'gone') && !this.commandMenus.has(key)) {
+    if (!force && (st === 'working' || st === 'gone')) {
       const had = this.menus.delete(key)
       return had
     }
@@ -229,7 +227,7 @@ export class ChatsLogs {
     const waiting = /(?:enter.*(?:confirm|select|continue)|space to select.*esc to reject|\[y\/n\]|\(y\/n\))/i.test(
       text.trimEnd().split('\n').slice(-3).join('\n'),
     )
-    const parsed = st === 'blocked' || this.commandMenus.has(key) || waiting ? parseMenu(text) : null
+    const parsed = st === 'blocked' || waiting ? parseMenu(text) : null
     const m = parsed
       ? { ...parsed, screen: parsed.screen ?? text.trim() }
       : st === 'blocked' && text.trim()
@@ -238,26 +236,7 @@ export class ChatsLogs {
     const before = JSON.stringify(this.menus.get(key) ?? null)
     if (m) this.menus.set(key, m)
     else this.menus.delete(key)
-    // the command's menu is answered: what you wrote meanwhile goes in
-    if (!m && this.commandMenus.delete(key)) void this.agents.deliver(key)
     return before !== JSON.stringify(m)
-  }
-
-  /** menus a slash command opened that herdr doesn't see as blocking the agent: shown as a card all the same, and what
-   *  you write waits for them like for any menu */
-  protected commandMenus = new Set<string>()
-
-  /** a slash command opened a menu: read it as a card; true when there is one */
-  async commandMenu(key: string) {
-    this.commandMenus.add(key)
-    await this.readMenu(key, true).catch(() => false)
-    if (!this.menus.has(key)) this.commandMenus.delete(key)
-    return this.menus.has(key)
-  }
-
-  /** a menu a slash command opened is up */
-  commandMenuUp(key: string) {
-    return this.commandMenus.has(key) && this.menus.has(key)
   }
 
   menu(key: string) {
@@ -324,49 +303,6 @@ export class ChatsLogs {
     const read = (o: OutItem) => ev.some((e) => e.kind === 'user' && e.at >= o.at - 5000 && same(flat(e.text), flat(o.text)))
     const mine = (o: OutItem) => !o.reaction && yours(o.text)
     return [...this.agents.waiting(key).filter(mine), ...this.agents.typedSince(key, start).filter((o) => mine(o) && !read(o))]
-  }
-
-  /* ---------- what it does: its steps, and its work in the background ---------- */
-
-  /**
-   * What it started in the background that still runs, each with what it does now: what its log started and didn't
-   * say is over. Nothing once it is gone.
-   */
-  jobs(key: string, act = activityOf(this.events.get(key) ?? [])): JobRec[] {
-    const st = this.agents.status(key)
-    if (st === 'gone') return []
-    return act.jobs.map((j) => ({ ...j, now: j.output ? lastLine(j.output) : undefined }))
-  }
-
-  /** what runs in the background changed since it was last asked (a pass of the watched chats): a job came or went,
-   *  or one does something else now */
-  jobsChanged(key: string): boolean {
-    this.pull(key)
-    const sig = JSON.stringify(this.jobs(key).map((j) => [j.id, j.now]))
-    if (this.jobsSeen.get(key) === sig) return false
-    this.jobsSeen.set(key, sig)
-    return true
-  }
-
-  /** what the screen opens: a turn's steps, a step's raw output, a background job's output */
-  activity(a: ActivityAsk): ActivityAnswer {
-    this.pull(a.chat)
-    const act = activityOf(this.events.get(a.chat) ?? [])
-    const turns = [...act.turns, ...(act.open ? [act.open] : [])]
-    if (a.what === 'turn') {
-      const t = turns.find((x) => x.id === a.id)
-      if (!t) return { error: 'That turn is no longer in its log.' }
-      return { steps: t.steps.slice(-300).map(shownStep), more: t.steps.length > 300 ? t.steps.length - 300 : undefined }
-    }
-    if (a.what === 'output') {
-      const s = turns.flatMap((t) => t.steps).find((x) => x.id === a.id)
-      const out = s?.where && outputAt(s.where, s.id)
-      return out === undefined || out === '' ? { error: s?.where ? 'It printed nothing.' : 'Its output is not in its log.' } : cutOutput(out)
-    }
-    const j = this.jobs(a.chat, act).find((x) => x.id === a.id)
-    if (!j) return { error: 'That is over now.' }
-    const tail = j.output && tailOf(j.output)
-    return tail === undefined || tail === '' ? { error: 'Nothing to show for it yet.' } : cutOutput(tail)
   }
 
   protected replying(key: string, ev: LogEvent[]) {

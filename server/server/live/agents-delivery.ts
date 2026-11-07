@@ -2,13 +2,12 @@ import { chatProblem } from './readers/index.ts'
 import { randomUUID } from 'node:crypto'
 import { dirname } from 'node:path'
 import { herdr, paneEvents, type AgentInfo, type AgentStatus, type HerdrEvent } from './herdr.ts'
-import { findLog, logKind } from './readers/find.ts'
+import { logKind } from './readers/find.ts'
 import { chooseModel, effortFor, modelArg } from '../../../src/models.ts'
 import * as task from './mfs.ts'
 import { agentEnv, BOX } from './box.ts'
 import { ROOT } from '../root.ts'
 import { type AgentRecord, type Spec, holdFrom, ownOldPane, promptPath, hidden } from './agents-helpers.ts'
-import { addLog } from './log-list.ts'
 import { AgentsState } from './agents-state.ts'
 import { listAfter } from './agent-events.ts'
 
@@ -188,23 +187,6 @@ export class AgentsDelivery extends AgentsState {
     this.emit('status', key, status)
     if (status !== 'gone' && status !== 'blocked') this.deliver(key)
     if (status !== 'gone') this.emit('logs', key)
-  }
-
-  /** after a command that may start another session (/new, /clear, /resume), : its
-   *  CLI's newest log changed since then, once it is one the chat doesn't read yet */
-  follow(key: string, since: number) {
-    const r = this.records[key]
-    if (!r) return
-    const look = () => {
-      const f = findLog(r.kind, r.cwd, since - 1000)
-      if (!f || !addLog(r, f)) return
-      // pi resumes by the id in its name; Codex by its last log
-      if (r.kind !== 'codex') r.sessionId = f.match(/([0-9a-f-]{36})\.jsonl$/)?.[1] ?? r.sessionId
-      this.save()
-      this.emit('logs', key)
-    }
-    // a menu it opened (Codex's /new asks where) may be answered a while later
-    for (const ms of [1500, 5000, 15000, 60000, 180000]) setTimeout(look, ms)
   }
 
   /** an agent already running in herdr that Lineclear should treat as this chat */

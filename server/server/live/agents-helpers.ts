@@ -54,8 +54,6 @@ export interface OutItem {
   brief?: boolean
   /** a CLI command (/model, /compact): goes in only between turns */
   idle?: boolean
-  /** a slash command you typed: Lineclear follows what it does (commands.ts) */
-  command?: boolean
 }
 
 /** what starts an agent: its record, the first thing it is told, and where its pane comes from when it isn't its
@@ -76,8 +74,6 @@ export interface SendOpts {
   cid?: string
   /** a CLI command: only between turns */
   idle?: boolean
-  /** a slash command you typed (commands.ts) */
-  command?: boolean
 }
 
 export interface Sent {

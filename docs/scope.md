@@ -26,7 +26,7 @@ the other. Each delete or merge names its area (D1 to D9 below). What is left to
 | --- | --- | --- |
 | D1 | The demo world and `lineclear run --demo` | gone |
 | D2 | Every agent CLI but pi; the catalog beyond pi in `settings-catalog.ts` is left | open: L443 |
-| D3 | The parts of the old board screen no page uses: sidebar order, unread, folders, slash commands, the side panel, the activity rows | open: L442 |
+| D3 | The parts of the old board screen no page uses: sidebar order, unread, folders, slash commands, the side panel, the activity rows | gone |
 | D4 | The agent-browser stack, so playwright-cli (`src/browsers.ts`) is the one browser | gone |
 | D5 | Automations and their triggers | gone |
 | D6 | Artifacts | gone |
@@ -43,13 +43,11 @@ The open areas hold 2115 of 48492 lines.
 | `server/scripts/store-formats.ts` | Install | 159 | keep | store files an update must still read |
 | `server/scripts/test.ts` | Checks | 215 | keep | the server's test runner |
 | `server/server/app.ts` | Run | 283 | keep | the server's API and live link |
-| `server/server/live/activity.ts` | none | 246 | delete (D3) | the old screen's chat rows of tool steps; no page reads them |
 | `server/server/live/agent*` | Run | 1315 | keep | agents: records, events, start, delivery, state |
 | `server/server/live/args.ts` | Run | 193 | keep | the board command's words |
 | `server/server/live/box.ts` | Machines | 295 | keep | SSH to another machine until herdr's forwarding does it all (L95) |
 | `server/server/live/chatlines.ts` | Dispatcher | 255 | keep | trim: no reactions or artifact lines (D3, D6) |
 | `server/server/live/chats*` | Dispatcher | 1021 | keep | chats, the Dispatcher's among them |
-| `server/server/live/commands.ts` | none | 153 | delete (D3) | slash commands typed into an agent from a chat |
 | `server/server/live/engine/` | Run | 3019 | keep | tasks: launch, briefs, worktrees, state, retire |
 | `server/server/live/engine/branch-work.ts` | Review and merge | 19 | keep | what a branch holds before a merge |
 | `server/server/live/engine/engine-merge.ts` | Review and merge | 169 | keep | checks and merge of a task |
@@ -59,7 +57,6 @@ The open areas hold 2115 of 48492 lines.
 | `server/server/live/engine/merge.ts` | Review and merge | 402 | keep | the merge |
 | `server/server/live/engine/stalls.ts` | Rules | 108 | keep | quiet and late tasks |
 | `server/server/live/estimates.ts` | View | 75 | keep | how long tasks took, for time left |
-| `server/server/live/folders.ts` | none | 175 | delete (D3) | the old sidebar's add project; src/add-project.ts does it |
 | `server/server/live/health.ts` | Rules | 353 | keep | machine load: slots and the load limit |
 | `server/server/live/herdr-forward.ts` | Machines | 142 | keep | herdr's forwarding to other machines |
 | `server/server/live/herdr.ts` | Run | 371 | keep | the herdr adapter |
@@ -73,7 +70,6 @@ The open areas hold 2115 of 48492 lines.
 | `server/server/live/prompts.ts` | Run | 221 | keep | what each agent is told at its start |
 | `server/server/live/quiet.ts` | Rules | 20 | keep | machine news wakes no model |
 | `server/server/live/readers/` | Run | 436 | keep | reads pi's log |
-| `server/server/live/readers/steps.ts` | none | 370 | delete (D3) | tool calls in plain words for the old screen |
 | `server/server/live/recovery.ts` | Machines | 44 | keep | retry of a failed link |
 | `server/server/live/requested-news.ts` | Run | 60 | keep | news to the agent that asked |
 | `server/server/live/restart.ts` | Rules | 120 | keep | the stall ladder's restart |
@@ -90,9 +86,7 @@ The open areas hold 2115 of 48492 lines.
 | `server/server/live/terminal-clock.ts` | View | 50 | keep | the task's live terminal |
 | `server/server/live/trust.ts` | Run | 71 | keep | trusted worktrees |
 | `server/server/live/tunnel.ts` | Machines | 83 | keep | the way back from another machine, until L95 |
-| `server/server/live/unread.ts` | none | 56 | delete (D3) | the old screen's unread marks |
 | `server/server/live/user-name.ts` | View | 16 | keep | the owner's name |
-| `server/server/live/worktree.ts` | none | 234 | delete (D3) | the old side panel; src/task-changes.ts reads the diff |
 | `server/server/lock.ts` | Run | 52 | keep | one server per store |
 | `server/server/main.ts` | Run | 88 | keep | trim: drop the demo switch (D1) |
 | `server/server/push.ts` | Inbox | 106 | keep | push alerts to the phone |
@@ -100,10 +94,7 @@ The open areas hold 2115 of 48492 lines.
 | `server/server/source.ts` | Run | 57 | keep | trim: one live source, no demo (D1) |
 | `server/server/store.ts` | Run | 37 | keep | the server's small files |
 | `server/shared/` | Run | 1007 | keep | types and helpers the server shares |
-| `server/shared/activity.ts` | none | 387 | delete (D3) | the old screen's steps in plain words |
 | `server/shared/alerts.ts` | Inbox | 214 | keep | what a push says |
-| `server/shared/attention.ts` | none | 19 | delete (D3) | native menus of the old screen |
-| `server/shared/order.ts` | none | 193 | delete (D3) | the old screen's sidebar order |
 
 ## The CLI and rule loop (`src/`, `pi/`, `bin/`, `install.sh`), 15483 lines
 
