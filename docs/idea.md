@@ -204,7 +204,7 @@ It follows three principles:
   a go.
 - **Step questions.** Merge now or wait, which reviewer, a flaky test: written rules answer them, else the
   Dispatcher decides from the brief and the roadmap. An agent never asks you one.
-- **Dispatcher.** The one chat for all your projects. It wakes only when you write, reads state through a tool, and
+- **Dispatcher.** The one chat for all your projects. It wakes when you write, and at night for the rule loop's checklist. It reads state through a tool, and
   never starts or merges a step itself. It picks the project from a list that plain code gives it: each project's
   name, repo and the first lines of its idea or README.
 - **Inbox.** The only place that asks you, with the answers as buttons and a push to your phone when something

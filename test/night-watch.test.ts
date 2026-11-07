@@ -35,17 +35,20 @@ describe("nightWatch", () => {
     rmSync(home, { recursive: true, force: true });
   });
 
-  test("a failed send is tried again", async () => {
+  test("a failed send is tried again after a while, not at the next tick", async () => {
     const { home, env } = setup(false);
     expect(await nightWatch(night, env, async () => "away")).toContain("away");
-    expect(await nightWatch(night, env, async () => undefined)).toContain("sent");
+    expect(await nightWatch(new Date(night.getTime() + 30_000), env, async () => undefined)).toBeUndefined();
+    expect(await nightWatch(new Date(night.getTime() + 16 * 60_000), env, async () => undefined)).toContain("sent");
     rmSync(home, { recursive: true, force: true });
   });
 
   test("a paused project is left out, and by day nothing is sent", async () => {
     const { home, env } = setup(true);
     expect(await nightWatch(night, env, async () => undefined)).toBeUndefined();
-    expect(await nightWatch(new Date(2026, 0, 1, 12), setup(false).env, async () => undefined)).toBeUndefined();
     rmSync(home, { recursive: true, force: true });
+    const day = setup(false);
+    expect(await nightWatch(new Date(2026, 0, 1, 12), day.env, async () => undefined)).toBeUndefined();
+    rmSync(day.home, { recursive: true, force: true });
   });
 });
