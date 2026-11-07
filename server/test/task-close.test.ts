@@ -52,6 +52,6 @@ describe('a closed task closes its pull request', () => {
     g.set({ prs: g.gh().prs.map((p) => ({ ...p, state: 'OPEN' })) })
     await w.engine.sweep()
     expect(g.gh().prs[0].state).toBe('CLOSED')
-    expect(t.prDropped).toBe(true)
+    expect(w.engine.task(t.id)?.prDropped).toBe(true)
   })
 })
