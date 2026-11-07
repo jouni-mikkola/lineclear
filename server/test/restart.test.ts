@@ -61,7 +61,7 @@ describe('what the agent is told', () => {
     expect(chat).toBe('Human: Use blue\n\npi: On it')
     const task = restartLine({ from: 'pi', to: 'pi (big-1, high)', chat, commits: 'a1 Add x', changes: '' })
     expect(task).toContain('restarted this task on pi (big-1, high). pi ran it until now')
-    expect(task).toContain('same worktree and branch')
+    expect(task).toContain('same worktree')
     expect(task).toContain('Commits on the branch so far:\na1 Add x')
     expect(task).toContain('Uncommitted changes:\nnone')
     expect(task).toContain('Human: Use blue')

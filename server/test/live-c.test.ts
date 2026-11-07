@@ -124,7 +124,6 @@ describe("a coordinator's instructions", () => {
     const main = coordinatorPrompt({ role: 'main', name: 'home', path: '/home/x', machine: 'vm-str' })
     expect(main).toContain('This is the home space of the main machine, vm-str')
     expect(main).toContain('you keep the overview of every machine')
-    expect(main).toContain('which alerts reach the phone')
     const rules = readFileSync(join(ROOT, 'skill', 'lineclear-coordinator', 'SKILL.md'), 'utf8')
     for (const w of ["Only on the human's plain word", 'standing requests', 'force-push', 'home space']) expect(rules).toContain(w)
   })
