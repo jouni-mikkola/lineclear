@@ -60,7 +60,11 @@ export abstract class LinkPoll extends Emitter<Events> {
    *  link tries again later (retry), never on a clock beside an open link. */
   protected async poll(l: Link): Promise<void> {
     if (!this.active(l) || l.polling) return
-    if (!l.rec.url && !this.moved(l)) return
+    if (!l.rec.url && !this.moved(l)) {
+      // no worker of ours: one may appear out of our hands until sync starts one; a starting worker says its own port
+      if (!l.worker) this.retry(l)
+      return
+    }
     l.polling = true
     try {
       const r = await fetch(`${l.rec.url}/api/snapshot`, { signal: AbortSignal.timeout(4000) })
@@ -108,8 +112,9 @@ export abstract class LinkPoll extends Emitter<Events> {
     for (const a of l.waiting.splice(0)) await this.forward(l, a).catch(() => l.waiting.push(a))
   }
 
-  /** a look again soon, so a lost link is back within seconds; one timer per link, never beside an open socket */
   protected retryAfter = 3000
+
+  /** a look again soon, so a lost link is back within seconds; one timer per link, never beside an open socket */
   protected retry(l: Link) {
     if (!this.active(l) || l.retryTimer) return
     l.retryTimer = setTimeout(() => {
