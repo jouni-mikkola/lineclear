@@ -198,16 +198,11 @@ describe('a restart of the main server (an update)', () => {
   async function before(w: { pid: number; port: number; token: string }, code: string) {
     const { HOME, writeJson } = await import('../server/store.ts')
     const { Machines, codeVersion } = await import('../server/live/machines.ts')
-    writeJson('machines/far/last.json', {
-      saved,
-      snap,
-      chats: [{ key: 'p:far:web', cli: 'Claude Code', messages: [{ id: 'm1', who: 'agent', at: 1, text: 'Done.' }] }],
-    })
     writeJson('workers/far/server.json', { port: w.port, pid: w.pid, token: w.token, code: code || codeVersion() })
     return { HOME, Machines, writeJson }
   }
 
-  test('what each machine showed comes back at once, connecting, and its worker on the same code is taken back', async () => {
+  test('a restart takes its worker on the same code is taken back, and nothing is written under machines/', async () => {
     const w = await oldWorker()
     const { HOME, Machines } = await before(w, '')
     const m = new Machines(
@@ -215,22 +210,17 @@ describe('a restart of the main server (an update)', () => {
       async () => ({}),
     )
     try {
+      await until(() => m.list().some((x) => x.rec.machine === 'far'), 'the machine to be listed')
       const l = m.list().find((x) => x.rec.machine === 'far')!
-      // at once: the chats on screen, as before the restart, connecting rather than out of reach; its tasks and places
-      // are read over the link, not kept
-      expect(l.snap).toBeUndefined()
-      expect(l.chats.get('p:far:web')?.messages[0].text).toBe('Done.')
-      expect(l.connecting).toBe(true)
-      expect(m.rows()[0].state).toBe('Connecting…')
       await until(() => l.reachable, 'the link to be reachable')
       expect(l.reachable).toBe(true)
       expect(l.connecting).toBe(false)
       expect(l.worker?.pid).toBe(w.pid)
       m.stop()
-      // the worker goes on after this server stops, and what the machine showed is kept for the next start
+      // the worker goes on after this server stops
       await Bun.sleep(100)
       expect(w.alive()).toBe(true)
-      expect(existsSync(join(HOME, 'machines', 'far', 'last.json'))).toBe(true)
+      expect(existsSync(join(HOME, 'machines'))).toBe(false)
     } finally {
       m.stop()
       process.kill(w.pid)
@@ -265,7 +255,7 @@ describe('a restart of the main server (an update)', () => {
 
   test('cached workers are not adopted while enabled membership is pending, and disabled workers stay off', async () => {
     const w = await oldWorker()
-    const { HOME, Machines } = await before(w, '')
+    const { Machines } = await before(w, '')
     let resolve!: (value: (typeof saved)[]) => void
     const pending = new Promise<(typeof saved)[]>((r) => {
       resolve = r
@@ -275,15 +265,11 @@ describe('a restart of the main server (an update)', () => {
       async () => ({}),
     )
     try {
-      const l = m.list().find((x) => x.rec.machine === 'far')!
-      expect(l.worker).toBeUndefined()
-      expect(l.reachable).toBe(false)
-      expect(l.rec.url).toBe('')
+      expect(m.byName('far')).toBeUndefined()
       resolve([{ ...saved, enabled: false }])
       await until(() => !w.alive(), 'the worker to stop')
       expect(w.alive()).toBe(false)
       expect(m.byName('far')).toBeUndefined()
-      expect(existsSync(join(HOME, 'machines', 'far', 'last.json'))).toBe(false)
     } finally {
       resolve([])
       m.stop()

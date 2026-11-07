@@ -40,20 +40,17 @@ async function linked() {
   return { m, l, far, poll, end: () => (m.stop(), far.server.stop(true)) }
 }
 
-test("no tasks.json is left under machines/: an update removes the old snapshot and moves the worker's store out", async () => {
+test('a start removes the machines/ folder an older version kept: 0 files are left under it', async () => {
   const { HOME, writeJson } = await import('../server/store.ts')
   const { Machines } = await import('../server/live/machines.ts')
   const saved = { id: 'old', label: 'old', target: 'old.invalid', session: 'default', enabled: false }
   writeJson('machines/old/last.json', { saved, snap: snapOf('work'), chats: [] })
-  writeJson('machines/old/tasks.json', { tasks: [task('work')] })
   const m = new Machines(
     async () => [saved],
     async () => ({}),
   )
   m.stop()
-  expect(existsSync(join(HOME, 'machines', 'old', 'tasks.json'))).toBe(false)
-  expect(JSON.parse(readFileSync(join(HOME, 'workers', 'old', 'tasks.json'), 'utf8')).tasks).toHaveLength(1)
-  expect(JSON.parse(readFileSync(join(HOME, 'machines', 'old', 'last.json'), 'utf8')).snap).toBeUndefined()
+  expect(existsSync(join(HOME, 'machines'))).toBe(false)
 })
 
 test('a change on the remote machine shows in the next read, and nothing of it is written here', async () => {

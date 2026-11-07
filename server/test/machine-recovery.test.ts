@@ -1,6 +1,4 @@
 import { describe, expect, test } from 'bun:test'
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
 import { LinkBackoff } from '../server/live/recovery.ts'
 import { EventEmitter } from 'node:events'
 import { Subscription } from '../server/live/herdr.ts'
@@ -158,26 +156,14 @@ describe('machine link recovery', () => {
     }
   })
 
-  test('removing a machine cancels cached writes and late probes cannot restore it', async () => {
-    const { HOME } = await import('../server/store.ts')
+  test('removing a machine drops its link', async () => {
     const m = new Machines(null, async () => ({}))
     const l = m.adopt('removed-fake', 'http://127.0.0.1:1')
-    type TestLink = typeof l
-    const internal = m as unknown as {
-      saved: () => Promise<never[]>
-      keep(l: TestLink): void
-      keepTimers: Map<string, ReturnType<typeof setTimeout>>
-    }
+    const internal = m as unknown as { saved: () => Promise<never[]> }
     internal.saved = async () => []
     try {
-      internal.keep(l)
-      expect(internal.keepTimers.has(l.saved.label)).toBe(true)
       await m.sync()
       expect(m.byName(l.saved.label)).toBeUndefined()
-      expect(internal.keepTimers.has(l.saved.label)).toBe(false)
-      internal.keep(l)
-      expect(internal.keepTimers.has(l.saved.label)).toBe(false)
-      expect(existsSync(join(HOME, 'machines', l.saved.label, 'last.json'))).toBe(false)
     } finally {
       m.stop()
     }
