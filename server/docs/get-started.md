@@ -8,8 +8,7 @@ CLI herdr can start works (chats are read for Claude Code, Codex and pi).
 ## Install
 
 Needs herdr 0.9 or later, on Linux or macOS. It runs on [Bun](https://bun.sh): with none found, it gets one pinned,
-checksum-checked Bun into `~/.lineclear/bun/` by itself. Other
-machines need nothing installed by hand ([Other machines](machines.md)).
+checksum-checked Bun into `~/.lineclear/bun/` by itself. Other machines need nothing installed by hand ([Other machines](machines.md)).
 
 ```sh
 herdr plugin install eliasstravik/herdr-projects     # or link a checkout: herdr plugin link /path/to/lineclear
