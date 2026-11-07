@@ -221,7 +221,7 @@ function sendSecrets(host: string, project: string, space: string, env: Env = pr
   if (text === "") return undefined;
   const script = `"$HOME/.local/bin/lineclear" secrets import ${quote(space)} >/dev/null`;
   try {
-    const p = Bun.spawnSync(sshArgs(env, host, `sh -c ${quote(script)}`), { stdin: Buffer.from(text), timeout: 60_000, env: env as Record<string, string> });
+    const p = Bun.spawnSync(sshArgs(env, host, script), { stdin: Buffer.from(text), timeout: 60_000, env: env as Record<string, string> });
     return p.exitCode === 0 ? undefined : `its secrets did not arrive: ${(p.stderr.toString() || `exit ${p.exitCode}`).trim().split("\n").at(-1)}`;
   } catch (e) {
     return `its secrets did not arrive: ${(e as Error).message}`;
@@ -254,9 +254,9 @@ export function startOn(
 }
 
 /** Runs a command on a machine with stdin. Returns the last lines of its error, or undefined when it succeeded. */
-function runScript(host: string, command: string, stdin: string, env: Env): string | undefined {
+function runScript(host: string, script: string, stdin: string, env: Env): string | undefined {
   try {
-    const p = Bun.spawnSync(sshArgs(env, host, command), { stdin: Buffer.from(stdin), timeout: 5 * 60_000, env: env as Record<string, string> });
+    const p = Bun.spawnSync(sshArgs(env, host, script), { stdin: Buffer.from(stdin), timeout: 5 * 60_000, env: env as Record<string, string> });
     return p.exitCode === 0 ? undefined : (p.stderr.toString() || p.stdout.toString()).trim().split("\n").slice(-3).join(" ") || `exit ${p.exitCode}`;
   } catch (e) {
     return (e as Error).message;
@@ -265,5 +265,5 @@ function runScript(host: string, command: string, stdin: string, env: Env): stri
 
 /** Clones a project's repo on a machine, or brings it up to date, with no task. Returns an error text, or undefined. */
 function cloneOn(host: string, space: string, origin: string, env: Env = process.env): string | undefined {
-  return runScript(host, `sh -c ${quote(`set -e\n${REMOTE_PATH}\n${cloneScript(origin, cloneDir(space))}`)}`, "", env);
+  return runScript(host, `set -e\n${REMOTE_PATH}\n${cloneScript(origin, cloneDir(space))}`, "", env);
 }

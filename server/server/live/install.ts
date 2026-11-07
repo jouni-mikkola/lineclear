@@ -5,9 +5,11 @@
 //   skill/               Lineclear's skills, which agents there read
 import { createHash } from 'node:crypto'
 import { lstatSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { hostname } from 'node:os'
 import { join, relative } from 'node:path'
 import { ROOT } from '../root.ts'
-import { helperDir, q, sshArgs, type BoxInfo } from './box.ts'
+import { quote } from '../../../src/ssh.ts'
+import { helperDir, RUN_BY, sshTo, type BoxInfo } from './box.ts'
 import { herdrCli } from './herdr.ts'
 
 /** a machine as herdr saved it (herdr machine list --json) */
@@ -36,7 +38,7 @@ export const machineStatus = async () =>
 
 /** a command on a machine over the shared SSH connection, before a worker for it runs */
 async function onMachine(target: string, script: string, o: { stdin?: Uint8Array | string; timeoutMs?: number } = {}) {
-  const p = Bun.spawn(sshArgs(target, script), { stdin: o.stdin === undefined ? 'ignore' : Buffer.from(o.stdin), stdout: 'pipe', stderr: 'pipe' })
+  const p = Bun.spawn(sshTo(target, script), { stdin: o.stdin === undefined ? 'ignore' : Buffer.from(o.stdin), stdout: 'pipe', stderr: 'pipe' })
   const t = setTimeout(() => p.kill(), o.timeoutMs ?? 60_000)
   const [out, err, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited])
   clearTimeout(t)
@@ -69,8 +71,14 @@ cat "$HOME/.lineclear/helper/version" 2>/dev/null | sed 's/^/helper=/'
 true
 `
 
+/** the machine says who runs its tasks, so its own task list and doctor can tell; the probe's one call carries it */
+const tellRunBy = () => {
+  const me = (process.env.LINECLEAR_MACHINE ?? hostname()).split('.')[0] ?? ''
+  return `mkdir -p "$HOME/.lineclear" && printf '"%s"' ${quote(me)} > "$HOME/.lineclear/${RUN_BY}" 2>/dev/null`
+}
+
 export async function probe(target: string): Promise<Probe> {
-  const r = await onMachine(target, PROBE, { timeoutMs: 30_000 })
+  const r = await onMachine(target, `${tellRunBy()}\n${PROBE}`, { timeoutMs: 30_000 })
   if (r.code !== 0) throw new Error(r.err.split('\n').pop() || `ssh ${target} failed`)
   const kv = Object.fromEntries(
     r.out
@@ -179,7 +187,7 @@ export async function installHelper(target: string, p: Probe) {
   const tar = tarOf(helperFiles(), version)
   const r = await onMachine(
     target,
-    `set -e; d=${q(dir)}; mkdir -p "$d"; rm -rf "$d/skill" "$d/bin"; tar xf - -C "$d"; mkdir -p "$d/hooks" "$d/inbox" "$d/prompts"`,
+    `set -e; d=${quote(dir)}; mkdir -p "$d"; rm -rf "$d/skill" "$d/bin"; tar xf - -C "$d"; mkdir -p "$d/hooks" "$d/inbox" "$d/prompts"`,
     {
       stdin: tar,
       timeoutMs: 180_000,

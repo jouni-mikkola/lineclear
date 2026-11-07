@@ -1,4 +1,4 @@
-import { existsSync } from '../mfs.ts'
+import { exists } from '../mfs.ts'
 import type { TaskStatus } from '../../../shared/types.ts'
 import { ROUTING_FAILURE } from '../agents.ts'
 import { splitBrief } from '../prompts.ts'
@@ -152,7 +152,7 @@ export class EngineTidy extends EngineMerge {
         throw e
       })
       const left = p ? await this.onMachineOf(t, () => this.wtOf(t).remove({ repo: p.path, wt: t.worktree!, branch: t.branch, label: labelOf(t) })) : []
-      if (!p && t.worktree && existsSync(t.worktree)) left.push(`${t.worktree} (its project is gone)`)
+      if (!p && t.worktree && (await exists(t.worktree))) left.push(`${t.worktree} (its project is gone)`)
       clearTimeout(this.later.get(t.id))
       for (const m of [this.later, this.wrote]) m.delete(t.id)
       // a Done task stays done for the ones queued after it

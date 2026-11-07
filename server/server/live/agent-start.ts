@@ -90,14 +90,14 @@ export async function startIn(r: AgentRecord, pane: string, args: string[]) {
 }
 
 /** the CLI's flags. Instructions go in a file: long text with quotes and newlines can't travel as a shell argument */
-export function launchArgs(r: AgentRecord): string[] {
+export async function launchArgs(r: AgentRecord): Promise<string[]> {
   if (r.kind !== 'pi') return []
   // a model is kept by its id, or by its name when picked in the chat's menu; an effort its model lacks goes in as the nearest it has
   const model = modelArg(r.kind, r.model)
   const effort = effortFor(r.kind, r.effort, r.model)
   if (r.system) {
-    task.mkdirSync(dirname(promptPath(r.name)), { recursive: true })
-    task.writeFileSync(promptPath(r.name), r.system)
+    await task.mkdir(dirname(promptPath(r.name)), { recursive: true })
+    await task.writeFile(promptPath(r.name), r.system)
   }
   return [
     ...(r.sessionId ? ['--session-id', r.sessionId] : []),

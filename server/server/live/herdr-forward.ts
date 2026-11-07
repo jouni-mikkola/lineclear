@@ -2,7 +2,7 @@
 // A call is the same call with `--machine <label-or-id>`; Lineclear keeps no script for it.
 import { readFileSync } from 'node:fs'
 import { availableParallelism, loadavg } from 'node:os'
-import { sshArgs } from './box.ts'
+import { sshTo } from './box.ts'
 import { adapter, type Call, HerdrError, rpc } from './herdr.ts'
 import { savedMachines } from './install.ts'
 
@@ -147,7 +147,7 @@ async function targetOf(machine: string): Promise<string | undefined> {
 const overSsh: Remote = async (machine, script) => {
   const target = await targetOf(machine)
   if (!target) return undefined
-  const p = Bun.spawn(sshArgs(target, script), { stdin: 'ignore', stdout: 'pipe', stderr: 'ignore', timeout: 10_000, killSignal: 'SIGKILL' })
+  const p = Bun.spawn(sshTo(target, script), { stdin: 'ignore', stdout: 'pipe', stderr: 'ignore', timeout: 10_000, killSignal: 'SIGKILL' })
   const [out, code] = await Promise.all([new Response(p.stdout).text(), p.exited])
   return code === 0 ? out : undefined
 }

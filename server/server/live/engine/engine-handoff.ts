@@ -1,4 +1,4 @@
-import { existsSync } from '../mfs.ts'
+import { exists } from '../mfs.ts'
 import type { Question } from '../../../shared/types.ts'
 import { hidden } from '../agents.ts'
 import { restartLine, resumedLine, taskFirst } from '../prompts.ts'
@@ -129,7 +129,7 @@ export class EngineHandoff extends EnginePr {
     const t = this.req(id)
     if (ended(t)) return 'ended'
     // the gates that run no test would fail the merge check: the agent hears them now, not after a turn in the lane
-    const gates = t.worktree && t.base && existsSync(t.worktree) ? await Lane.fastGatesFailure(t.worktree, t.base) : undefined
+    const gates = t.worktree && t.base && (await exists(t.worktree)) ? await Lane.fastGatesFailure(t.worktree, t.base) : undefined
     if (gates)
       throw new Error(
         `Not ready: the check's fast gates fail on this branch, so nothing was reported. Fix them, commit, then run lineclear ready ${t.id} again.\n${gates}`,
@@ -145,7 +145,7 @@ export class EngineHandoff extends EnginePr {
     t.watch ??= { since: ghNow() }
     // its job is over: so is what it said of its progress
     t.report = undefined
-    if (t.worktree && t.base && existsSync(t.worktree) && !(await G.dirty(t.worktree)) && (await G.aheadCount(t.worktree, t.base)) === 0) {
+    if (t.worktree && t.base && (await exists(t.worktree)) && !(await G.dirty(t.worktree)) && (await G.aheadCount(t.worktree, t.base)) === 0) {
       this.markClosed(t, 'done')
       if (this.agents.status(this.key(t)) !== 'working') await this.cleanup(t)
       return 'closed'

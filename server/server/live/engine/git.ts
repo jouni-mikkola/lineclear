@@ -1,8 +1,8 @@
 // git for tasks: what a fresh worktree starts from and gets copied in, whether its work is in main, commits, rebasing
 // on main and merging into it. herdr itself makes and removes task worktrees (worktrees.ts).
 import { join } from 'node:path'
-import { remoteBox, GIT_READ_SHARE_MS, isGitRead, run } from '../box.ts'
-import { existsSync } from '../mfs.ts'
+import { remoteBox, run } from '../box.ts'
+import { exists } from '../mfs.ts'
 
 export interface Run {
   ok: boolean
@@ -17,10 +17,9 @@ export async function sh(
   cwd: string,
   opts: { timeoutMs?: number; env?: Record<string, string>; here?: boolean; onPid?: (pid: number) => void } = {},
 ): Promise<Run> {
-  if (!remoteBox() && !existsSync(cwd)) return { ok: false, code: 127, out: '', err: `the folder ${cwd} is gone` } // else Bun says "posix_spawn 'git'"
-  const share = isGitRead(cmd) // asked before the broker's flags go in front of the subcommand
+  if (!remoteBox() && !(await exists(cwd))) return { ok: false, code: 127, out: '', err: `the folder ${cwd} is gone` } // else Bun says "posix_spawn 'git'"
   if (remoteBox() && !opts.here) {
-    const r = await run(cmd, { cwd, env: { GIT_TERMINAL_PROMPT: '0', ...opts.env }, timeoutMs: opts.timeoutMs, shareMs: share ? GIT_READ_SHARE_MS : undefined })
+    const r = await run(cmd, { cwd, env: { GIT_TERMINAL_PROMPT: '0', ...opts.env }, timeoutMs: opts.timeoutMs })
     return { ok: r.code === 0, code: r.code, out: r.out.trimEnd(), err: r.err.trimEnd() }
   }
   const p = Bun.spawn(cmd, { cwd, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, GIT_TERMINAL_PROMPT: '0', ...opts.env } })
