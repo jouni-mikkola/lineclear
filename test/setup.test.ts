@@ -126,3 +126,11 @@ describe("the machine settings file", () => {
     expect(() => readSetup(env)).toThrow("newer");
   });
 });
+
+test("readSettings returns the message of a bad machine settings file instead of throwing", () => {
+  const env = configEnv();
+  mkdirSync(join(projectsDir(env), "p"), { recursive: true });
+  writeFileSync(join(projectsDir(env), "p", "settings.json"), JSON.stringify({ repo: "/r", space: "s", check: "c", models: {} }));
+  writeFileSync(join(configDir(env), "settings.json"), "{ bad");
+  expect(readSettings("p", env)).toContain(join(configDir(env), "settings.json"));
+});

@@ -226,7 +226,12 @@ export function readProjectFile(name: string, env: NodeJS.ProcessEnv): Settings 
 
 export function readSettings(name: string, env: NodeJS.ProcessEnv = process.env): Settings | string {
   const s = readProjectFile(name, env);
-  return typeof s === "string" ? s : withSetupModels(s, env);
+  if (typeof s === "string") return s;
+  try {
+    return withSetupModels(s, env);
+  } catch (e) {
+    return (e as Error).message;
+  }
 }
 
 export function listProjectNames(env = process.env): string[] {
