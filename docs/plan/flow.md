@@ -123,21 +123,8 @@ Each step is in [ROADMAP.md](../ROADMAP.md), or dropped with the step that does 
 - L797 An agent stops at ready: in ROADMAP.md.
 - L798 Each role has a token budget: in ROADMAP.md.
 
-### L799 Tokens per merged step
-Result: `bun scripts/core-baseline.ts step-tokens 20` prints the tokens of each role per merged step over the last 20 merges.
-- why: tokens are counted per task today, not per merged step, so the review, the chats and retries of a step are not added up.
-- done when: the command sums agent, reviewer, project chat and Dispatcher usage for each merged step and prints median and p90 per role; a test reads a fake store of 3 steps, one with a retried task, and sees the sums; `measure.ts` stays under 200 lines.
-- locks: step-tokens, file-src-measure-ts, file-scripts-core-baseline-ts
-- after: none
-- files: src/measure.ts, scripts/core-baseline.ts, test/core-baseline.test.ts
-
-### L800 The swarm measure is a script
-Result: `bun scripts/swarm-measure.ts <swarm-base> <one-base>` prints merged steps per hour, tokens per merged step and job minutes per arm.
-- why: roles.md's first measure has no script, so no run of it is comparable with another.
-- done when: the script reads the board's tasks of each base branch, their sessions and their `check.yml` runs and prints one row per arm; it counts a step only if its base is still green an hour after the merge; a test with two fake arms prints the pass or fail of the rule (3 times the steps an hour, at most 1.2 times the tokens).
-- locks: swarm-measure
-- after: none
-- files: scripts/swarm-measure.ts, test/swarm-measure.test.ts
+- L799 Tokens per merged step: in ROADMAP.md.
+- L800 The swarm measure is a script: in ROADMAP.md, its pass rule is R18 of release.md.
 
 - L801 The swarm arm is measured: dropped, L609 measures both arms (ROADMAP.md).
 - L803 One agent arm and the verdict: dropped, L609 measures both arms (ROADMAP.md).
@@ -146,30 +133,9 @@ Result: `bun scripts/swarm-measure.ts <swarm-base> <one-base>` prints merged ste
 - L804 No timer outside Lineclear: in ROADMAP.md.
 - L805 Sessions of gone tasks go: in ROADMAP.md.
 
-### L806 Any repo gets a check
-Result: Adding a project with no GitHub check opens its first task: a `lineclear-check.yml` workflow that runs the project's check command.
-- why: the lane needs a full check on GitHub, and a repo with no special setup has none, so v0.2's flow would work for Lineclear alone.
-- done when: `lineclear project add` on a repo with no workflow adds a task whose brief adds `templates/check.yml` with the detected check command, shards 1, 5 minutes a job and the `lane` label rule; a test adds a scratch repo and sees the task and the file text; a repo that has a workflow gets no task.
-- locks: project-add, file-src-add-project-ts
-- after: none
-- files: src/add-project.ts, templates/check.yml, test/add-project.test.ts
-
-### L807 The lane reads the repo's check
-Result: The lane waits for the check name the repo's own ruleset requires, not for a job called `check`.
-- why: `github.ts` reads checks by this repo's job name, so another project's lane would wait for a check that never comes.
-- done when: the required check names come from `gh api repos/<repo>/rulesets` once per repo watch, with `check` only when the repo has none; a test with a fake ruleset requiring `build` waits for `build`.
-- locks: github-read, file-server-server-live-engine-github-ts
-- after: none
-- files: server/server/live/engine/github.ts
-
-### L808 The flow runs on a second repo
-Result: A small second repo with no special setup goes through 3 steps: add, build, review, lane and merge, with no hand step.
-- why: the owner's priority 4: the flow must serve any project, and only a real second repo proves it.
-- done when: `docs/numbers.md` lists the repo, its 3 tasks and their times from add to merge, with 0 hand steps and 0 red runs on its main.
-  - Owner only: create the second small repo on GitHub (it leaves the machine).
-- locks: swarm-measure, file-docs-numbers-md
-- after: L806, L807, L791, L795
-- files: docs/numbers.md
+- L806 Any repo gets a check: in ROADMAP.md.
+- L807 The lane reads the repo's check: in ROADMAP.md.
+- L808 The flow runs on a second repo: in ROADMAP.md, writing its own page of `docs/numbers/` (L773's folder).
 
 - L809 Usage shows tokens per step: dropped, W118 of the web plan does it.
 

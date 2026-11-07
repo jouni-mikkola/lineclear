@@ -101,13 +101,7 @@ paths when they open.
 - L762 The roadmap reads step files: in ROADMAP.md.
 - L763 Plans write step files: in ROADMAP.md.
 
-### L764 Every roadmap is split
-Result: This repo and every registered project keep their steps as files, and the single-file reader is gone.
-- why: two formats are two ways to do one job; L762 reads both only until every project is split.
-- done when: `lineclear roadmap split <project>` writes one file per open step and a short `docs/roadmap/README.md`; it ran on every project of `lineclear project list`; `git grep -n "ROADMAP.md" src` lists none; `lineclear roadmap check .` passes.
-- locks: roadmap-read, file-src-roadmap-source-ts, file-docs-roadmap-md
-- after: L762, L763
-- files: src/roadmap-source.ts, src/roadmap-cli.ts, docs/ROADMAP.md, docs/roadmap/
+- L764 Every roadmap is split: in ROADMAP.md, its grep cut to the reader's two files (11 files of `src/` name ROADMAP.md).
 
 ### L765 The install folder
 Result: Install, update, uninstall and the store copies live in one folder with their tests.
@@ -126,21 +120,9 @@ Result: Install, update, uninstall and the store copies live in one folder with 
 - L771 Source tests by module: in ROADMAP.md.
 - L772 Engine tests by module: in ROADMAP.md.
 
-### L773 One file per measure
-Result: Each measure has its own page in `docs/numbers/`, so two measuring steps never edit one file.
-- why: `docs/numbers.md` was changed by 11 PRs, 1 with a conflict.
-- done when: `docs/numbers/<measure>.md` holds each section; `docs/numbers.md` is gone; `git grep -n "numbers.md"` lists none outside git history.
-- locks: numbers-doc, file-docs-numbers-md
-- after: L760, L609
-- files: docs/numbers.md, docs/numbers/, scripts/check-speed.ts, scripts/core-baseline.ts, scripts/check.ts
+- L773 One file per measure: in ROADMAP.md; `docs/numbers.md` stays as a pointer to the folder, so every link to it still holds.
 
-### L774 Collisions can be measured
-Result: One command prints how many merged PRs hit a rebase conflict and which files many PRs touch.
-- why: the numbers above were taken by hand; the layout's goal needs a number anyone can rerun.
-- done when: `bun scripts/core-baseline.ts collisions <n>` replays the force pushes of the last n merged PRs with `git merge-tree` and prints conflicting PRs per 100 and files touched by more than 10 PRs; run on today's window it prints 29 of 295; a test replays a planted conflict.
-- locks: core-baseline
-- after: L773
-- files: scripts/core-baseline.ts, test/core-baseline.test.ts
+- L774 Collisions can be measured: in ROADMAP.md.
 
 - L775 The fork's leftovers are gone: in ROADMAP.md.
 - L776 One package, one lock file: in ROADMAP.md.

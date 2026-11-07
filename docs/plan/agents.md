@@ -99,32 +99,13 @@ Each step is in [ROADMAP.md](../ROADMAP.md), or dropped with the step that does 
 - L749 The host carries the agents' CLI: dropped, L589 does it (ROADMAP.md).
 - L750 A task end leaves nothing: in ROADMAP.md; the session sweep is L805's.
 
-### L751 Budgets are set per role
-Result: Each role's token budget and memory cap are settings with measured defaults, passed to the agent at spawn.
-- why: P3. L735 and L736 enforce numbers; the owner sets them in one place.
-- done when: settings hold `budget.tokens` and `budget.memory` per role (agent 150 k, reviewer 80 k, coordinator 1 M); a test starts an agent and sees `LINECLEAR_TOKEN_BUDGET` and the scope's `MemoryMax` from the setting.
-- locks: settings, file-server-server-live-settings-store-ts, file-server-server-live-agent-start-ts
-- after: L735, L736, L742
-- files: server/server/live/settings-types.ts, server/server/live/settings-store.ts, server/server/live/agent-start.ts
-
-### L752 Any repo gets an agent
-Result: A small repo with no package.json and no Lineclear setup gets a worktree, an RPC agent and a merge, like this repo.
-- why: P4. The start links a `node_modules` store and assumes Bun tools; another project must get the same flow.
-- done when: a test adds a 3-file repo with a shell check command, starts one step and sees worktree, brief, ready and merge with 0 errors; `storePath` runs only when a lock file exists.
-- locks: any-repo, file-server-server-live-engine-git-ts
-- after: L732
-- files: server/server/live/engine/git.ts, server/test/any-repo-start.test.ts
+- L751 Budgets are set per role: in ROADMAP.md, after L798 and L502 in place of L736 and L742.
+- L752 Any repo gets an agent: in ROADMAP.md, on `engine/install.ts` where `storePath` is, with no `after` (L506, which replaced L732, is merged).
 
 - L753 The helper goes in atomically: dropped, L590 did it (merged).
 - L754 Updates drain a machine: dropped, L591 does it (ROADMAP.md).
 - L755 Machine actions are kept: dropped, L593 does it (ROADMAP.md).
 
-### L756 Settings show each machine
-Result: Settings shows each machine's free agents, memory and running agents in the graphite theme, with every state designed.
-- why: P5. The owner sees where 45 agents run and why a machine takes none.
-- done when: the Machines section shows the `place` numbers for each machine; screenshots at 1440 and 390 px for empty, loading, error, 3 machines and an unreachable one use only `tokens.css` colours (red only for unreachable).
-- locks: settings-machines, file-ui-web-settings-tsx
-- after: L744
-- files: ui/web/settings.tsx, ui/web/settings-machines.tsx, ui/test/settings-machines.spec.ts
+- L756 Settings show each machine: dropped, W123 of the web plan shows each machine on Home, and W116 keeps machine findings out of Settings.
 
 - L757 45 agents on 3 machines: in ROADMAP.md.
