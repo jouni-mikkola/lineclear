@@ -45,8 +45,7 @@ export type LogEvent =
   | { kind: 'turn-start'; id: string; at: number }
   /** the agent's turn ended (the CLI wrote its end-of-turn marker) */
   | { kind: 'turn-end'; id: string; at: number }
-  /** the model's provider cut the turn off: its words, and the CLI's own code and HTTP status for it where it has them
-   *  (retry.ts decides what it means) */
+  /** the model's provider cut the turn off: its words, and the CLI's own code and HTTP status for it where it has them */
   | { kind: 'error'; id: string; at: number; text: string; code?: string; status?: number }
   /** a tool call of the agent itself (not a subagent's): what kind, its tool, what it did in words. A CLI that logs a
    *  step only once it is over sends it with its end (and a test run's outcome) */
