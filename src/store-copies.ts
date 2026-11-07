@@ -1,3 +1,4 @@
+import { withHotLog } from "./hot-log.ts";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -20,7 +21,7 @@ const storeCopiesDir = (env: Env = process.env) =>
 export function taskCount(dir: string): number {
   let n = 0;
   try {
-    const hot = JSON.parse(readFileSync(join(dir, "tasks.json"), "utf8")) as { tasks?: unknown[] };
+    const hot = withHotLog(dir, JSON.parse(readFileSync(join(dir, "tasks.json"), "utf8")) as { tasks?: { id?: string }[] });
     n += Array.isArray(hot.tasks) ? hot.tasks.length : 0;
   } catch {
     // no file, or one that is not JSON: no hot tasks
