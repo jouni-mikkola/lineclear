@@ -69,7 +69,9 @@ function testsByImports(root: string, changed: string[]): string[] | undefined {
   const reached = new Set(changed);
   const queue = [...changed];
   for (let f = queue.pop(); f !== undefined; f = queue.pop()) {
-    for (const up of by.get(f) ?? []) if (!reached.has(up)) queue.push(up), reached.add(up);
+    const fresh = [...(by.get(f) ?? [])].filter((up) => !reached.has(up));
+    for (const up of fresh) reached.add(up);
+    queue.push(...fresh);
   }
   const named = [...reached].filter((f) => !CODE.test(f) || f === "bin/lineclear" || f.startsWith("scripts/"));
   return files.filter((t) => TEST.test(t) && (reached.has(t) || named.some((f) => text.get(t)?.includes(f))));

@@ -250,6 +250,6 @@ css, shell, perl and the `bin` scripts): server 17,094, `src/` 14,725, `ui/` 11,
 | `scripts/` | Checks | 1109 | keep | the check and its tools |
 | `scripts/canary.ts` | Install | 9 | keep | the canary |
 | `scripts/gates/` | Checks | 293 | keep | lint, dead code, borders |
-| `scripts/release*` | Install | 116 | keep | releases |
+| `scripts/release*` | Install | 86 | keep | releases |
 | `playwright*.ts` | Checks | 44 | keep | the UI bar's browser configs |
 | `scripts/smoke.ts` | Install | 210 | keep | the update's smoke check |

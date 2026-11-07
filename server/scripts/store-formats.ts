@@ -10,8 +10,9 @@ type Values = Record<string, string>
 /** The files the server keeps its settings, spaces and tasks in; the database with its journals. */
 const FILES = ['settings.json', 'tasks.json', 'spaces.json', 'task-ids.sqlite', 'task-ids.sqlite-wal', 'task-ids.sqlite-shm']
 
-const dir = process.argv[2] ?? process.exit(console.error('usage: store-formats.ts <dir> [--older]') ?? 2)
-const older = process.argv.includes('--older')
+const args = process.argv.slice(2).filter((a) => a !== 'read') // `read` is the old verb: a promotion by an older build may still say it
+const dir = args.find((a) => a !== '--older') ?? process.exit(console.error('usage: store-formats.ts <dir> [--older]') ?? 2)
+const older = args.includes('--older')
 const home = mkdtempSync(join(tmpdir(), 'store-formats-'))
 for (const f of FILES) if (existsSync(join(dir, f))) copyFileSync(join(dir, f), join(home, f))
 if (existsSync(join(dir, 'chatlog'))) cpSync(join(dir, 'chatlog'), join(home, 'chatlog'), { recursive: true })
