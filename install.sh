@@ -145,14 +145,15 @@ point() {
 }
 
 # install_build: builds the wanted version once in builds/<name> and points builds/current at it, builds/previous at the
-# build it replaces. Its .release file is written last, so a folder without one is an unfinished build and is made again.
+# build it replaces. Its .built file is written last, so a folder without one is an unfinished build and is made again.
+# A release build also has .release, which doctor looks for; a build of a branch does not, so doctor still asks for a release.
 # Sets changed=1 when current moved, and arms the rollback when a running service was on an earlier build.
 install_build() {
   mkdir -p "$builds"
   want=$(remote_commit)
   if is_release; then name=${ref#v}; else name=$(printf '%.12s' "${want:-$ref}"); fi
   dest=$builds/$name
-  if [ -f "$dest/.release" ]; then
+  if [ -f "$dest/.built" ] || [ -f "$dest/.release" ]; then
     say "Lineclear: $name is built already"
   else
     say "Lineclear: installing $name"
@@ -163,9 +164,12 @@ install_build() {
     head=$(git -C "$dest" rev-parse HEAD)
     build_deps "$dest" || { rm -rf "$dest"; die "building $name failed"; }
     rm -rf "$dest/.git"
-    printf '%s\n' "$name" >"$dest/.release"
+    if is_release; then printf '%s\n' "$name" >"$dest/.release"; fi
+    printf '%s\n' "$name" >"$dest/.built"
   fi
   was=$(readlink "$builds/current" 2>/dev/null || true)
+  # an install made before builds/ ran from a checkout in $app: it is the build to go back to
+  if [ -z "$was" ] && [ -d "$app/.git" ]; then was=$app; fi
   [ "$was" != "$dest" ] || return 0
   if [ -n "$was" ]; then
     point "$was" "$builds/previous"
@@ -370,11 +374,13 @@ rollback() {
     say "Lineclear: could not post the Inbox item"
   point "$was" "$builds/current"
   rm -f "$builds/previous"
+  rm -rf "$dest" # a failed build is made again next time
   problems=
   restore_projects && restart_all || problems="the service did not restart"
   if store_lost; then
     if restore_store && restart_all; then say "Lineclear: the update had lost tasks; the store is back ($tasks_before tasks)"; else problems="$problems; the store lost tasks and could not be put back from $store_copy"; fi
   fi
+  if store_lost; then problems="$problems; the store holds fewer than the $tasks_before tasks from before"; fi
   problems=$(printf '%s' "$problems" | sed 's/^; //')
   if [ -n "$problems" ]; then
     say "Lineclear: after putting $short back: $problems. Run 'lineclear doctor'."

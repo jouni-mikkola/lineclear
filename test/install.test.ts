@@ -41,6 +41,7 @@ test("install adds Lineclear, the extension and the service, and doctor passes",
   expect(d.out).toContain("ok     starts at boot");
   expect(d.out).toContain("ok     compile cache on disk");
   wellButBuild(d);
+  expect(d.out).toContain("FAILED stable build"); // a build of a branch is not a release
 }, 180_000); // the first full build of the app and its web pages, then a doctor run
 
 test("where lingering needs root, install prints the one command and doctor names it", () => {
