@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmp, waitFor } from "./helpers.ts";
 
@@ -15,7 +15,6 @@ test("one process serves the pages, the home data and the board's snapshot on on
   probe.stop(true);
   const root = join(import.meta.dir, "..", "server");
   const server = join(root, "server");
-  if (!existsSync(join(root, "generated", "server-plugins.ts"))) Bun.spawnSync(["bun", "scripts/build-plugins.ts"], { cwd: root });
   const child = Bun.spawn([process.execPath, "main.ts"], {
     cwd: server,
     env: {
