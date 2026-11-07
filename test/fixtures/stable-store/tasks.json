@@ -1,0 +1,17 @@
+{
+  "next": {
+    "SAM": 1
+  },
+  "tasks": [
+    {
+      "id": "SAM-1",
+      "n": 1,
+      "project": "p:desktop:sample",
+      "title": "A sample task",
+      "desc": "Its brief",
+      "by": "sample",
+      "created": 1,
+      "updated": 1
+    }
+  ]
+}

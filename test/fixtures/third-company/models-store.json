@@ -1,0 +1,4 @@
+{
+  "quillon": { "models": [{ "id": "lumen-3", "cost": { "input": 4, "output": 12 } }, { "id": "lumen-3-mini", "cost": { "input": 0.1, "output": 0.4 } }] },
+  "vexor": { "models": [{ "id": "praxis-2", "cost": { "input": 1, "output": 3 } }] }
+}

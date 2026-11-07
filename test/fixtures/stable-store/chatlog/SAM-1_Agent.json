@@ -1,0 +1,14 @@
+{
+  "posted": [
+    {
+      "at": 1,
+      "id": "m1",
+      "card": {
+        "id": "ask1",
+        "status": "need",
+        "task": "SAM-1"
+      }
+    }
+  ],
+  "answers": {}
+}
