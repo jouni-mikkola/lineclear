@@ -40,6 +40,7 @@ import {
 import { fastGates } from "./fast-gates.ts";
 import { describeFailure, type Failure, outsideChange, parseFailures } from "./failures.ts";
 import { changedSince } from "./gates/tools.ts";
+import { judge, readQuarantine } from "./quarantine.ts";
 
 // Every step but the server's (below) runs with TMPDIR in a folder of this run, on disk. Each test process clears its own
 // folder inside it (tmp-scope.ts), so anything left in it when the steps end was left by a process that did not get
@@ -227,6 +228,15 @@ const started = performance.now();
 const times: StepTime[] = [];
 const outcome = new Map<string, Promise<boolean>>();
 
+/** Reruns a failed test alone in its step's folder: true when it passes, so the failure was a flake. */
+function passesAlone(step: Step, f: Failure): boolean {
+  if (f.file === "") return false;
+  const only = ["-t", `^${f.test.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`];
+  const cmd = step.cwd === "server" ? ["bun", "scripts/test.ts", f.file, ...only] : ["bun", "test", "--timeout", "120000", f.file, ...only];
+  const r = Bun.spawnSync(cmd, { cwd: step.cwd, stdin: "ignore", stdout: "ignore", stderr: "ignore", env: step.cwd === "server" ? serverEnv : env });
+  return r.success;
+}
+
 /** Runs one step after the steps it needs. Resolves to whether it passed; a step skipped for a failed need counts as failed. */
 async function runStep(step: Step): Promise<boolean> {
   // every step is in the map before any looks for its needs, whatever their order in the plan
@@ -235,7 +245,13 @@ async function runStep(step: Step): Promise<boolean> {
   const at = performance.now();
   const { code, failing, output } = await run(step);
   const isTests = step.name.startsWith("tests");
-  const ok = code === 0;
+  let ok = code === 0;
+  const reruns = !ok && failing.length > 0 && failing.length <= 20 && (isTests || step.name === "server tests");
+  const verdict = reruns ? judge(failing, (f) => passesAlone(step, f), readQuarantine()) : undefined;
+  if (verdict?.ok) {
+    ok = true;
+    console.log(`check: ${step.name}: only quarantined flakes failed (they passed alone):\n${failing.map((f) => `  ${describeFailure(f)}`).join("\n")}`);
+  }
   times.push({ step: step.name, seconds: (performance.now() - at) / 1000, ok });
   if (!ok) {
     console.error(
@@ -248,7 +264,7 @@ async function runStep(step: Step): Promise<boolean> {
           : ""
       }${
         isTests && touched && outsideChange(failing, touched) ? `${failing.map((f) => `check: outside the change: ${f.test}`).join("\n")}\n` : ""
-      }check: ${step.name} failed${failing.length > 0 ? "" : `: ${lastErrorLine(output)}`}`,
+      }${verdict ? `${verdict.faults.map((l) => `check: ${l}`).join("\n")}\n` : ""}check: ${step.name} failed${failing.length > 0 ? "" : `: ${lastErrorLine(output)}`}`,
     );
   }
   return ok;
