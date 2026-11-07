@@ -1,6 +1,16 @@
 import { expect, test } from 'bun:test'
 
 const COUNT = 12
+
+async function* chunks(stream: ReadableStream<Uint8Array>) {
+  const reader = stream.getReader()
+  const decoder = new TextDecoder()
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) return
+    yield decoder.decode(value)
+  }
+}
 // A stand-in pi: answers every line it gets with an event line, ends on "quit"
 const STAND_IN = `
 require('node:readline').createInterface({ input: process.stdin }).on('line', (l) => {
@@ -13,8 +23,8 @@ test('one host carries 12 stand-in pi children: events under their keys, 12 exit
   const frames: Record<string, unknown>[] = []
   const reader = (async () => {
     let rest = ''
-    for await (const chunk of host.stdout) {
-      rest += new TextDecoder().decode(chunk)
+    for await (const chunk of chunks(host.stdout)) {
+      rest += chunk
       const lines = rest.split('\n')
       rest = lines.pop() ?? ''
       for (const l of lines) frames.push(JSON.parse(l))
@@ -49,8 +59,8 @@ test('stop ends a child', async () => {
   host.stdin.write(`${JSON.stringify({ type: 'stop', key: 'k' })}\n`)
   await host.stdin.flush()
   let seen = ''
-  for await (const chunk of host.stdout) {
-    seen += new TextDecoder().decode(chunk)
+  for await (const chunk of chunks(host.stdout)) {
+    seen += chunk
     if (seen.includes('"type":"exit"')) break
   }
   expect(seen).toContain('"key":"k"')
