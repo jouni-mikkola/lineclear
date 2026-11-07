@@ -1,12 +1,13 @@
 import { freshDecisions } from "../src/decision-dedupe.ts";
 import { expect, spyOn, test } from "bun:test";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { cpus } from "node:os";
 import { join } from "node:path";
 import { readItems } from "../src/inbox.ts";
 import { decisionsPath } from "../pi/config.ts";
 import { readState, realWorld, runMain, tick, TICK_MS } from "../src/rules.ts";
 import { removeFolders } from "../src/tmpdirs.ts";
+import { CLAIM_MS, claimStart, releaseStart } from "../src/starts.ts";
 import { pickReviewer } from "../src/stalls.ts";
 import { company } from "../src/company.ts";
 import { recordTaskSteps } from "./helpers.ts";
@@ -92,6 +93,20 @@ test("the same step added twice starts once and is refused the second time", () 
   staleTick(t, { tasks: () => [{ id: "LIN-9", title: "A Title A", status: "work" }] });
   expect(t.adds().length).toBe(1);
   expect(t.decisions().some((x) => x.step === "A" && x.reason.includes("does not start twice"))).toBe(true);
+});
+
+test("two loops starting one step at once: the second is refused by the claim", () => {
+  const t = setup({ steps: [step("A", "none")] });
+  const claims = join(t.config, "projects", "demo", "claims");
+  expect(claimStart(claims, "A")).toBe(true);
+  expect(claimStart(claims, "A")).toBe(false);
+  expect(claimStart(claims, "A", Date.now() + CLAIM_MS + 1000)).toBe(true);
+  releaseStart(claims, "A");
+  mkdirSync(claims, { recursive: true });
+  writeFileSync(join(claims, "A"), "x");
+  t.doTick();
+  expect(t.adds()).toEqual([]);
+  expect(t.decisions().some((x) => x.step === "A" && x.reason.includes("another loop"))).toBe(true);
 });
 
 test("a step closed with nothing to merge is landed and starts no agent", () => {

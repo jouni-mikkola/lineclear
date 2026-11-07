@@ -6,7 +6,7 @@ import { testOf } from "./doneproof.ts";
 import { ownerStepItem } from "./owner-steps.ts";
 import { stepHeld } from "./parts.ts";
 import { company } from "./company.ts";
-import type { Settings } from "./project.ts";
+import { projectsDir, type Settings } from "./project.ts";
 import { checkRoadmap, closedSteps, doneIds, isFrozen, resultFlag, type StepStatus, type Task } from "./roadmap.ts";
 import { statusesFrom, stepInputs } from "./task-steps.ts";
 import type { Decision, State } from "./rules.ts";
@@ -14,7 +14,7 @@ import { askMachines, type Candidate, mostRoom, type Room, roomLack } from "./sp
 import { routineWorker } from "./routine.ts";
 import { askKey, availability, climbStalls, revertLast, reviewerFor, serviceAccounts } from "./stalls.ts";
 import { THIS_MACHINE } from "./start-failures.ts";
-import { bindStarts, liveSteps, recordStart, lockWhy, reservedLocks, settleLockWaits } from "./starts.ts";
+import { bindStarts, claimStart, liveSteps, releaseStart, recordStart, lockWhy, reservedLocks, settleLockWaits } from "./starts.ts";
 import type { Wait } from "./waits.ts";
 import type { World } from "./world.ts";
 
@@ -283,7 +283,7 @@ function addStepTask(s: Starting, step: Step, host: string | undefined, worker: 
 
 /**
  * Just before a start, reads the tasks here and on every other machine, and main, again: the list of this tick may be
- * minutes old. A step with a task that is not done anywhere, or merged on origin/main, is never started twice. A
+ * minutes old. A step with a task that is not done anywhere, closed with nothing to merge, or merged on origin/main, is never started twice. A
  * machine that cannot be reached still holds what it last ran.
  */
 function whyStale(s: Starting, step: Step): string | undefined {
@@ -342,8 +342,14 @@ function startStep(s: Starting, step: Step): boolean {
       note("skip", stale, step.id);
       return false;
     }
+    const claims = join(projectsDir(env), t.name, "claims");
+    if (!claimStart(claims, step.id)) {
+      note("skip", "another loop is starting this step, so it does not start twice", step.id);
+      return false;
+    }
     const err = addStepTask(s, step, host, worker, reviewer);
     if (err) {
+      releaseStart(claims, step.id);
       note("skip", `task add failed: ${err}`, step.id, host ?? THIS_MACHINE);
       return false;
     }
