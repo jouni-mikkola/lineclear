@@ -11,6 +11,7 @@ const TaskView = lazy(() => import("./task.tsx").then((m) => ({ default: m.TaskV
 const Chat = lazy(() => import("./chat-view.tsx").then((m) => ({ default: m.Chat })));
 const Browsers = lazy(() => import("./browsers.tsx").then((m) => ({ default: m.Browsers })));
 const Roadmap = lazy(() => import("./roadmap/index.tsx").then((m) => ({ default: m.Roadmap })));
+const UsagePage = lazy(() => import("./usage-sheet.tsx").then((m) => ({ default: m.UsagePage })));
 const Setup = lazy(() => import("./setup.tsx").then((m) => ({ default: m.Setup })));
 const Settings = lazy(() => import("./settings.tsx").then((m) => ({ default: m.Settings })));
 
@@ -170,6 +171,7 @@ type PageProps = {
 /** The view the address names. Home is the page for usage and the chat too. */
 function Page(p: PageProps) {
   const { view, state } = p;
+  if (view === "usage") return <UsagePage d={p.home.status === "ok" ? p.home.data : undefined} />;
   if (p.shown === "home") {
     return (
       <Home
@@ -184,8 +186,8 @@ function Page(p: PageProps) {
         chat={<Chat chat={p.chat} panel />}
         chatState={p.panelState}
         chatAsked={view === "chat"}
-        usageOpen={p.usageOpen || view === "usage"}
-        setUsageOpen={(o) => (o ? p.setUsageOpen(true) : view === "usage" ? p.go("/") : p.setUsageOpen(false))}
+        usageOpen={p.usageOpen}
+        setUsageOpen={p.setUsageOpen}
       />
     );
   }
@@ -244,9 +246,8 @@ export function App() {
   useEffect(() => {
     if (view === "home" && path === "/inbox") history.replaceState(history.state, "", `/${location.search}`);
   }, [view, path]);
-  // /usage is Home with its usage sheet open
-  // Home is the one page for these: they open it, the usage one with its sheet
-  const shown = view === "usage" || view === "chat" ? "home" : view;
+  // Home is the one page for the chat too
+  const shown = view === "chat" ? "home" : view;
   const page: PageProps = {
     view,
     shown,
