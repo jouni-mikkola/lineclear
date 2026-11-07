@@ -1,6 +1,7 @@
 import { existsSync } from '../mfs.ts'
 import type { Question } from '../../../shared/types.ts'
 import { hidden } from '../agents.ts'
+import { factsWithModel } from '../agents-helpers.ts'
 import type { Space } from '../places.ts'
 import { restartLine, resumedLine, splitBrief, taskFirst } from '../prompts.ts'
 import { CLI_NAME } from '../settings.ts'
@@ -123,12 +124,6 @@ export class EngineHandoff extends EngineLaunch {
     this.beat.set(this.req(id).id, at)
   }
 
-  /** the facts, with the model a start chose on its own when no default was set */
-  private withChosenModel(key: string, facts: string): string {
-    const chosen = this.agents.record(key)?.chosenModel
-    return chosen ? `${facts}, model ${chosen} (no default set, first available)` : facts
-  }
-
   /**
    * The agent reports done: Ready, waiting for review or merge. A branch with no changes at all (a research task, an
    * answer) has nothing to merge: it is closed, Done at once, and put away once the agent's turn ends.
@@ -143,7 +138,7 @@ export class EngineHandoff extends EngineLaunch {
         `Not ready: the check's fast gates fail on this branch, so nothing was reported. Fix them, commit, then run lineclear ready ${t.id} again.\n${gates}`,
       )
     if (summary) t.said = summary
-    if (facts) t.facts = this.withChosenModel(this.key(t), facts)
+    t.facts = factsWithModel(facts ?? '', this.agents.record(this.key(t))?.chosenModel) || t.facts
     t.reported = true
     t.reportedAt ??= Date.now()
     t.landing = undefined

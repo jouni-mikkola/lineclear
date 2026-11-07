@@ -9,6 +9,7 @@ import { copiesProblem, runByNote } from "./store-copies.ts";
 import { cacheEnvFile, dataDir, extensionFile, INSTALL_URL, type Paths, SERVICE } from "./paths.ts";
 import { diskTrouble, freeBytes } from "./health.ts";
 import { firstModel, readModelFile } from "./models.ts";
+import { readSetup } from "./project.ts";
 import { checkoutPointers } from "./install-paths.ts";
 import { buildNames, buildProblem, buildsDir, installReleaseCommand, type RunFrom, unitCommand } from "./builds.ts";
 import { publishedAddress, serveCommand } from "./published.ts";
@@ -313,7 +314,7 @@ export function doctorChecks(probe: Probe): Check[] {
     tool(p, "rsync", "sudo apt install rsync"),
     tool(p, "herdr", "curl -fsSL https://herdr.dev/install.sh | sh"),
     tool(p, "pi", "curl -fsSL https://pi.dev/install.sh | sh"),
-    { name: "new task model", problem: "", fix: "", info: firstModel("pi") ?? "pi lists no model" },
+    { name: "new task model", problem: "", fix: "", info: readSetup().worker || firstModel("pi") || "pi lists no model" },
     { name: "models.json", problem: readModelFile(p.dataDir ?? dataDir()).problem, fix: "fix or delete models.json in the data folder" },
     {
       name: "lineclear files",

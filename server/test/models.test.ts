@@ -1,5 +1,6 @@
 // pi's models and effort levels, as the registry lists them (src/models.ts)
 import { describe, expect, test } from 'bun:test'
+import { factsWithModel, takeFirstModel } from '../server/live/agents-helpers.ts'
 import { chooseModel, findModel, firstModel, modelsOf, nearest, setRegistry, setRegistryReader } from '../../src/models.ts'
 
 describe('reading what pi takes', () => {
@@ -32,6 +33,21 @@ describe('reading what pi takes', () => {
       setRegistry([])
     }
     expect(firstModel('pi')).toBeUndefined()
+  })
+  test('a start with no model takes the first one, the facts say so, and a later start with a model drops the note', () => {
+    setRegistry([{ harness: 'pi', provider: 'fakeco', name: 'zeta-1' }])
+    try {
+      const r: { kind: string; model?: string; chosenModel?: string } = { kind: 'pi', model: '' }
+      takeFirstModel(r)
+      expect(r).toEqual({ kind: 'pi', model: 'fakeco/zeta-1', chosenModel: 'fakeco/zeta-1' })
+      expect(factsWithModel('PR 1', r.chosenModel)).toBe('PR 1, model fakeco/zeta-1 (no default set, first available)')
+      expect(factsWithModel('', r.chosenModel)).toStartWith('model fakeco/zeta-1')
+      takeFirstModel(r)
+      expect(r.chosenModel).toBeUndefined()
+      expect(factsWithModel('PR 1', r.chosenModel)).toBe('PR 1')
+    } finally {
+      setRegistry([])
+    }
   })
   test('a fresh server reads the registry before it answers the first time', () => {
     setRegistryReader(() => [{ harness: 'pi', provider: 'fakeco', name: 'zeta-1' }])

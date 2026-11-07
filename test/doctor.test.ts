@@ -248,13 +248,19 @@ test("a malformed models.json is a doctor problem and a good or missing one is n
 });
 
 test("doctor prints the model a new task would use", () => {
+  const config = mkdtempSync(join(tmpdir(), "doctor-config-"));
+  const was = process.env.LINECLEAR_CONFIG;
+  process.env.LINECLEAR_CONFIG = config;
   setRegistry([{ harness: "pi", provider: "fakeco", name: "zeta-1" }]);
   try {
-    const check = doctorChecks(probe({})).find((c) => c.name === "new task model");
-    expect(check?.problem).toBe("");
-    expect(check?.info).toBe("fakeco/zeta-1");
+    const info = () => doctorChecks(probe({})).find((c) => c.name === "new task model")?.info;
+    expect(info()).toBe("fakeco/zeta-1");
+    writeFileSync(join(config, "setup.json"), JSON.stringify({ worker: "other/set-1" }));
+    expect(info()).toBe("other/set-1");
   } finally {
     setRegistry([]);
+    if (was === undefined) delete process.env.LINECLEAR_CONFIG;
+    else process.env.LINECLEAR_CONFIG = was;
   }
 });
 

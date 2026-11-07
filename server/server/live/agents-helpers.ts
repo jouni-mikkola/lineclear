@@ -3,6 +3,21 @@ import type { TermScreen } from '../../shared/types.ts'
 import type { AgentInfo, AgentStatus, HerdrError } from './herdr.ts'
 import { tag } from './chatlines.ts'
 import { boxDir } from './mfs.ts'
+import { chooseModel, firstModel } from '../../../src/models.ts'
+
+/** A start whose CLI needs a model and has none set takes the machine's first, and the record says so. */
+export function takeFirstModel(r: { kind: string; model?: string; chosenModel?: string }) {
+  r.chosenModel = undefined
+  const first = chooseModel(r.kind, r.model) ? firstModel(r.kind) : undefined
+  if (!first) return
+  r.model = first
+  r.chosenModel = first
+}
+
+/** The facts line with the model a start chose on its own, when it did. */
+export function factsWithModel(facts: string, chosen?: string): string {
+  return chosen ? `${facts ? `${facts}, ` : ''}model ${chosen} (no default set, first available)` : facts
+}
 
 export interface AgentRecord {
   /** Identity for startup instructions; every replacement invalidates the old ones. */
