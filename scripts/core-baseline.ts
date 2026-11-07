@@ -1,6 +1,7 @@
 // Core speed baseline numbers (docs/numbers.md, "Core baseline"): one mode per measure, each prints median, p90 and worst.
 // Usage: bun scripts/core-baseline.ts <start|tokens|stalls|gh|time|snapshot|chat-tokens> [args]
-//   start  [n=20]       task add to the agent's first tool call, from the last n done tasks' session files
+//   start  [n=20]       task add to the agent's first tool call, and each phase (worktree, install, session, first call) of the
+//                       tasks whose worktree still stands, from the last n done tasks' session files
 //   tokens [n=20]       tokens per task by role (agent, reviewer), from the last n done tasks' session files
 //   stalls              stalls per hour and failed starts per machine, from the board's task history
 //   gh     [n=20]       GitHub check time on main per job, from the last n runs of check.yml
@@ -80,10 +81,10 @@ function sessionsOf(task: Task): Session[] {
     });
 }
 
-/** ctime of a worktree entry, in ms; a worktree already removed has none */
+/** birth time of a worktree entry, in ms; a worktree already removed has none */
 const madeAt = (task: Task, name: string): number | undefined => {
   try {
-    return lstatSync(join(task.worktree, name)).ctimeMs;
+    return lstatSync(join(task.worktree, name)).birthtimeMs;
   } catch {
     return undefined;
   }
@@ -112,7 +113,9 @@ function start(n: number): void {
     Object.keys(phases).forEach((name, i) => phases[name]?.push(((marks[i + 1] as number) - (marks[i] as number)) / 1000));
   }
   line("task add to first tool call", secs, "s");
-  for (const [name, xs] of Object.entries(phases)) if (xs.length) line(`  phase ${name}`, xs, "s");
+  const measured = phases.worktree?.length ?? 0;
+  if (!measured) console.log("  phases: no task of these has its worktree left");
+  for (const [name, xs] of Object.entries(phases)) if (xs.length) line(`  phase ${name} (${measured} tasks)`, xs, "s");
   console.log(`tasks whose brief was sent again: ${resent}`);
 }
 
