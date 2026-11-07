@@ -132,7 +132,7 @@ css, shell, perl and the `bin` scripts; counted by `.ts` and `.tsx` alone it is 
 | `src/agent-status.ts` | View | 72 | keep | what runs where |
 | `src/ask-model.ts` | Plan | 70 | keep | one model question |
 | `src/asks.ts` | Inbox | 436 | keep | rule or Inbox for each ask |
-| `src/autoplan.ts` | Plan | 304 | keep | the planner's chain check |
+| `src/autoplan.ts` | Plan | 304 | keep | applies and undoes plans (Plan); trim: its chain count names U43 (L496) |
 | `src/board.ts` | Install | 40 | keep | starts the board where no service manager does |
 | `src/brief.ts` | Run | 160 | keep | a step's brief |
 | `src/browsers.ts` | View | 354 | keep | the agents' browsers (playwright-cli) |
@@ -142,12 +142,12 @@ css, shell, perl and the `bin` scripts; counted by `.ts` and `.tsx` alone it is 
 | `src/chat.ts` | Dispatcher | 517 | keep | the web chat with the Dispatcher |
 | `src/check-runs.ts` | Review and merge | 63 | keep | a branch's GitHub checks |
 | `src/cli.ts` | Install | 220 | keep | the CLI entry; drop `run --demo` (D1) |
-| `src/company.ts` | Models | 21 | keep | which company a model is from |
-| `src/decision-dedupe.ts` | Rules | 25 | keep | one decision line per reason |
+| `src/company.ts` | Models | 21 | keep | idea.md: a reviewer and the step check are from another company |
+| `src/decision-dedupe.ts` | Rules | 25 | keep | one decision line per reason; L469 shrinks the log with it |
 | `src/direction.ts` | Plan | 32 | keep | the owner's direction for planners |
 | `src/dispatcher.ts` | Dispatcher | 198 | keep | the Dispatcher's space and routing |
 | `src/doctor*` | Install | 421 | keep | doctor |
-| `src/doneproof*` | Review and merge | 295 | keep | the done-when proof gate |
+| `src/doneproof*` | Review and merge | 295 | keep | idea.md: a step is done only when its done-when proof passes |
 | `src/fill-setup.ts` | Models | 22 | keep | setup defaults |
 | `src/full.ts` | Models | 151 | keep | an account that ran out |
 | `src/git.ts` | Run | 30 | keep | the one git helper |
@@ -165,7 +165,7 @@ css, shell, perl and the `bin` scripts; counted by `.ts` and `.tsx` alone it is 
 | `src/main-branch.ts` | Run | 22 | keep | a repo's main branch |
 | `src/measure.ts` | Models | 150 | keep | tokens and cost per step |
 | `src/models.ts` | Models | 272 | keep | the model registry |
-| `src/night-watch.ts` | Rules | 76 | keep | the night watch: its window and its sends to the Dispatcher |
+| `src/night-watch.ts` | Rules | 76 | keep | idea.md: the Dispatcher wakes at night for the rule loop's checklist |
 | `src/notify.ts` | Inbox | 95 | keep | an Inbox item as a push |
 | `src/owner-steps.ts` | Rules | 52 | keep | the owner's steps in a tick |
 | `src/parts.ts` | Plan | 94 | keep | parts, locks and files of a step |
@@ -179,7 +179,7 @@ css, shell, perl and the `bin` scripts; counted by `.ts` and `.tsx` alone it is 
 | `src/published.ts` | Secrets | 22 | keep | the tailnet name the page answers on |
 | `src/read-aside.ts` | View | 34 | keep | slow reads in their own process |
 | `src/reader-ask.ts` | Plan | 3 | keep | the step check's question |
-| `src/real-world.ts` | Rules | 239 | keep | the rule loop's real world |
+| `src/real-world.ts` | Rules | 239 | merge | into `world.ts`, its only interface (L497) |
 | `src/requests.ts` | Dispatcher | 182 | keep | a request handed to the planner |
 | `src/resolve.ts` | Dispatcher | 121 | keep | a project by name |
 | `src/roadmap*` | Plan | 721 | keep | the roadmap: parse, check, view |
