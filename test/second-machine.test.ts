@@ -206,7 +206,7 @@ test("a machine that is not started on gets no secrets", () => {
 });
 
 test("one tick with 5 ready steps and 1 other machine spawns 15 commands or fewer", () => {
-  const t = setup({ steps: [1, 2, 3, 4, 5].map((n) => step(`S${n}`, `s${n}`)), localMax: 0 });
+  const t = setup({ steps: [1, 2, 3, 4, 5].map((n) => step(`S${n}`, `s${n}`)), localMax: 0, remoteLoadPerCore: 2 });
   let spawned = 0;
   const { spawnSync, spawn } = Bun;
   Bun.spawnSync = ((...a: Parameters<typeof spawnSync>) => (spawned++, spawnSync(...a))) as typeof spawnSync;
