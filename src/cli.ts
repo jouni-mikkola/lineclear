@@ -26,8 +26,7 @@ import { setupMain } from "./setup.ts";
 import { project } from "./project-cli.ts";
 import { roadmapMain } from "./roadmap-cli.ts";
 import { demoMain } from "./demo.ts";
-import { decisionsPath, realWorld, runMain } from "./rules.ts";
-import { fileFixNow } from "./self-fix.ts";
+import { decisionsPath, runMain } from "./rules.ts";
 import { startWeb } from "./web.ts";
 import { secrets, totp } from "./secrets.ts";
 import { stallsMain } from "./stall-class.ts";
@@ -198,7 +197,7 @@ function inboxCommand(rest: string[], out: Out): number | Promise<number> {
 const COMMANDS: Record<string, (rest: string[], out: Out) => number | Promise<number>> = {
   stalls: (rest, out) => stallsMain(rest, out, decisionsPath()),
   track: trackMain,
-  machine: (rest, out) => machineMain(rest, out, process.env, (evidence) => fileFixNow(realWorld(process.env), "command-failed", evidence)),
+  machine: (rest, out) => machineMain(rest, out),
   roadmap: roadmapMain,
   run: (rest, out) => (rest[0] === "--demo" ? demoMain(rest.slice(1), out) : runMain(rest, out, undefined, { web: startWeb })),
   serve: serveMain,

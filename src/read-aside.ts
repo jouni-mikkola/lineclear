@@ -6,7 +6,7 @@ import { roadmapData } from "./roadmap-view.ts";
 // `bun src/read-aside.ts spend|roadmap <project>` prints the result as JSON.
 
 type Env = Record<string, string | undefined>;
-export type Aside = (what: "spend" | "heal" | "fix" | "dispatcher" | "roadmap" | "step", arg?: string) => Promise<unknown>;
+export type Aside = (what: "spend" | "fix" | "dispatcher" | "roadmap" | "step", arg?: string) => Promise<unknown>;
 
 /** Runs one read in a child process with `env`, and gives its JSON. A failed read throws with its last words;
  * one that takes over a minute is stopped, so a hung read never holds the server's value for good. */
@@ -15,8 +15,7 @@ export function readAside(env: Env): Aside {
   const childEnv = { PATH: process.env.PATH, HOME: process.env.HOME, ...env };
   return async (what, arg) => {
     // the fixes live in heal.ts: the server needs the doctor's modules only in a process of its own
-    const script =
-      what === "heal" || what === "fix" || what === "dispatcher" || what === "step" ? join(dirname(import.meta.path), "heal.ts") : import.meta.path;
+    const script = what === "fix" || what === "dispatcher" || what === "step" ? join(dirname(import.meta.path), "heal.ts") : import.meta.path;
     const p = Bun.spawn([process.execPath, script, what, ...(arg ? [arg] : [])], { env: childEnv, stdin: "ignore", stdout: "pipe", stderr: "pipe" });
     const limit = setTimeout(() => p.kill(), 60_000);
     const [out, err, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]).finally(() => clearTimeout(limit));

@@ -5,9 +5,7 @@ import { type ProveTools, commandsFor, doneItems, readOnly, readProofs, type Run
 import { checkerModels, proveStep } from "../src/doneproof-run.ts";
 import { readPlan } from "../src/progress.ts";
 import { checkRoadmap, stepStatuses, type Step } from "../src/roadmap.ts";
-import { readItems } from "../src/inbox.ts";
 import { tick } from "../src/rules.ts";
-import { readFixes } from "../src/self-fix.ts";
 import { fakeWorld, scratch } from "./fake-world.ts";
 
 const scratchDir = scratch();
@@ -160,7 +158,7 @@ function tickSetup() {
   return { ...f, env, once, finish, asked };
 }
 
-test("an unproven step starts again with its missing item as the brief, three times a day, then one Fix task, never a loop", () => {
+test("an unproven step starts again with its missing item as the brief, three times a day, then it waits, never a loop", () => {
   const t = tickSetup();
   t.once();
   expect(t.adds).toHaveLength(1);
@@ -174,41 +172,14 @@ test("an unproven step starts again with its missing item as the brief, three ti
   expect(t.adds).toHaveLength(3);
   t.finish();
   t.once();
-  expect(t.adds).toHaveLength(4);
-  expect(t.adds[3]?.[0]).toBe("R3 Fix: Release 0.1 tagged");
   t.once();
   t.once();
-  expect(t.adds).toHaveLength(4);
+  expect(t.adds).toHaveLength(3);
   expect(t.adds.some((a) => a[0] === "R4 Next")).toBe(false);
   t.finish();
   t.clock.at = new Date(t.clock.at.getTime() + 86_400_000);
   t.once();
-  expect(t.adds[4]?.[0]).toBe("R3 Release 0.1 tagged");
-});
-
-test("a fix task that ends unmerged makes an Inbox item on the next tick, and the step waits for the owner", () => {
-  const t = tickSetup();
-  t.once();
-  t.finish();
-  t.once();
-  t.finish();
-  t.once();
-  t.finish();
-  t.once();
-  expect(t.adds.at(-1)?.[0]).toBe("R3 Fix: Release 0.1 tagged");
-  expect(readItems(t.env)).toHaveLength(0);
-  // the fix task closes with nothing merged
-  t.tasks.list = t.tasks.list.map((x) => (x.title.startsWith("R3 Fix") ? { ...x, status: "closed" } : x));
-  t.once();
-  const items = readItems(t.env);
-  expect(items).toHaveLength(1);
-  expect(items[0]?.question).toContain("R3 Fix: Release 0.1 tagged");
-  expect(items[0]?.question).toContain("ended without a merge");
-  // while that item waits, no second fix task is filed
-  t.once();
-  t.once();
-  expect(t.adds.filter((a) => a[0]?.startsWith("R3 Fix"))).toHaveLength(1);
-  expect(Object.keys(readFixes(t.env))).toEqual(["demo:R3:unproven"]);
+  expect(t.adds[3]?.[0]).toBe("R3 Release 0.1 tagged");
 });
 
 test("the tick asks the checker about a merged step, and one that did not answer is not asked again within half an hour", () => {

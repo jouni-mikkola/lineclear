@@ -32,16 +32,12 @@ export function retiredChecks(p: Probe): Check[] {
 }
 
 /**
- * Turns the timers off, when the owner asked (`doctor --fix`); the server's own heal gives `report` instead and changes nothing.
+ * Turns the timers off, when the owner asked (`doctor --fix`).
  * A running server keeps the modes in memory and writes them back, so it is asked; the file is edited only when none runs.
  */
-function fixTimers(p: Probe & { dataDir: string }, out: Out, report?: (spaces: string[]) => void): number {
+function fixTimers(p: Probe & { dataDir: string }, out: Out): number {
   const timers = timerSpaces(p.dataDir);
   if (!timers.length) return 0;
-  if (report) {
-    report(timers);
-    return 0;
-  }
   if (!p.running?.()) {
     const file = join(p.dataDir, "modes.json");
     const modes: Record<string, string> = readJson(file) ?? {};
@@ -57,10 +53,10 @@ function fixTimers(p: Probe & { dataDir: string }, out: Out, report?: (spaces: s
   return failed.length ? 1 : 0;
 }
 
-/** Turns every timer off on this machine, printing each (or only reporting the timers, with `reportTimers`). */
-export function fixRetired(p: Probe, out: Out, reportTimers?: (spaces: string[]) => void): number {
+/** Turns every timer off on this machine, printing each. */
+export function fixRetired(p: Probe, out: Out): number {
   let code = 0;
-  if (p.dataDir) code = Math.max(code, fixTimers({ ...p, dataDir: p.dataDir }, out, reportTimers));
+  if (p.dataDir) code = Math.max(code, fixTimers({ ...p, dataDir: p.dataDir }, out));
   return code;
 }
 

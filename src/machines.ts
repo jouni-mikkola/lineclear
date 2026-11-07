@@ -143,16 +143,13 @@ async function rollBack(host: string, env: Env, out: (l: string) => void): Promi
   out(back.code === 0 ? `${host} is back on its previous build.` : `${host} could not go back: ${back.lines.at(-1) ?? `exit ${back.code}`}`);
 }
 
-/** Files the one fix for a machine that did not take a build; returns what it did, in words. */
-type FileFix = (evidence: string[]) => string;
-
 /**
  * Updates the machines one by one, each to the build this one runs, with the install's own smoke check there. The
  * machine's own list is not followed (LINECLEAR_NO_FANOUT), so no machine updates the others in a loop. A machine that
- * does not end ready goes back to its previous build, and the machines after it stay on theirs: one fix is filed.
+ * does not end ready goes back to its previous build, and the machines after it stay on theirs.
  * Returns how many did not end ready.
  */
-async function updateMachines(hosts: string[], env: Env, out: (l: string) => void, fileFix?: FileFix): Promise<number> {
+async function updateMachines(hosts: string[], env: Env, out: (l: string) => void): Promise<number> {
   for (const [i, host] of hosts.entries()) {
     const before = await buildOn(host, env);
     const m = await installMachine(host, { ...env, LINECLEAR_NO_FANOUT: "1" }, out);
@@ -170,7 +167,6 @@ async function updateMachines(hosts: string[], env: Env, out: (l: string) => voi
     else await rollBack(host, env, out);
     const rest = hosts.slice(i + 1);
     if (rest.length) out(`Stopped: ${rest.join(", ")} stay on their old build.`);
-    if (fileFix) out(fileFix([`lineclear machine update: ${host} did not take the new build: ${why}`, ...(m.doctor ?? []).slice(1, 4)]));
     return 1;
   }
   return 0;
@@ -341,18 +337,18 @@ function removeMain(host: string, env: Env, out: (l: string) => void): number {
   return 0;
 }
 
-async function updateMain(host: string | undefined, env: Env, out: (l: string) => void, fileFix?: FileFix): Promise<number> {
+async function updateMain(host: string | undefined, env: Env, out: (l: string) => void): Promise<number> {
   const saved = readMachines(env).map((m) => m.host);
   if (host !== undefined && !saved.includes(host)) return fail(out, `no machine named '${host}'`);
-  return (await updateMachines(host ? [host] : saved, env, out, fileFix)) ? 1 : 0;
+  return (await updateMachines(host ? [host] : saved, env, out)) ? 1 : 0;
 }
 
-export async function machineMain(args: string[], out: (l: string) => void, env: Env = process.env, fileFix?: FileFix): Promise<number> {
+export async function machineMain(args: string[], out: (l: string) => void, env: Env = process.env): Promise<number> {
   const [sub, ...rest] = args;
   if (sub === "add" && rest.length === 1) return addMain(rest[0]!, env, out);
   if (sub === "list" && rest.length === 0) return listMain(env, out);
   if (sub === "remove" && rest.length === 1) return removeMain(rest[0]!, env, out);
-  if (sub === "update" && rest.length <= 1) return updateMain(rest[0], env, out, fileFix);
+  if (sub === "update" && rest.length <= 1) return updateMain(rest[0], env, out);
   out("usage: lineclear machine add <ssh host> | list | remove <ssh host> | update [<ssh host>]");
   return 2;
 }

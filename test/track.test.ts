@@ -9,7 +9,6 @@ import { refreshQuota, unknownAdapter } from "../src/quota.ts";
 import { availability } from "../src/stalls.ts";
 import { realWorld, type World } from "../src/rules.ts";
 import { pickChecker } from "../src/stepcheck.ts";
-import { readFixes } from "../src/self-fix.ts";
 import {
   cheapest,
   trackReviewer,
@@ -119,19 +118,14 @@ test("a broken run files one fix and logs the run; after an update it also rolls
   const broken = () => fake({ stuck: "review", stall: { class: "account-full", evidence: "anthropic is full" } }).w;
   expect(await trackMain(["--after-update"], (l) => out.push(l), t.env, deps(broken()))).toBe(1);
   expect(out[0]).toBe("track: broke at review: account full (anthropic is full)");
-  expect(out[1]).toBe("track: filed a fix: Plan: fix account full");
-  expect(out[2]).toBe("track: rolled back to the version before the update");
+  expect(out[1]).toBe("track: rolled back to the version before the update");
   expect(rolled).toEqual(["the test track broke at review (account full)"]);
-  expect(t.adds).toHaveLength(1);
-  expect(t.adds[0]?.[1]).toContain("test track after an update broke at review: anthropic is full");
-  expect(readFixes(t.env)["account-full"]?.title).toBe("Plan: fix account full");
+  expect(t.adds).toHaveLength(0);
 
-  // the next night it breaks the same way: the fix is open, so no second one, and no rollback without an update
+  // the next night it breaks the same way: no rollback without an update
   out.length = 0;
   expect(await trackMain([], (l) => out.push(l), t.env, deps(broken()))).toBe(1);
-  expect(out[1]).toBe("track: a fix is already open: Plan: fix account full");
-  expect(out).toHaveLength(2);
-  expect(t.adds).toHaveLength(1);
+  expect(out).toHaveLength(1);
   expect(rolled).toHaveLength(1);
 
   const runs = readFileSync(trackLog(t.env), "utf8")
