@@ -65,6 +65,8 @@ export abstract class EngineState extends Emitter<Events> {
   protected lastStart = 0
   protected releasing = false
   protected checking = false
+  /** herdr has listed its agents since the start */
+  protected resumed = false
   /** the look at done tasks' pull requests that is under way */
   protected watching: Promise<void> | undefined
   protected watchingMain = false
@@ -147,7 +149,7 @@ export abstract class EngineState extends Emitter<Events> {
   }
 
   /** once the engine is up: a start, a handoff or a clean-up it was in the middle of is gone, so its phase is too.
-   *  A brief phase stays: its agent may still take the brief up, and resumeQueue arms its timer again */
+   *  A brief phase stays: its agent may still take the brief up, and resumeAfterStart leaves it to the agent */
   protected endPhases() {
     for (const t of this.tasks) if (!this.inPhase(t, 'briefing')) move(t, 'interrupted')
   }

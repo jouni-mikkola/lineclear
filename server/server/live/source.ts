@@ -48,6 +48,8 @@ export class LiveSource extends LiveSourceUpkeep implements Source {
       this.emit('chat', key)
       this.fresh(key)
     }
+    // once herdr has told which agents are alive: a go sent before would start a second
+    const off = this.agents.on('listed', () => (off(), this.engine.resumeAfterStart()))
     this.agents.on('routed', (key) => this.engine.routeRecovered(key))
     this.agents.on('status', (key, st) => {
       if (key === '*') return this.emit('snapshot')

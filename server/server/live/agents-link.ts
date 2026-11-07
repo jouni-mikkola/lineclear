@@ -99,6 +99,7 @@ export abstract class AgentsLink extends AgentsState {
       this.reachable = !this.subDown
       this.lastReach = Date.now()
       this.take(list)
+      this.emit('listed')
     } catch {
       const wait = this.recovery.fail()
       if (BOX) this.retryAt = Date.now() + wait

@@ -82,6 +82,8 @@ export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 export const ROUTING_FAILURE = 'Could not provision private agent command routing'
 
 export type Events = {
+  /** herdr's first full list was read after the start */
+  listed: []
   routed: [key: string]
   status: [key: string, status: AgentStatus | 'gone']
   logs: [key: string]

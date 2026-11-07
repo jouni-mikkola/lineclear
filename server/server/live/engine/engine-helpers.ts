@@ -187,9 +187,6 @@ export const START_GAP = 30_000
 /** the line a held task shows */
 export const HELD = { slots: 'Waiting for a free slot', machine: 'Waiting for the machine' } as const
 
-/** queued tasks are first looked at once herdr has told which agents are alive: a go sent before would start a second */
-export const RECHECK_FIRST = 15_000
-
 /** the branch every task's worktree gets */
 export const branchFor = (t: TaskRec) => `work/${t.n}-${slug(t.title)}`
 
