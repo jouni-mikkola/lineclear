@@ -18,7 +18,6 @@ import { cutDecisionsDaily, type StallEntry } from "./stall-class.ts";
 import type { StartRecord } from "./starts.ts";
 import { tickProject } from "./tick-project.ts";
 import { sweepOldTemp } from "./tmpdirs.ts";
-import { unstick } from "./unstick.ts";
 import { holdWorld } from "./hold.ts";
 import { serviceWaits } from "./wait-service.ts";
 import { clearWait, loadLimit, readWaits } from "./waits.ts";
@@ -88,10 +87,6 @@ export interface State extends StartRecord {
   limitItems?: Record<string, number>;
   /** Owner-only steps with the Inbox item that asks the owner; the owner's Done answer ends the step. */
   ownerItems?: Record<string, number>;
-  /** Tasks showing Went wrong: when first seen (ms). */
-  wrongSeen?: Record<string, number>;
-  /** Tasks on Ready to merge: when first seen (ms) and when its merge was last tried and how many merges were started (see unstick.ts). */
-  readySeen?: Record<string, { since: number; tried?: number; tries?: number }>;
 }
 const emptyState = (): State => ({ healthFailures: 0, stopped: false, roadmapErrors: [], last: {}, ladder: {}, models: {}, handed: [], starts: {} });
 const statePath = (name: string, env = process.env) => join(projectsDir(env), name, "state.json");
@@ -172,7 +167,6 @@ export function tick(world: World, dryRun: boolean, env = process.env): Decision
     const decisions = [
       ...routed,
       ...closeOver(name, settings, world, dryRun, env),
-      ...unstick({ project: name, settings, world: held, state, waits: readWaits(env), dryRun }),
       ...serviceWaits(name, held, dryRun, env),
       ...tickProject(name, settings, held, state, dryRun, readWaits(env), loadLimit(env), env),
     ];
