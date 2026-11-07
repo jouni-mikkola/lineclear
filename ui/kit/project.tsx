@@ -66,7 +66,7 @@ export function AddProject({
   onDetect,
   onSave,
 }: {
-  /** Undefined while the repos are looked up: their row keeps its room, so the card below does not move. */
+  /** Undefined while the repos are looked up: the suggestions appear when they arrive. */
   repos: Repo[] | undefined;
   onDetect: (repo: string) => Promise<Detection | { error: string }>;
   onSave: (p: NewProject) => Promise<Started>;
