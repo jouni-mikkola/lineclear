@@ -6,7 +6,6 @@ export const project = (config: string, name: string, space: string) => {
   mkdirSync(join(config, "projects", name), { recursive: true });
   writeFileSync(join(config, "projects", name, "settings.json"), JSON.stringify({ space, repo: `/x/${name}` }));
 };
-export const usage = (input: number) => ({ model: "m", provider: "p", input, output: 0, cacheRead: 0, cacheWrite: 0 });
 export const sh = (cwd: string, ...a: string[]) =>
   Bun.spawnSync(["git", "-C", cwd, ...a], { stdout: "pipe" })
     .stdout.toString()

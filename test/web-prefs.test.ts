@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { listProjectNames } from "../src/project.ts";
 import { webApi } from "../src/web.ts";
-import { json, until } from "./helpers.ts";
+import { json } from "./helpers.ts";
 
 type Answer = { projects: { name: string }[]; usage: { account: string }[]; month?: { accounts: unknown[] }; accounts: unknown[]; showPaused: boolean };
 
@@ -25,28 +25,22 @@ const api = () => {
   return { dir, handle: webApi(conf) };
 };
 
-test("an account is retired from Settings: hidden from usage and the month's spend, listed there until it is used again", async () => {
+test("an account is retired from Settings and stays listed there until it is ticked again", async () => {
   const { dir, handle } = api();
   writeFileSync(
     join(dir, "config", "accounts.json"),
     JSON.stringify({ gone: { kind: "subscription", price: 20, currency: "USD", out: true, resetAt: "2999-01-01T00:00:00.000Z" } }),
   );
-  const read = async (): Promise<Answer> => (await handle(new Request("http://127.0.0.1:7420/api/home"))).json();
-  await until(async () => !!(await read()).month, 50);
-  expect((await read()).usage.map((u) => u.account)).toEqual(["gone"]);
   expect((await handle(json("/api/accounts/gone", { retired: "yes" }))).status).toBe(400);
   expect((await handle(json("/api/accounts/gone", { retired: true }, { "content-type": "text/plain" }))).status).toBe(403);
   expect((await handle(json("/api/accounts/gone", { retired: true }))).status).toBe(200);
-  const home = await read();
-  expect(home.usage).toEqual([]);
-  expect(home.month?.accounts).toEqual([]);
   const settings: Answer = await (await handle(new Request("http://127.0.0.1:7420/api/settings"))).json();
   expect(settings.accounts).toEqual([{ account: "gone", kind: "subscription", price: 20, currency: "USD", retired: true }]);
-  // a price change keeps it retired; unticked, it counts again
+  // a price change keeps it retired; unticked, it is no longer retired
   await handle(json("/api/accounts/gone", { price: 25, currency: "USD" }));
   expect(JSON.parse(readFileSync(join(dir, "config", "accounts.json"), "utf8")).gone.retired).toBe(true);
   expect((await handle(json("/api/accounts/gone", { retired: false }))).status).toBe(200);
-  expect((await read()).usage.map((u) => u.account)).toEqual(["gone"]);
+  expect(JSON.parse(readFileSync(join(dir, "config", "accounts.json"), "utf8")).gone.retired).toBeUndefined();
   rmSync(dir, { recursive: true, force: true });
 });
 

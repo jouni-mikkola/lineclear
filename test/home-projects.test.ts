@@ -1,13 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { appendFileSync, chmodSync, existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { monthSpend, homeData, piSpendAndUsage, spendAndUsage, stageSince, stepOf, taskStage } from "../src/home-data.ts";
+import { homeData, stageSince, stepOf, taskStage } from "../src/home-data.ts";
 import { waitBlocker } from "../src/home-waits.ts";
 import { plainTitle, whereTo } from "../src/progress.ts";
 import { waitGroups } from "../src/waits.ts";
 import { tmp } from "./helpers.ts";
-import { sessionLine, writeSessions } from "../scripts/fake-sessions.ts";
-import { NOW, usage } from "./home-fixtures.ts";
+import { NOW } from "./home-fixtures.ts";
 
 describe("where a task is on the line", () => {
   test("a step id starts the title", () => {
@@ -60,133 +59,6 @@ describe("the line under a project", () => {
     // the waiting task still takes a step's time, a day at this pace, once the wait ends
     expect(w.finish).toBe(until + 86_400_000);
     expect(w.blocker).toEqual({ text: "waits until 24 Dec" });
-  });
-});
-
-describe("spend cache", () => {
-  const NOW2 = Date.parse("2026-10-31T12:00:00Z");
-
-  test("500 session files: same totals as a full read, a warm refresh reads none of them, grown files re-read", () => {
-    const root = tmp("spend");
-    const pi = join(root, "pi");
-    const env = { PI_CODING_AGENT_DIR: pi, XDG_CACHE_HOME: join(root, "cache") };
-    writeSessions(pi, NOW2, 500);
-    const cold = piSpendAndUsage(env, NOW2);
-    // unreadable now, so a warm refresh that read one would miss its totals (how fast it is: scripts/measure-speed.ts)
-    const files = readdirSync(join(pi, "sessions"), { recursive: true, encoding: "utf8" })
-      .filter((f) => f.endsWith(".jsonl"))
-      .map((f) => join(pi, "sessions", f));
-    for (const f of files) chmodSync(f, 0o000);
-    const warm = piSpendAndUsage(env, NOW2);
-    for (const f of files) chmodSync(f, 0o644);
-    expect(warm).toEqual(cold);
-    expect(existsSync(join(root, "cache", "lineclear", "spend.json"))).toBe(true);
-    // the same totals as with no cache at all
-    expect(piSpendAndUsage({ ...env, XDG_CACHE_HOME: join(root, "other") }, NOW2)).toEqual(cold);
-    // a grown file is read again
-    appendFileSync(join(pi, "sessions", "--f0--", "s0.jsonl"), `${sessionLine(NOW2, 99999).replace('"provider":"a"', '"provider":"c"')}\n`);
-    expect(piSpendAndUsage(env, NOW2).active).toEqual(["a", "b", "c"]);
-  });
-});
-
-test("a broken spend cache is read over, not crashed on", () => {
-  const root = tmp("spend-bad");
-  const dir = join(root, "pi", "sessions", "--f--");
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(
-    join(dir, "s.jsonl"),
-    `${JSON.stringify({ timestamp: "2026-10-31T11:00:00Z", message: { role: "assistant", model: "m", provider: "a", usage: { input: 5, output: 0 } } })}\n`,
-  );
-  mkdirSync(join(root, "cache", "lineclear"), { recursive: true });
-  const env = { PI_CODING_AGENT_DIR: join(root, "pi"), XDG_CACHE_HOME: join(root, "cache") };
-  for (const bad of ["null", "[]", "not json"]) {
-    writeFileSync(join(root, "cache", "lineclear", "spend.json"), bad);
-    expect(piSpendAndUsage(env, Date.parse("2026-10-31T12:00:00Z")).active).toEqual(["a"]);
-  }
-});
-
-describe("month spend: paid and at API prices", () => {
-  const price = { input: 1_000_000, output: 0, cacheRead: 0, cacheWrite: 0 }; // $1 a token
-  const MID = Date.parse("2026-10-20T12:00:00Z");
-  const msg = (at: number, account: string, n: number) => ({ at, account, usage: usage(n) });
-
-  test("two subscriptions and one API key", () => {
-    const pi = spendAndUsage([msg(MID - 1000, "a", 30), msg(MID - 2000, "b", 10), msg(MID - 3000, "k", 5)], () => price, MID);
-    const m = monthSpend(
-      pi,
-      { a: { kind: "subscription", price: 100, currency: "USD" }, b: { kind: "subscription", price: 20, currency: "USD" }, k: { kind: "key" } },
-      MID,
-    )!;
-    expect(m.month).toBe("2026-10");
-    expect(m.paid).toEqual([{ amount: 125, currency: "USD" }]);
-    expect(m.paidUnknown).toBe(false);
-    expect(m.apiEquivalent).toBe(45);
-    expect(m.accounts.find((a) => a.account === "a")).toEqual({
-      account: "a",
-      kind: "subscription",
-      paid: { amount: 100, currency: "USD" },
-      apiEquivalent: 30,
-    });
-    expect(m.accounts.find((a) => a.account === "k")?.paid).toEqual({ amount: 5, currency: "USD" });
-  });
-
-  test("a subscription without a price is not reported, never 0", () => {
-    const pi = spendAndUsage([msg(MID - 1000, "a", 30), msg(MID - 2000, "b", 10)], () => price, MID);
-    const m = monthSpend(pi, { a: { kind: "subscription", price: 100, currency: "EUR" } }, MID)!;
-    expect(m.paid).toEqual([{ amount: 100, currency: "EUR" }]);
-    expect(m.paidUnknown).toBe(true);
-    const b = m.accounts.find((a) => a.account === "b")!;
-    expect(b.paid).toBeUndefined();
-    expect(b.apiEquivalent).toBe(10);
-    const none = monthSpend(pi, {}, MID)!;
-    expect(none.paid).toEqual([]);
-    expect(none.paidUnknown).toBe(true);
-  });
-
-  test("tokens with no list price are not reported, never 0", () => {
-    const pi = spendAndUsage([msg(MID - 1000, "a", 30)], () => undefined, MID);
-    const m = monthSpend(pi, { a: { kind: "key" } }, MID)!;
-    expect(m.apiEquivalent).toBeUndefined();
-    expect(m.accounts[0]!.paid).toBeUndefined();
-    expect(m.accounts[0]!.apiEquivalent).toBeUndefined();
-  });
-
-  test("a month boundary: last month's tokens do not count, and a new month starts at 0 tokens but full prices", () => {
-    const last = Date.parse("2026-09-30T23:30:00Z");
-    const first = Date.parse("2026-10-01T00:30:00Z");
-    const now = Date.parse("2026-10-01T06:00:00Z");
-    const pi = spendAndUsage([msg(last, "a", 100), msg(first, "a", 3)], () => price, now);
-    const m = monthSpend(pi, { a: { kind: "subscription", price: 100, currency: "USD" } }, now)!;
-    expect(m.month).toBe("2026-10");
-    expect(m.apiEquivalent).toBe(3);
-    expect(m.paid).toEqual([{ amount: 100, currency: "USD" }]);
-    // the 14 day chart still sees both days
-    expect(pi.spend.reduce((s, d) => s + d.dollars, 0)).toBe(103);
-    // no tokens yet this month: the API equivalent is a known 0, the subscription is still paid in full
-    const empty = monthSpend(
-      spendAndUsage([msg(last, "a", 100)], () => price, now),
-      { a: { kind: "subscription", price: 100, currency: "USD" } },
-      now,
-    )!;
-    expect(empty.apiEquivalent).toBe(0);
-    expect(empty.paid).toEqual([{ amount: 100, currency: "USD" }]);
-  });
-
-  test("the window reads the whole month, not only 14 days", () => {
-    const root = tmp("month-window");
-    const now = Date.parse("2026-10-30T12:00:00Z");
-    const dir = join(root, "pi", "sessions", "s");
-    mkdirSync(dir, { recursive: true });
-    const early = join(dir, "early.jsonl");
-    writeFileSync(
-      early,
-      `${JSON.stringify({ timestamp: "2026-10-02T10:00:00Z", message: { role: "assistant", provider: "p", model: "m", usage: { input: 7, output: 0, cacheRead: 0, cacheWrite: 0 } } })}\n`,
-    );
-    const t = new Date("2026-10-02T10:00:00Z");
-    require("node:fs").utimesSync(early, t, t);
-    const env = { HOME: root, PI_CODING_AGENT_DIR: join(root, "pi"), XDG_CACHE_HOME: join(root, "cache") } as NodeJS.ProcessEnv;
-    const pi = piSpendAndUsage(env, now);
-    expect(pi.monthAccounts).toEqual(["p"]);
   });
 });
 

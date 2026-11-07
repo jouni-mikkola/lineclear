@@ -100,7 +100,7 @@ const api = () => {
 const post = (n: number, body: unknown, headers: Record<string, string> = { "content-type": "application/json", "x-lineclear-token": PAGE_TOKEN }) =>
   new Request(`http://127.0.0.1:7420/api/inbox/${n}`, { method: "POST", headers, body: JSON.stringify(body) });
 
-test("/api/home is the projects with plain titles, and 14 days of spend once it is read", async () => {
+test("/api/home is the projects with plain titles", async () => {
   const { dir, handle } = api();
   const home = async () => (await (await handle(new Request("http://127.0.0.1:7420/api/home"))).json()) as any;
   expect((await home()).projects[0]).toMatchObject({
@@ -108,30 +108,6 @@ test("/api/home is the projects with plain titles, and 14 days of spend once it 
     broken: false,
     tasks: [{ id: "WEB-1", title: "Pay with a saved card", state: "work" }],
   });
-  await until(async () => !!(await home()).spend, 50);
-  expect((await home()).spend).toHaveLength(14);
-  expect((await home()).usage).toEqual([]);
-  rmSync(dir, { recursive: true, force: true });
-});
-
-test("/api/home answers with the projects at once while spend and usage are still read", async () => {
-  const { dir } = api();
-  const env = {
-    LINECLEAR_CONFIG: join(dir, "config"),
-    LINECLEAR_HOME: join(dir, "lineclear"),
-    HOME: dir,
-    LINECLEAR_DOCTOR_FILE: join(dir, "none.json"),
-  };
-  const asked: string[] = [];
-  // a read of spend that never ends
-  const handle = webApi(env, undefined, (what) => (asked.push(what), new Promise(() => {})));
-  const home = (await (await handle(new Request("http://127.0.0.1:7420/api/home"))).json()) as any;
-  expect(home.projects[0]).toMatchObject({ name: "web-shop" });
-  expect(home.spend).toBeUndefined();
-  expect(home.usage).toBeUndefined();
-  // asked again, it does not start a second read
-  await handle(new Request("http://127.0.0.1:7420/api/home"));
-  expect(asked.filter((w) => w === "spend")).toEqual(["spend"]);
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -304,7 +280,7 @@ test("a plan's rejection needs its reason, and the reason goes with the answer",
   rmSync(dir, { recursive: true, force: true });
 });
 
-test("/api/home gives each account's limits and the last moves; an account marked full is at 100% until its reset", async () => {
+test("/api/home gives the last moves", async () => {
   const { dir, handle } = api();
   writeFileSync(
     join(dir, "config", "accounts.json"),
@@ -315,15 +291,12 @@ test("/api/home gives each account's limits and the last moves; an account marke
     `${JSON.stringify({ time: "2026-06-01T10:00:00.000Z", task: "LIN-5", step: "A", from: "anthropic/x", to: "b/z", why: "w" })}\n`,
   );
   const read = async () => (await (await handle(new Request("http://127.0.0.1:7420/api/home"))).json()) as any;
-  // usage comes with spend, once the spend read is done
-  await until(async () => !!(await read()).usage, 50);
   const home = await read();
-  expect(home.usage).toEqual([{ account: "anthropic", pace: "ahead", week: { percent: 100, resetAt: "2999-01-01T00:00:00.000Z" } }]);
   expect(home.moves).toMatchObject([{ task: "LIN-5", from: "anthropic/x", to: "b/z" }]);
   rmSync(dir, { recursive: true, force: true });
 });
 
-test("an account's monthly price is set from Settings, never guessed, and /api/home reports paid", async () => {
+test("an account's monthly price is set from Settings, never guessed, ", async () => {
   const { dir, handle } = api();
   const accounts = () => (JSON.parse(readFileSync(join(dir, "config", "accounts.json"), "utf8")) ?? {}) as any;
   writeFileSync(join(dir, "config", "accounts.json"), JSON.stringify({ anthropic: { kind: "subscription" }, openrouter: { kind: "key" } }));
@@ -336,9 +309,6 @@ test("an account's monthly price is set from Settings, never guessed, and /api/h
   expect((await handle(json("/api/accounts/anthropic", { price: "100", currency: "usd" }))).status).toBe(200);
   expect(accounts().anthropic).toEqual({ kind: "subscription", price: 100, currency: "USD" });
   expect((await settings()).accounts[0]).toEqual({ account: "anthropic", kind: "subscription", price: 100, currency: "USD" });
-  const read = async () => (await (await handle(new Request("http://127.0.0.1:7420/api/home"))).json()) as any;
-  await until(async () => !!(await read()).month, 50);
-  expect((await read()).month.paid).toEqual([{ amount: 100, currency: "USD" }]);
   // an empty price clears it
   expect((await handle(json("/api/accounts/anthropic", { price: "" }))).status).toBe(200);
   expect(accounts().anthropic).toEqual({ kind: "subscription" });
@@ -402,8 +372,6 @@ test("a machine is added over SSH in the background and removed, only from the s
     LINECLEAR_SSH: join(import.meta.dir, "..", "ui", "test", "fake-ssh"),
   };
   const handle = webApi(env);
-  // the first read of usage, which Settings waits for once
-  await handle(new Request("http://127.0.0.1:7420/api/settings"));
   expect(
     (
       await handle(

@@ -13,19 +13,15 @@ import { spaceStops, waitBlocker, waitingOf } from "./home-waits.ts";
 import { notReached, remoteTasks } from "./spread.ts";
 import { type Export, remoteExports } from "./remotes.ts";
 import { readWaits, type Wait, type WaitGroup, waitsForOwner } from "./waits.ts";
-import { type AccountUse, usageLimits } from "./limits.ts";
-import { type Move, readAccounts, readMoves } from "./full.ts";
+import { type Move, readMoves } from "./full.ts";
 import { listProjectNames, readSettings } from "./project.ts";
 import { mainRefs } from "./main-branch.ts";
 import { rowFacts } from "./task-detail.ts";
-import { type MonthSpend, type PiSpend, monthSpend, piSpendAndUsage } from "./home-spend.ts";
 import { DAY } from "./time.ts";
 import { gitText } from "./git.ts";
 
 /** A parsed file or event read as it is: its shape is not ours to promise. */
 type Raw = any;
-
-export { type PiSpend, monthSpend, piSpendAndUsage, spendAndUsage } from "./home-spend.ts";
 
 /** What Home draws. Built from Lineclear's files, pi's session files and git, with no AI. */
 export interface HomeData {
@@ -34,14 +30,8 @@ export interface HomeData {
   projects: HomeProject[];
   /** Open tasks of spaces no project points at, so no running work hides. */
   loose?: LooseTask[];
-  /** How full each account's session and week limits are. */
-  usage: AccountUse[];
   /** The last tasks that moved to another model because their account was full, newest first. */
   moves?: Move[];
-  /** The equivalent $ of each of the last 14 days, oldest first. */
-  spend: { day: string; dollars: number }[];
-  /** This calendar month (UTC): what the subscriptions cost and what the same tokens cost at API list prices. */
-  month?: MonthSpend;
   /** How many requests the Planner is laying steps for now. */
   planning?: number;
   /** The Dispatcher works on an answer now: its signal box shows writing dots. */
@@ -427,14 +417,6 @@ function spaceView(s: Raw, ctx: SpaceContext, owner?: { project: string; paused:
   } satisfies HomeProject;
 }
 
-/** Home's Usage and Spend cards: spend per day, each account's limits and the last moves. */
-export const usageData = (pi: PiSpend, env: Env, now: number): Pick<HomeData, "usage" | "spend" | "moves" | "month"> => ({
-  spend: pi.spend,
-  month: monthSpend(pi, readAccounts(env as NodeJS.ProcessEnv), now),
-  usage: usageLimits(pi.active ?? [], env as NodeJS.ProcessEnv, now),
-  moves: readMoves(env as NodeJS.ProcessEnv, 5),
-});
-
 /** What a space is called in a URL: lower case words joined by dashes, at most 80 characters. */
 const spaceSlug = (name: string) =>
   name
@@ -471,13 +453,12 @@ export function projectsData(env: Env = process.env, now = Date.now(), remote: E
 
 export function homeData(env: Env = process.env, now = Date.now(), remote?: Export[]): HomeData {
   const all = projectsData(env, now, remote);
-  const usage = usageData(piSpendAndUsage(env, now), env, now);
   return {
     at: now,
     host: hostname(),
     projects: withProject(all),
     loose: looseTasks(all),
-    ...usage,
+    moves: readMoves(env as NodeJS.ProcessEnv, 5),
   };
 }
 

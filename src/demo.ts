@@ -1,11 +1,10 @@
 import { chmodSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { sessionsRoot } from "./harness-pi.ts";
 import { writeAtomic } from "../pi/atomic.ts";
 import { runMain } from "./rules.ts";
 import { startWeb } from "./web.ts";
-import { DAY, HOUR_MS, MIN } from "./time.ts";
+import { DAY, MIN } from "./time.ts";
 import { gitWith } from "./git.ts";
 
 // Demo mode: `lineclear run --demo` serves the real app on fixed data written into one folder, so a picture of it
@@ -140,37 +139,7 @@ function writeRepo(dir: string, name: string, roadmap: string, tasks: DemoTask[]
   return repo;
 }
 
-/** Tokens of one day's work, in a pi session file: the dollars of each day come from them at the prices below. */
-const sessionLine = (at: number, provider: string, model: string, outputTokens: number) =>
-  JSON.stringify({
-    timestamp: new Date(at).toISOString(),
-    message: {
-      role: "assistant",
-      provider,
-      model,
-      usage: { input: outputTokens / 4, output: outputTokens, cacheRead: outputTokens * 2, cacheWrite: outputTokens / 8 },
-    },
-  });
-
-const PRICES = {
-  anthropic: { models: [{ id: "demo-sonnet", cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 } }] },
-  openai: { models: [{ id: "demo-codex", cost: { input: 1.25, output: 10, cacheRead: 0.125, cacheWrite: 0 } }] },
-};
-const DAILY_K_TOKENS = [310, 420, 380, 250, 90, 60, 510, 640, 590, 470, 700, 820, 540, 610];
-
-function writeUsage(dir: string, now: number) {
-  const lines = DAILY_K_TOKENS.map((k, i) => {
-    const at = now - (DAILY_K_TOKENS.length - 1 - i) * DAY - HOUR_MS;
-    return [sessionLine(at, "anthropic", "demo-sonnet", k * 1000), ...(i % 3 === 0 ? [sessionLine(at, "openai", "demo-codex", k * 400)] : [])];
-  });
-  write(join(sessionsRoot(join(dir, "pi")), "demo", "work.jsonl"), `${lines.flat().join("\n")}\n`);
-  write(join(dir, "pi", "models-store.json"), PRICES);
-  const window = (percent: number, hours: number) => ({ percent, resetAt: new Date(now + hours * HOUR_MS).toISOString() });
-  const at = new Date(now).toISOString();
-  write(join(dir, "config", "limits.json"), {
-    anthropic: { at, session: window(42, 2.5), week: window(81, 70) },
-    openai: { at, session: window(18, 4), week: window(33, 120) },
-  });
+function writeAccounts(dir: string) {
   write(join(dir, "config", "accounts.json"), {
     anthropic: { kind: "subscription", price: 100, currency: "USD" },
     openai: { kind: "subscription", price: 20, currency: "USD" },
@@ -199,7 +168,7 @@ exit 0
 
 /**
  * Writes the demo data into `dir` (an empty folder): two projects with roadmaps, their tasks, an Inbox ask, two
- * accounts with usage and two weeks of spend. Returns the environment that makes the app read it.
+ * accounts. Returns the environment that makes the app read it.
  */
 function writeDemo(dir: string, now = Date.now()): Record<string, string> {
   const projects = [
@@ -248,7 +217,7 @@ function writeDemo(dir: string, now = Date.now()): Record<string, string> {
     choices: ["Stripe", "Adyen"],
   });
   write(join(dir, "doctor.json"), []);
-  writeUsage(dir, now);
+  writeAccounts(dir);
   for (const [name, text] of [
     ["lineclear", LINECLEAR],
     ["playwright-cli", PLAYWRIGHT_CLI],

@@ -10,7 +10,6 @@ import { startBoard } from "./board.ts";
 import { freshDecisions } from "./decision-dedupe.ts";
 import { answerCard, closeItem, closeSettledUpdates, isOpen, type Item, readItems } from "./inbox.ts";
 import { listProjectNames, projectsDir, readSettings, type Settings } from "./project.ts";
-import { refreshQuota } from "./quota.ts";
 import { realWorld } from "./real-world.ts";
 import { startReleaseIfDue } from "./release.ts";
 import type { Task } from "./roadmap.ts";
@@ -233,7 +232,7 @@ export async function runMain(args: string[], out: (l: string) => void, world: W
     const tickOnce = async () => {
       try {
         if (deps.tick) show(await deps.tick(world, dryRun));
-        else await Promise.all([refreshQuota().catch(() => {}), tickAway(out)]);
+        else await tickAway(out);
       } catch (e) {
         console.error(`lineclear run: tick failed: ${e instanceof Error ? e.message : e}`);
         return;

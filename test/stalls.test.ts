@@ -7,7 +7,7 @@ import { reviewerFor } from "../src/stalls.ts";
 import { tick } from "../src/rules.ts";
 import { availability, parseReset, readAccounts, stallCards } from "../src/stalls.ts";
 import { readLimit } from "../src/full.ts";
-import { usageLimits } from "../src/limits.ts";
+
 import type { StartState } from "../src/starts.ts";
 import { demoConfig, idleWorld } from "./demo-world.ts";
 import { recordTaskSteps, tmp } from "./helpers.ts";
@@ -214,15 +214,6 @@ test("an error the task got past is not read again", () => {
   t.tick();
   expect(t.log).toEqual([]);
   expect(readAccounts(t.env)).toEqual({});
-});
-
-test("Usage reads each account as free or full until a time", () => {
-  const t = setup({ accounts: { anthropic: { kind: "subscription", out: true, resetAt: "2026-06-01T17:00:00.000Z", window: "session" } } });
-  expect(usageLimits(["openai-codex"], t.env, t.clock.at.getTime())).toEqual([
-    { account: "anthropic", session: { percent: 100, resetAt: "2026-06-01T17:00:00.000Z" } },
-    { account: "openai-codex", unreported: true },
-  ]);
-  expect(usageLimits([], t.env, Date.parse("2026-06-01T17:00:01Z"))).toEqual([]);
 });
 
 test("an error read after its own reset time marks nothing", () => {

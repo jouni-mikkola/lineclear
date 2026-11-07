@@ -6,8 +6,6 @@ import { CHECKS_PER_TICK, type ProveTools, missingItem, needsProof, testOf } fro
 import { ownerStepItem } from "./owner-steps.ts";
 import { overStartLimit, recordStepStart, START_LIMIT, startsInDay } from "./start-limit.ts";
 import { placeHeld } from "./held.ts";
-import { criticalSteps, firstByRoom } from "./pace.ts";
-import { noWorkerNote, startAccountNote } from "./quota.ts";
 import { stepHeld } from "./parts.ts";
 import { company } from "./company.ts";
 import type { Settings } from "./project.ts";
@@ -254,18 +252,18 @@ function capacityOf(t: Tick, tasks: Task[], waits: Wait[], rooms: Map<string, Ro
 /** The worker model, chosen when the first step is about to start, not before. */
 function workerPicker(t: Tick, offered: () => Set<string> | undefined) {
   const { settings, world, dryRun, env, note } = t;
-  let pick: { workers: string[]; worker: string | undefined; ahead: boolean } | undefined;
+  let pick: { workers: string[]; worker: string | undefined } | undefined;
   return () => {
     if (pick) return pick;
     const set = offered();
     const workers = settings.models.worker.filter((m) => set === undefined || set.has(m));
-    // A full account is passed over, and the one with the most room a day left goes first. A paid key waits for your leave in the Inbox.
-    const { worker, ahead } = firstByRoom(workers, (m) => availability(m, env, world.now()) === "ok", env, world.now());
+    // A full account is passed over. A paid key waits for your leave in the Inbox.
+    const worker = workers.find((m) => availability(m, env, world.now()) === "ok");
     // Ask for a key only when nothing before it in the list has room.
     const keyed = workers.find((m) => availability(m, env, world.now()) !== "out");
     const asked = worker === undefined && keyed !== undefined && !dryRun ? askKey(keyed, world, world.now(), env) : undefined;
     if (asked) note("skip", asked);
-    pick = { workers, worker, ahead: ahead && settings.pace === "even" };
+    pick = { workers, worker };
     return pick;
   };
 }
@@ -303,9 +301,8 @@ function whyNotStart(s: Starting, step: Step, reserved: Map<string, string>) {
   if (locked) return locked;
   const here = noSlotHere(t, cap);
   if (here && ![...cap.remoteFree.values()].some((n) => n > 0)) return [here, ...cap.remoteLack].join("; ");
-  const { workers, worker, ahead } = s.picked();
-  if (!worker) return workers.length > 0 ? noWorkerNote(workers, t.env, t.world.now()) : "pi offers none of the worker models";
-  if (ahead && !criticalSteps(s.steps, s.status).has(step.id)) return "every account is ahead of its weekly pace: only the critical path starts";
+  const { workers, worker } = s.picked();
+  if (!worker) return workers.length > 0 ? "no worker model has room, or its paid key is not allowed yet" : "pi offers none of the worker models";
   return undefined;
 }
 
@@ -404,7 +401,7 @@ function startStep(s: Starting, step: Step): boolean {
     recordStepStart(state, step.id, world.now());
     if (host === undefined) recordStart(state, `${step.id} ${step.title}`, step.id);
     const same = company(reviewer) === company(worker) ? " (same company: no other company has room, a different model reviews with a fresh context)" : "";
-    const on = `${cheap ? `routine step on the cheap worker model ${cheap}; ` : ""}${startAccountNote(s.picked().workers, worker, env, world.now())}`;
+    const on = `${cheap ? `routine step on the cheap worker model ${cheap}; ` : ""}worker ${worker}`;
     note("start", `ready, locks free, slot free${where}; ${on}, reviewer ${reviewer}${same}`, step.id);
   }
   if (host === undefined) {

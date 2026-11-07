@@ -1,9 +1,9 @@
 import { detectProject, findRepos, saveProject } from "./add-project.ts";
 import type { browsers } from "./browsers.ts";
 import type { dispatcherChat } from "./chat.ts";
-import { setPrice, setRetired } from "./full.ts";
+import { readMoves, setPrice, setRetired } from "./full.ts";
 import { readPrefs, setShowPaused, shownProjects } from "./prefs.ts";
-import { type HomeData, type HomeProject, looseTasks, type PiSpend, usageData, withProject } from "./home-data.ts";
+import { type HomeData, type HomeProject, looseTasks, withProject } from "./home-data.ts";
 import { undoApplied } from "./autoplan.ts";
 import { inboxMain } from "./inbox-answer.ts";
 import { projectDecisions, readItems } from "./inbox.ts";
@@ -37,7 +37,6 @@ export interface Ctx {
   now: () => number;
   aside: Aside;
   push?: Promise<Pusher>;
-  pi: { now: () => PiSpend | undefined };
   readProjects: (t: number) => Promise<HomeData["projects"]>;
   forgetProjects: () => void;
   forgetRoadmap: (name: string) => void;
@@ -92,7 +91,6 @@ const homeRoute: Route = async (c, req, url) => {
     if (!c.warmed.has(name)) void c.roadmap(name).ready();
     c.warmed.add(name);
   }
-  const spent = c.pi.now();
   const release = readRelease(c.env);
   const planning = planViews(c.env).filter((r) => r.state === "planning").length;
   return json({
@@ -102,7 +100,7 @@ const homeRoute: Route = async (c, req, url) => {
     dispatcher: { writing: c.dispatcher().view().writing },
     doctor: doctorProblems(c.env, t).map((p) => `${p.problem}: ${p.fix}`),
     ...(release.checked ? { release } : {}),
-    ...(spent ? usageData(spent, c.env, t) : {}),
+    moves: readMoves(c.env as NodeJS.ProcessEnv, 5),
   } satisfies Partial<HomeData>);
 };
 
@@ -128,7 +126,7 @@ const settingsRoute: Route = (c, req, url) =>
     ? json({
         machines: c.machines(),
         projects: projectSettings(c.env),
-        accounts: accountSettings(c.env, c.pi.now()),
+        accounts: accountSettings(c.env),
         showPaused: readPrefs(c.env as NodeJS.ProcessEnv).showPaused === true,
       } satisfies SettingsData)
     : undefined;
