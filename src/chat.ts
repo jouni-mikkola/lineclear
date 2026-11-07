@@ -245,7 +245,7 @@ interface ChatTarget {
   freshEach?: boolean;
 }
 
-const DISPATCHER: ChatTarget = {
+export const DISPATCHER: ChatTarget = {
   none: NONE,
   freshEach: true,
   find: (snap) => {
