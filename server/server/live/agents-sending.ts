@@ -42,6 +42,8 @@ export class AgentsSending extends AgentsDelivery {
         this.due.add(key)
         this.onSuspect?.()
       }
+      // the CLI ended, not the pane: it stays listed (its shell at the prompt) until herdr closes it or lists it otherwise
+      return
     }
     super.heard(e)
   }
