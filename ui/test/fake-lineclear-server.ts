@@ -6,6 +6,7 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { exitWhenParentGone } from "../../src/reaper.ts";
 
 /** A parsed file or event read as it is: its shape is not ours to promise. */
 type Raw = any;
@@ -212,5 +213,7 @@ if (import.meta.main) {
   // a stopped or killed fake leaves no inbox folder behind
   process.on("exit", fake.stop);
   process.on("SIGTERM", () => process.exit(0));
+  // a run that is killed cannot stop its server, so the server ends itself once its parent is gone
+  exitWhenParentGone(process.ppid, Number(process.env.LINECLEAR_REAPER_MS ?? 5000));
   writeFileSync(join(dir, "server.json"), JSON.stringify({ port: fake.port, pid: process.pid }));
 }
