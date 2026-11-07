@@ -17,6 +17,9 @@ export function gitWith(options: GitOptions, cwd: string, ...args: string[]): Gi
   return { ok: p.exitCode === 0, out: p.stdout.toString(), err: p.stderr.toString().trim() };
 }
 
+/** The text of a failed git run, or undefined when it worked. */
+export const gitFailure = (r: GitRun) => (r.ok ? undefined : r.err || r.out.trim() || "git failed");
+
 /** `git -C cwd <args>`: the one way Lineclear runs git. */
 export const git = (cwd: string, ...args: string[]) => gitWith({}, cwd, ...args);
 

@@ -29,6 +29,35 @@ function readList(args: string[], env: Env): Read {
   return read;
 }
 
+/** What a tick reads once: `lineclear` reads until a command changes a task, and the memos until the next tick. */
+export function readers<R>(run: (cmd: string[]) => R) {
+  // `lineclear task list` and `show` each start a process of their own: read each once, until a command changes a task.
+  let reads = new Map<string, R>();
+  // chat files and main's refs are read once a tick: the ladder and the stall detectors both look at them
+  let memos = new Map<string, unknown>();
+  return {
+    read(cmd: string[]) {
+      const key = cmd.join("\0");
+      const r = reads.get(key) ?? run(cmd);
+      reads.set(key, r);
+      return r;
+    },
+    change(cmd: string[]) {
+      reads = new Map();
+      forgetTaskReads();
+      return run(cmd);
+    },
+    memo<T>(key: string, f: () => T): T {
+      return (memos.has(key) ? memos.get(key) : memos.set(key, f()).get(key)) as T;
+    },
+    newTick() {
+      reads = new Map();
+      forgetTaskReads();
+      memos = new Map();
+    },
+  };
+}
+
 /**
  * This machine's tasks of one space, or of every space. The all-spaces list is read once and filtered here. A board
  * that does not name the space in its tasks (an older one, a stand-in), or fails to list them all, is asked for the

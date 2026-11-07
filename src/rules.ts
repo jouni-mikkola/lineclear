@@ -8,7 +8,6 @@ import { copyStoreQuietly } from "./store-copies.ts";
 import { freshDecisions } from "./decision-dedupe.ts";
 import { answerCard, closeItem, closeSettledUpdates, isOpen, type Item, readItems } from "./inbox.ts";
 import { listProjectNames, projectsDir, readSettings, type Settings } from "./project.ts";
-import { realWorld } from "./real-world.ts";
 import type { Task } from "./roadmap.ts";
 import { cutDecisionsDaily, type StallEntry } from "./stall-class.ts";
 import { holdProjectTick, type StartRecord } from "./starts.ts";
@@ -18,7 +17,7 @@ import { holdWorld } from "./hold.ts";
 import { nightWatch } from "./night-watch.ts";
 import { serviceWaits } from "./wait-service.ts";
 import { clearWait, loadLimit, readWaits } from "./waits.ts";
-import { ownMark, type World } from "./world.ts";
+import { ownMark, realWorld, type World } from "./world.ts";
 export { decisionsPath, ownMark, realWorld };
 export type { World };
 
