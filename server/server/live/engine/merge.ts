@@ -330,7 +330,8 @@ export class EngineLand extends EngineHandoff {
     // one red run on main stops the merges until a run is green; the fix task for that red goes through
     if (!t.title.startsWith(`Fix ${p.base} red at`)) {
       await this.watchMain(p).catch(() => undefined)
-      if (this.data.red?.[p.path]) return { ok: false, error: `${p.base} is red on GitHub: ${t.id} waits for a green run on ${p.base}, then merge it again. Nothing was merged.` }
+      if (this.data.red?.[p.path])
+        return { ok: false, error: `${p.base} is red on GitHub: ${t.id} waits for a green run on ${p.base}, then merge it again. Nothing was merged.` }
     }
     const m = await GH.mergePr(g, wt, n, head, `${t.id}: ${t.title} (#${n})`, t.said ?? '')
     let state = (await GH.viewPr(g, wt, n))?.state
