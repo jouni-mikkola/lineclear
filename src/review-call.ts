@@ -39,9 +39,10 @@ function diffAgainst(repo: string, base: string): string | undefined {
   const ref = [`origin/${base}`, base].find((r) => git(repo, "rev-parse", "--verify", "--quiet", r).ok);
   const from = ref && gitText(repo, "merge-base", ref, "HEAD");
   if (!from) return undefined;
-  // intent-to-add makes a new file show in the diff; it stages no content
-  git(repo, "add", "--intent-to-add", "--all");
-  return git(repo, "diff", `-U${CONTEXT_LINES}`, from).out;
+  // new files are not in `git diff`; they are added from git's own listing, leaving the index as it was
+  const fresh = git(repo, "ls-files", "--others", "--exclude-standard").out.split("\n").filter(Boolean);
+  const added = fresh.map((f) => git(repo, "diff", "--no-index", `-U${CONTEXT_LINES}`, "--", "/dev/null", f).out);
+  return [git(repo, "diff", `-U${CONTEXT_LINES}`, from).out, ...added].join("");
 }
 
 function reviewQuestion(brief: string, diff: string, rules: string): string {
@@ -128,7 +129,12 @@ export function reviewMain(rest: string[], out: (line: string) => void, env: Nod
   if (!task || task.startsWith("-") || (at >= 0 && !asked)) return (out("usage: lineclear review <task> [--model <provider/model>]"), 2);
   const shown = Bun.spawnSync([serverBin(env), "task", "show", task, "--json"], { env, stdin: "ignore" });
   if (shown.exitCode !== 0) return (out(`lineclear review: ${shown.stderr.toString().trim() || shown.stdout.toString().trim()}`), 1);
-  const t = JSON.parse(shown.stdout.toString()) as { desc?: string; base?: string };
+  let t: { desc?: string; base?: string };
+  try {
+    t = JSON.parse(shown.stdout.toString());
+  } catch {
+    return (out(`lineclear review: the board did not show ${task} as JSON`), 1);
+  }
   const brief = t.desc ?? "";
   const r = review(
     {

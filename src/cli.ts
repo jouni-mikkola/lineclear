@@ -177,7 +177,7 @@ const COMMANDS: Record<string, (rest: string[], out: Out) => number | Promise<nu
   totp,
   store: storeMain,
   status: statusCommand,
-  review: (rest, out) => reviewMain(rest, out),
+  review: reviewMain,
   plan: planMain,
   move: moveMain,
   dispatcher: dispatcherMain,
