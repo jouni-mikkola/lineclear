@@ -2,6 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import compactChats, { COORDINATOR_LIMIT, DISPATCHER_LIMIT } from "../pi/compact-chats.ts";
 import { dispatcherPrompt, moveMain } from "../src/dispatcher.ts";
 import { readItems } from "../src/inbox.ts";
 import { planMain } from "../src/plan.ts";
@@ -72,4 +73,18 @@ test("the web chat gets answers to status, plan and move from the Dispatcher", a
   } finally {
     fake.stop();
   }
+});
+
+test("a chat session that grew long is compacted when its turn ends, a task agent's is not", () => {
+  const ended = (env: Record<string, string>, tokens: number) => {
+    let compacted = 0;
+    const handlers: Record<string, (e: unknown, c: unknown) => void> = {};
+    compactChats({ on: (name, h) => void (handlers[name] = h) }, env);
+    handlers.agent_end?.({}, { getContextUsage: () => ({ tokens }), compact: () => compacted++ });
+    return compacted;
+  };
+  expect(ended({ LINECLEAR_ROLE: "dispatcher" }, DISPATCHER_LIMIT + 1)).toBe(1);
+  expect(ended({ LINECLEAR_ROLE: "dispatcher" }, DISPATCHER_LIMIT)).toBe(0);
+  expect(ended({ LINECLEAR_CHAT: "demo" }, COORDINATOR_LIMIT + 1)).toBe(1);
+  expect(ended({ LINECLEAR_CHAT: "LE-1/Agent" }, COORDINATOR_LIMIT * 5)).toBe(0);
 });
