@@ -36,7 +36,7 @@ export interface HomeData {
 }
 
 /** `offline` is when the server last answered, while a later read fails. */
-export type Load<T> = { status: "loading" } | { status: "error"; error: string; retry: () => void } | { status: "ok"; data: T; offline?: number };
+export type Load<T> = { status: "loading" } | { status: "error"; error: string; retry: () => void; missing?: boolean } | { status: "ok"; data: T; offline?: number };
 
 const emptyRoadmap = (project: string): RoadmapData => ({
   project,
@@ -86,7 +86,7 @@ export async function get<T>(path: string, fits: (data: unknown) => boolean = ()
       const lines = Array.isArray(body.lines) ? body.lines.map(String) : undefined;
       const kind = [502, 503, 504].includes(r.status) ? "stopped" : lines && typeof body.file === "string" ? "broken" : "stale";
       const message = typeof body.error === "string" ? [body.error, ...(lines ?? [])].join("\n") : `${path} answered ${r.status}.`;
-      throw new ApiError(message, kind, typeof body.file === "string" ? body.file : undefined, lines);
+      throw new ApiError(message, kind, typeof body.file === "string" ? body.file : undefined, lines, r.status);
     }
     const data: unknown = await r.json().catch(() => undefined);
     if (!fits(data)) throw new ApiError(`${path} gave an answer this page cannot read.`, "stale");
@@ -134,7 +134,7 @@ export function useLoad<T>(
   if (state) return sample(state, () => filled(state), empty);
   // what was read stays on screen while a later read fails
   if (q.data !== undefined) return { status: "ok", data: q.data, ...(q.isError ? { offline: q.dataUpdatedAt } : {}) };
-  if (q.isError) return { status: "error", error: q.error.message, retry: () => void q.refetch() };
+  if (q.isError) return { status: "error", error: q.error.message, retry: () => void q.refetch(), missing: q.error instanceof ApiError && q.error.status === 404 };
   return { status: "loading" };
 }
 

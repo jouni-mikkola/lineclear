@@ -147,7 +147,7 @@ export function Frame({
   }, [showPanel]);
   // the address names the view you are on: Browsers and Usage are drawn on Home, but their link is the one marked
   const at = viewOf(location.pathname);
-  const current = view === "roadmap" ? `project:${project}` : at === "task" ? "inbox" : at === "usage" || at === "chat" ? "home" : at;
+  const current = view === "roadmap" ? `project:${project}` : at === "task" ? "" : at === "usage" || at === "chat" ? "home" : at;
   const shown = view === "inbox" ? <InboxView sample={sample} ask={placeOf(location.pathname).ask} /> : children;
   return (
     <div className={`min-h-dvh lg:pl-(--lc-rail-w) ${showPanel ? "lg:pr-[400px]" : ""}`} data-frame>
