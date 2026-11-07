@@ -1,7 +1,7 @@
 import { openSync, readSync, closeSync, realpathSync, statSync } from "node:fs";
 import { basename, extname, sep } from "node:path";
 import { DISPATCHER_SPACE, dispatcherDir } from "./dispatcher.ts";
-import { keepLinks, postAction, lineclearServer, taskChatKey, watchSocket } from "./lineclear-client.ts";
+import { keepLinks, postAction, lineclearServer, readSnapshot, taskChatKey, watchSocket } from "./lineclear-client.ts";
 import { listProjectNames, readSettings } from "./project.ts";
 
 // The web chat with the Dispatcher. The Dispatcher is the coordinator chat of its own Lineclear space, so
@@ -245,7 +245,7 @@ interface ChatTarget {
   freshEach?: boolean;
 }
 
-export const DISPATCHER: ChatTarget = {
+const DISPATCHER: ChatTarget = {
   none: NONE,
   freshEach: true,
   find: (snap) => {
@@ -256,6 +256,16 @@ export const DISPATCHER: ChatTarget = {
 };
 
 const taskTarget = (id: string): ChatTarget => ({ none: NO_TASK_CHAT, find: (snap) => taskChatKey(snap, id) });
+
+/** Sends the Dispatcher's chat a text through Lineclear's server; the reason when it cannot. */
+export async function sendToDispatcher(text: string, env: Env): Promise<string | undefined> {
+  const base = lineclearServer(env);
+  if (!base) return "the board server is not running";
+  const key = DISPATCHER.find((await readSnapshot(base)) as Parameters<typeof DISPATCHER.find>[0]);
+  if (!key) return DISPATCHER.none;
+  const failed = await postAction(base, { type: "send", chat: key, text, attachments: [] }, 10_000, "the board server is away", "the board server is slow");
+  return failed?.error;
+}
 
 /** The live link to the Dispatcher's chat; see `lineclearChat`. */
 export function dispatcherChat(env: Env = process.env, backoffStartMs = 1000, sendMs = 120_000, makeDispatcher?: () => number | Promise<number>) {

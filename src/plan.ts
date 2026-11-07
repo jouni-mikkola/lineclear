@@ -1,7 +1,7 @@
 import { serverBin } from "./paths.ts";
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { dispatcherDir } from "./dispatcher.ts";
+import { DISPATCHER_MODEL, dispatcherDir } from "./dispatcher.ts";
 import { planProblems, plansAreAuto, readiness, stepFormProblems } from "./autoplan.ts";
 import { applyPlan } from "./plan-apply.ts";
 import { addItem, isOpen, readItems } from "./inbox.ts";
@@ -60,7 +60,7 @@ function submit(out: (l: string) => void, env: NodeJS.ProcessEnv, cwd: string, n
   const fail = (m: string) => (out(`lineclear plan submit: ${m}`), 1);
   if (serverIsDown(env)) return (out(NO_SERVER), 1);
   const task = findTask(cwd, env);
-  if (task === undefined) return fail("cannot tell which task this is, run it inside the planning task's worktree");
+  if (task === undefined) return fail("cannot tell which task this is, run it in the plan's worktree with LINECLEAR_TASK set to its plan id");
   const project = findProject(cwd, env);
   const top = git(cwd, "rev-parse", "--show-toplevel");
   if (!top.ok) return fail("this folder is not a git repository");
@@ -89,11 +89,11 @@ function submit(out: (l: string) => void, env: NodeJS.ProcessEnv, cwd: string, n
   if (readItems(env).some((i) => i.kind === "plan" && i.task === task && isOpen(i))) return fail("this plan waits for the owner already");
   const head = git(root, "rev-parse", "HEAD").out.trim();
   const round = readItems(env).filter((i) => i.kind === "plan" && i.task === task).length + 1;
-  if (round > 2) return fail("the plan was already sent back once; this task ends");
+  if (round > 2) return fail("the plan was already sent back once; this plan ends");
   const settings = project ? readSettings(project, env) : undefined;
   const before = was.ok ? was.out : "";
   const reviewers = typeof settings === "object" ? settings.models.reviewer : [];
-  const read = stepCheckOf(settings, { task, root, before, after: text, reviewers, env });
+  const read = stepCheckOf(settings, { task, root, before, after: text, planner: DISPATCHER_MODEL, reviewers, env });
   if (read.kind === "refused") {
     // a plan held as Ready to merge is watched by no stall check, so the failure is recorded as a stall of its own
     logStall(task, project, `the fresh-model step check cannot run: ${read.why}`, env, now);

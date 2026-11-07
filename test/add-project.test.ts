@@ -117,11 +117,15 @@ test("Start makes the space, saves the project, sets up the Dispatcher and has a
   expect(detectProject(r, env)).toMatchObject({ name: "shop", check: "npm run test", roadmap: false, models: [] });
   expect(await saveProject({ repo: r, check: "npm run test", models: [] }, env)).toMatchObject({ status: 400, error: expect.stringContaining("/login") });
   expect(await saveProject({ repo: r, check: "", models: ["a/b"] }, env)).toMatchObject({ status: 400, error: expect.stringContaining("no tests") });
-  expect(await saveProject({ repo: r, check: "npm run test", models: ["a/b"] }, env)).toEqual({ name: "shop", planning: true });
+  const sent: string[] = [];
+  const send = async (text: string) => void sent.push(text);
+  expect(await saveProject({ repo: r, check: "npm run test", models: ["a/b"] }, env, send)).toEqual({ name: "shop", planning: true });
+  expect(sent).toHaveLength(1);
+  expect(sent[0]).toContain("Plan PLAN-1 for the project shop");
   const calls = readFileSync(join(dir, "board", "calls.log"), "utf8");
   expect(calls).toContain(`space add ${r} --name shop`);
   expect(calls).toContain(`space add ${join(dir, "config", "dispatcher")} --name dispatcher`);
-  expect(calls).toContain("task add Plan: A first roadmap --brief");
+  expect(calls).not.toContain("task add");
   expect(JSON.parse(readFileSync(join(dir, "config", "projects", "shop", "settings.json"), "utf8"))).toMatchObject({ space: "shop", check: "npm run test" });
   expect(FIRST_ROADMAP).toContain("at most 8");
 });

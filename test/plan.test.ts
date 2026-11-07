@@ -216,10 +216,10 @@ test("a go keeps the answer with its model and tokens and sends it with the Inbo
   expect(question).toContain("### B Title B");
   expect(question).not.toContain("### A Title A");
   expect(question).toContain("Tracked files:\ndocs/ROADMAP.md");
-  expect(model.trim()).toBe("anthropic/claude-sonnet-5-5");
+  expect(model.trim()).toBe("opencode-go/glm-5.3");
   const checks = readItems(t.env)[0]?.checks ?? [];
   expect(checks).toHaveLength(1);
-  expect(checks[0]).toMatchObject({ step: "B", go: true, model: "anthropic/claude-sonnet-5-5", said: "B does one thing." });
+  expect(checks[0]).toMatchObject({ step: "B", go: true, model: "opencode-go/glm-5.3", said: "B does one thing." });
   expect(checks[0]?.tokensIn).toBeGreaterThan(0);
   const kept = JSON.parse(readFileSync(join(String(t.env.LINECLEAR_CONFIG), "plan-checks", "LIN-5.json"), "utf8"));
   expect(kept.answers[0]).toMatchObject({ step: "B", go: true });

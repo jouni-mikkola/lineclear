@@ -189,10 +189,16 @@ test("a clear pick plans in that project; the plan comes back as one approval in
     expect(plan).toMatchObject({ state: "approve", steps: ["B1", "B2"], item: { id: String(item.n), choices: ["Approve", "Reject"] } });
     expect((await c.get("/api/inbox")).map((i: any) => i.id)).toEqual([String(item.n)]);
 
-    // approving merges the plan's task; the Dispatcher merged nothing itself
-    expect(readFileSync(w.log, "utf8")).not.toMatch(/^merge /m);
+    // approving merges the plan's branch `plan/PLAN-1`; the Dispatcher merged nothing itself
+    const repo = w.repo("budget-app");
+    git(repo, "branch", "plan/PLAN-1");
+    git(repo, "worktree", "add", "-q", join(w.dir, "plan-1"), "plan/PLAN-1");
+    writeFileSync(join(w.dir, "plan-1", "plan-note.txt"), "B1, B2\n");
+    git(join(w.dir, "plan-1"), "add", ".");
+    git(join(w.dir, "plan-1"), "commit", "-q", "-m", "plan B1 and B2");
+    expect(git(repo, "log", "--format=%s", "main").stdout.toString()).not.toContain("PLAN-1: roadmap plan");
     expect((await c.post(`/api/inbox/${plan.item.id}`, { choice: "Approve" })).status).toBe(200);
-    expect(readFileSync(w.log, "utf8")).toMatch(/^merge PLAN-1/m);
+    expect(git(repo, "log", "--format=%s", "main").stdout.toString()).toContain("PLAN-1: roadmap plan");
     expect((await c.get("/api/plans"))[0]).toMatchObject({ state: "approved", answer: "Approve" });
     expect(await c.get("/api/inbox")).toEqual([]);
 
@@ -256,13 +262,14 @@ test("rejecting a plan sends it back once with your note, and a second rejection
     const first = planned(w.env, "PLAN-1", "budget-app", ["B1"]);
     expect((await c.post(`/api/inbox/${first.n}`, { choice: "Reject" })).status).toBe(400);
     expect((await c.post(`/api/inbox/${first.n}`, { choice: "Reject", note: "One step is enough" })).status).toBe(200);
-    expect(readFileSync(w.log, "utf8")).toContain("task tell PLAN-1 The owner rejected the plan: One step is enough.");
+    // the Dispatcher wrote the plan and has no task to tell
+    expect(readFileSync(w.log, "utf8")).not.toContain("task tell");
     expect((await c.get("/api/plans"))[0]).toMatchObject({ state: "planning", answer: "Reject" });
 
     const second = planned(w.env, "PLAN-1", "budget-app", ["B1"], 2);
     expect((await c.get("/api/plans"))[0]).toMatchObject({ state: "approve", item: { id: String(second.n) } });
     expect((await c.post(`/api/inbox/${second.n}`, { choice: "Reject" })).status).toBe(200);
-    expect(readFileSync(w.log, "utf8")).toContain("task close PLAN-1");
+    expect(readFileSync(w.log, "utf8")).not.toContain("task close");
     expect((await c.get("/api/plans"))[0]).toMatchObject({ state: "rejected" });
     expect(readFileSync(w.log, "utf8")).not.toMatch(/^merge /m);
     expect(readFileSync(join(w.repo("budget-app"), "docs", "ROADMAP.md"), "utf8")).toBe(roadmap(step("A1")));

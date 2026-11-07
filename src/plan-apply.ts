@@ -1,5 +1,5 @@
 import { planProblems, plansAreAuto, readiness } from "./autoplan.ts";
-import { gitAsLineclear } from "./git.ts";
+import { gitAsLineclear, gitFailure } from "./git.ts";
 import { addItem, closeItem, isOpen, readItems, saveItem, type Item } from "./inbox.ts";
 import { serverBin } from "./paths.ts";
 import { readSettings } from "./project.ts";
@@ -19,13 +19,30 @@ export function recordApplied(
   return addItem({ ...item, answer: "Approve", answeredAt: now.toISOString(), auto: true, base, commit, ...(commits ? { commits } : {}) }, env);
 }
 
-/** Merges a task by the server and returns the main commits it added, or an error line. */
-function mergeTask(task: string, repo: string, env = process.env): { base: string; commit: string; commits?: string[] } | string {
-  const base = tip(repo);
+/** A plan the Dispatcher wrote itself has an id `PLAN-n` and no task: its branch is `plan/PLAN-n`. */
+export const isPlanId = (task: string) => task.startsWith("PLAN-");
+
+/** The branch refs of a plan's task: `plan/PLAN-n` for the Dispatcher's own plan, else the task's `work/<n>-*`. */
+export function planRef(task: string): string | undefined {
+  if (isPlanId(task)) return `refs/heads/plan/${task}`;
   const n = /-(\d+)$/.exec(task)?.[1];
-  const subjects = new Set((n ? gitAsLineclear(repo, "log", "--format=%s", `main..refs/heads/work/${n}-*`).out.trim().split("\n") : []).filter(Boolean));
+  return n ? `refs/heads/work/${n}-*` : undefined;
+}
+
+function serverMerge(task: string, env: NodeJS.ProcessEnv): string | undefined {
   const m = Bun.spawnSync([serverBin(env), "merge", task], { stdin: "ignore" });
-  if (m.exitCode !== 0) return (m.stderr.toString() || m.stdout.toString()).trim() || "merge failed";
+  return m.exitCode === 0 ? undefined : (m.stderr.toString() || m.stdout.toString()).trim() || "merge failed";
+}
+
+/** Merges a plan's task by the server, or a Dispatcher plan's branch by git. Returns the main commits it added, or an error line. */
+export function mergeTask(task: string, repo: string, env = process.env): { base: string; commit: string; commits?: string[] } | string {
+  const base = tip(repo);
+  const ref = planRef(task);
+  const subjects = new Set((ref ? gitAsLineclear(repo, "log", "--format=%s", `main..${ref}`).out.trim().split("\n") : []).filter(Boolean));
+  const failure = isPlanId(task)
+    ? gitFailure(gitAsLineclear(repo, "merge", "--no-ff", "--no-edit", "-m", `${task}: roadmap plan`, `plan/${task}`))
+    : serverMerge(task, env);
+  if (failure !== undefined) return failure;
   const commit = tip(repo);
   // another task may have merged in between: keep only this task's own commits for an undo
   const all = gitAsLineclear(repo, "rev-list", "--first-parent", `${base}..${commit}`).out.trim().split("\n").filter(Boolean);
@@ -109,8 +126,8 @@ function settleOne(item: Item & { head: string; diff: string }, now: Date, env: 
     saveItem({ ...item, tried: item.head }, env);
     out.push(`inbox ${item.n}: ${item.task} stays: ${why}`);
   };
-  const n = /-(\d+)$/.exec(item.task)?.[1];
-  const branch = n && gitAsLineclear(repo, "for-each-ref", "--format=%(objectname)", `refs/heads/work/${n}-*`).out.trim();
+  const ref = planRef(item.task);
+  const branch = ref && gitAsLineclear(repo, "for-each-ref", "--format=%(objectname)", ref).out.trim();
   if (branch !== item.head) {
     closeItem(item, "the branch changed after the plan was sent", now, env);
     out.push(`inbox ${item.n}: closed, the branch changed after the plan was sent`);
