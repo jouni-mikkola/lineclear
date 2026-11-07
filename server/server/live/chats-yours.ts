@@ -1,7 +1,7 @@
 import type { Message } from '../../shared/types.ts'
 import { stripHidden } from './agents.ts'
-import { parseUserLine, userLines } from './chatlines.ts'
-import { parseReply } from './chatquotes.ts'
+import { parseUserLine } from './chatlines.ts'
+import { parseReply, userLines } from './chatquotes.ts'
 import { shownAs } from './chats-helpers.ts'
 
 /** what a line of yours in the log says: its words, the title of an answer or secret it carries, its files, and the

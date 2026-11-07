@@ -72,28 +72,3 @@ export function parseUserLine(l: string): Parsed | null {
   if (answer) return { kind: 'answer', title: answer[2], answer: answer[3] }
   return attach ? { kind: 'attach', name: attach[2], path: attach[3] } : null
 }
-
-/** what you sent, line by line, an answer or reply whose words run over several lines kept whole (its last closing tag:
- *  the words may hold one of their own) */
-export function userLines(text: string): string[] {
-  const lines = text.split('\n')
-  const out: string[] = []
-  for (let i = 0; i < lines.length; i++) {
-    const open = lines[i].trim().match(/^<(answer|reply)[\s>]/)
-    const close = open && lines.findLastIndex((l, j) => j >= i && l.trimEnd().endsWith(`</${open[1]}>`))
-    if (
-      close &&
-      close > i &&
-      tagOf(
-        lines
-          .slice(i, close + 1)
-          .join('\n')
-          .trim(),
-      )
-    ) {
-      out.push(lines.slice(i, close + 1).join('\n'))
-      i = close
-    } else out.push(lines[i])
-  }
-  return out
-}

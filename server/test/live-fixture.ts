@@ -4,9 +4,9 @@ import { join } from 'node:path'
 
 process.env.LINECLEAR_HOME = mkdtempSync(join(tmpdir(), 'shep-test-'))
 
-export const { excerpt, line, parseUserLine, userLines } = await import('../server/live/chatlines.ts')
+export const { excerpt, line, parseUserLine } = await import('../server/live/chatlines.ts')
 export const { agentLines } = await import('../server/live/agentlines.ts')
-export const { findQuoted, matches, parseReply } = await import('../server/live/chatquotes.ts')
+export const { findQuoted, matches, parseReply, userLines } = await import('../server/live/chatquotes.ts')
 export const { parseMenu } = await import('../server/live/chats.ts')
 export const { CATALOG, Settings, effortFor, setForTask } = await import('../server/live/settings.ts')
 export const { coordinatorPrompt, readSection, settingsBlock, splitBrief, taskPrompt } = await import('../server/live/prompts.ts')

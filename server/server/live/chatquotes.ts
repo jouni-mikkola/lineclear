@@ -3,6 +3,23 @@
 
 import { excerpt, OLD, parseUserLine, tagOf } from './chatlines.ts'
 
+/** what you sent, line by line, an answer or reply whose words run over several lines kept whole (its last closing tag:
+ *  the words may hold one of their own) */
+export function userLines(text: string): string[] {
+  const lines = text.split('\n')
+  const out: string[] = []
+  for (let i = 0; i < lines.length; i++) {
+    const open = lines[i].trim().match(/^<(answer|reply)[\s>]/)
+    const close = open ? lines.findLastIndex((l, j) => j >= i && l.trimEnd().endsWith(`</${open[1]}>`)) : -1
+    const whole = close > i ? lines.slice(i, close + 1).join('\n') : ''
+    if (whole && tagOf(whole.trim())) {
+      out.push(whole)
+      i = close
+    } else out.push(lines[i])
+  }
+  return out
+}
+
 /** the words of a message and the attachments after them, on lines of their own */
 function withFiles(text: string) {
   const lines = text.split('\n')
