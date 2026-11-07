@@ -22,3 +22,25 @@ test("no view shows a lineclear command, or a headline that repeats the Inbox co
   }
   expect(wrong).toEqual([]);
 });
+
+test("seven doctor findings are one line and a Details row, their commands only inside Details", async ({ page }) => {
+  const problems = Array.from({ length: 7 }, (_, i) => `problem ${i + 1}: curl -fsS https://example.com/fix-${i + 1} | sh`);
+  await page.route("**/api/home", async (route) => {
+    const res = await route.fetch();
+    await route.fulfill({ response: res, json: { ...(await res.json()), doctor: problems } });
+  });
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/");
+    const line = page.locator("[data-doctor]");
+    await expect(line).toContainText("7 things on this machine need fixing");
+    await expect(line.getByRole("button", { name: "Details" })).toBeVisible();
+    expect((await line.boundingBox())?.height).toBeLessThan(60);
+    expect(await page.locator("body").textContent()).not.toMatch(/curl|fix-1/);
+    const first = await page.locator("[data-line], [data-part]").first().boundingBox();
+    expect(first).not.toBeNull();
+    expect(first?.y).toBeLessThan(400);
+    await line.getByRole("button", { name: "Details" }).click();
+    await expect(line).toContainText("curl -fsS");
+  }
+});

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { get, post } from "./data.ts";
+import { doctorSummary } from "./health.ts";
 
 /** Where this device stands on alerts: not asked yet, allowed, blocked in the browser, or a try that failed. */
 type Stand = "unknown" | "unsupported" | "off" | "on" | "blocked" | "busy" | "failed";
@@ -77,5 +78,33 @@ export function Alerts({ sample }: { sample?: Stand }) {
         </>
       )}
     </p>
+  );
+}
+
+/** The doctor's findings on Home: one line with a count; the problems and their fix commands show only once Details is open. */
+export function DoctorLine({ lines }: { lines: string[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="text-sm text-caution" data-doctor="">
+      <p>
+        {doctorSummary(lines.length)}
+        <span className="text-fg3"> · </span>
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+          className="rounded-sm text-fg3 hover:text-fg focus-visible:outline-2 focus-visible:outline-accent"
+        >
+          Details
+        </button>
+      </p>
+      {open && (
+        <ul className="mt-1 flex flex-col gap-1 break-words text-fg2">
+          {lines.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
