@@ -279,9 +279,6 @@ export type Events = {
   ]
   /** a card for its project's chat: the task now waits on you (needs you, or ready), or it is done */
   card: [task: TaskRec, status: TaskStatus, sub: string]
-  /** a task was stopped, merged, closed or deleted: what it had running beside its agent (its shared browser) goes;
-   *  for good (forget) unless it was only stopped */
-  gone: [task: TaskRec, forget: boolean]
 }
 
 /** a message you wrote makes the agent busy a moment later: until then it counts as working */

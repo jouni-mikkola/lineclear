@@ -1,7 +1,6 @@
 import { apart, cardMessage, type Chat, type Job, type Message, type Reaction } from '../../shared/types.ts'
 import { stripHidden } from './agents.ts'
-import { agentLines, excerpt, findQuoted, parseBrowserNotes, parseReply, parseUserLine, userLines } from './chatlines.ts'
-import { shortUrl } from '../../shared/browser.ts'
+import { agentLines, excerpt, findQuoted, parseReply, parseUserLine, userLines } from './chatlines.ts'
 import { findModel } from '../../../src/models.ts'
 import { sameCommand } from './commands.ts'
 import { sessionRuntime } from './runtime.ts'
@@ -81,15 +80,10 @@ export class ChatsReplies extends ChatsLogs {
       if (e.kind === 'user') {
         const text = stripHidden(e.text)
         if (!text) continue
-        // a reply: its words, then its files; notes from the shared browser show short: each element and its note
-        const bn = parseBrowserNotes(text)
-        const r = bn ? null : parseReply(text)
+        // a reply: its words, then its files
+        const r = parseReply(text)
         const reply = r ? replyTo(r.to, undefined, r.line, r.artifact) : undefined
-        const lines = bn
-          ? [`Notes in the browser on ${shortUrl(bn.url)}:`, ...bn.notes.map((n, i) => `${i + 1}. ${n.element}: ${n.note}`), ...bn.rest]
-          : r
-            ? [...userLines(r.text), ...r.rest]
-            : userLines(text)
+        const lines = r ? [...userLines(r.text), ...r.rest] : userLines(text)
         const files: { name: string; path: string }[] = []
         const rest: string[] = []
         let answeredTitle: string | undefined

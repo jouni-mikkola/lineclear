@@ -4,7 +4,6 @@ import { ARTIFACT_DATA } from './artifacts.ts'
 import { CLI_NAME, kindOf } from '../live/settings.ts'
 import { harnessProblem, harnessWords, restartClis } from '../live/restart.ts'
 import { excerpt } from '../live/chatlines.ts'
-import { shortUrl } from '../../shared/browser.ts'
 import { deleteSection, moveSpace, newSection, PINNED, renameSection, sectionProblem, setOrder } from '../../shared/order.ts'
 import { seq, id } from './world-helpers.ts'
 import { DemoWorldState } from './world-state.ts'
@@ -122,14 +121,6 @@ export class DemoWorldActions extends DemoWorldState {
           }, 3200)
         }
         return { to: art.keeper }
-      }
-      case 'browser-notes': {
-        // as the live chat shows them: each element and its note
-        this.push(a.chat, {
-          who: 'you',
-          text: [`Notes in the browser on ${shortUrl(a.url)}:`, ...a.notes.map((n, i) => `${i + 1}. ${n.pick.element}: ${n.comment}`)].join('\n'),
-        })
-        return {}
       }
       case 'artifact-delete': {
         this.artifacts = this.artifacts.filter((x) => x.id !== a.artifact)

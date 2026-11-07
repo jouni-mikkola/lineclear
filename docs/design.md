@@ -544,7 +544,6 @@ the agent's own question. A `[lineclear]` line with no kind, and any `<lineclear
 | `server/server/live/engine/engine.ts` github, queue, `sendBack` | News of the task's own pull request (a failed check, a review), a queue line when the owner or a coordinator queues the task, a refused merge sent back | Step. github and queue lines are counted by `measure`; `sendBack` is plain text, so it is not |
 | `server/server/live/engine/engine.ts` `tell`, `source.ts` `send` | The owner or a coordinator runs `lineclear task tell` or writes in a task's chat | Owner. A coordinator is an AI, so there is none by default |
 | `server/server/live/source.ts` `relaunch` | An agent that was working stopped (herdr restarted, its CLI exited) and is started again | Resume: a `restart` line, once per restart. `measure` counts it |
-| `server/server/live/source.ts` browsers `tell` | The human took the shared browser over or handed it back | Step: a `browser` line. `measure` counts it |
 
 What does not reach an agent, and where it goes:
 

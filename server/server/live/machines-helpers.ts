@@ -41,8 +41,6 @@ export interface Link {
   lacks: string[]
   probe?: Probe
   busy?: boolean
-  /** what went wrong putting Chrome there for the shared browser */
-  chrome?: string
   /** not reached yet since this server started: shown as connecting, not as out of reach, for a while */
   connecting: boolean
   health: WorkerHealth
@@ -164,7 +162,7 @@ export function kept(): Kept[] {
 }
 
 /** the machine as last looked at is ready for a worker: nothing missing, and the helper there is this one's */
-export const fits = (p: Probe) => !lacks(p).length && p.helper === helperVersion(p.os, p.arch)
+export const fits = (p: Probe) => !lacks(p).length && p.helper === helperVersion()
 
 /** a worker started from one look runs the same as from the other */
 export const sameBox = (m: Saved, a: Probe, b: Probe) => JSON.stringify(boxInfo(m, a)) === JSON.stringify(boxInfo(m, b))

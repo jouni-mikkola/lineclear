@@ -24,13 +24,12 @@ agents. Your data lives in `~/.lineclear` (`LINECLEAR_HOME` to move it).
 
 ```text
 server/            the web server, the demo source and the live source
-  live/            herdr link, chats from logs (readers/), tasks (engine/), settings, machines (box, install), browser
+  live/            herdr link, chats from logs (readers/), tasks (engine/), settings, machines (box, install)
 src/               the screen's kernel, layout and shared pieces
 plugins/<name>/    each base plugin's parts (yours: ~/.lineclear/plugins/<name>/)
 skill/             what every agent is taught (lineclear/), coordinators (lineclear-coordinator/), task agents (lineclear-agent/)
-helper/            what Lineclear puts on another machine: its lineclear command and agent-browser
+helper/            what Lineclear puts on another machine: its lineclear command
 bin/lineclear      the command agents use
-bin/agent-browser  agent-browser at the pinned version, for each task's shared browser
 ```
 
 Task IDs are configured only in Settings → a repository space → Task IDs. The automatic prefix remains the default;

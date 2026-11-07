@@ -348,7 +348,7 @@ export function settingStores() {
  *  one of the human's own, and a stand-up plugin of theirs (none failing: the screen would say so at its top, over
  *  every screen the tests measure) */
 const DEMO_PLUGINS: PluginEntry[] = [
-  ...['places', 'coordinators', 'tasks', 'chat', 'reactions', 'artifacts', 'terminal', 'worktree', 'browser', 'health', 'alerts', 'keyboard'].map((name) => ({
+  ...['places', 'coordinators', 'tasks', 'chat', 'reactions', 'artifacts', 'terminal', 'worktree', 'health', 'alerts', 'keyboard'].map((name) => ({
     name,
     from: 'base' as const,
     on: true,

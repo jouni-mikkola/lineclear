@@ -7,7 +7,7 @@ How to run, build and lay out the code: [docs/develop.md](docs/develop.md).
 - No tests on this machine: it keeps the CPU for herdr, the server and the agents. While you work and before you
   merge, run only `bun run typecheck` (seconds). Don't run `bun run test`, `bun test`, `bun run test changed`,
   `bun run check` or any browser test here.
-- Check what you changed on the screen by hand in your shared browser, for the proof.
+- Check what you changed on the screen by hand in a browser (playwright-cli), for the proof.
 - GitHub runs the whole check (types, every test with the browser tests, the build) after each merge: the Check
   workflow (`.github/workflows/check.yml`) on every push to main, not on pull requests. A red main reaches the
   coordinator, who has it fixed forward. A failure's log is `gh run view <run> --log-failed`.

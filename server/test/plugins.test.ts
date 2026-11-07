@@ -103,9 +103,9 @@ describe('Settings → Plugins', () => {
   })
 
   test('a switch writes the human’s own list, never the repo’s', () => {
-    expect(setPluginOn('browser', false)).toEqual({ ok: true })
+    expect(setPluginOn('worktree', false)).toEqual({ ok: true })
     expect(setPluginOn('health', false)).toEqual({ ok: true })
-    expect(setPluginOn('browser', true)).toEqual({ ok: true })
+    expect(setPluginOn('worktree', true)).toEqual({ ok: true })
     expect(JSON.parse(readFileSync(join(HOME, 'plugins.json'), 'utf8'))).toEqual({ off: ['health'] })
     expect(setPluginOn('nothing-here', false).ok).toBe(false)
   })

@@ -5,20 +5,8 @@ import type { Action, Chat, Snapshot } from '../../shared/types.ts'
 import { clock } from '../../shared/time.ts'
 import { Emitter } from '../source.ts'
 import { HOME, readJson, writeJson } from '../store.ts'
-import {
-  boxInfo,
-  browserVersion,
-  helperVersion,
-  installHelper,
-  lacks,
-  machineStatus,
-  onMachine,
-  probe,
-  savedMachines,
-  type Probe,
-  type Saved,
-} from './install.ts'
-import { q, tellRunBy, type BoxInfo } from './box.ts'
+import { boxInfo, helperVersion, installHelper, lacks, machineStatus, probe, savedMachines, type Probe, type Saved } from './install.ts'
+import { tellRunBy, type BoxInfo } from './box.ts'
 import { MERGE_DEADLINE } from './engine/engine.ts'
 import {
   type Events,
@@ -272,16 +260,11 @@ export class MachinesLinks extends Emitter<Events> {
       l.connecting = false
       return null
     }
-    if (force || p.helper !== helperVersion(p.os, p.arch)) {
+    if (force || p.helper !== helperVersion()) {
       if (!l.worker) l.state = 'Putting the helper there…'
       this.emit('snapshot')
       p.helper = await installHelper(l.saved.target, p)
       if (!this.active(l)) return null
-      p.browser = browserVersion(p.os, p.arch)
-      // Chrome for the shared browser, by the helper's agent-browser (nothing to do when it is there)
-      void onMachine(l.saved.target, `${q(join(p.home, '.lineclear', 'helper', 'bin', 'agent-browser'))} install`, { timeoutMs: 600_000 }).then((r) => {
-        l.chrome = r.code === 0 ? undefined : `Chrome didn't install there: ${r.err.split('\n').pop() || r.out.trim().split('\n').pop()}`
-      })
     }
     tellRunBy(l.saved.target)
     this.keep(l)

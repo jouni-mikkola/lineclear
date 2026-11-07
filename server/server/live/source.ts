@@ -89,16 +89,6 @@ export class LiveSource extends LiveSourceUpkeep implements Source {
       else if (this.engine.statusOf(t) === 'need') this.withAsks(this.chats.chat(t.project))
     })
     this.engine.on('news', (project, text, kind, about, card) => this.news(project, text, kind, about, card))
-    this.engine.on('gone', (t, forget) => {
-      void this.browsers?.close(t.id, forget).catch(() => undefined)
-    })
-    if (this.browsers && process.env.NODE_ENV !== 'test') {
-      // browsers left from before a restart, or opened again after their task ended (tests never sweep this machine's)
-      const sweep = () => void this.sweepBrowsers().catch(() => undefined)
-      this.timers.push(setTimeout(sweep, 20_000) as unknown as ReturnType<typeof setInterval>, setInterval(sweep, 600_000))
-      // browsers left idle (Settings, browser.idleClose): looked for once a minute
-      this.timers.push(setInterval(() => void this.browsers?.closeIdle().catch(() => undefined), 60_000))
-    }
     this.agents.start()
     // the space the machine's and All machines' coordinators shared is the home space's now; their agents close
     void this.agents.space(HOME_SPACE.label, HOME_SPACE.was).catch(() => undefined)

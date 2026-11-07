@@ -3,7 +3,6 @@
 import { join } from 'node:path'
 import { SET_BY, SETTINGS_HEAD, type SetBy } from '../../shared/brief.ts'
 import { ROOT } from '../root.ts'
-import { has } from '../plugins.ts'
 import { BOX, helperDir } from './box.ts'
 
 /** where an agent finds Lineclear's files: its checkout here; on another machine the helper's copy (install.ts) */
@@ -150,18 +149,9 @@ export function taskPrompt(t: { id: string; branch: string; base: string }, time
     commandLine(`${t.id}/Agent`),
     `You work in your own git worktree on branch ${t.branch} (from ${t.base}): commit there, and don't switch branches.`,
     times,
-    has('browser') ? browserLine(t.id) : '',
   ]
     .filter(Boolean)
     .join('\n\n')
-}
-
-/** the shared browser, in a task's instructions (the skill says more) */
-const browserLine = (id: string) => {
-  // by its full path: a shell's start-up files can put another agent-browser ahead of Lineclear's bin on the PATH, and
-  // two versions on one session keep restarting its daemon
-  const ab = join(OWN, 'bin', 'agent-browser')
-  return `Your shared browser (session ${id}, set in your environment) runs only by its full path, ${ab}: a plain agent-browser may be another version, and two versions on one session keep restarting it.`
 }
 
 export function taskFirst(t: { title: string; desc: string }) {

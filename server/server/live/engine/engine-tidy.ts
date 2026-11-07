@@ -106,7 +106,6 @@ export class EngineTidy extends EngineMerge {
     await this.agents.interrupt(key)
     // closed before anything is looked at, so it changes nothing more
     await this.agents.finish(key)
-    this.emit('gone', t, false)
     const p = this.places.space(t.project) && this.proj(t)
     if (!p || !t.worktree || ended(t) || this.cleaning.has(t.id)) return []
     this.cleaning.add(t.id)
@@ -159,7 +158,6 @@ export class EngineTidy extends EngineMerge {
       // a Done task stays done for the ones queued after it
       if (ended(t)) this.passOn(t)
       this.data.tasks = this.data.tasks.filter((x) => x !== t)
-      this.emit('gone', t, true)
       this.chats.forget(key)
       this.agents.forget(key)
       this.save()
@@ -186,8 +184,6 @@ export class EngineTidy extends EngineMerge {
     this.quiet(t)
     const stopped = this.agents.status(this.key(t)) !== 'gone' && !ended(t)
     const kept = stopped ? await this.stopTask(t.id) : []
-    // its shared browser closes too (stopping it already did)
-    if (!stopped) this.emit('gone', t, ended(t))
     // a finished task's agent may still be about: put away as merging would
     if (ended(t) && !t.cleaned && this.agents.status(this.key(t)) !== 'working') this.cleanup(t, true).catch(() => undefined)
     return { kept, stopped }

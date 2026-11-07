@@ -1,16 +1,14 @@
-import { dirname, join } from 'node:path'
 import { deleteSection, moveSpace, newSection, PINNED, renameSection, sectionProblem } from '../../shared/order.ts'
 import { asEmoji, NAME_MAX, nameProblem, type Action } from '../../shared/types.ts'
 import { hidden } from './agents.ts'
 import { isCommand } from './commands.ts'
 import { line } from './chatlines.ts'
 import { BOX } from './box.ts'
-import { boxDir } from './mfs.ts'
 import { NAME, placeId } from './places.ts'
 import { restartInfo } from './restart.ts'
 import { CLI_NAME, kindOf } from './settings.ts'
 import { PLUGIN_KEY, setPluginOn } from '../plugins.ts'
-import { heldWords, chatDir } from './source-helpers.ts'
+import { heldWords } from './source-helpers.ts'
 import { LiveSourceRestarts } from './source-restarts.ts'
 
 export class LiveSourceActions extends LiveSourceRestarts {
@@ -87,21 +85,6 @@ export class LiveSourceActions extends LiveSourceRestarts {
       case 'artifact-delete': {
         if (!this.artifacts.remove(a.artifact)) return { ok: false, error: 'That artifact is gone.' }
         this.emit('snapshot')
-        return {}
-      }
-      case 'browser-notes': {
-        if (!this.browsers || !a.notes?.length) return { ok: false }
-        // a shot goes in only from this chat's own inbox, where Mark up saved it
-        const inbox = join(boxDir(), 'inbox', chatDir(a.chat))
-        const notes = a.notes.map((n) => ({
-          comment: String(n.comment ?? ''),
-          pick: {
-            ...n.pick,
-            shot: n.pick.shot && dirname(n.pick.shot) === inbox && /^[\w-]+-note-[\w-]+\.png$/.test(n.pick.shot.split('/').pop()!) ? n.pick.shot : undefined,
-          },
-        }))
-        const shots = notes.map((n) => n.pick.shot).filter((x): x is string => !!x)
-        await this.send(a.chat, line.browserNotes(this.user, { url: a.url, title: a.title, viewport: a.viewport }, notes), shots, true)
         return {}
       }
       case 'model':

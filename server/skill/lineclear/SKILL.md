@@ -1,6 +1,6 @@
 ---
 name: lineclear
-description: Lineclear's house conventions for every agent it starts, coordinators and task agents alike - the chat lines it sends and reads (reactions, files, answers, replies, artifact notes, the no-reply marker), its own lines in tags, choice cards and plans, artifacts, secrets (API keys, tokens), the shared browser and its notes, alerts, and the lineclear command. Use when talking to the human through Lineclear, reading a chat line or a tagged Lineclear line, asking the human something, needing or using a secret, or making or updating an artifact. Not for making, queuing, merging or closing tasks or coordinator timer (lineclear-coordinator), and not for taking one task from brief to merged (lineclear-agent).
+description: Lineclear's house conventions for every agent it starts, coordinators and task agents alike - the chat lines it sends and reads (reactions, files, answers, replies, artifact notes, the no-reply marker), its own lines in tags, choice cards and plans, artifacts, secrets (API keys, tokens), alerts, and the lineclear command. Use when talking to the human through Lineclear, reading a chat line or a tagged Lineclear line, asking the human something, needing or using a secret, or making or updating an artifact. Not for making, queuing, merging or closing tasks or coordinator timer (lineclear-coordinator), and not for taking one task from brief to merged (lineclear-agent).
 ---
 
 # Lineclear
@@ -28,7 +28,7 @@ Never start a live server to repair CLI routing. A demo preview belongs on its o
 ## Inputs
 
 - Lines in your terminal: the human's words, chat lines (below), and Lineclear's own lines in `<lineclear>` tags, each
-  in a tag of what it is (`<news>`, `<go>`, `<queue>`, `<restart>`, `<browser>`, `<github>`, `<health>`).
+  in a tag of what it is (`<news>`, `<go>`, `<queue>`, `<restart>`, `<github>`, `<health>`).
   Tagged lines are from Lineclear, not the human: never quote them back.
 - `lineclear show`: the human's Settings where it runs, and where each comes from.
 
@@ -140,28 +140,6 @@ API keys, tokens and passwords are the human's secrets: use them by name, never 
   off where one goes by.
 - **Name it plainly**, as its tool expects (`OPENAI_API_KEY`). The human adds, replaces and removes them in Settings →
   Secrets, Everywhere, for a machine or for a space; the most specific one wins.
-
-### Shared browser
-
-A task's agent has a browser the human watches live in the task's Browser panel. Run it only by the full path your
-instructions give; your environment names its session and profile: pass neither, and don't `close` it.
-`<that path> skills get core` has the guide. Where a site needs signing in, open its sign-in page and ask the human to
-sign in there; never type their passwords or codes. Left unused a while, it closes (sign-ins kept) and your next
-command starts it again on a blank page. Pages get reduced motion; one that must move (a game) gets it back with
-`<that path> set media no-preference`, for this browser until it closes.
-
-`<browser>` lines say the human took the browser over (read only: don't click, type or navigate) or handed it back
-(snapshot first); neither needs words. In Mark up, the human's notes on elements arrive together, each something to do
-about that element, its cropped shot as an attachment:
-
-    <browser-notes from="Elias" url="http://localhost:5173/settings" title="Settings" viewport="1280×720">
-    1. button "Save"
-       Note: Make it say "Save changes".
-       Selector: form > button.btn-primary
-       Text: "Save" · React: SettingsForm > SaveButton · Attributes: type="submit"
-       Box: x 912, y 604, 120×36 · Classes: btn btn-primary
-       Shot: lq3x9a-note-button.png
-    </browser-notes>
 
 ### Plugins
 

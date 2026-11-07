@@ -34,7 +34,7 @@ export class MachinesActions extends MachinesLinks {
         ? [!p.tools.gh && 'gh (pull requests of GitHub repos)', !p.tools.claude && 'Claude Code', !p.tools.codex && 'Codex'].filter(Boolean)
         : []
       out.push(
-        `${l.rec.machine} (${l.saved.target}): ${l.lacks.length ? `needs ${l.lacks.join(', ')}` : l.state.startsWith("Can't") || l.state.startsWith('herdr') ? l.state : 'helper put there again, worker started again'}${missing.length ? `; not there: ${missing.join(', ')}` : ''}${l.chrome ? `; ${l.chrome}` : ''}`,
+        `${l.rec.machine} (${l.saved.target}): ${l.lacks.length ? `needs ${l.lacks.join(', ')}` : l.state.startsWith("Can't") || l.state.startsWith('herdr') ? l.state : 'helper put there again, worker started again'}${missing.length ? `; not there: ${missing.join(', ')}` : ''}`,
       )
     }
     return out.length ? out : ['No other machines saved in herdr (herdr machine add <ssh target> adds one).']

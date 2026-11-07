@@ -10,7 +10,7 @@ test('a machine herdr has saved is known to room at once, and to placement once 
   expect((await src.cli(['room', 'nowhere'], {})).out).toContain('No machine called nowhere')
   expect(src.engine.machines.has('elitebook')).toBe(false)
 
-  l.probe = { home: '/home/e', os: 'Linux', arch: 'x86_64', path: '/usr/bin', herdr: 'herdr', tools: {}, helper: '', browser: '' }
+  l.probe = { home: '/home/e', os: 'Linux', arch: 'x86_64', path: '/usr/bin', herdr: 'herdr', tools: {}, helper: '' }
   src.syncMachines()
   expect(src.engine.machines.get('elitebook')?.home).toBe('/home/e')
 })
