@@ -25,9 +25,6 @@ export interface StepProof {
 
 type Proofs = Record<string, StepProof>;
 
-/** The most steps one tick asks the checker about. */
-export const CHECKS_PER_TICK = 2;
-
 const proofsPath = (repo: string, env: NodeJS.ProcessEnv) =>
   join(configDir(env), "plan-checks", `proofs-${createHash("sha1").update(resolve(repo)).digest("hex").slice(0, 12)}.json`);
 
@@ -70,7 +67,7 @@ export function doneItems(step: Step): string[] {
 }
 
 /** The step's items as the unproven-step name shows them: the first false one. */
-export const missingItem = (p: StepProof): string | undefined => p.items.find((i) => !i.ok)?.item;
+const missingItem = (p: StepProof): string | undefined => p.items.find((i) => !i.ok)?.item;
 
 /** Step id to its first unproven item, for every step whose record has a false item. A step with no record is not in it. */
 export function unprovenOf(repo: string, env: NodeJS.ProcessEnv = process.env): Map<string, string> {
@@ -83,13 +80,6 @@ export function unprovenOf(repo: string, env: NodeJS.ProcessEnv = process.env): 
 }
 
 export const keyOf = (step: Step) => doneItems(step).join("\n");
-
-/** Whether the checker should read this merged step now: never checked, its items changed, or a false item and main has moved on. */
-export function needsProof(step: Step, record: StepProof | undefined, head: string): boolean {
-  if (doneItems(step).length === 0 || step.reopened) return false;
-  if (record === undefined || record.key !== keyOf(step)) return true;
-  return missingItem(record) !== undefined && record.head !== head;
-}
 
 /** A command that proves an item that is an action outside the repo, and what its output must hold. */
 export interface Command {

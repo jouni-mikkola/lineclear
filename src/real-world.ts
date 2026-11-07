@@ -3,17 +3,14 @@ import { loadavg, tmpdir } from "node:os";
 import { join } from "node:path";
 import { serverBin } from "./paths.ts";
 import { forgetTaskReads, readTasks } from "./task-read.ts";
-import { briefOf } from "./held.ts";
 import { sessionFolderPath } from "./harness-pi.ts";
 import { lineclearDir } from "./measure.ts";
 import { mainRefs } from "./main-branch.ts";
-import { readProofs } from "./doneproof.ts";
-import { proveStep } from "./doneproof-run.ts";
 import { fitTitle } from "./roadmap.ts";
 import { readRoom, startOn } from "./spread.ts";
 import { agentLastError, realChatCards, realStallCards } from "./stalls.ts";
 import { agentStart, nudgePane } from "./starts.ts";
-import { commitsAhead, ownerWrote, pushBranch, taskWorktree, worktreeClean } from "./worktree.ts";
+import { ownerWrote, taskWorktree, worktreeClean } from "./worktree.ts";
 import { ownMark, type World } from "./world.ts";
 
 const HEALTH_TIMEOUT_MS = 10 * 60_000;
@@ -75,9 +72,7 @@ function readers() {
 type Readers = ReturnType<typeof readers>;
 
 /** The git side of the world: main, fetch, the roadmap, health, revert, branches. */
-function gitWorld(
-  refsOf: (repo: string) => [string, string],
-): Pick<World, "main" | "fetch" | "commitsSince" | "roadmap" | "health" | "revert" | "branchOf" | "pushBranch" | "commitsAhead"> {
+function gitWorld(refsOf: (repo: string) => [string, string]): Pick<World, "main" | "fetch" | "commitsSince" | "roadmap" | "health" | "revert" | "branchOf"> {
   return {
     main(repo) {
       const log = run(["git", "-C", repo, "log", refsOf(repo)[0], "-z", "--format=%H%x01%s%x01%b"]);
@@ -144,8 +139,6 @@ function gitWorld(
         .map((l) => l.trim())
         .find((l) => l !== "");
     },
-    pushBranch: (repo, branch) => pushBranch(run, repo, branch),
-    commitsAhead: (repo, branch) => commitsAhead(run, repo, branch),
   };
 }
 
@@ -154,7 +147,7 @@ function taskWorld(
   lineclear: string,
   io: Readers,
   env: NodeJS.ProcessEnv,
-): Pick<World, "tasks" | "maxTasks" | "reviewerSetting" | "briefOf" | "stopTask" | "tellTask" | "closeTask" | "mergeTask" | "addTask" | "addTaskOn"> {
+): Pick<World, "tasks" | "maxTasks" | "reviewerSetting" | "stopTask" | "tellTask" | "closeTask" | "mergeTask" | "addTask" | "addTaskOn"> {
   // a done task has no pane: refused here, before the server and herdr are asked
   const doneTask = (id: string) =>
     taskStatus(run([lineclear, "task", "show", id, "--json"]).out) === "done" ? `${id} is Done already: it has no agent, so nothing is sent to it.` : undefined;
@@ -173,7 +166,6 @@ function taskWorld(
       const m = /^reviewer\.model\s+(\S+\/\S+)/m.exec(r.out);
       return r.code === 0 && m ? m[1] : undefined;
     },
-    briefOf: (id) => briefOf(run([lineclear, "task", "show", id, "--json"]).out),
     stopTask: (id) => doneTask(id) ?? failure(io.change([lineclear, "task", "stop", id])),
     // The mark tells the agent's log apart from a message of the owner (see ownerWrote), and a resume from other lines.
     tellTask: (id, text, kind) => doneTask(id) ?? failure(io.change([lineclear, "task", "tell", id, `${ownMark(kind)} ${text}`])),
@@ -240,9 +232,6 @@ export function realWorld(env = process.env): World {
     offered: offeredModels(env),
     load: () => loadavg()[0] ?? 0,
     room: (host, space) => readRoom(host, space, env),
-    proofs: (repo) => readProofs(repo, env),
-    proveStep: (settings, step, head, tools) =>
-      proveStep({ repo: settings.repo, step, ref: refsOf(settings.repo)[0], head, reviewers: settings.models.reviewer, env, now: new Date(), tools }),
     ...gitWorld(refsOf),
     ...taskWorld(serverBin(env), io, env),
     ...agentWorld(io, env),

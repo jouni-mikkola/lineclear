@@ -108,7 +108,7 @@ export const AGE_TICKS = 10;
 /** The locks the aged ready steps reserve, oldest first, each by the step that reserved it; a step blocked by an older reservation reserves nothing. */
 export function reservedLocks(status: { id: string; state: string }[], byId: Map<string, Step>, waits: Record<string, number> = {}): Map<string, string> {
   const reserved = new Map<string, string>();
-  const ids = status.filter((st) => st.state === "ready" || st.state === "unproven").map((st) => st.id);
+  const ids = status.filter((st) => st.state === "ready").map((st) => st.id);
   const aged = ids
     .filter((id) => (waits[id] ?? 0) >= AGE_TICKS)
     .sort((a, b) => (waits[b] ?? 0) - (waits[a] ?? 0))

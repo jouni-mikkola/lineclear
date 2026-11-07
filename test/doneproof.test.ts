@@ -5,8 +5,7 @@ import { type ProveTools, commandsFor, doneItems, readOnly, readProofs, type Run
 import { checkerModels, proveStep } from "../src/doneproof-run.ts";
 import { readPlan } from "../src/progress.ts";
 import { checkRoadmap, stepStatuses, type Step } from "../src/roadmap.ts";
-import { tick } from "../src/rules.ts";
-import { fakeWorld, scratch } from "./fake-world.ts";
+import { scratch } from "./fake-world.ts";
 
 const scratchDir = scratch();
 
@@ -123,84 +122,6 @@ test("progress counts an unproven step as not done", () => {
   const commits = [{ subject: "LIN-1: R3 Release 0.1 tagged", body: "" }];
   expect(readPlan(roadmap, commits).steps.map((s) => s.done)).toEqual([true, false]);
   expect(readPlan(roadmap, commits, new Map([["R3", "tagged"]])).steps.map((s) => s.done)).toEqual([false, false]);
-});
-
-function tickSetup() {
-  const dir = scratchDir("doneproof-tick");
-  const at = (...p: string[]) => join(dir, ...p);
-  mkdirSync(at("config", "projects", "demo"), { recursive: true });
-  mkdirSync(at("tmp"));
-  const worker = ["anthropic/claude-sonnet-5-5"];
-  const reviewer = ["anthropic/claude-opus-5-5"];
-  const settings = { repo: dir, space: "demo", check: "true", models: { worker, reviewer, planner: reviewer } };
-  writeFileSync(at("config", "projects", "demo", "settings.json"), JSON.stringify(settings));
-  writeFileSync(at("config", "machine.json"), JSON.stringify({ loadLimit: 1e6 }));
-  const own = {
-    LINECLEAR_CONFIG: at("config"),
-    TMPDIR: at("tmp"),
-    LINECLEAR_HOME: at("home"),
-    LINECLEAR_STORE_COPIES: at("copies"),
-    XDG_CACHE_HOME: at("cache"),
-  };
-  const env = { ...process.env, ...own };
-  const f = fakeWorld(env, [], roadmap, [{ subject: "LIN-9: R3 Release 0.1 tagged", body: "" }]);
-  const asked: string[] = [];
-  const proof = { key: doneItems(r3).join("\n"), head: "abc", at: "2026-06-01T10:00:00Z", model: "m", items: [{ item: ITEM, ok: false, proof: "no tag" }] };
-  f.world.proofs = () => ({ R3: proof });
-  f.world.proveStep = (_s, step) => {
-    asked.push(step.id);
-    return "no answer";
-  };
-  const once = () => tick(f.world, false, env);
-  const finish = () => {
-    f.tasks.list = f.tasks.list.map((t) => ({ ...t, status: "done" }));
-  };
-  return { ...f, env, once, finish, asked };
-}
-
-test("an unproven step starts again with its missing item as the brief, three times a day, then it waits, never a loop", () => {
-  const t = tickSetup();
-  t.once();
-  expect(t.adds).toHaveLength(1);
-  expect(t.adds[0]?.[0]).toBe("R3 Release 0.1 tagged");
-  expect(t.adds[0]?.[1]).toContain(ITEM);
-  t.finish();
-  t.once();
-  expect(t.adds).toHaveLength(2);
-  t.finish();
-  t.once();
-  expect(t.adds).toHaveLength(3);
-  t.finish();
-  t.once();
-  t.once();
-  t.once();
-  expect(t.adds).toHaveLength(3);
-  expect(t.adds.some((a) => a[0] === "R4 Next")).toBe(false);
-  t.finish();
-  t.clock.at = new Date(t.clock.at.getTime() + 86_400_000);
-  t.once();
-  expect(t.adds[3]?.[0]).toBe("R3 Release 0.1 tagged");
-});
-
-test("the tick asks the checker about a merged step, and one that did not answer is not asked again within half an hour", () => {
-  const t = tickSetup();
-  t.world.proofs = () => ({});
-  t.once();
-  expect(t.asked).toEqual(["R3"]);
-  t.once();
-  expect(t.asked).toEqual(["R3"]);
-  t.clock.at = new Date(t.clock.at.getTime() + 31 * 60_000);
-  t.once();
-  expect(t.asked).toEqual(["R3", "R3"]);
-});
-
-test("an unproven step is not started again while its record is older than main", () => {
-  const t = tickSetup();
-  t.world.proofs = () => ({
-    R3: { key: doneItems(r3).join("\n"), head: "older", at: "2026-06-01T09:00:00Z", model: "m", items: [{ item: ITEM, ok: false, proof: "no tag" }] },
-  });
-  t.once();
-  expect(t.adds).toHaveLength(0);
 });
 
 test("the checker runs reads only: a write command is refused", () => {

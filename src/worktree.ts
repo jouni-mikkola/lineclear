@@ -62,15 +62,3 @@ export function worktreeClean(task: string, run: (cmd: string[], cwd?: string) =
   }
   return false;
 }
-
-/** A branch's commits that main lacks; one that cannot be read is taken to hold work. */
-export function commitsAhead(run: (cmd: string[]) => { code: number | null; out: string }, repo: string, branch: string): number {
-  const r = run(["git", "-C", repo, "rev-list", "--count", `main..${branch}`]);
-  return r.code === 0 ? Number(r.out.trim()) : 1;
-}
-
-/** Pushes a branch to origin, so a task moved to another machine finds its work there. Returns an error text, or undefined. */
-export function pushBranch(run: (cmd: string[]) => { code: number | null; out: string; err: string }, repo: string, branch: string): string | undefined {
-  const r = run(["git", "-C", repo, "push", "origin", `${branch}:refs/heads/${branch}`]);
-  return r.code === 0 ? undefined : (r.err || r.out).trim() || `exit ${r.code}`;
-}

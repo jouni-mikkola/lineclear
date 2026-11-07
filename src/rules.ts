@@ -71,18 +71,8 @@ export interface State extends StartRecord {
   machineReads?: Record<string, { good: number; missed?: true; dropped?: true }>;
   /** The project's open stalls, by `<task or step>|<class>`. */
   stalls?: Record<string, StallEntry>;
-  /** Held tasks made on another machine, by their id here: one whose local copy did not close is not made twice. */
-  placed?: Record<string, string>;
   /** Steps whose task ended with nothing to merge, with that task: kept for good, so archiving the task does not start the step again. */
   closedSteps?: Record<string, string>;
-  /** When the checker was last asked about each step (ms): a step is not asked twice in half an hour. */
-  proofTried?: Record<string, number>;
-  /** When each step's tasks were started (ms), kept for 24 hours: a step started twice in that time is not started again. */
-  stepStarts?: Record<string, number[]>;
-  /** When each step's tasks were first seen in the task list (ms), by task id, kept for 24 hours. */
-  taskSeen?: Record<string, Record<string, number>>;
-  /** Steps over that limit with the Inbox item that told the owner, kept until the step is under the limit again. */
-  limitItems?: Record<string, number>;
   /** Owner-only steps with the Inbox item that asks the owner; the owner's Done answer ends the step. */
   ownerItems?: Record<string, number>;
 }
