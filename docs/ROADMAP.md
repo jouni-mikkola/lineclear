@@ -390,6 +390,14 @@ Result: `server/scripts/test.ts` is deleted, and the root test command is the on
 - after: L776
 - files: server/scripts/test.ts
 
+### L773 One file per measure
+Result: Each measure has its own page in `docs/numbers/`, so two measuring steps never edit one file.
+- why: `docs/numbers.md` was changed by 11 PRs in 3 days, 1 with a conflict.
+- done when: each section of `docs/numbers.md` is a page `docs/numbers/<measure>.md`; `docs/numbers.md` keeps only a pointer to the folder (10 lines or fewer), so every link to it still holds; `core-baseline.ts`, `check-speed.ts` and `check.ts` name the page they write.
+- locks: none
+- after: L760, L609
+- files: docs/numbers.md, docs/numbers/, scripts/check-speed.ts, scripts/core-baseline.ts, scripts/check.ts
+
 ## Open steps from the audits
 
 The open steps of the audits of `docs/audit/` and `docs/roles.md`, in the order stores, engine, agents, loop,
@@ -524,9 +532,189 @@ each (R18 of `release.md`); then the swarm run repeated with the coordinator, th
 - after: none
 - files: docs/numbers.md, src/measure.ts
 
-## Open steps for the web
+## Token budgets (P3)
 
-The open steps of [web-audit.md](web-audit.md), listed after the core steps.
+The steps that measure and set what each role spends: the flow and agents plans of `docs/plan/` in rank 3 of
+[release.md](release.md).
+
+### L799 Tokens per merged step
+Result: `bun scripts/core-baseline.ts step-tokens 20` prints the tokens of each role per merged step over the last 20 merges.
+- why: tokens are counted per task today, not per merged step, so the review, the chats and retries of a step are not added up.
+- done when: the command sums agent, reviewer, project chat and Dispatcher usage for each merged step and prints median and p90 per role; a test reads a fake store of 3 steps, one with a retried task, and sees the sums; `measure.ts` stays under 200 lines.
+- locks: none
+- after: none
+- files: src/measure.ts, scripts/core-baseline.ts, test/core-baseline.test.ts
+
+### L800 The swarm measure is a script
+Result: `bun scripts/swarm-measure.ts <swarm-base> <one-base>` prints merged steps per hour, tokens per merged step and job minutes per arm.
+- why: roles.md's first measure has no script, so no run of it is comparable with another.
+- done when: the script reads the board's tasks of each base branch, their sessions and their `check.yml` runs and prints one row per arm; it counts a step only if its base is still green an hour after the merge; a test with two fake arms prints the pass or fail of R18 of release.md.
+- locks: none
+- after: none
+- files: scripts/swarm-measure.ts, test/swarm-measure.test.ts
+
+### L751 Budgets are set per role
+Result: Each role's token budget and memory cap are settings with measured defaults, passed to the agent at spawn.
+- why: L798 and L735 enforce numbers that are fixed in code; the owner should set them in one place.
+- done when: settings hold `budget.tokens` and `budget.memory` per role (agent 150 k, reviewer 80 k, coordinator 1 M); a test starts an agent and sees L798's `LINECLEAR_BUDGET_<ROLE>` and the scope's `MemoryMax` from the setting.
+- locks: none
+- after: L735, L798, L502
+- files: server/server/live/settings-types.ts, server/server/live/settings-store.ts, server/server/live/agent-start.ts, server/test/agent-budget.test.ts
+
+## Any project (P4)
+
+The steps that give a repo with no special setup the same flow: the core, flow and agents plans of `docs/plan/` in
+rank 4 of [release.md](release.md).
+
+### L806 Any repo gets a check
+Result: Adding a project with no GitHub check opens its first task: a `lineclear-check.yml` workflow that runs the project's check command.
+- why: the lane needs a full check on GitHub, and a repo with no special setup has none, so v0.2's flow would work for Lineclear alone.
+- done when: `lineclear project add` on a repo with no workflow adds a task whose brief adds `templates/check.yml` with the detected check command, shards 1, 5 minutes a job and the `lane` label rule; a test adds a scratch repo and sees the task and the file text; a repo that has a workflow gets no task.
+- locks: none
+- after: none
+- files: src/add-project.ts, templates/check.yml, test/add-project.test.ts
+
+### L807 The lane reads the repo's check
+Result: The lane waits for the check name the repo's own ruleset requires, not for a job called `check`.
+- why: `github.ts` reads checks by this repo's job name, so another project's lane would wait for a check that never comes.
+- done when: the required check names come from `gh api repos/<repo>/rulesets` once per repo watch, with `check` only when the repo has none; a test with a fake ruleset requiring `build` waits for `build`.
+- locks: none
+- after: none
+- files: server/server/live/engine/github.ts, server/test/github-checks.test.ts
+
+### L752 Any repo gets an agent
+Result: A small repo with no package.json and no Lineclear setup gets a worktree, an RPC agent and a merge, like this repo.
+- why: the start links a `node_modules` store and assumes Bun tools, so another project would not get the same flow.
+- done when: a test adds a 3-file repo with a shell check command, starts one step and sees worktree, brief, ready and merge with 0 errors; `storePath` runs only when a lock file exists.
+- locks: none
+- after: none
+- files: server/server/live/engine/git.ts, server/test/any-repo-start.test.ts
+
+### L718 Any repo runs the loop
+Result: The core loop test passes on a second small repo with a plain GitHub PR check and on one with no remote, with no Lineclear setup.
+- why: the flow is proven on Lineclear's own repo only, whose check is special.
+- done when: `server/test/core-loop-any.test.ts` runs L700's loop on a repo with a fake gh and a plain PR check, and on a repo with only `make test`; both merge 2 steps once each. Tests: new file.
+- locks: none
+- after: L700, L791
+- files: server/test/core-loop-any.test.ts
+
+### L808 The flow runs on a second repo
+Result: A small second repo with no special setup goes through 3 steps: add, build, review, lane and merge, with no hand step.
+- why: the owner's priority 4: the flow must serve any project, and only a real second repo proves it.
+- done when: `docs/numbers/second-repo.md` lists the repo, its 3 tasks and their times from add to merge, with 0 hand steps and 0 red runs on its main.
+  - Owner only: create the second small repo on GitHub (it leaves the machine).
+- locks: none
+- after: L806, L807, L791, L795, L773
+- files: docs/numbers/second-repo.md
+
+## The web (P5)
+
+The steps of [plan/web.md](plan/web.md) in its rank, then the open step of [web-audit.md](web-audit.md). Every step
+checks the theme of [design.md](design.md) at 1440 and 390 px.
+
+### W106 Roadmap counts match Home
+Result: The roadmap's at-work count is the number of the project's working tasks that Home shows, from the same records.
+- why: the roadmap says 0 at work while Home shows 8 on the same project.
+- done when: a bun test with 8 working tasks on one project gets 8 from the roadmap's progress and from `/api/home`; a new `test/progress.test.ts` holds it.
+- locks: none
+- after: none
+- files: src/progress.ts, test/progress.test.ts
+
+### W108 No Terminal tab on a task
+Result: A task page has Chat and Changes only; a task agent has no terminal since L509, and its tool calls are in its chat.
+- why: owner priority 2: 235 web lines draw a screen that is always empty, since an RPC agent has no pane.
+- done when: `ui/web/task-live.tsx`, `ui/kit/terminal.tsx` and `ui/test/task-live.pw.ts` are deleted; `?tab=terminal` opens Chat; `ui/` loses at least 300 lines (`wc -l`); knip is green.
+- locks: none
+- after: none
+- files: ui/web/task.tsx, ui/web/task-live.tsx, ui/kit/terminal.tsx, ui/test/task-live.pw.ts
+
+### W124 Pages update one way
+Result: An open page updates only from the live stream, with no poll beside it, and a lost stream retries 1, 2, 4 up to 30 s.
+- why: owner priority 2: pages stay current four ways, a stream, two 1.5 s polls and a fixed 3 s reconnect.
+- done when: `grep -rnE 'refetchInterval: [0-9]|, 1500,' ui/web` finds nothing; an unchanged board gets 0 page requests in 60 s with the stream up; a stopped server gets at most 15 tries in 5 minutes.
+- locks: none
+- after: none
+- files: ui/web/data.ts, ui/web/live.ts
+
+### W103 One project key in links
+Result: The rail opens a project's roadmap by its key, so a project whose name differs from its key still opens.
+- why: owner priority 4: the rail links `/lineclear/roadmap` while the API knows the project as `lineclear-eb`.
+- done when: with a fixture project named `shop` whose key is `shop-2` (`/api/home` already sends it as `project`), the rail's link and Home's line label open `/shop-2/roadmap` and show `shop`; `ui/test/one-name.pw.ts` checks both at 1440 and 390 px.
+- locks: none
+- after: none
+- files: ui/web/frame.tsx, ui/test/one-name.pw.ts
+
+### W105 A repo with no roadmap works
+Result: A project with no `docs/ROADMAP.md` shows merged tasks as progress and a roadmap page that says so, inside the frame.
+- why: owner priority 4; F29 of web-audit.md: such a page is black today.
+- done when: `ui/test/any-repo.pw.ts` adds a fresh one-commit repo with no roadmap as a project; Home, `/<key>/roadmap` and a task page each draw a named state in the frame at 1440 and 390 px with 0 console errors; the F29 case moves out of `errors.pw.ts`.
+- locks: none
+- after: none
+- files: ui/web/roadmap/index.tsx, ui/test/fixture.ts, ui/test/any-repo.pw.ts, ui/test/errors.pw.ts
+
+### W100 Theme gate for every view
+Result: A UI test fails when a view paints red without a broken state, amber without a wait, or orange on a state.
+- why: owner priority 5: orange paints trains, the Dispatcher box and chat icons today.
+- done when: `ui/test/theme.pw.ts` reads computed colours of every view's `?state=` pages at 1440 and 390 px; it lists today's 3 known uses by the step that removes each (W101, W102) and fails on any other; a planted red on a working row fails it.
+- locks: none
+- after: none
+- files: ui/test/theme.pw.ts
+
+### W101 Working trains are white
+Result: A train at work is white on the line, as brand.md draws it, so orange never reads as a state next to red.
+- why: owner priority 5: `rail.ts` paints a working train `accent`, which reads as broken next to stop red.
+- done when: the working train's body in `rail.ts` (line 122 today) is painted `fg`, not `accent`; Home screenshot at 1440 and 390 px.
+- locks: none
+- after: none
+- files: ui/brand/rail.ts
+
+### W102 Chat and box marks not orange
+Result: The Dispatcher box and the chat's icons are grey at rest, amber only when something waits for you.
+- why: owner priority 5: brand.md keeps orange for the mark, the focus ring and the selected tab.
+- done when: the 3 icons of `ui/kit/chat.tsx` (lines 51, 68, 271 today) use no accent and `line-labels.tsx` inks the box `fg2` or `caution`.
+- locks: none
+- after: none
+- files: ui/kit/chat.tsx, ui/kit/line-labels.tsx
+
+### W121 Tables draw a window
+Result: A table of 200 rows draws at most 60 and scrolls at 60 fps.
+- why: `?state=tasks200` draws 2,865 nodes and 80 rows.
+- done when: Home with `?state=tasks200` has at most 1,200 DOM nodes; a trace of a scroll to row 200 has no task over 50 ms; `ui/test/kit.pw.ts`.
+- locks: none
+- after: none
+- files: ui/kit/table.tsx, ui/test/kit.pw.ts
+
+### W122 The line never cuts a project
+Result: Home's line shows every project and every label whole at 1440 and 390 px, however many projects there are.
+- why: F1, F6 and F23 of web-audit.md: at 390 px a train label overlaps "merged".
+- done when: with `?state=many` and `?state=tasks200` no track or label is cut or overlaps another at 1440 and 390 px; `ui/test/home-line.pw.ts`.
+- locks: none
+- after: none
+- files: ui/kit/line.tsx, ui/kit/line-parts.tsx, ui/kit/line-glide.tsx, ui/test/home-line.pw.ts
+
+### W114 Chat folds repeats, windows 200
+Result: Equal notices in a row show once with a count, and a chat of 200 messages draws at most 40.
+- why: F4 and F24 of web-audit.md: the Dispatcher panel opens on one notice 6 times.
+- done when: 6 equal notices show as one line with "×6"; 200 messages draw at most 40 message nodes and open on the newest; a fresh config shows the empty chat with its composer; `ui/test/chat-panel.pw.ts`.
+- locks: none
+- after: none
+- files: ui/web/chat-view.tsx, ui/web/chat-rows.tsx, ui/test/chat-panel.pw.ts
+
+### W113 Browsers has its own empty state
+Result: `/browsers` with no open session says "No browser is open." in the frame, not Home.
+- why: F27 of web-audit.md: `/browsers` with no session draws Home under the Browsers tab.
+- done when: `ui/test/browsers.pw.ts` with no session finds that line and no Home part at 1440 and 390 px.
+- locks: none
+- after: none
+- files: ui/web/browsers.tsx, ui/test/browsers.pw.ts
+
+### W111 Changes tab draws every state
+Result: The Changes tab has a drawn loading, empty, error and long state, each a `?state=` sample.
+- why: F22 and F35 of web-audit.md.
+- done when: 4 samples exist and `ui/test/demo-states.pw.ts` shoots each at 1440 and 390 px; none shows raw error text.
+- locks: none
+- after: none
+- files: ui/web/task-changes.tsx, ui/test/demo-states.pw.ts
 
 ### W22 State changes have named motion
 Result: Route changes, tab switches, list additions and the Dispatcher panel each play a named motion from the kit, and none under reduced motion.

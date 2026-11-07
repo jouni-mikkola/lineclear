@@ -54,37 +54,12 @@ W107; W10, W17 by W111; W11 by W105, W112, W113; W20 by W117; W22 by W126.
 
 ## Steps
 
-### W100 Theme gate for every view
-Result: A UI test fails when a view paints red without a broken state, amber without a wait, or orange on a state.
-- why: owner priority 5; V6: orange paints trains, the Dispatcher box and chat icons today.
-- done when: `ui/test/theme.pw.ts` reads computed colours of every view's `?state=` pages at 1440 and 390 px; it lists today's 3 known uses (V6) by the step that removes each and fails on any other; a planted red on a working row fails it.
-- locks: theme-gate
-- after: none
-- files: ui/test/theme.pw.ts
+Each step is in [ROADMAP.md](../ROADMAP.md), or dropped with the step that does its job.
 
-### W101 Working trains are white
-Result: A train at work is white on the line, as brand.md draws it, so orange never reads as a state next to red.
-- why: V6, owner priority 5.
-- done when: the working train's body in `rail.ts` (line 122 today) is painted `fg`, not `accent`; Home screenshot at 1440 and 390 px.
-- locks: brand-rail, file-ui-brand-rail-ts
-- after: none
-- files: ui/brand/rail.ts
-
-### W102 Chat and box marks not orange
-Result: The Dispatcher box and the chat's icons are grey at rest, amber only when something waits for you.
-- why: V6, owner priority 5.
-- done when: the 3 icons of `ui/kit/chat.tsx` (lines 51, 68, 271 today) use no accent and `line-labels.tsx` inks the box `fg2` or `caution`.
-- locks: kit-chat-marks, file-ui-kit-chat-tsx, file-ui-kit-line-labels-tsx
-- after: none
-- files: ui/kit/chat.tsx, ui/kit/line-labels.tsx
-
-### W103 One project key in links
-Result: The rail opens a project's roadmap by its key, so a project whose name differs from its key still opens.
-- why: V1, owner priority 4.
-- done when: with a fixture project named `shop` whose key is `shop-2` (`/api/home` already sends it as `project`), the rail's link and Home's line label open `/shop-2/roadmap` and show `shop`; `ui/test/one-name.pw.ts` checks both at 1440 and 390 px.
-- locks: project-key, file-ui-web-frame-tsx
-- after: none
-- files: ui/web/frame.tsx, ui/test/one-name.pw.ts
+- W100 Theme gate for every view: in ROADMAP.md.
+- W101 Working trains are white: in ROADMAP.md.
+- W102 Chat and box marks not orange: in ROADMAP.md.
+- W103 One project key in links: in ROADMAP.md.
 
 ### W104 The step page names its project
 Result: A step page's back link shows the project's name, and its done-when items carry no "no evidence yet".
@@ -94,21 +69,8 @@ Result: A step page's back link shows the project's name, and its done-when item
 - after: L567, W103
 - files: ui/web/roadmap/step.tsx, ui/test/step-page.pw.ts
 
-### W105 A repo with no roadmap works
-Result: A project with no `docs/ROADMAP.md` shows merged tasks as progress and a roadmap page that says so, inside the frame.
-- why: owner priority 4; F29: such a page is black today.
-- done when: `ui/test/any-repo.pw.ts` adds a fresh one-commit repo with no roadmap as a project; Home, `/<key>/roadmap` and a task page each draw a named state in the frame at 1440 and 390 px with 0 console errors; the F29 case moves out of `errors.pw.ts`.
-- locks: roadmap-view, file-ui-web-roadmap-index-tsx, file-ui-test-fixture-ts, file-ui-test-errors-pw-ts
-- after: none
-- files: ui/web/roadmap/index.tsx, ui/test/fixture.ts, ui/test/any-repo.pw.ts, ui/test/errors.pw.ts
-
-### W106 Roadmap counts match Home
-Result: The roadmap's at-work count is the number of the project's working tasks that Home shows, from the same records.
-- why: V2: 0 at work on the roadmap, 8 on Home.
-- done when: a bun test with 8 working tasks on one project gets 8 from the roadmap's progress and from `/api/home`; a new `test/progress.test.ts` holds it.
-- locks: progress, file-src-progress-ts
-- after: none
-- files: src/progress.ts, test/progress.test.ts
+- W105 A repo with no roadmap works: in ROADMAP.md.
+- W106 Roadmap counts match Home: in ROADMAP.md.
 
 ### W107 Roadmap opens short
 Result: The roadmap opens on a status under 80 characters, a phase bar in the track style, and the steps at work first.
@@ -118,13 +80,7 @@ Result: The roadmap opens on a status under 80 characters, a phase bar in the tr
 - after: W106
 - files: ui/web/roadmap/summary.tsx, ui/web/roadmap/bar.tsx, ui/test/roadmap.pw.ts
 
-### W108 No Terminal tab on a task
-Result: A task page has Chat and Changes only; a task agent has no terminal since L509, and its tool calls are in its chat.
-- why: V4, owner priority 2: 235 web lines draw a screen that is always empty.
-- done when: `ui/web/task-live.tsx`, `ui/kit/terminal.tsx` and `ui/test/task-live.pw.ts` are deleted; `?tab=terminal` opens Chat; `ui/` loses at least 300 lines (`wc -l`); knip is green.
-- locks: task-page, file-ui-web-task-tsx, file-ui-kit-terminal-tsx
-- after: none
-- files: ui/web/task.tsx, ui/web/task-live.tsx, ui/kit/terminal.tsx, ui/test/task-live.pw.ts
+- W108 No Terminal tab on a task: in ROADMAP.md.
 
 ### W109 No terminal route
 Result: The web server has no task terminal route, so no page asks herdr for a task's screen.
@@ -142,13 +98,7 @@ Result: A task page opens on one header: result title, state, step, model, machi
 - after: W108
 - files: ui/kit/task-head.tsx, ui/web/task.tsx, ui/test/task.pw.ts
 
-### W111 Changes tab draws every state
-Result: The Changes tab has a drawn loading, empty, error and long state, each a `?state=` sample.
-- why: F22, F35.
-- done when: 4 samples exist and `ui/test/demo-states.pw.ts` shoots each at 1440 and 390 px; none shows raw error text.
-- locks: task-changes, file-ui-web-task-changes-tsx
-- after: none
-- files: ui/web/task-changes.tsx, ui/test/demo-states.pw.ts
+- W111 Changes tab draws every state: in ROADMAP.md.
 
 ### W112 Rail and bar after the Inbox
 Result: The rail and the 390 px bar list Home, Chat, Browsers, Usage and Settings, and mark only the view you are on.
@@ -158,21 +108,8 @@ Result: The rail and the 390 px bar list Home, Chat, Browsers, Usage and Setting
 - after: L605, W103
 - files: ui/web/frame.tsx, ui/kit/rail.tsx, ui/test/frame.pw.ts
 
-### W113 Browsers has its own empty state
-Result: `/browsers` with no open session says "No browser is open." in the frame, not Home.
-- why: V9, F27.
-- done when: `ui/test/browsers.pw.ts` with no session finds that line and no Home part at 1440 and 390 px.
-- locks: browsers-view
-- after: none
-- files: ui/web/browsers.tsx, ui/test/browsers.pw.ts
-
-### W114 Chat folds repeats, windows 200
-Result: Equal notices in a row show once with a count, and a chat of 200 messages draws at most 40.
-- why: V5, F4, F24.
-- done when: 6 equal notices show as one line with "×6"; 200 messages draw at most 40 message nodes and open on the newest; a fresh config shows the empty chat with its composer; `ui/test/chat-panel.pw.ts`.
-- locks: chat-view, file-ui-web-chat-view-tsx
-- after: none
-- files: ui/web/chat-view.tsx, ui/web/chat-rows.tsx, ui/test/chat-panel.pw.ts
+- W113 Browsers has its own empty state: in ROADMAP.md.
+- W114 Chat folds repeats, windows 200: in ROADMAP.md.
 
 ### W115 Setup is a Settings tab
 Result: The first run opens Settings > Models with one ordered list per role; the select-and-Save form and `/setup` are gone.
@@ -214,21 +151,8 @@ Result: Each working row shows its step's result title, a short model name and i
 - after: L606
 - files: ui/web/home-table.tsx, ui/web/home-rows.ts, ui/test/home.pw.ts
 
-### W121 Tables draw a window
-Result: A table of 200 rows draws at most 60 and scrolls at 60 fps.
-- why: V8: 2,865 nodes for `?state=tasks200`.
-- done when: Home with `?state=tasks200` has at most 1,200 DOM nodes; a trace of a scroll to row 200 has no task over 50 ms; `ui/test/kit.pw.ts`.
-- locks: kit-table, file-ui-kit-table-tsx
-- after: none
-- files: ui/kit/table.tsx, ui/test/kit.pw.ts
-
-### W122 The line never cuts a project
-Result: Home's line shows every project and every label whole at 1440 and 390 px, however many projects there are.
-- why: V8, F1, F6, F23.
-- done when: with `?state=many` and `?state=tasks200` no track or label is cut or overlaps another at 1440 and 390 px; `ui/test/home-line.pw.ts`.
-- locks: line, file-ui-kit-line-tsx
-- after: none
-- files: ui/kit/line.tsx, ui/kit/line-parts.tsx, ui/kit/line-glide.tsx, ui/test/home-line.pw.ts
+- W121 Tables draw a window: in ROADMAP.md.
+- W122 The line never cuts a project: in ROADMAP.md.
 
 ### W123 Home shows each machine
 Result: Home shows one row per machine with its agents, free slots and memory, red only when it is down, and its findings in Details.
@@ -238,13 +162,7 @@ Result: Home shows one row per machine with its agents, free slots and memory, r
 - after: L580, L606
 - files: ui/web/machines.tsx, ui/web/health.ts, ui/web/home.tsx, ui/test/once.pw.ts
 
-### W124 Pages update one way
-Result: An open page updates only from the live stream, with no poll beside it, and a lost stream retries 1, 2, 4 up to 30 s.
-- why: V13, owner priority 2.
-- done when: `grep -rnE 'refetchInterval: [0-9]|, 1500,' ui/web` finds nothing; an unchanged board gets 0 page requests in 60 s with the stream up; a stopped server gets at most 15 tries in 5 minutes.
-- locks: live-client, file-ui-web-data-ts
-- after: none
-- files: ui/web/data.ts, ui/web/live.ts
+- W124 Pages update one way: in ROADMAP.md.
 
 ### W125 The server sends on change
 Result: The live stream sends an answer only when the store changed, with no 6 s re-read of every watched answer.

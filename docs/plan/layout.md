@@ -126,13 +126,7 @@ Result: Install, update, uninstall and the store copies live in one folder with 
 - L771 Source tests by module: in ROADMAP.md.
 - L772 Engine tests by module: in ROADMAP.md.
 
-### L773 One file per measure
-Result: Each measure has its own page in `docs/numbers/`, so two measuring steps never edit one file.
-- why: `docs/numbers.md` was changed by 11 PRs, 1 with a conflict.
-- done when: `docs/numbers/<measure>.md` holds each section; `docs/numbers.md` is gone; `git grep -n "numbers.md"` lists none outside git history.
-- locks: numbers-doc, file-docs-numbers-md
-- after: L760, L609
-- files: docs/numbers.md, docs/numbers/, scripts/check-speed.ts, scripts/core-baseline.ts, scripts/check.ts
+- L773 One file per measure: in ROADMAP.md; `docs/numbers.md` stays as a pointer to the folder, so every link to it still holds.
 
 ### L774 Collisions can be measured
 Result: One command prints how many merged PRs hit a rebase conflict and which files many PRs touch.

@@ -95,13 +95,7 @@ Each step is in [ROADMAP.md](../ROADMAP.md), or dropped with the step that does 
 - L716 Leftovers are swept: in ROADMAP.md.
 - L717 A task stops at its budget: dropped, L798 does it (ROADMAP.md).
 
-### L718 Any repo runs the loop
-Result: The core loop test passes on a second small repo with a plain GitHub PR check and on one with no remote, with no Lineclear setup.
-- why: the flow is proven on Lineclear's own repo only, whose check is special.
-- done when: `server/test/core-loop-any.test.ts` runs L700's loop on a repo with a fake gh and a plain PR check, and on a repo with only `make test`; both merge 2 steps once each. Tests: new file.
-- locks: any-repo-test
-- after: L700, L712
-- files: server/test/core-loop-any.test.ts
+- L718 Any repo runs the loop: in ROADMAP.md, after L791 in place of L712.
 
 - L719 Old record fixes are gone: in ROADMAP.md.
 - L720 The engine is composed: dropped, L529 does it (ROADMAP.md).
