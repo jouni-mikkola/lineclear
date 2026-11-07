@@ -1,7 +1,8 @@
 import { expect } from 'bun:test'
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, openSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { forgetWritePermissions } from '../server/live/engine/github.ts'
 import { sh, repo, type world, Settings } from './engine-world.ts'
 import type { FakeGitHub } from './fake-gh.ts'
 
@@ -23,8 +24,24 @@ export function onGitHub(o: { authed?: boolean; down?: boolean; checks?: FakeGit
   const file = join(mkdtempSync(join(tmpdir(), 'shep-gh-state-')), 'github.json')
   writeFileSync(file, JSON.stringify({ origin: bare, repo: 'acme/app', prs: [], calls: [], authed: o.authed, down: o.down, checks: o.checks }))
   process.env.FAKE_GH_STATE = file
+  forgetWritePermissions()
   const gh = () => JSON.parse(readFileSync(file, 'utf8')) as FakeGitHub
-  const set = (patch: Partial<FakeGitHub>) => writeFileSync(file, JSON.stringify({ ...gh(), ...patch }))
+  // under the lock fake-gh holds from read to write, or a running gh writes its older state over the patch
+  const set = (patch: Partial<FakeGitHub>) => {
+    const lock = `${file}.lock`
+    for (;;)
+      try {
+        openSync(lock, 'wx')
+        break
+      } catch {
+        Bun.sleepSync(5)
+      }
+    try {
+      writeFileSync(file, JSON.stringify({ ...gh(), ...patch }))
+    } finally {
+      unlinkSync(lock)
+    }
+  }
   return { bare, dir, gh, set }
 }
 

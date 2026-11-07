@@ -365,6 +365,11 @@ const PERMISSION_TTL_MS = 60 * 60_000
 const RATE_LIMIT_BACKOFF_MS = 10 * 60_000
 const permissions = new Map<string, { at: number; ok: boolean; backoff?: boolean }>()
 
+/** for tests: every fake GitHub repo shares one name, so an answer kept for it must not outlive its test */
+export function forgetWritePermissions() {
+  permissions.clear()
+}
+
 /**
  * Write permission on the GitHub repo, from the REST API (its own, larger limit; GraphQL's secondary limit failed every
  * task add). Read once an hour per repo. On a rate limit the last answer, or yes, holds for a while: the push itself
