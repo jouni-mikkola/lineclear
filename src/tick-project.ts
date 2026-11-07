@@ -117,6 +117,7 @@ export function tickProject(
     return out;
   }
   if (!dryRun) {
+    world.renewClaims?.();
     const claimed = world.claimedSteps?.(settings.repo) ?? [];
     world.releaseSteps?.(
       settings.repo,
