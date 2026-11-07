@@ -1,8 +1,9 @@
 import { join } from 'node:path'
-import type { Action, Alert, Chat, Snapshot, TermScreen } from '../../shared/types.ts'
+import type { Alert, Chat, Snapshot, TermScreen } from '../../shared/types.ts'
 import type { Overview } from '../source.ts'
 import { HOME } from '../store.ts'
 import { boxInfo, helperVersion, lacks, type Probe, type Saved } from './install.ts'
+import type { Queued } from './waiting.ts'
 import type { Worker } from './worker-process.ts'
 
 export interface MachineRec {
@@ -29,8 +30,11 @@ export interface Link {
   watching: { chats: string[]; term: string | null }
   reachable: boolean
   down?: number
-  /** what you sent while it was out of reach */
-  waiting: Action[]
+  /** what you sent while it was out of reach: kept on disk until the machine has taken it */
+  waiting: Queued[]
+  /** why the first waiting action was not delivered, shown in the machine's state until it is */
+  failed?: string
+  flushing?: boolean
   /** its worker: started here, or one from before a restart taken back */
   worker?: Worker
   /** how it is going, in a few words: Ready, Putting the helper there…, Can't reach it: … */

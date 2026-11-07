@@ -12,11 +12,11 @@ export interface Kept {
 }
 
 /** Older versions ran a machine's worker inside machines/<label>, so its tasks.json sat where a mirror would. The
- *  worker is stopped and everything but last.json moves to workers/<label>: no tasks.json is left under machines/. */
+ *  worker is stopped and everything but last.json and waiting.json moves to workers/<label>: no tasks.json is left under machines/. */
 function moveOldStore(d: string) {
   const from = join(HOME, 'machines', d)
   const to = join(HOME, 'workers', d)
-  const files = readdirSync(from).filter((f) => f !== 'last.json')
+  const files = readdirSync(from).filter((f) => f !== 'last.json' && f !== 'waiting.json')
   if (!files.length) return
   mkdirSync(to, { recursive: true })
   for (const f of files) {

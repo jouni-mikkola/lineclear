@@ -42,8 +42,9 @@ export class MachinesActions extends MachinesLinks {
   rows() {
     return [...this.links.values()].map((l) => ({
       name: l.rec.machine,
-      state:
-        l.reachable && l.state === 'Ready'
+      state: l.failed
+        ? `${l.failed}; ${l.waiting.length} waiting`
+        : l.reachable && l.state === 'Ready'
           ? `Ready · ${l.saved.target}`
           : l.reachable
             ? l.state
