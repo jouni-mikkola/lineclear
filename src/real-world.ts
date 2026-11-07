@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { serverBin } from "./paths.ts";
 import { forgetTaskReads, readTasks } from "./task-read.ts";
 import { briefOf } from "./held.ts";
-import { piHarness } from "./harness-pi.ts";
+import { sessionFolderPath } from "./harness-pi.ts";
 import { lineclearDir } from "./measure.ts";
 import { mainRefs } from "./main-branch.ts";
 import { readProofs } from "./doneproof.ts";
@@ -201,7 +201,7 @@ function taskWorld(
 /** The agents' side of the world: their sessions, panes, stall cards and chat. */
 function agentWorld(io: Readers, env: NodeJS.ProcessEnv): Pick<World, "stallCards" | "chatCards" | "started" | "lastError" | "nudge" | "ownerWrote" | "clean"> {
   const tasksFile = join(lineclearDir(env), "tasks.json");
-  const sessionsOf = (worktree: string) => piHarness.sessionFolderPath(worktree, env);
+  const sessionsOf = (worktree: string) => sessionFolderPath(worktree, env);
   return {
     stallCards: (space, repo) => io.memo(`stall\0${space}\0${repo}`, () => realStallCards(space, repo, env)),
     chatCards: (space, repo) => io.memo(`chat\0${space}\0${repo}`, () => realChatCards(space, repo, env)),
