@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { parseArgs } from '../server/live/args.ts'
-import { harnessOf } from '../server/live/source-helpers.ts'
+import { harnessOf } from '../server/live/task-options.ts'
 import { CLIS, KIND, Settings } from '../server/live/settings.ts'
 
 test('the catalog names pi alone, in a small file, and task add --agent claude is refused naming pi', () => {
