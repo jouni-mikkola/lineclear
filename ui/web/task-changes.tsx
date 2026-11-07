@@ -3,7 +3,7 @@ import type { TaskChanges } from "../../src/task-changes.ts";
 import { DiffFile, PullRequest } from "../kit/diff.tsx";
 import { Part, type PartState } from "../kit/index.ts";
 import { get, sampleState } from "./data.ts";
-import type { PageState } from "./samples.ts";
+import type { PageState } from "./states.ts";
 
 // A task's changes, the tab next to its terminal: the branch's diff against its base and its pull request, read only.
 // `?state=` draws sample states instead.

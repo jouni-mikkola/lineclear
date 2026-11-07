@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { countSteps, readPlan } from "../src/progress.ts";
 import { criticalPath, roadmapLine } from "../src/roadmap-line.ts";
 import { FORK_PATH } from "../ui/test/chain-path.ts";
-import { roadmapSample } from "../ui/web/roadmap-samples.ts";
+import { roadmapSample } from "../ui/test/samples/roadmap-samples.ts";
 import { stepFiles, stepParts } from "../src/parts.ts";
 import { roadmapMain } from "../src/roadmap-cli.ts";
 import { checkRoadmap, closedSteps, doneIds, fitTitle, formErrors, parseRoadmap, resultFlag, resultOf, type Step, TITLE_MAX } from "../src/roadmap.ts";

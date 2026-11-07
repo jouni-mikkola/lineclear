@@ -17,11 +17,12 @@ imports count for the borders but not for cycles, since they are gone when the c
 | `cli` | `src/` | the CLI and its commands, the rules loop, config and data paths, the web API | `pi`, `check-line`, `registry`, `secrets` |
 | `bin` | `bin/` | the `lineclear` command | `cli` |
 | `kit` | `ui/kit/` | the design system's parts and motion | `brand`, `cli` |
-| `web` | `ui/web/` | the pages `lineclear run` serves | `kit`, `brand`, `cli` |
-| `ui-test` | `ui/test/`, `ui/budget/`, `playwright.config.ts`, `playwright.budget.config.ts` | the UI bar's browser tests and their fixture | `web`, `kit`, `brand`, `cli`, `pi` |
+| `web` | `ui/web/` | the pages `lineclear run` serves | `kit`, `brand`, `cli`, `samples` |
+| `samples` | `ui/test/samples/` | the sample data of each `?state=` page, loaded only on such a page | `web`, `kit`, `cli` |
+| `ui-test` | `ui/test/`, `ui/budget/`, `playwright.config.ts`, `playwright.budget.config.ts` | the UI bar's browser tests and their fixture | `web`, `kit`, `brand`, `cli`, `pi`, `samples` |
 | `gates` | `scripts/gates/` | the check's gates | `check-line` |
 | `scripts` | `scripts/` | repo tools: the check, the smoke check, measurements | `cli`, `brand`, `gates`, `check-line` |
-| `tests` | `test/` | the bun tests, one file per command | `cli`, `pi`, `kit`, `web`, `brand`, `scripts`, `gates`, `ui-test`, `check-line`, `registry`, `secrets` |
+| `tests` | `test/` | the bun tests, one file per command | `cli`, `pi`, `kit`, `web`, `brand`, `scripts`, `gates`, `ui-test`, `samples`, `check-line`, `registry`, `secrets` |
 | `shared` | `server/shared/` | types and pure helpers the server shares | none |
 | `server` | `server/server/` | the server: the live source, agents, chats, the engine and the merge lane | `shared`, `check-line`, `registry`, `secrets`, `project-models` |
 | `registry` | `src/models.ts` | the models every installed harness lists | none |

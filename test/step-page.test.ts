@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { checklistItems, namedBy } from "../src/step-page.ts";
-import { roadmapSample, stepSample } from "../ui/web/roadmap-samples.ts";
+import { roadmapSample, stepSample } from "../ui/test/samples/roadmap-samples.ts";
 
 const parts = (id: string) => {
   const d = roadmapSample("filled", "web-shop");

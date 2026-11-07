@@ -1,7 +1,7 @@
-import type { ChatMessage, ChatView } from "../../src/chat.ts";
-import type { PlanCard } from "../../src/web.ts";
-import type { Attached } from "../kit/index.ts";
-import type { ChatState } from "./samples.ts";
+import type { ChatMessage, ChatView } from "../../../src/chat.ts";
+import type { PlanCard } from "../../../src/web.ts";
+import type { Attached } from "../../kit/index.ts";
+import type { ChatState } from "../../web/states.ts";
 
 // Sample chats for each state of the Chat view (`?state=`), so their screenshots are the same on every machine. The
 // Chat view has five states more than the others: sending, streaming, offline, none, and request (one request from a

@@ -16,7 +16,7 @@ import {
   splitSessions,
   whereOf,
 } from "../kit/index.ts";
-import { samplePictureOf } from "./browser-samples.ts";
+import { samples } from "./sample-loader.ts";
 import { drive, type Load } from "./data.ts";
 
 // The agents' browsers at `/browsers`: each open playwright-cli session as a card with a live picture. One click
@@ -24,7 +24,7 @@ import { drive, type Load } from "./data.ts";
 
 const SHOWN = 24;
 const pictureOf = (b: Browser, sample: boolean, thumb = false) =>
-  sample ? samplePictureOf(b) : `/api/browsers/${encodeURIComponent(b.session)}/picture${thumb ? "?size=thumb" : ""}`;
+  sample ? samples().browser.samplePictureOf(b) : `/api/browsers/${encodeURIComponent(b.session)}/picture${thumb ? "?size=thumb" : ""}`;
 const browserPath = (session: string) => `/browsers/${encodeURIComponent(session)}`;
 
 /** One group per project, the one with a browser that waits first and the sessions of no project last. */

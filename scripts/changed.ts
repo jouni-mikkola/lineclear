@@ -93,11 +93,11 @@ function testsByImports(root: string, changed: string[]): string[] | undefined {
 // The spec files a view's code is tested by. Code not listed here (the kit, the brand, the frame, the routes, the
 // build, the helpers every spec shares) can change any view, so it runs them all.
 const VIEW_SPECS: [RegExp, string[]][] = [
-  [/^ui\/web\/(home|inbox|alerts|usage|samples|real-samples)\b/, ["views", "usage-inbox", "add-project"]],
-  [/^ui\/web\/(chat|chat-samples)\b/, ["chat"]],
-  [/^ui\/web\/(browsers|browser-samples)\b/, ["browsers"]],
-  [/^ui\/web\/(settings|settings-samples)\b/, ["settings"]],
-  [/^ui\/web\/roadmap/, ["roadmap"]],
+  [/^ui\/(web\/(home|inbox|alerts|usage)|test\/samples\/(page|real-samples))\b/, ["views", "usage-inbox", "add-project"]],
+  [/^ui\/(web\/chat|test\/samples\/chat-samples)\b/, ["chat"]],
+  [/^ui\/(web\/browsers|test\/samples\/browser-samples)\b/, ["browsers"]],
+  [/^ui\/(web\/settings|test\/samples\/settings-samples)\b/, ["settings"]],
+  [/^ui\/(web\/roadmap|test\/samples\/roadmap-samples)/, ["roadmap"]],
   [/^ui\/web\/design\b/, ["design", "kit"]],
 ];
 

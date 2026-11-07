@@ -19,7 +19,7 @@ import {
 } from "../kit/index.ts";
 import { Quote, ReplyButton } from "../kit/chat-reply.tsx";
 import { TaskNote } from "../kit/task-head.tsx";
-import { QUESTIONS } from "./samples.ts";
+import { QUESTIONS } from "./states.ts";
 import type { Pending, useChat } from "./chat.tsx";
 
 const PLAN_SAID: Record<PlanCard["state"], string> = {
