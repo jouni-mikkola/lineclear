@@ -1,7 +1,6 @@
 // Fictional data for the demo source: the same world the frozen prototype shows, so a reviewer can put the
 // build and the prototype side by side. Nothing here is real.
-import type { Artifact, Automation, Machine, MachineHealth, Place, SettingSection, Task, TaskAgent } from '../../shared/types.ts'
-import { nextWords, timeRule, timeWords } from '../live/trigger.ts'
+import type { Artifact, Machine, MachineHealth, Place, SettingSection, Task, TaskAgent } from '../../shared/types.ts'
 import { Settings } from '../live/settings.ts'
 import { pluginCatalog, pluginsPage } from '../plugins.ts'
 import type { PluginEntry } from '../plugin-list.ts'
@@ -271,27 +270,8 @@ export function tasks(): Task[] {
   })) as Task[]
 }
 
-/** the demo's time zone, Everywhere: its schedules read the same on any machine */
-export const DEMO_ZONE = 'Europe/Stockholm'
-const daily7 = timeRule('FREQ=DAILY;BYHOUR=7;BYMINUTE=0')
-const lastFriday = timeRule('FREQ=MONTHLY;BYDAY=-1FR;BYHOUR=8;BYMINUTE=0')
-
-export const AUTOMATIONS: Record<string, Automation[]> = {
-  [GTM]: [
-    {
-      name: 'Flaky tests',
-      when: timeWords(daily7, DEMO_ZONE),
-      what: 'Rerun the flaky test suite',
-      brief: 'Run the suite three times and fix or skip any test that fails only some of the time.',
-      on: true,
-      time: daily7,
-      next: nextWords(daily7, DEMO_ZONE),
-      runs: [{ at: Date.now() - 5 * 3_600_000, task: 'GTM-41' }],
-    },
-    { name: 'Changelog', when: 'When a task is merged', what: 'Update the changelog', on: true, events: 'merged', next: [], runs: [] },
-    { name: 'Dependency bump', when: timeWords(lastFriday, DEMO_ZONE), what: 'Bump dependencies', on: false, time: lastFriday, next: [], runs: [] },
-  ],
-}
+/** the demo's time zone, Everywhere: it reads the same on any machine */
+const DEMO_ZONE = 'Europe/Stockholm'
 
 /** the demo agents' artifacts (their pages are in artifacts.ts), newest first */
 export function artifacts(): Artifact[] {

@@ -117,11 +117,11 @@ Yes. Lineclear is installed once, on the main machine. Every other machine you s
 
 ### Do I have to start every task through a coordinator?
 
-Mostly. The app has no new-task button: you ask a space's coordinator in your own words and it adds the task (`lineclear task add`), so every one gets a brief and the same rules. An [automation](docs/coordinator-timer.md) adds tasks on a schedule or when something happens, such as a merge.
+Mostly. The app has no new-task button: you ask a space's coordinator in your own words and it adds the task (`lineclear task add`), so every one gets a brief and the same rules.
 
 ### What if the safety settings aren't enough?
 
-They are soft. A task's review, merge and rules are lines in its brief, and its agent follows them. Codex runs with full access and every agent has a shell: one can do anything you can, a review is another agent's judgement and not a proof, and automations run with nobody watching. Set Merge to "ask me first" for a yes before anything lands,.
+They are soft. A task's review, merge and rules are lines in its brief, and its agent follows them. Codex runs with full access and every agent has a shell: one can do anything you can, a review is another agent's judgement and not a proof. Set Merge to "ask me first" for a yes before anything lands,.
 
 ### What does it cost?
 

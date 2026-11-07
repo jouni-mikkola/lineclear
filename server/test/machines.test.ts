@@ -178,7 +178,6 @@ describe('a restart of the main server (an update)', () => {
       { id: 'p:far:web', kind: 'project', level: 2, name: 'web', machine: 'far', status: 'need', mode: 'regular', chat: 'p:far:web' },
     ],
     tasks: [],
-    automations: {},
     asks: {},
     settings: [],
     overrides: {},

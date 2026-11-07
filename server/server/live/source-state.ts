@@ -9,8 +9,6 @@ import { HOME, readJson, writeJson } from '../store.ts'
 import { ROOT } from '../root.ts'
 import { wrapPage } from '../frame.ts'
 import { Agents, hidden, type Spec } from './agents.ts'
-import { Automations, type Automation } from './automations.ts'
-import type { Happened } from './trigger.ts'
 import { Browsers } from './browser.ts'
 import { Chats } from './chats.ts'
 import { ended, Engine } from './engine/engine.ts'
@@ -29,7 +27,7 @@ import { RequestedNewsMailbox } from './requested-news.ts'
 import { Unread } from './unread.ts'
 import { Monitor, meters, procLines, summary, topProcs, type HealthEvent, type Kind } from './health.ts'
 import { has } from '../plugins.ts'
-import { REPLY_AFTER_CARD, BY_AUTOMATION } from './source-helpers.ts'
+import { REPLY_AFTER_CARD } from './source-helpers.ts'
 
 export class LiveSourceState extends Emitter<SourceEvents> {
   readonly kind = 'live' as const
@@ -43,7 +41,6 @@ export class LiveSourceState extends Emitter<SourceEvents> {
     () => this.user,
   )
   engine = new Engine(this.agents, this.chats, this.places, this.settings)
-  automations = new Automations()
   artifacts = new Artifacts()
   /** agents' secrets: one file on the main machine, which a worker for another machine reads there */
   vault = new Vault(process.env.LINECLEAR_MAIN_HOME || HOME)
@@ -379,7 +376,6 @@ export class LiveSourceState extends Emitter<SourceEvents> {
       ? [`Lineclear closed ${swept.length} shared browser${swept.length > 1 ? 's' : ''} that finished tasks left open (${swept.join(', ')}).`]
       : []
     const text = [`Machine ${NAME}: ${words}.`, summary(s), `Tasks: ${this.workingLine()}.`, ...closed, ...procs, what].join('\n')
-    if (e.what === 'over') this.fireTaskAutomations({ event: 'health' }, machine)
     const tail = `Act on it if the human asked you to handle such things. If it can’t wait, alert the human with lineclear alert and say why. A card in this chat already shows the human the news: ${REPLY_AFTER_CARD}`
     this.agents
       .send(machine, hidden(`${text}\n${tail}`, 'health', { kind: e.kind, what: e.what }), { ensure: () => this.coordinator(machine) })
@@ -388,29 +384,6 @@ export class LiveSourceState extends Emitter<SourceEvents> {
 
   alert(a: Alert) {
     if (has('alerts')) this.emit('alert', a)
-  }
-
-  /* ---------- automations ---------- */
-
-  protected fireTaskAutomations(h: Happened, project: string, task?: string) {
-    // a task an automation added sets off no automation on being added: one could add tasks without end
-    if (h.event === 'added' && task && this.engine.task(task)?.by.startsWith(BY_AUTOMATION)) return
-    for (const a of this.automations.on(h, project)) this.fire(a)
-  }
-
-  /** an automation runs (timed: on its time rule): a new task from its template, with a fresh agent of its own */
-  protected fire(a: Automation, timed = false) {
-    const p = this.places.space(a.place)
-    try {
-      if (!p) throw new Error('Its space is gone')
-      const t = this.engine.add({ project: p.name, title: a.task.title, desc: a.task.desc, by: `${BY_AUTOMATION} “${a.name}”`, agent: a.task.agent })
-      this.automations.fired(a, { task: t.id }, Date.now(), timed)
-      return t
-    } catch (e) {
-      this.automations.fired(a, { error: (e as Error).message }, Date.now(), timed)
-      this.emit('snapshot')
-      return undefined
-    }
   }
 
   protected resumeTaskAgent(key: string) {

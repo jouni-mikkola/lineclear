@@ -4,11 +4,9 @@ import { openCards } from '../../shared/alerts.ts'
 import type { Action } from '../../shared/types.ts'
 import { HOME } from '../store.ts'
 import { hidden } from './agents.ts'
-import type { Template } from './automations.ts'
-import { eventRules, timeRule } from './trigger.ts'
 import { line } from './chatlines.ts'
 import { menuId, menuKeys } from './chats.ts'
-import { checkTitle, ended } from './engine/engine.ts'
+import { ended } from './engine/engine.ts'
 import { NAME, placeId } from './places.ts'
 import { restartLine, resumedLine } from './prompts.ts'
 import { fitHarness, harnessProblem, harnessWords, recentChat, type Harness } from './restart.ts'
@@ -70,37 +68,6 @@ export class LiveSourceRestarts extends LiveSourceSpaces {
     this.emit('snapshot')
     this.emit('chat', key)
     return words
-  }
-
-  /** a space's automation: added (by the command only), paused or on again, run now, removed */
-  protected automation(
-    place: string,
-    op: 'add' | 'pause' | 'resume' | 'run' | 'remove',
-    name: string | undefined,
-    to?: { name: string; when?: string; on?: string; title: string; brief?: string; agent?: Template['agent'] },
-  ) {
-    if (!this.places.space(place)) throw new Error('Automations add tasks to a space with a repo: pick one (--space NAME)')
-    if (op === 'add') {
-      const t = to!
-      const task: Template = { title: checkTitle(t.title), ...(t.brief?.trim() ? { desc: t.brief.trim() } : {}), ...(t.agent ? { agent: t.agent } : {}) }
-      const time = t.when?.trim() ? timeRule(t.when) : 'off'
-      const on = t.on?.trim() ? eventRules(t.on) : []
-      if (!t.name?.trim()) throw new Error('An automation needs a name')
-      const x = this.automations.add({ place, name: t.name.trim(), trigger: { ...(time !== 'off' ? { time } : {}), ...(on.length ? { on } : {}) }, task })
-      this.emit('snapshot')
-      return x
-    }
-    const x = this.automations.find(place, name ?? '')
-    if (!x) throw new Error(`No automation “${name}” here`)
-    if (op === 'remove') this.automations.remove(place, x.name)
-    else if (op === 'run') {
-      const t = this.fire(x)
-      if (!t) throw new Error(x.runs?.at(-1)?.error ?? 'It could not add its task')
-      this.emit('snapshot')
-      return t
-    } else this.automations.pause(place, x.name, op === 'resume')
-    this.emit('snapshot')
-    return x
   }
 
   /** a change from the screen, shown once it is made; or why it could not be */

@@ -10,7 +10,6 @@ export type {
   TaskAgent,
   AgentHerdr,
   Task,
-  Automation,
   Question,
   Artifact,
   ArtifactPost,

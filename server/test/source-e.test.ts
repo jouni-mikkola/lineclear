@@ -156,7 +156,6 @@ describe("every machine's news reaches the main machine's home space", () => {
         places: [{ id: 'p:faraway:shop', name: 'shop', machine: 'faraway', level: 1, status: 'need', mode: 'regular', chat: 'p:faraway:shop' }],
         machines: [{ id: 'm:faraway', machine: 'faraway', name: 'faraway', status: 'need' }],
         tasks: [{ id: 'FS-1', name: 'Colours', status: 'need', place: 'p:faraway:shop', age: '1m', state: '', on: '', created: '' }],
-        automations: {},
         asks: {},
         settings: [],
         overrides: {},
@@ -223,66 +222,6 @@ describe("every machine's news reaches the main machine's home space", () => {
   })
 })
 
-describe('automations add tasks with fresh agents', () => {
-  test('on a time rule and on an event, each run a new task from its template; paused, run now, edited, removed', async () => {
-    const { t, place } = await workedTask('autos')
-    const name = src.places.space(place)!.name
-    const tasks = () => src.engine.tasks.filter((x) => x.project === place && x.by.startsWith('the automation'))
-    const add = await src.cli(
-      ['automation', 'add', 'Nightly', '--task', 'Bump deps', '--brief', 'Bump and test.', '--when', 'FREQ=MINUTELY;INTERVAL=5', '--agent', 'pi'],
-      { chat: place },
-    )
-    expect(add.out).toMatch(
-      /^Automation “Nightly” is on: Every 5 minutes \(.+\); next .+ \[--when "DTSTART:20260101T000000 RRULE:FREQ=MINUTELY;INTERVAL=5"\]\. It adds the task “Bump deps” to autos, with a fresh agent/,
-    )
-    // its first run is the rule's first after it was made: as if made six minutes ago
-    src.automations.find(place, 'Nightly')!.since = Date.now() - 6 * 60_000
-    ;(src as unknown as { runSchedules(): void }).runSchedules()
-    expect(tasks().map((x) => [x.title, x.by, x.agent?.kind])).toEqual([['Bump deps', 'the automation “Nightly”', 'pi']])
-    expect(tasks()[0].desc).toStartWith('Bump and test.')
-    // the next run is five minutes after the last
-    ;(src as unknown as { runSchedules(): void }).runSchedules()
-    expect(tasks()).toHaveLength(1)
-    expect(src.snapshot().automations[place][0]).toMatchObject({
-      name: 'Nightly',
-      when: expect.stringMatching(/^Every 5 minutes \(/),
-      what: 'Bump deps',
-      on: true,
-      next: expect.any(Array),
-      runs: [{ task: tasks()[0].id }],
-    })
-    // an event: a task merged adds one; a task an automation added sets off no 'added' automation
-    await src.cli(['automation', 'add', 'Notes', '--task', 'Write notes', '--on', 'merged'], { chat: place })
-    await src.cli(['automation', 'add', 'Echo', '--task', 'Echo', '--on', 'added'], { chat: place })
-    await src.cli(['merge', t.id], {})
-    await until(() => tasks().some((x) => x.title === 'Write notes'))
-    expect(tasks().filter((x) => x.title === 'Echo')).toHaveLength(0)
-    // from the screen: paused, run now, removed; changed only by the command
-    expect(await src.act({ type: 'automation', place, op: 'pause', name: 'Nightly' })).toEqual({ ok: true })
-    expect(src.automations.dueNow(src.settings.zone(), Date.now() + 3_600_000).map((a) => a.name)).not.toContain('Nightly')
-    expect(await src.act({ type: 'automation', place, op: 'run', name: 'Nightly' })).toEqual({ ok: true })
-    expect(tasks().filter((x) => x.title === 'Bump deps')).toHaveLength(2)
-    await src.cli(['automation', 'edit', 'Nightly', '--when', 'FREQ=DAILY;BYHOUR=3;BYMINUTE=0', '--task', 'Bump all deps', '--brief', ''], { chat: place })
-    expect(src.automations.find(place, 'Nightly')).toMatchObject({
-      trigger: { time: 'DTSTART:20260101T000000 RRULE:FREQ=DAILY;BYHOUR=3;BYMINUTE=0' },
-      task: { title: 'Bump all deps', agent: { kind: 'pi' } },
-      on: false,
-    })
-    expect(src.automations.find(place, 'Nightly')!.task.desc).toBeUndefined()
-    expect((await src.cli(['automation', 'add', 'Bad', '--task', 'x', '--when', 'sometimes'], { chat: place })).out).toContain("Can't read the time rule")
-    // the old flags are gone
-    expect((await src.cli(['automation', 'add', 'Old', '--task', 'x', '--schedule', 'daily 9:00'], { chat: place })).out).toContain('takes no --schedule')
-    // the screen adds or changes none
-    expect(await src.act({ type: 'automation', place, op: 'save', name: 'Nightly' } as never)).toMatchObject({ ok: false })
-    expect(await src.act({ type: 'automation', place, op: 'remove', name: 'Echo' })).toEqual({ ok: true })
-    expect((await src.cli(['automation', 'list', '--space', name], {})).out).toMatch(
-      /Nightly · Every day at 3:00 \(.+\) \[--when "DTSTART:20260101T000000 RRULE:FREQ=DAILY;BYHOUR=3;BYMINUTE=0"\] · adds “Bump all deps” \(pi\) · autos · paused · last ran/,
-    )
-    // the old kinds are gone
-    expect((await src.cli(['automation', 'add', 'Ask', '--ask', 'What waits?', '--when', 'FREQ=DAILY'], { chat: place })).out).toContain('takes no --ask')
-  })
-})
-
 describe('adding a space from the sidebar', () => {
   const home = mkdtempSync(join(tmpdir(), 'shep-home-'))
   const realHome = process.env.HOME
@@ -324,7 +263,6 @@ describe('adding a space from the sidebar', () => {
             places: [{ id: 'p:far:~', name: 'home', machine: 'far', home: true, level: 1, status: 'idle', mode: 'manual', chat: 'p:far:~' }],
             machines: [{ id: 'm:far', machine: 'far', name: 'far', status: 'idle' }],
             tasks: [],
-            automations: {},
             asks: {},
             settings: [],
             overrides: {},

@@ -3,7 +3,6 @@ import * as D from './data.ts'
 import { ARTIFACT_DATA } from './artifacts.ts'
 import { CLI_NAME, kindOf } from '../live/settings.ts'
 import { harnessProblem, harnessWords, restartClis } from '../live/restart.ts'
-import { nextWords } from '../live/trigger.ts'
 import { excerpt } from '../live/chatlines.ts'
 import { shortUrl } from '../../shared/browser.ts'
 import { deleteSection, moveSpace, newSection, PINNED, renameSection, sectionProblem, setOrder } from '../../shared/order.ts'
@@ -159,19 +158,6 @@ export class DemoWorldActions extends DemoWorldState {
       case 'call': {
         if (a.on) setTimeout(() => this.push(a.chat, { who: 'you', text: 'Also ping me when CI is green.' }, { who: 'agent', text: 'Will do.' }), 1500)
         return {}
-      }
-      case 'automation': {
-        const list = (this.automations[a.place] ??= [])
-        const x = list.find((y) => y.name === a.name)
-        if (!x) return { ok: false, error: `No automation “${a.name}” here` }
-        if (a.op === 'remove') this.automations[a.place] = list.filter((y) => y !== x)
-        else if (a.op === 'run') x.runs = [{ at: Date.now(), task: `GTM-${50 + x.runs.length}` }, ...x.runs]
-        else {
-          x.on = a.op === 'resume'
-          x.next = x.on && x.time ? nextWords(x.time, D.DEMO_ZONE) : []
-        }
-        this.emit('snapshot')
-        return { ok: true }
       }
       case 'setting': {
         if (a.key === 'space.base') {

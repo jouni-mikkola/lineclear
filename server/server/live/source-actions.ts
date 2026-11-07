@@ -104,15 +104,6 @@ export class LiveSourceActions extends LiveSourceRestarts {
         await this.send(a.chat, line.browserNotes(this.user, { url: a.url, title: a.title, viewport: a.viewport }, notes), shots, true)
         return {}
       }
-      case 'automation':
-        try {
-          // the screen only pauses, runs or removes one: agents add and change them, through the command
-          if (!['pause', 'resume', 'run', 'remove'].includes(a.op)) throw new Error('Ask the coordinator in the chat to add or change an automation')
-          this.automation(a.place, a.op, a.name)
-          return { ok: true }
-        } catch (e) {
-          return { ok: false, error: (e as Error).message }
-        }
       case 'model':
       case 'effort':
         return { ok: false, error: 'Use the + menu agent controls and Restart to apply model or effort changes. Chat and work are preserved.' }

@@ -270,7 +270,6 @@ describe("another machine's artifacts", () => {
             places: [{ id: 'p:far2:~', name: 'home', machine: 'far2', home: true, level: 1, status: 'idle', mode: 'manual', chat: 'p:far2:~' }],
             machines: [{ id: 'm:far2', machine: 'far2', name: 'far2', status: 'idle' }],
             tasks: [],
-            automations: {},
             artifacts: [art],
             asks: {},
             settings: [],

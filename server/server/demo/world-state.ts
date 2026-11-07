@@ -62,7 +62,6 @@ export class DemoWorldState extends Emitter<SourceEvents> {
   sections = D.settings(this.stores)
   /** agents' secrets, in memory only */
   vault = new Vault('', D.secrets())
-  automations = structuredClone(D.AUTOMATIONS)
   artifacts: Artifact[] = D.artifacts()
   /** what each artifact's page sent, by the HTML version it was sent from */
   artifactSent: Record<string, { html: number; text: string }> = {}
@@ -181,7 +180,6 @@ export class DemoWorldState extends Emitter<SourceEvents> {
           ? t
           : { ...t, browser: this.browsers?.status() ?? { ready: false, hint: 'The demo has no browser: start it with LINECLEAR_DEMO_BROWSER=1.' } },
       ),
-      automations: this.automations,
       artifacts: this.artifacts,
       asks: this.asks,
       attentionRequests: Object.fromEntries([

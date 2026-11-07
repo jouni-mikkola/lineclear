@@ -277,7 +277,6 @@ describe('To do from the command', () => {
     expect(long.out).toContain('49 characters')
     expect(long.out).toContain('32 at most')
     expect(src.engine.tasks.length).toBe(before)
-    expect((await src.cli(['automation', 'add', 'Nightly', '--task', 'x'.repeat(33), '--when', 'FREQ=DAILY'], { chat: place })).code).toBe(1)
     const add = await src.cli(['task', 'add', 'Noted', '--desc', 'For later.', '--later'], { chat: place })
     expect(add.out).toContain('Its agent (pi) reads the brief now and waits for a go')
     const id = add.out.match(/([A-Z]+-\d+)/)![1]

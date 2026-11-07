@@ -148,11 +148,9 @@ export class LiveSourceViews extends LiveSourceState {
   snapshot(): Snapshot {
     const { places, machines, sections } = this.listed()
     const peers = this.peers?.list() ?? []
-    const automations: Snapshot['automations'] = Object.fromEntries(places.map((p) => [p.id, this.automations.view(p.id, this.settings.zone())]))
     const asks = this.asks()
     const attentionRequests = this.attentionRequests()
     for (const l of peers) {
-      Object.assign(automations, l.snap?.automations ?? {})
       Object.assign(asks, l.snap?.asks ?? {})
       Object.assign(attentionRequests, l.snap?.attentionRequests ?? {})
     }
@@ -167,7 +165,6 @@ export class LiveSourceViews extends LiveSourceState {
           .map((t) => ({ ...this.engine.view(t), ...(this.browsers && !ended(t) ? { browser: t.stopped ? STOPPED : this.browsers.status() } : {}) })),
         ...peers.flatMap((l) => this.peers!.tasksOf(l)),
       ],
-      automations,
       artifacts: [...Object.values(this.artifacts.list).map((a) => this.artifactView(a)), ...peers.flatMap((l) => l.snap?.artifacts ?? [])].sort(
         (a, b) => b.at - a.at,
       ),

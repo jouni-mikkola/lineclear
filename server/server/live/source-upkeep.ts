@@ -2,7 +2,6 @@ import { clip } from '../../shared/alerts.ts'
 import type { TaskStatus, UpdateCard } from '../../shared/types.ts'
 import type { Overview } from '../source.ts'
 import { hidden } from './agents.ts'
-import type { Happened, TriggerEvent } from './trigger.ts'
 import type { BrowserBridge, BrowserClient } from './browser.ts'
 import { ended, type TaskRec } from './engine/engine.ts'
 import { BOX } from './box.ts'
@@ -136,8 +135,6 @@ export class LiveSourceUpkeep extends LiveSourceCli {
     // for the main machine's home space, when this is another machine's worker: its link carries it there (app.ts; the
     // main machine has no link, and hears its own above)
     this.emit('news', { place: project, line: text, kind, about })
-    // one event each: a task that went wrong is failed, not needs-you too
-    this.fireTaskAutomations(this.happened(kind, project, text, about?.task), project, about?.task)
   }
 
   protected async drainRequestedNews() {
@@ -186,22 +183,6 @@ export class LiveSourceUpkeep extends LiveSourceCli {
     this.overview(n.kind === 'health' ? `Machine ${machine}` : `${machine} · ${this.chatName(n.place)}`, n)
   }
 
-  /** what a piece of news is, to match against event rules: its event, and its space and task */
-  protected happened(kind: string, project: string, text: string, task?: string): Happened {
-    const t = task ? this.engine.task(task) : undefined
-    const event: TriggerEvent =
-      kind === 'need'
-        ? /needs you: Went wrong/.test(text)
-          ? 'failed'
-          : 'needs-you'
-        : kind === 'done'
-          ? 'merged'
-          : kind === 'red'
-            ? 'main-red'
-            : (kind as TriggerEvent)
-    return { event, space: this.places.space(project)?.name ?? this.places.nameOf(project) ?? undefined, branch: t?.branch, title: t?.title }
-  }
-
   /** a task now waits on you, is done, or stalled: one small update card in its space's chat, one line of a few
    *  words; its summary is in the task (the main machine's home space's coordinator picks what buzzes) */
   protected onCard(t: TaskRec, status: TaskStatus, sub: string) {
@@ -221,10 +202,6 @@ export class LiveSourceUpkeep extends LiveSourceCli {
     if (this.watched.includes(t.project)) this.emit('chat', t.project)
     // what it asks, kept on its card though no one looks yet
     else if (status === 'need') this.withAsks(this.chats.chat(t.project))
-  }
-
-  protected runSchedules() {
-    for (const a of this.automations.dueNow(this.settings.zone())) this.fire(a, true)
   }
 
   /** a Browser panel's link to a task's shared browser: here, or passed through to the machine the task is on */

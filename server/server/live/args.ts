@@ -182,7 +182,7 @@ Artifacts (one self-contained HTML file, optional JSON data; checked at phone wi
   lineclear artifact show <id>                   its versions and the files of its latest, to edit
   lineclear artifact rm <id>
 
-Settings and automations
+Settings
   lineclear show [--space NAME]                the app's few settings (how tasks work, each agent's CLI, model and
                                                  effort, auto-archive, the time zone, this machine's
                                                  limits and numbers now, alerts)
@@ -194,30 +194,6 @@ Settings and automations
                                                  or one space (--space); the most specific one set wins.
                                                  unset drops that level's own, so the level above it counts again.
                                                  Counts and limits take any number in their range
-  lineclear automation add "<name>" --task "<title>" [--brief "<brief>"] [--when "<time rule>"] [--on "<events>"]
-                         [--agent CLI] [--model ID] [--effort LEVEL] [--space NAME]
-                                                 each run adds that task to the space, with a fresh agent; it runs on
-                                                 its time rule, its events, or both (at least one)
-  lineclear automation edit "<name>" [--name "<new name>"] [--task …] [--brief …] [--when … | off] [--on … | none]
-                         [--agent …]
-
-  Triggers: automations take a time rule, events, or both,
-  their times in time.zone (Everywhere). Write them from the human's words; show them back in the words Lineclear
-  prints, never as written.
-      time rule (--when): an iCalendar RRULE (RFC 5545), with DTSTART and EXDATE lines where needed
-          FREQ=MINUTELY;INTERVAL=30                       every 30 minutes
-          FREQ=MINUTELY;INTERVAL=30;BYHOUR=8,9,…,21;BYDAY=MO,TU,WE,TH,FR    every 30 min, 8:00-22:00, weekdays
-          FREQ=WEEKLY;INTERVAL=2;BYDAY=FR;BYHOUR=16;BYMINUTE=0           every other Friday at 16:00
-          FREQ=MONTHLY;BYDAY=-1FR;BYHOUR=9;BYMINUTE=0                    the last Friday of the month at 9:00
-          DTSTART:20261201T090000 RRULE:FREQ=DAILY;COUNT=10 EXDATE:20261206T090000   from, how many, skip dates
-        or once 2026-11-02 9:00, or off. Without DTSTART it counts from 2026-01-01 0:00 (every other week, every 7 min)
-      events (--on): all news, none, or some split by commas, each with optional filters
-          added · ready · failed · needs-you · merged · stalled · main-red
-          space=<name> · branch=<glob, * any> · title=<words in the title>       ready, merged branch=release/*
-        an automation hears its own space's news unless a rule names another space=
-  lineclear automation pause|resume|run|remove "<name>" [--space NAME]
-                                                 run: add its task now
-  lineclear automation list [--space NAME]     with each one's last run
 
 Setup
   lineclear doctor                               check every machine saved in herdr; put its helper there again (main machine)
