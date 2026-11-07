@@ -68,7 +68,8 @@ export function openStore(file = STORE_FILE): Database {
   try {
     mkdirSync(dirname(file), { recursive: true, mode: 0o700 })
     handle = new Database(file, { create: true })
-    handle.exec('PRAGMA busy_timeout=5000')
+    // small pages, for a file made now (an older file keeps its 4 KB): a changed row rewrites one page, so a status line writes about 1 KB
+    handle.exec('PRAGMA page_size=1024; PRAGMA busy_timeout=5000')
     enterWal(handle)
     handle.exec('PRAGMA synchronous=NORMAL')
     const check = handle.query('PRAGMA quick_check').all() as { quick_check: string }[]

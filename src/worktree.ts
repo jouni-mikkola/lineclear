@@ -1,7 +1,6 @@
 import { existsSync } from "node:fs";
 import { dirname } from "node:path";
-import { withHotLog } from "./hot-log.ts";
-import { readJson } from "../pi/config.ts";
+import { readTasksKept } from "./tasks-kept.ts";
 
 /** The fields of a Lineclear task that these checks read. */
 interface Task {
@@ -11,9 +10,7 @@ interface Task {
 }
 
 function taskOf(task: string, tasksFile: string): Task | undefined {
-  const file = readJson(tasksFile);
-  const tasks: Task[] | undefined = file ? withHotLog(dirname(tasksFile), file).tasks : undefined;
-  return (Array.isArray(tasks) ? tasks : []).find((t) => t?.id === task);
+  return (readTasksKept(dirname(tasksFile)).tasks as Task[]).find((t) => t?.id === task);
 }
 
 /** The worktree of a task as Lineclear's task list holds it, or undefined. */

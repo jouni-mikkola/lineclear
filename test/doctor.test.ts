@@ -256,17 +256,16 @@ test("doctor fails on a task id that two tasks hold, an alias counted, and passe
   expect(find(["OMA-91", "OMA-92", "oma-91"])?.problem).toContain("OMA-91");
 });
 
-test("doctor reads the live store and its cold file for a duplicate task id", () => {
+test("doctor reads the stored tasks and their aliases for a duplicate task id", () => {
   const dir = mkdtempSync(join(tmpdir(), "doc-ids-"));
-  writeFileSync(join(dir, "tasks.json"), JSON.stringify({ tasks: [{ id: "OMA-91" }] }));
-  writeFileSync(join(dir, "tasks-cold.jsonl"), `${JSON.stringify({ id: "OMA-91" })}\n`);
   const cold = join(dir, "tasks-cold.jsonl");
+  writeFileSync(join(dir, "tasks.json"), JSON.stringify({ tasks: [{ id: "OMA-91" }] }));
   writeFileSync(
     cold,
     `${JSON.stringify({ id: "OMA-5" })}\n${JSON.stringify({ id: "OMA-5", title: "b" })}\n${JSON.stringify({ id: "OMA-6" })}\n${JSON.stringify({ gone: "OMA-6" })}\n{cut`,
   );
   expect(storedTaskIds(dir).sort()).toEqual(["OMA-5", "OMA-91"]);
-  writeFileSync(cold, `${JSON.stringify({ id: "OMA-91" })}\n`);
+  writeFileSync(join(dir, "tasks.json"), JSON.stringify({ tasks: [{ id: "OMA-91" }, { id: "OMA-92", aliases: ["OMA-91"] }] }));
   expect(doctorChecks(probe({ taskIds: () => storedTaskIds(dir) })).find((c) => c.name === "task ids")?.problem).toContain("OMA-91");
 });
 

@@ -3,7 +3,7 @@ import { IDLE_TEXT } from "./cards.ts";
 import { farTasks } from "./far-tasks.ts";
 import { IDLE_CARD, lastCards, stageSince, stepOf, type TaskRecord, taskStage, taskState } from "./home-stage.ts";
 import { laneNote } from "./lane-note.ts";
-import { readTasksKept } from "./tasks-kept.ts";
+import { readTasksKept, retiredCounts } from "./tasks-kept.ts";
 import { dataDir } from "./paths.ts";
 import { existsSync, readdirSync } from "node:fs";
 import { hostname } from "node:os";
@@ -213,8 +213,8 @@ function machineSpaces(dir: string, env: Env, now: number): HomeProject[] {
     if (!spaces.some((s) => s.name === p.space)) strays.push({ name: p.space, key: "", path: p.repo });
   }
   const every = spaces.length ? lineclearAllTasks(env) : [];
-  // tasks the server retired after 90 days are counted in archive/counts.json, by space key
-  const retired = readJsonKept<Record<string, { merged: number; closed: number }>>(join(dir, "archive", "counts.json")) ?? {};
+  // tasks the server retired after 90 days are counted by space key
+  const retired = retiredCounts(dir);
   const ctx: SpaceContext = { tasks, red, names, machine, waits, honest, cards, every, retired, env, now };
   // one line per project of `lineclear project list`, whatever the server holds: a space two projects share shows twice, a missing one empty
   const lines = [...spaces, ...strays].flatMap((s) => (owners.get(s.name) ?? [undefined]).map((owner) => spaceView(s, ctx, owner)));

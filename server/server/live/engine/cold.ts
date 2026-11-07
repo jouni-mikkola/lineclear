@@ -1,14 +1,11 @@
-// Tasks that ended over COLD_AFTER ago leave tasks.json for tasks-cold.jsonl, an append log: a line per change of
-// one of them (the last line of an id wins, `{"gone": id}` drops it). Every agent record is a row of such a log
+// An append log: a line per change of one record (the last line of an id wins, `{"gone": id}` drops it). Every agent record is a row of such a log
 // (agents-cold.jsonl), so a change to one record writes that record only, however many the board has kept.
 import { appendFileSync, closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, rmSync, writeSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { HOME } from '../../store.ts'
-import { durableWrite } from './task-store.ts'
+import { durableWrite } from './durable.ts'
 
-export const COLD_AFTER = 86_400_000
-export const COLD_FILE = 'tasks-cold.jsonl'
-export const COLD_AGENTS = 'agents-cold.jsonl'
+const COLD_AGENTS = 'agents-cold.jsonl'
 
 type Rec = Record<string, unknown>
 
@@ -38,7 +35,7 @@ function readCold(file: string, idKey = 'id', repair = true): { recs: Rec[]; lin
   return { recs: [...by.values()], lines, skipped }
 }
 
-export class ColdLog<T extends object> {
+class ColdLog<T extends object> {
   private file: string
   /** each cold record as last written, as its line: a record changed in place still differs from it */
   private written = new Map<string, string>()
@@ -48,7 +45,7 @@ export class ColdLog<T extends object> {
   private id: (t: T) => string
 
   constructor(
-    name = COLD_FILE,
+    name: string,
     private idKey = 'id',
     dir = HOME,
   ) {
@@ -113,12 +110,6 @@ export class ColdLog<T extends object> {
     durableWrite(this.file, cold.map((t) => `${JSON.stringify(t)}\n`).join(''))
     this.lines = cold.length
   }
-}
-
-/** tasks.json's data with the cold tasks of `cold` read back into its list */
-export function withCold<T extends object, D extends { tasks: T[] }>(cold: ColdLog<T>, data: D): D {
-  data.tasks = cold.load(data.tasks)
-  return data
 }
 
 type AgentLine = { key: string; started: number }

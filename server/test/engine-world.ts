@@ -13,11 +13,18 @@ export const { placeId } = await import('../server/live/places.ts')
 export const { Settings } = await import('../server/live/settings.ts')
 export const { settingsBlock } = await import('../server/live/prompts.ts')
 const store = await import('../server/store.ts')
-const { COLD_FILE, COLD_AGENTS } = await import('../server/live/engine/cold.ts')
-/** a test's tasks.json or agents.json is the whole of them: what earlier tests left in the cold logs goes */
+/** a test's tasks.json or agents.json is the whole of them: the rows earlier tests left and the cold log go, and the file is imported again */
 export const writeJson = (name: string, value: unknown) => {
-  if (name === 'tasks.json') rmSync(join(store.HOME, COLD_FILE), { force: true })
-  if (name === 'agents.json') rmSync(join(store.HOME, COLD_AGENTS), { force: true })
+  if (name === 'tasks.json') {
+    for (const table of ['tasks', 'task_briefs', 'task_meta', 'imports']) {
+      try {
+        store.db.exec(table === 'imports' ? "delete from imports where name = 'tasks.json'" : `delete from ${table}`)
+      } catch {
+        // no engine has made the table yet
+      }
+    }
+  }
+  if (name === 'agents.json') rmSync(join(store.HOME, 'agents-cold.jsonl'), { force: true })
   store.writeJson(name, value)
 }
 export const { fakeHerdr } = await import('./fake-herdr.ts')

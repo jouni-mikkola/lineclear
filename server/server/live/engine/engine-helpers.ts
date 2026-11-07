@@ -15,9 +15,6 @@ export interface TaskRec {
   title: string
   result?: string
   desc: string
-  /** the file under the data folder that holds the brief, and its size in bytes */
-  briefPath?: string
-  briefSize?: number
   /** how long each phase of its start took, in ms (core-baseline.ts start prints them) */
   startMs?: { worktree: number; install: number; session: number }
   by: string

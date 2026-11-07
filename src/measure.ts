@@ -1,7 +1,7 @@
 import { readJson } from "../pi/config.ts";
 import { dataDir, piDir } from "./paths.ts";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { readTasksKept, type TaskLine } from "./tasks-kept.ts";
+import { existsSync, readdirSync } from "node:fs";
+import { readRetiredKept, readTasksKept } from "./tasks-kept.ts";
 import { join } from "node:path";
 import { readSessions } from "./harness-pi.ts";
 import { reviewerRound, sessionUsage, type Usage } from "./session-text.ts";
@@ -52,12 +52,12 @@ export function findSpace(dir: string, space: string, repo: string): { name: str
   return s ? { name: s.name, key: s.key } : undefined;
 }
 
-/** A space's tasks: tasks.json with its append log, and with `retired`, the ones in the archive; each once. */
+/** A space's tasks: the live rows, and with `retired`, the retired ones; each once. */
 export function spaceTasks(dir: string, space: { key: string }, retired = false): any[] {
   const raw: any[] = readTasksKept(dir).tasks;
   const live = Array.isArray(raw) ? raw : Object.values(raw);
   // a task retired twice (a stop between the two writes) or still in tasks.json counts once
-  const byId = new Map([...(retired ? retiredTasks(dir) : []), ...live].map((t) => [String(t.id), t] as const));
+  const byId = new Map([...(retired ? readRetiredKept(dir) : []), ...live].map((t) => [String(t.id), t] as const));
   return [...byId.values()].filter((t) => String(t.id).startsWith(`${space.key}-`));
 }
 
@@ -72,22 +72,6 @@ export function chatFiles(dir: string, space: { name: string; key: string }, coo
         .map((f) => readJson(join(log, f))),
     )
     .filter((d) => d !== undefined);
-}
-
-/** The records of retired tasks, from archive/tasks-<month>.jsonl. */
-function retiredTasks(dir: string): TaskLine[] {
-  const archive = join(dir, "archive");
-  if (!existsSync(archive)) return [];
-  return readdirSync(archive)
-    .filter((f) => f.startsWith("tasks-") && f.endsWith(".jsonl"))
-    .flatMap((f) => readFileSync(join(archive, f), "utf8").split("\n"))
-    .flatMap((l) => {
-      try {
-        return l ? [JSON.parse(l)] : [];
-      } catch {
-        return [];
-      }
-    });
 }
 
 /** The start of a task is its first "started" card, else the time it was made if it has a worktree, else it never started. */
