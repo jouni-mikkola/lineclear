@@ -5,20 +5,20 @@ Every agent, coordinator or task agent, gets the same chat.
 - Pick a space; write to its coordinator. Ask it for a task; tasks are created only through a coordinator.
 - What you send shows in the chat the moment you tap Send, faded until it is in. If it can't go through, it says so
   under the message, with Retry and Remove; it is still there after a reload.
-- Write to a busy agent any time: it goes in at once and steers the agent mid-turn (Claude Code, Codex and pi take it
-  at their next step). It waits only while the agent shows a menu or permission prompt, where typed text could pick an
+- Write to a busy agent any time: it goes in at once and steers the agent mid-turn (pi takes it
+  at its next step). It waits only while the agent shows a menu or permission prompt, where typed text could pick an
   option (the bubble says so, and it goes in once the prompt is answered), or while the agent is still starting.
   Commands like /compact or a model change wait for the turn to end.
 - Startup trust and MCP approval prompts appear as choice cards, even before the first message. The card keeps the
   CLI's screen text and offers Open terminal if it cannot read the choices. Answers are checked before messages go
-  in. Only task worktrees Lineclear creates are pre-trusted in Claude Code and Codex; a space you picked still asks.
+  in. Only task worktrees Lineclear creates need no trust prompt in pi.
 - A slash command you type (`/clear`, `/new`, `/compact`, `/model sonnet`, a custom one) goes into the agent's CLI as
   you typed it, once its turn is over, and the CLI runs it. The chat shows it as you typed it, and what the CLI printed
   as its answer. After `/clear` or `/new` a quiet New session line starts the new session, whose log the chat reads
   from then on. A menu or view the command opens in the terminal (`/model` alone, `/usage`) comes into the chat and is
-  closed, so your next message goes in; one that asks a question (Codex's `/new`: where should the new conversation
-  run?) is a card to answer, and what you write meanwhile waits for it. A command the CLI didn't run fails with Retry.
-- Every chat shows what its agent does, calmly and in plain words (Claude Code and Codex, read from their logs). Just
+  closed, so your next message goes in; one that asks a question (a `/new` that asks where the new conversation
+  should run) is a card to answer, and what you write meanwhile waits for it. A command the CLI didn't run fails with Retry.
+- Every chat shows what its agent does, calmly and in plain words (pi, read from its log). Just
   before a turn's last reply its steps sit as at most three quiet rows, each an icon for its kind (read, edit, run,
   search, web, subagent) and what it did: `Checked the task list`, `Edited 2 files: app.ts, panel.tsx  +12 −3`,
   `Ran tests: 41 passed`, `Searched the code for “review”`. Files read or changed group into one row, and the rows that
@@ -28,7 +28,7 @@ Every agent, coordinator or task agent, gets the same chat.
   (`git status` is `Checked git status`, `bun test` is `Ran tests`, an unknown program `Ran <its name>`), else the
   tool. While a turn runs, one quiet line in place of the typing dots says what it does now and for how long
   (`Checking the task list  12s`), coordinators' turns too (their header still says nothing of it). While work it
-  started in the background runs (subagents, background shells and monitors, a headless `codex exec` or `claude -p`,
+  started in the background runs (subagents, background shells and monitors, a headless `pi -p`,
   which counts as a subagent), a small tag sits just above the message box (`1 subagent · 1 shell`), only in its own
   chat (task rows stay clean); a tap shows each piece, what it does now (its latest step, or its output's last line)
   and for how long, and each opens to its own steps or its recent output. Nothing streams by default and nothing

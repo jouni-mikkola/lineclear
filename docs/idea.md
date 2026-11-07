@@ -215,7 +215,7 @@ It follows three principles:
 
 ## Models and accounts
 
-- Model-agnostic: you choose the models for each role in Settings. Claude, Codex, Gemini and others work side by
+- Model-agnostic: you choose the models for each role in Settings. Claude, GPT, Gemini and others work side by
   side through [pi](https://pi.dev), on several subscriptions at once.
 - Each role (worker, reviewer, planner) has an ordered model list. When one subscription runs out, the next one
   takes over. A free or extra account running out never breaks work. A paid API key is used only with your leave.
