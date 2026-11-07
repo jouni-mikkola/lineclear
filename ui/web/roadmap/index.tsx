@@ -236,7 +236,16 @@ function useStepFlip(ref: React.RefObject<HTMLUListElement | null>, steps: Roadm
 
 const GLOW = "0 0 0 1px var(--lc-fg), 0 0 28px 4px color-mix(in srgb, var(--lc-fg) 28%, transparent)";
 
-/** A step: its state as the line's own picture, its title and its result. The id shows on hover only. */
+const plain = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+/** A result that only restates the title adds nothing to a card. */
+const restatesTitle = (s: RoadmapStep) => {
+  const result = plain(s.result);
+  const title = plain(s.title.replace(/^[A-Z]+\d+\s+/, ""));
+  return result === title || result.includes(title);
+};
+
+/** A step: its state as the line's own picture, its title and its result when that says more. The id shows on hover only. */
 function StepCard({ s, byId, onOpen }: { s: RoadmapStep; byId: Map<string, RoadmapStep>; onOpen: () => void }) {
   const glow = useRef<HTMLSpanElement>(null);
   const was = useRef(s.state);
@@ -268,7 +277,7 @@ function StepCard({ s, byId, onOpen }: { s: RoadmapStep; byId: Map<string, Roadm
           <span className={`block break-words text-sm font-medium ${quiet ? "text-fg2" : "text-fg"} ${s.state === "dropped" ? "line-through" : ""}`}>
             {s.title}
           </span>
-          {s.result && (
+          {s.result && !restatesTitle(s) && (
             <span className="mt-1 block break-words text-sm text-fg2" data-result>
               {s.result}
             </span>

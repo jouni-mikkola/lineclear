@@ -52,15 +52,28 @@ export function LineOfRoadmap({ line, project }: { line: RoadmapLine; project: s
       {line.text}
     </p>
   );
-  if (!head) return <div className="mb-4">{text}</div>;
-  return (
+  const details = line.detail && (
+    <details className="mt-1 text-sm text-fg3" data-roadmap-detail>
+      <summary className="min-h-8 cursor-pointer hover:text-fg2">Details</summary>
+      <p className="break-words [overflow-wrap:anywhere]">{line.detail}</p>
+    </details>
+  );
+  const link = head ? (
     <a
       href={roadmapPath(project, head)}
-      className="mb-4 flex min-h-12 items-center py-2 hover:text-fg"
+      className="flex min-h-12 items-center py-2 hover:text-fg"
       aria-label={`${line.text} Opens the critical path.`}
       data-critical-path-link
     >
       {text}
     </a>
+  ) : (
+    text
+  );
+  return (
+    <div className="mb-4">
+      {link}
+      {details}
+    </div>
   );
 }

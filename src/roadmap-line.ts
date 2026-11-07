@@ -17,8 +17,10 @@ export interface RoadmapLine {
   why?: string;
   /** The step ids of the longest chain of steps that wait on each other, first step first. Absent below 2 steps. */
   path?: string[];
-  /** The whole line as a sentence. */
+  /** The status in under 80 characters: the counts and the finish date. */
   text: string;
+  /** What the pace is measured on and why the end is not sooner. Shown in Details. */
+  detail?: string;
 }
 
 const longer = (a: string[], b: string[]) => (b.length > a.length ? b : a);
@@ -75,17 +77,19 @@ export function roadmapLine(plan: Plan, marks: Map<string, "work" | "need">, whe
   const chainIsWhy = Boolean(where.finish) && !where.blocker && chain >= 2 && chain >= shared;
   const why = where.blocker?.text.replace(/\b[A-Z][A-Z0-9]*-\d+(?:@\S+)?/g, "another task") ?? structure;
   const sums = `${counts.done} done, ${work} at work, ${waiting} waiting for you, ${left} left`;
-  const when = where.finish
-    ? `Done about ${day(where.finish)} at the pace of the last 7 days${why ? `, not sooner: ${why}` : ""}.`
+  const when = where.finish ? `Done about ${day(where.finish)}.` : merged7 === 0 ? "No finish date yet." : "No finish date.";
+  const detail = where.finish
+    ? `At the pace of the last 7 days${why ? `, not sooner: ${why}` : ""}.`
     : merged7 === 0
-      ? "No finish date yet: nothing has merged in the last 7 days to measure a pace."
-      : "No finish date: at this pace it is more than a year away.";
+      ? "Nothing has merged in the last 7 days to measure a pace."
+      : "At this pace it is more than a year away.";
   return {
     ...counts,
     ...(where.finish ? { finish: where.finish } : {}),
     ...(why ? { why } : {}),
     ...(chainIsWhy ? { path: criticalPath(open) } : {}),
     text: `${sums}. ${when}`,
+    detail,
   };
 }
 
