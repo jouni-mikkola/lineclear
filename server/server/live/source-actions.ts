@@ -37,8 +37,6 @@ export class LiveSourceActions extends LiveSourceRestarts {
         })
         return { ok: true }
       }
-      case 'react':
-        return this.react(a.chat, a.message, a.emoji)
       case 'answer':
         return this.answer(a)
       case 'secret': {

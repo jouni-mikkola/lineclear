@@ -1,5 +1,7 @@
 import type { Message, Question, SecretAsk, UpdateCard } from '../../shared/types.ts'
-import { agentLines, markerSoFar, type Parsed } from './chatlines.ts'
+import { agentLines, markerSoFar } from './agentlines.ts'
+import type { Parsed } from './chatlines.ts'
+import type { LogEvent } from './readers/types.ts'
 import type { Shown } from './chats-turns.ts'
 
 /** a chat line of yours that shows as words: an answer, a secret you gave */
@@ -47,6 +49,37 @@ export function withAnswer(q: Question, l: ChatLog, place: (key: string) => Ques
   return { ...q, sent, said: s?.text, via: s?.chat || (!s && q.id.startsWith('ask:')) ? 'chat' : undefined, elsewhere }
 }
 
+/** the cards an agent's question asks with, one per item: answered here, in the terminal, or on its copy in a space's chat */
+export function questionMessages(
+  e: Extract<LogEvent, { kind: 'question' }>,
+  l: ChatLog,
+  to: string,
+  answered: boolean,
+  place: (key: string) => Question['elsewhere'],
+): Message[] {
+  return e.items.map((it, i) => {
+    const qid = e.items.length > 1 ? `${e.id}:${i}` : e.id
+    const sent = l.answers[qid] ?? (answered ? -1 : undefined)
+    // not picked here and no words typed on the card: answered in the terminal
+    const said = sent === -1 ? l.said?.[qid]?.text : undefined
+    const space = l.said?.[qid]?.space
+    const question: Question = {
+      id: qid,
+      title: it.question,
+      kind: 'Question',
+      choices: it.options,
+      multi: it.multiSelect,
+      other: it.allowCustom,
+      to,
+      sent,
+      said,
+      via: sent === -1 && !said ? 'terminal' : undefined,
+      elsewhere: space ? place(space) : undefined,
+    }
+    return { id: `${e.id}#${i}`, who: 'agent', at: e.at + i, question }
+  })
+}
+
 export const safe = (key: string) => key.replace(/[^a-zA-Z0-9_.-]+/g, '_')
 
 /** words as typed, whatever the spacing a CLI's log keeps */
@@ -71,8 +104,8 @@ export function hostFor(msgs: Message[], at: number, p: { question?: unknown }):
   return undefined
 }
 
-/** one more read of the screen: the reply counts once it grew since the last read and, past its reaction and reply
- *  lines, starts with two letters or more that aren't a hidden marker (<no-reply>, an older [[...]]), whole or still coming */
+/** one more read of the screen: the reply counts once it grew since the last read and, past its reply
+ *  line, starts with two letters or more that aren't a hidden marker (<no-reply>, an older [[...]]), whole or still coming */
 export function sawReply(s: Pick<Shown, 'last' | 'on'>, text: string | undefined): Pick<Shown, 'last' | 'on'> {
   const words = text === undefined ? '' : agentLines(text).text
   const ok = words.length >= 2 && !markerSoFar(words)

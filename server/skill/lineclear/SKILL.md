@@ -1,6 +1,6 @@
 ---
 name: lineclear
-description: Lineclear's house conventions for every agent it starts, coordinators and task agents alike - the chat lines it sends and reads (reactions, files, answers, replies, the no-reply marker), its own lines in tags, choice cards and plans, secrets (API keys, tokens), alerts, and the lineclear command. Use when talking to the human through Lineclear, reading a chat line or a tagged Lineclear line, asking the human something or needing or using a secret. Not for making, queuing, merging or closing tasks or coordinator timer (lineclear-coordinator), and not for taking one task from brief to merged (lineclear-agent).
+description: Lineclear's house conventions for every agent it starts, coordinators and task agents alike - the chat lines it sends and reads (files, answers, replies, the no-reply marker), its own lines in tags, choice cards and plans, secrets (API keys, tokens), alerts, and the lineclear command. Use when talking to the human through Lineclear, reading a chat line or a tagged Lineclear line, asking the human something or needing or using a secret. Not for making, queuing, merging or closing tasks or coordinator timer (lineclear-coordinator), and not for taking one task from brief to merged (lineclear-agent).
 ---
 
 # Lineclear
@@ -40,10 +40,7 @@ The human reads your replies in a chat on a phone, tablet or desktop, never this
 
 ### Chat lines you receive
 
-    <reaction from="Elias" emoji="👍" to="PR #52 is ready to merge"/>
-    <reaction-removed from="Elias" emoji="👍" to="PR #52 is ready to merge"/>
     <attachment from="Elias" name="screenshot.png" path="~/.lineclear/inbox/screenshot.png"/>
-    <reaction from="Elias" emoji="👍" file="screenshot.png" path="~/.lineclear/inbox/screenshot.png"/>
     <answer from="Elias" question="Rerun CI on main?">Rerun it</answer>
     <secret from="Elias" name="GITHUB_TOKEN" for="api"/>
     <reply from="Elias" to="Tests pass on the branch. Want me to merge?">Yes, merge it</reply>
@@ -55,8 +52,6 @@ on this machine at its path. A reply quotes the start of the message it answers.
 
 Each on a line of its own:
 
-    <react emoji="👀" to="What needs me today?"/>
-    <react emoji="👀" file="screenshot.png" path="~/.lineclear/inbox/screenshot.png"/>
     <reply to="Can you check the flaky test?"/>
 
 `<reply to="…"/>` starts your reply and quotes the start of the message it answers. When a Lineclear line needs no

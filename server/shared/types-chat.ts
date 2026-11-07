@@ -1,4 +1,4 @@
-import type { Question, Reaction, ReplyQuote, UpdateCard, Task } from './types-core.ts'
+import type { Question, ReplyQuote, UpdateCard, Task } from './types-core.ts'
 
 /** a secret an agent asked for by name: the human types or pastes it in a masked box, for one of the levels offered;
  *  only its name ever shows, never its value */
@@ -23,7 +23,6 @@ export interface Message {
   /** answered on the question's copy in a space's chat: a link there */
   elsewhere?: Question['elsewhere']
   question?: Question
-  reactions?: Reaction[]
   /** waits to go in: the agent shows a menu or permission prompt, or is still starting (a busy one takes it at once) */
   waiting?: boolean
   /** why it waits: a menu is up (typed text could pick an option), the agent is starting, or a CLI command waits for the
@@ -37,8 +36,7 @@ export interface Message {
   reply?: ReplyQuote
   /** a thin "New session" divider before this message */
   newSession?: boolean
-  /** Lineclear's update card about a task, drawn as the card; its text ("SHE-4 is done: …") is what a reaction or a
-   *  reply quotes */
+  /** Lineclear's update card about a task, drawn as the card; its text ("SHE-4 is done: …") is what a reply quotes */
   card?: UpdateCard
   /** a secret the agent asked for (lineclear secret ask): a masked box to give it in */
   secret?: SecretAsk
@@ -51,7 +49,7 @@ export const doneNewestFirst = <T extends Pick<Task, 'status' | 'doneAt'>>(ts: T
   ...ts.filter((t) => t.status === 'done').sort((a, b) => (b.doneAt ?? 0) - (a.doneAt ?? 0)),
 ]
 
-/** an update card as a message in the chat: its words are what a reaction or a reply quotes */
+/** an update card as a message in the chat: its words are what a reply quotes */
 export const cardMessage = (card: UpdateCard, at?: number): Message => ({
   id: card.id,
   who: 'agent',

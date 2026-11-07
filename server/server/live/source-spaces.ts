@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto'
 import { dirname, join, sep } from 'node:path'
 import { STATUS_MAX } from '../../shared/types.ts'
 import { one, type Parsed } from './args.ts'
-import { line } from './chatlines.ts'
 import { fitStatus } from './engine/status-line.ts'
 import { BOX, boxHome } from './box.ts'
 import { fileType } from '../../shared/files.ts'
@@ -57,7 +56,7 @@ export class LiveSourceSpaces extends LiveSourceViews {
     const dir = join(boxDir(), 'inbox', chatDir(chat))
     task.mkdirSync(dir, { recursive: true })
     const safe = name.replace(/[^a-zA-Z0-9_. -]+/g, '_').slice(0, 120) || 'file'
-    // its own path even next to a file of the same name: a reaction names the file by it
+    // its own path even next to a file of the same name: a reply names the file by it
     const f = join(dir, `${Date.now().toString(36)}${randomUUID().slice(0, 4)}-${safe}`)
     task.writeFileSync(f, data)
     return f
@@ -180,24 +179,6 @@ export class LiveSourceSpaces extends LiveSourceViews {
     this.chats.post(key, { id: `command:${at}`, who: 'you', text, cid })
     this.emit('chat', key)
     this.agents.follow(key, at)
-  }
-
-  protected async react(key: string, messageId: string, emoji: string) {
-    const chat = this.chats.chat(key)
-    const m = chat.messages.find((x) => x.id === messageId)
-    if (!m || !(m.text || m.file)) return { ok: false }
-    const mine = m.reactions?.find((r) => r.emoji === emoji && (r.by === 'me' || r.by === 'both'))
-    // a file is named with its path: two files may share a name
-    const f = m.text ? undefined : m.file
-    const text = f
-      ? (mine ? line.unreactFile : line.reactFile)(this.user, emoji, f.name, f.path)
-      : (mine ? line.unreact : line.react)(this.user, emoji, m.text!)
-    await this.agents.send(key, text, {
-      reaction: { message: messageId, emoji },
-      ensure: key.includes('/') ? () => this.resumeTaskAgent(key) : () => this.coordinator(key),
-    })
-    this.emit('chat', key)
-    return {}
   }
 
   protected menuAnswers = new Set<string>()

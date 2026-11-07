@@ -29,33 +29,6 @@ describe('attachments', () => {
     ])
     expect(msgs[1].file?.path).toBe(shot)
   })
-  test('a reaction to a file lands on that file, not on a later one of the same name', async () => {
-    const first = src.chats.chat(chat).messages.find((x) => x.id === 'u1:0')!
-    // what a tap sends names the file by its path
-    const sent: string[] = []
-    const send = src.agents.send
-    src.agents.send = (async (_k: string, text: string) => (sent.push(text), { waiting: false })) as typeof send
-    try {
-      expect(await src.act({ type: 'react', chat, message: first.id, emoji: '❤️' })).toEqual({})
-    } finally {
-      src.agents.send = send
-    }
-    expect(sent).toEqual([`<reaction from="${src.user}" emoji="❤️" file="shot.png" path="${first.file!.path}"/>`])
-    // and read back from the log, it marks the first shot.png (u2 is a later one)
-    said('u3', sent[0])
-    // the agent's own reaction to it, too
-    const ev = (src.chats as unknown as { events: Map<string, unknown[]> }).events
-    ev.get(chat)!.push({ kind: 'agent', id: 'a3', at: Date.now(), text: `<react emoji="👀" file="shot.png" path="${first.file!.path}"/>\nLooking.` })
-    const msgs = src.chats.chat(chat).messages
-    expect(msgs.find((x) => x.id === 'u1:0')?.reactions).toEqual([
-      { emoji: '❤️', by: 'me' },
-      { emoji: '👀', by: 'them' },
-    ])
-    expect(msgs.find((x) => x.id === 'u2')?.reactions).toBeUndefined()
-    // a line naming only the file (an older one) goes to the latest of that name
-    said('u3c', '[Elias reacted 🎉 to "notes.pdf"]')
-    expect(src.chats.chat(chat).messages.find((x) => x.id === 'u1:1')?.reactions).toEqual([{ emoji: '🎉', by: 'me' }])
-  })
   test('a reply goes in quoting the message it answers, and reads back as a quote that jumps to it', async () => {
     const ev = (src.chats as unknown as { events: Map<string, unknown[]> }).events
     ev.get(chat)!.push({ kind: 'agent', id: 'r1', at: Date.now(), text: 'Tests pass on the branch. Want me to merge?' })

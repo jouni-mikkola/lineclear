@@ -45,8 +45,6 @@ export interface OutItem {
   id: string
   key: string
   text: string
-  /** a reaction line: shown as a faded pill until it goes in */
-  reaction?: { message: string; emoji: string }
   at: number
   /** the screen's own id for it (Message.cid) */
   cid?: string
@@ -68,8 +66,6 @@ export type Hold = 'menu' | 'start' | 'turn'
 
 export interface SendOpts {
   generation?: string
-  /** a reaction line: shown as a faded pill until it goes in */
-  reaction?: OutItem['reaction']
   /** starts (or resumes) the agent when it isn't running */
   ensure?: () => Promise<unknown>
   /** the screen's own id for it */

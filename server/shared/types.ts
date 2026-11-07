@@ -8,7 +8,6 @@ export type {
   AgentHerdr,
   Task,
   Question,
-  Reaction,
   CardAsk,
   UpdateCard,
 } from './types-core.ts'

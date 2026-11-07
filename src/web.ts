@@ -63,7 +63,7 @@ function keptAside<T>(read: () => Promise<T>, ms: number, now: () => number): Ke
  * `{"text": "...", "files": [ids], "cid": "..."}` sends it a message, `POST /api/chat/files` with `{"name": "...", "data": base64}` attaches a
  * file through Lineclear and gives its id, `GET /api/chat/file?path=` reads a file of the chat from Lineclear, and
  * `GET /api/chat/image?path=` shows an image the Dispatcher names from its own folders. `POST /api/chat/answer` with
- * `{"question": id, "choice": n}` answers a card the Dispatcher asked with. `/api/task/<id>/chat` and its `/events`, `/file`, `/image`, `/files`, `/answer`, `/react` are the same for the chat of one task with its agent. `GET /api/plans` lists each plan started
+ * `{"question": id, "choice": n}` answers a card the Dispatcher asked with. `/api/task/<id>/chat` and its `/events`, `/file`, `/image`, `/files`, and `/answer` are the same for the chat of one task with its agent. `GET /api/plans` lists each plan started
  * with `lineclear plan`, newest first: its goal, where it stands, the steps it adds, and its open Inbox item.
  * Projects are read again at most once a second. The slow reads run aside, in a process of their own, and answer
  * with the last value while a new one is read: each roadmap at most once a second (one older than a minute is waited

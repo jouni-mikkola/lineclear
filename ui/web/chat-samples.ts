@@ -132,7 +132,7 @@ function request(): ChatMessage[] {
   ];
 }
 
-/** A task\'s chat: the agent asks, you answer and react, it shows a plan and a picture. */
+/** A task\'s chat: the agent asks, you answer, it shows a plan and a picture. */
 function taskTalk(): ChatMessage[] {
   return [
     {
@@ -140,7 +140,6 @@ function taskTalk(): ChatMessage[] {
       who: "dispatcher",
       text: "I read the checkout page. The pay button stays grey until the terms box is ticked.",
       at: AT,
-      reactions: [{ emoji: "👍", by: "me" }],
     },
     { id: "t2", who: "you", text: "Move the terms box above the button.", at: AT + 20_000 },
     { id: "t3", who: "dispatcher", text: "Done. Here is how the page looks now.", at: AT + 60_000, reply: { text: "Move the terms box above the button." } },

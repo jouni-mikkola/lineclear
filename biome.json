@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "!**/node_modules", "!**/dist", "!server/plugins/reactions/emoji-data.ts", "!ui/brand/rail.ts"]
+    "includes": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "!**/node_modules", "!**/dist", "!ui/brand/rail.ts"]
   },
   "formatter": {
     "indentStyle": "space",

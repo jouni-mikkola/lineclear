@@ -313,8 +313,7 @@ test("a task's chat is served at its own address, says it has none, and the olde
       return none.state === "none";
     }, "the task chat to be none");
     expect(none.state).toBe("none");
-    const bad = await handle(req("/api/task/WEB-3/chat/react", { message: "", emoji: "x" }));
-    expect(bad.status).toBe(400);
+    expect((await handle(req("/api/task/WEB-3/chat/react", { message: "m", emoji: "x" }))).status).toBe(404);
     expect((await handle(req("/api/task/bad id/chat"))).status).toBe(404);
   } finally {
     fake.stop();

@@ -130,7 +130,6 @@ export interface ChatMessage {
   waiting?: boolean;
   /** A card the Dispatcher asks with: its choices as buttons, and the one sent once it is answered. A plan lists its steps. */
   question?: { id: string; choices: string[]; sent?: number; said?: string; words?: boolean; steps?: string[] };
-  reactions?: { emoji: string; by: "me" | "them" | "both" }[];
   /** What it answers: the start of that message's words, and its id while the chat still has it. */
   reply?: { text: string; id?: string };
 }
@@ -157,11 +156,8 @@ function fileView(file: { name: string; path: string }, sizes: ReadonlyMap<strin
   return { name: file.name, image: !!IMAGE_TYPES[extname(file.path).toLowerCase()], ...(size !== undefined ? { size } : {}), url: fileUrl(file.path) };
 }
 
-/** What every message of the page carries: id, side, time, waiting, reactions and the message it answers. */
+/** What every message of the page carries: id, side, time, waiting and the message it answers. */
 function messageBase(m: Raw): ChatMessage {
-  const reactions = (Array.isArray(m.reactions) ? m.reactions : []).filter(
-    (r: { emoji?: unknown; by?: unknown }) => typeof r?.emoji === "string" && ["me", "them", "both"].includes(String(r.by)),
-  );
   const reply = typeof m.reply?.text === "string" ? { text: m.reply.text, ...(typeof m.reply.id === "string" ? { id: m.reply.id } : {}) } : undefined;
   return {
     id: String(m.id),
@@ -169,7 +165,6 @@ function messageBase(m: Raw): ChatMessage {
     ...(typeof m.at === "number" ? { at: m.at } : {}),
     ...(typeof m.cid === "string" ? { cid: m.cid } : {}),
     ...(m.waiting ? { waiting: true } : {}),
-    ...(reactions.length ? { reactions: reactions.map((r: { emoji: string; by: "me" | "them" | "both" }) => ({ emoji: r.emoji, by: r.by })) } : {}),
     ...(reply ? { reply } : {}),
   } as ChatMessage;
 }
@@ -414,10 +409,6 @@ function lineclearChat(env: Env, target: ChatTarget, retryMs = 3000, sendMs = 12
         if (reset) return reset;
       }
       return act({ type: "send", chat: link.key(), text, attachments: files, ...(cid ? { cid } : {}), ...(reply ? { reply } : {}) });
-    },
-    /** Puts your reaction on a message, or takes it off when it is there already, as Lineclear's own chat does. */
-    async react(message: string, emoji: string): Promise<{ error: string; status: number } | undefined> {
-      return notReady() ?? act({ type: "react", chat: link.key(), message, emoji });
     },
     /** Answers a card the Dispatcher asked with, by the number of its choice, as Lineclear's own chat does. */
     async answer(question: string, choice: number): Promise<{ error: string; status: number } | undefined> {
