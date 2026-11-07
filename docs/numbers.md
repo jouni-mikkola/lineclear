@@ -17,6 +17,29 @@ L100    inbox    L47     part inbox, lock inbox
 
 No line has a holder and waiter that share no lock, no file and no part.
 
+## Install of a new worktree
+
+Limits: under 5 seconds and under 50 MB of new disk for a worktree. Measured for 10 worktrees in a row, each a copy of this
+repo's `package.json` and lock files (root and `server/`), Bun's download cache warm, new disk from `df` on a Linux machine.
+
+Before: every worktree ran `bun install --frozen-lockfile` and kept its own `node_modules`.
+
+```
+install seconds  0.8 each, 0.7 to 1.2
+new disk         425 MB each, 4245 MB for 10
+```
+
+The disk limit was over, so a new worktree now links `node_modules` from a store keyed by the hash of the lock file
+(`storePath` in `server/server/live/engine/git.ts`). The first worktree of a lock file installs and moves its `node_modules`
+into the store. A changed lock file makes a new entry.
+
+After, 10 more worktrees with the same lock files:
+
+```
+install seconds  0.02 to 0.08 each
+new disk         0.7 MB for 10 (the first, 460 MB, filled the store once)
+```
+
 ## Core baseline
 
 The speed today, measured on 2026-11-07 on one 12-core laptop (load about 1.5, 2 tasks working), from a fresh main.

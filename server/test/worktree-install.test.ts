@@ -4,9 +4,10 @@ import { describe, expect, test } from 'bun:test'
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { lstatSync, readFileSync, readlinkSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { fakeHerdr, repo, until, world } from './engine-world.ts'
-import { install, installDirs } from '../server/live/engine/git.ts'
+import { install, installDirs, storeKey, storePath } from '../server/live/engine/git.ts'
 const { Worktrees } = await import('../server/live/engine/worktrees.ts')
 
 /** a folder with a Bun project whose one dependency is a local package (no network) and a lockfile made by bun */
@@ -58,6 +59,40 @@ describe('install step of a new worktree', () => {
   })
 })
 
+function copyProject(from: string, to: string) {
+  mkdirSync(join(to, 'dep'))
+  writeFileSync(join(to, 'package.json'), readFileSync(join(from, 'package.json')))
+  writeFileSync(join(to, 'bun.lock'), readFileSync(join(from, 'bun.lock')))
+  writeFileSync(join(to, 'dep/package.json'), readFileSync(join(from, 'dep/package.json')))
+}
+
+describe('one install per lock file', () => {
+  test('the key is the lock file hash: the same lock gives the same key, a changed one a new key', () => {
+    expect(storeKey('a')).toBe(storeKey(Buffer.from('a')))
+    expect(storeKey('a')).not.toBe(storeKey('b'))
+    expect(storeKey('a')).toMatch(/^[0-9a-f]{16}$/)
+  })
+
+  test('the first worktree installs into the store and links it, the next links without installing, a changed lock gets its own entry', async () => {
+    const a = mkdtempSync(join(tmpdir(), 'shep-inst-'))
+    const b = mkdtempSync(join(tmpdir(), 'shep-inst-'))
+    const c = mkdtempSync(join(tmpdir(), 'shep-inst-'))
+    await bunProject(a)
+    copyProject(a, b)
+    copyProject(a, c)
+    writeFileSync(join(c, 'bun.lock'), `${readFileSync(join(c, 'bun.lock'), 'utf8')}\n`)
+    await install(a)
+    expect(lstatSync(join(a, 'node_modules')).isSymbolicLink()).toBe(true)
+    expect(readlinkSync(join(a, 'node_modules'))).toBe(storePath(a, a))
+    // b has the same lock file: it links the store entry
+    await install(b)
+    expect(readlinkSync(join(b, 'node_modules'))).toBe(storePath(a, a))
+    expect(existsSync(join(b, 'node_modules/dep/package.json'))).toBe(true)
+    expect(storePath(c, c)).not.toBe(storePath(a, a))
+    for (const d of [a, b, c]) rmSync(d, { recursive: true, force: true })
+  })
+})
+
 describe('a task worktree made for a project', () => {
   test('has its node_modules in root and server/ when it is made, so check finds tsc', async () => {
     const dir = repo()
@@ -68,6 +103,7 @@ describe('a task worktree made for a project', () => {
     const made = await wt.create({ repo: dir, name: 'p' }, 'work/1-x', 'main', 'lab')
     expect(existsSync(join(made.path, 'node_modules/dep/package.json'))).toBe(true)
     expect(existsSync(join(made.path, 'server/node_modules/dep/package.json'))).toBe(true)
+    expect(execSync('git status --short', { cwd: made.path }).toString()).toBe('')
   })
 
   test('a failed install step fails the start, saying so', async () => {
