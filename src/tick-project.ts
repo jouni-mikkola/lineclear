@@ -304,6 +304,9 @@ function whyStale(s: Starting, step: Step): string | undefined {
     (x) => x.status !== "done" && (x.title.startsWith(`${step.id} `) || (x.id !== undefined && state.taskSteps?.[x.id] === step.id)),
   );
   if (open) return `${open.id ?? open.title} for this step is not done (${open.status}), so it does not start twice`;
+  // A task just added may not show in the list yet: the rules' own record of the start holds the step until it does.
+  if (Object.values(state.pendingStarts ?? {}).includes(step.id)) return "a task was just started for this step and is not listed yet, so it does not start twice";
+  if (state.closedSteps?.[step.id] !== undefined) return "it is closed with nothing to merge already";
   return undefined;
 }
 
