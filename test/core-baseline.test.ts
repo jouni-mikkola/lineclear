@@ -19,7 +19,8 @@ test("chat-tokens sees the coordinator and the Dispatcher in a session folder", 
   session(home, "/work/app");
   session(home, join(home, ".config/lineclear/dispatcher"));
 
-  const out = spawnSync("bun", [join(import.meta.dir, "../scripts/core-baseline.ts"), "chat-tokens", "20"], {
+  const args = [join(import.meta.dir, "../scripts/core-baseline.ts"), "chat-tokens", "20"];
+  const out = spawnSync("bun", args, {
     encoding: "utf8",
     env: { ...process.env, HOME: home },
   }).stdout;
