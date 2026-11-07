@@ -4,18 +4,15 @@ import { createInterface } from "node:readline/promises";
 import { asksMain } from "./asks.ts";
 import { storeMain } from "./store-copies.ts";
 import { dispatcherMain, moveMain } from "./dispatcher.ts";
-import { doctor, herdrUnsaved, herdrVersions, realProbe, testedHerdr } from "./doctor.ts";
+import { doctor, herdrVersions, realProbe, testedHerdr } from "./doctor.ts";
 import { askMain } from "./inbox.ts";
 import { inboxMain } from "./inbox-answer.ts";
-import { exportMain, inboxAll, statusAll } from "./export.ts";
-import { machineMain } from "./machines.ts";
-import { readMachines } from "./machine-list.ts";
-import { fetchExportSync, relationOf } from "./remotes.ts";
+import { status } from "./status.ts";
 import { planMain } from "./plan.ts";
 import { planStatus } from "./requests.ts";
 import { resolveProject } from "./resolve.ts";
-import { codeCommit, pathsFor } from "./paths.ts";
-import { readRelease, releaseMain } from "./release.ts";
+import { pathsFor } from "./paths.ts";
+import { releaseMain } from "./release.ts";
 import { fillSetup } from "./fill-setup.ts";
 import { type Ask, setupGate } from "./project.ts";
 import { setupMain } from "./setup.ts";
@@ -110,14 +107,13 @@ export function versionLine(dir: string = root): string {
 const TASK_ID = /^[A-Z][A-Z0-9]*-\d+$/;
 
 /** `lineclear status [<project>]`: a project written loosely is read as the one it means, or refused with the two nearest. */
-function statusProject(raw: string | undefined, out: (line: string) => void, local = false): number {
-  if (raw === undefined) return statusAll(out, process.env);
+function statusProject(raw: string | undefined, out: (line: string) => void): number {
+  if (raw === undefined) return status(out, process.env);
   const r = resolveProject(raw);
-  // a project of another machine is not in this one's list: its own machine tells it
   if ("error" in r && TASK_ID.test(raw)) return (out(`lineclear status: '${raw}' is a task, and status takes a project. Try 'lineclear task show ${raw}'`), 1);
-  if ("error" in r) return !local && readMachines().length > 0 ? statusAll(out, process.env, raw) : (out(`lineclear status: ${r.error}`), 1);
+  if ("error" in r) return (out(`lineclear status: ${r.error}`), 1);
   if (r.loose) out(`status of ${r.name} (read '${raw}' as ${r.name})`);
-  return statusAll(out, process.env, r.name, local);
+  return status(out, process.env, r.name);
 }
 
 /** Runs one command and returns the exit code. A command that throws prints one line, never a stack trace. */
@@ -165,32 +161,26 @@ async function dispatch(args: string[], out: (line: string) => void = console.lo
 
 type Out = (line: string) => void;
 
-const STATUS_USAGE = "usage: lineclear status [<project>] [--local] | lineclear status --plan [<task>]";
+const STATUS_USAGE = "usage: lineclear status [<project>] | lineclear status --plan [<task>]";
 
 function statusCommand(rest: string[], out: Out): number | Promise<number> {
   if (rest.includes("--help") || rest.includes("-h")) return (out(STATUS_USAGE), 0);
   if (rest[0] === "--plan") return rest.length > 2 ? (out("usage: lineclear status --plan [<task>]"), 2) : planStatus(out, process.env, rest[1]);
-  // --local is how a machine asks another: the receiver never asks a third, so a call goes one hop at most
-  const local = rest.includes("--local");
-  const args = rest.filter((a) => a !== "--local");
-  if (args.length > 1 || args[0]?.startsWith("-")) return (out(STATUS_USAGE), 2);
-  return statusProject(args[0], out, local);
+  if (rest.length > 1 || rest[0]?.startsWith("-")) return (out(STATUS_USAGE), 2);
+  return statusProject(rest[0], out);
 }
 
 function inboxCommand(rest: string[], out: Out): number | Promise<number> {
   if (rest[0] === "--help" || rest[0] === "-h") return (out("usage: lineclear inbox [--all] | lineclear inbox answer <n> <choice> [--note <text>]"), 0);
-  if (rest.length === 0) return inboxAll(out);
   return inboxMain(rest, out);
 }
 
 /** The commands that are one call: each gets the words after its name. */
 const COMMANDS: Record<string, (rest: string[], out: Out) => number | Promise<number>> = {
   stalls: (rest, out) => stallsMain(rest, out, decisionsPath()),
-  machine: (rest, out) => machineMain(rest, out),
   roadmap: roadmapMain,
   run: (rest, out) => (rest[0] === "--demo" ? demoMain(rest.slice(1), out) : runMain(rest, out, undefined, { web: startWeb })),
   serve: serveMain,
-  export: (_rest, out) => exportMain(out),
   secrets,
   totp,
   store: storeMain,
@@ -209,17 +199,7 @@ async function installCommand(name: "doctor" | "uninstall", rest: string[], out:
   if (name === "doctor") {
     const probe = realProbe(paths);
     const here = rest.includes("--here");
-    const hosts = here ? [] : readMachines().map((m) => m.host);
-    if (probe.which("herdr")) probe.herdr = { tested: testedHerdr(), machines: herdrVersions(probe.run, here), unsaved: herdrUnsaved(probe.run, hosts) };
-    if (hosts.length > 0)
-      probe.machines = {
-        commit: codeCommit(),
-        stable: readRelease().stable?.commit,
-        others: hosts.map((host) => {
-          const e = fetchExportSync(host);
-          return { host, commit: e?.commit ?? null, ...(e ? { relation: relationOf(codeCommit(), e.commit) } : {}) };
-        }),
-      };
+    if (probe.which("herdr")) probe.herdr = { tested: testedHerdr(), machines: herdrVersions(probe.run, here) };
     return doctor(probe, out);
   }
   const bad = rest.find((a) => a !== "--all");

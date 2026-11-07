@@ -197,16 +197,9 @@ while the other cards slide.
 | Taken over | [picture](../ui/test/screens/browser-taken-1440.png) | [picture](../ui/test/screens/browser-taken-390.png) |
 | Closed while watched | [picture](../ui/test/screens/browser-gone-1440.png) | [picture](../ui/test/screens/browser-gone-390.png) |
 
-Settings are at `/settings`. It reads `GET /api/settings` and answers one question first: is every machine ready?
-Machines come first, this one and each one added by its SSH host, as cards with a state shape (a lit train while it
-installs, a green station when ready, an outline train in line when it is busy over its load limit, where new tasks
-wait, the red square only when it needs a fix or SSH cannot reach it) and its load average against its load limit as
-a bar: green up to the limit mark, grey past it. Busy is grey, not amber: nothing waits for you there. Over the cards, the machines are counted by state, with one bar of their
-shares. Each card has its doctor under Details. Add machine runs `install.sh` there over SSH (`POST /api/machines`, the same as
-`lineclear machine add`), then `lineclear doctor`, and the card shows how it goes. Each other machine's load is read
-over SSH in the background at most every 15 s, so the page never waits on SSH. `LINECLEAR_SSH` sets the command.
+Settings are at `/settings`. It reads `GET /api/settings`.
 
-Then each role's models for a project, best first: one click moves a model up or down, and
+Each role's models for a project, best first: one click moves a model up or down, and
 the order is saved in the project's settings. Last, each project's check and health commands, editable, and its
 secrets by name only: a value never reaches a page.
 
@@ -258,8 +251,8 @@ it does now. Offline, a line says so and Send waits. A new message slides up int
 | No Dispatcher yet | [picture](../ui/test/screens/chat-none-1440.png) | [picture](../ui/test/screens/chat-none-390.png) |
 
 The UI bar for the views is `ui/test/views.pw.ts`, `ui/test/roadmap.pw.ts`, `ui/test/browsers.pw.ts`,
-`ui/test/settings.pw.ts` and `ui/test/chat.pw.ts`, with `ui/test/fake-playwright-cli` for playwright-cli, `ui/test/fake-ssh` for SSH
-and `ui/test/fake-lineclear-server.ts` for Lineclear's server. It writes the files the server reads (`ui/test/fixture.ts`) and
+`ui/test/settings.pw.ts` and `ui/test/chat.pw.ts`, with `ui/test/fake-playwright-cli` for playwright-cli and
+`ui/test/fake-lineclear-server.ts` for Lineclear's server. It writes the files the server reads (`ui/test/fixture.ts`) and
 checks each motion.
 
 ### The line

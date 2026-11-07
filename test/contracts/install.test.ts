@@ -1,8 +1,7 @@
-// The contract of install: the parts that read machines, secrets and releases rely on these reads.
+// The contract of install: the parts that read secrets and releases rely on these reads.
 import { expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { readMachines } from "../../src/machine-list.ts";
 import { readRelease, saveRelease } from "../../src/release.ts";
 import { secretNames, secrets, storedLoginAdvice } from "../../src/secrets.ts";
 import { tmp } from "../helpers.ts";
@@ -28,34 +27,6 @@ const store = async (env: ReturnType<typeof fresh>, name: string, value: string)
       async () => `${value}\n`,
     ),
   ).toBe(0);
-
-const writeMachines = (env: ReturnType<typeof fresh>, text: string) => writeFileSync(join(env.LINECLEAR_CONFIG, "machines.json"), text);
-
-test("readMachines gives [] with no file and with a file that is not JSON", () => {
-  const env = fresh();
-  expect(readMachines(env)).toEqual([]);
-  writeMachines(env, "not json {");
-  expect(readMachines(env)).toEqual([]);
-});
-
-test("readMachines drops an entry with an invalid host and fails an install whose pid is gone", () => {
-  const env = fresh();
-  const since = "2026-01-01T00:00:00Z";
-  writeMachines(
-    env,
-    JSON.stringify({
-      machines: [
-        { host: "good.example", state: "ready", since },
-        { host: "bad host; rm -rf", state: "ready", since },
-        { host: "gone.example", state: "installing", since, pid: 2 ** 22 + 12345 },
-      ],
-    }),
-  );
-  const list = readMachines(env);
-  expect(list.map((m) => m.host)).toEqual(["good.example", "gone.example"]);
-  expect(list[0]?.state).toBe("ready");
-  expect(list[1]?.state).toBe("failed");
-});
 
 test("secretNames gives a project's names sorted and never a value", async () => {
   const env = fresh();

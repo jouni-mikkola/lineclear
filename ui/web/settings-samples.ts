@@ -1,5 +1,5 @@
-import type { Machine, ProjectSettings } from "../kit/index.ts";
-import { DOCTOR_OK, here, type SettingsData } from "./settings-empty.ts";
+import type { ProjectSettings } from "../kit/index.ts";
+import type { SettingsData } from "./settings-empty.ts";
 import type { PageState } from "./samples.ts";
 import type { SetupView } from "../../src/setup.ts";
 
@@ -26,12 +26,6 @@ const REASONS = {
 
 function filled(): SettingsData {
   return {
-    machines: [
-      here,
-      { host: "build-box", local: false, state: "ready", doctor: DOCTOR_OK, load: 5.1, limit: 8 },
-      { host: "me@10.0.0.7", local: false, state: "ready", doctor: DOCTOR_OK, load: 4.6, limit: 4 },
-      { host: "spare-laptop", local: false, state: "installing" },
-    ],
     accounts: [
       { account: "anthropic", kind: "subscription", price: 100, currency: "USD" },
       { account: "openai", kind: "subscription" },
@@ -59,26 +53,12 @@ function filled(): SettingsData {
   };
 }
 
-const LONG_HOST = "deploy-user@a-build-machine-with-a-very-long-host-name.internal.example.com";
 const LONG_CMD = "docker compose run --rm --build app sh -c 'bun install --frozen-lockfile && bun run types && bun run test && bun run lint'";
 
 function long(): SettingsData {
   const f = filled();
   return {
     ...f,
-    machines: [
-      { ...here, slots: { total: 16, busy: 11 } },
-      { host: LONG_HOST, local: false, state: "ready", doctor: DOCTOR_OK, load: 12.75, limit: 16 },
-      {
-        host: "old-server",
-        local: false,
-        state: "failed",
-        doctor: [
-          "install.sh failed (exit 1).",
-          "install: pi needs Node.js 22.19 or newer and npm, and they are not here. Install them, then run this again, and check that the PATH of a non-interactive SSH session finds them too.",
-        ],
-      },
-    ],
     projects: [
       {
         name: "a-project-with-a-very-long-repository-name-that-goes-on-and-on",
@@ -99,14 +79,6 @@ function long(): SettingsData {
 }
 
 function many(): SettingsData {
-  const machines: Machine[] = [here];
-  for (let i = 1; i < 200; i++) {
-    machines.push(
-      i % 37 === 0
-        ? { host: `node-${i}`, local: false, state: "unreachable", doctor: DOCTOR_OK }
-        : { host: `node-${i}`, local: false, state: "ready", doctor: DOCTOR_OK, load: (i * 7) % 11, limit: 8 },
-    );
-  }
   const projects: ProjectSettings[] = Array.from({ length: 200 }, (_, i) => ({
     name: `project-${i + 1}`,
     repo: `/home/me/code/project-${i + 1}`,
@@ -115,17 +87,10 @@ function many(): SettingsData {
     reasons: REASONS,
     secrets: i % 3 ? [] : ["API_TOKEN"],
   }));
-  return { machines, projects };
+  return { projects };
 }
 
 export function settingsSample(state: PageState): SettingsData {
-  if (state === "real") {
-    const s = filled();
-    return {
-      ...s,
-      machines: [...s.machines, { host: "old-nuc", local: false, state: "failed", doctor: ["FAILED service: lineclear.service is not running"] }],
-    };
-  }
   if (state === "long") return long();
   if (state === "many") return many();
   return filled();

@@ -51,7 +51,7 @@ const planter = (dir: string) => (n: number, w: object) =>
   );
 
 const homeText = (world: Record<string, string>) => (id: string) =>
-  projectsData(world, Date.now(), [])
+  projectsData(world, Date.now())
     .flatMap((p) => p.tasks)
     .find((t) => t.id === id)?.text;
 
@@ -175,7 +175,7 @@ test("an idle task of another machine counts in none of Home, the Inbox badge an
   const { dir, world } = setup();
   const before = countWaiting(waitingForYou(world));
   plantBox(dir, [{ id: "WEB-8", sub: "Waits for your reply" }]);
-  const home = projectsData(world, Date.now(), []).flatMap((p) => p.tasks);
+  const home = projectsData(world, Date.now()).flatMap((p) => p.tasks);
   expect(home.find((t) => t.id === "WEB-8@box")).toMatchObject({ state: "need", stage: "work" });
   expect(waitingForYou(world).tasks.map((t) => t.task)).not.toContain("WEB-8@box");
   expect(countWaiting(waitingForYou(world))).toBe(before);
@@ -215,7 +215,7 @@ test("a silent machine's tasks are not waiting, drop after a day with one note, 
     writeFileSync(join(project, "state.json"), JSON.stringify(memory));
   };
   const row = () =>
-    projectsData(world, Date.now(), [])
+    projectsData(world, Date.now())
       .flatMap((p) => p.tasks)
       .find((t) => t.id === "WEB-9@box");
   const room = { host: "box", tasks: [task], working: 1, max: 4, load: 0, loadLimit: 4 } satisfies Room;

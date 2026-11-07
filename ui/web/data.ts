@@ -243,7 +243,7 @@ export function useAnswer(state: PageState | undefined) {
   return { gone, errors, answer };
 }
 
-/** Machines and each project's settings, read only while Settings shows. */
+/** Each project's settings, read only while Settings shows. */
 export const useSettings = (state: PageState | undefined, on: boolean) =>
   useLoad<SettingsData>(
     "settings",
@@ -252,7 +252,7 @@ export const useSettings = (state: PageState | undefined, on: boolean) =>
     () => lazySamples?.settings.settingsSample(state as PageState) ?? emptySettings,
     emptySettings,
     on,
-    hasLists("machines", "projects"),
+    hasLists("projects"),
   );
 
 type Answer<T> = { ok: true; data: T } | { ok: false; error: string };

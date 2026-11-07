@@ -3,7 +3,6 @@ import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { configDir } from "../pi/config.ts";
 import { compileCacheDir } from "./tmpdirs.ts";
-import { gitText } from "./git.ts";
 
 /** The address install.sh is fetched from: read from the install.sh shipped beside this code, so the repo's address lives in README and install.sh only. */
 export const INSTALL_URL = (() => {
@@ -112,11 +111,6 @@ export function stableRefusal(root: string, args: string[], env: Env = process.e
   if (set !== undefined && [STABLE_PORT, stableBoardPort(stableData)].includes(Number(set))) used.push(`the stable port ${set}`);
   if (!used.length) return "";
   return `this checkout's bin/lineclear would use ${used.join(", ")}. The stable lineclear on PATH runs the real system. To try this code, set LINECLEAR_CONFIG, LINECLEAR_HOME and LINECLEAR_PORT to a folder and a port of your own.`;
-}
-
-/** The commit of the code that runs here. */
-export function codeCommit(): string {
-  return gitText(resolve(import.meta.dir, ".."), "rev-parse", "HEAD") ?? "unknown";
 }
 
 /** The lock file `<name>.lock` in the config folder: one guard per job that must not run twice at once. */

@@ -78,31 +78,6 @@ export function StationPic({ look, size = 16, label }: { look: part.StationLook;
   return <Pic shapes={part.station(look, paint, 6)} box={[-8, -8, 16, 16]} width={size} height={size} label={label} data-station-look={look} />;
 }
 
-const SIDINGS_PER_COLUMN = 4;
-
-/** A machine's task slots as a yard: one siding per slot, a train in each busy one, the free ones empty. */
-export function SidingsPic({ total, busy }: { total: number; busy: number }) {
-  const shown = Math.min(total, 24);
-  const cols = Math.ceil(shown / SIDINGS_PER_COLUMN);
-  const rows = Math.min(shown, SIDINGS_PER_COLUMN);
-  const len = 40;
-  const colW = len + 14;
-  const rowH = 14;
-  const shapes: Shape[] = [];
-  for (let i = 0; i < shown; i++) {
-    const x = Math.floor(i / SIDINGS_PER_COLUMN) * colW;
-    const y = (i % SIDINGS_PER_COLUMN) * rowH;
-    shapes.push(
-      part.at(x, y, [...part.siding(paint, len), ...(i < busy ? [part.at(len / 2 - 1, 0, part.train("work", paint, { w: 24, h: 8 }))] : [])], {
-        "data-siding": i < busy ? "busy" : "free",
-      }),
-    );
-  }
-  const w = cols * colW;
-  const h = (rows - 1) * rowH + 12;
-  return <Pic shapes={shapes} box={[-2, -6, w, h]} width={w} height={h} label={`${busy} of ${total} task slots busy`} data-sidings />;
-}
-
 /** An empty part: a track that runs to a station with nothing at it yet. Never the mark. */
 export function EmptyTrack({ width = 120 }: { width?: number }) {
   const shapes: Shape[] = [...part.rail("M0 0H36", paint), part.at(44, 0, part.station("ahead", paint, 6))];

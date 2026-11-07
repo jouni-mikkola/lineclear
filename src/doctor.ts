@@ -7,8 +7,7 @@ import { readJson } from "../pi/config.ts";
 import { failureTail } from "./secrets.ts";
 import { copiesProblem, runByNote } from "./store-copies.ts";
 import { follows, type ReleaseState, readRelease, releaseLines } from "./release.ts";
-import { cacheEnvFile, dataDir, extensionFile, INSTALL_URL, type Paths, SERVICE } from "./paths.ts";
-import type { Relation } from "./remotes.ts";
+import { cacheEnvFile, dataDir, extensionFile, INSTALL_URL, type Paths, SERVICE, serverBin } from "./paths.ts";
 import { diskTrouble, freeBytes } from "./health.ts";
 import { readModelFile } from "./models.ts";
 import { checkoutPointers } from "./install-paths.ts";
@@ -39,8 +38,6 @@ export interface Probe {
   which(cmd: string): string | null;
   /** Runs a command and returns its output, or null when it failed. */
   run(cmd: string[]): string | null;
-  /** The machines added in Settings and the commit each runs (null when it cannot be read), and this one's. */
-  machines?: { commit: string; stable?: string; others: { host: string; commit: string | null; relation?: Relation }[] };
   /** The exit code and last 20 lines of the latest command that failed, secrets masked. */
   failure?: string;
   /** The user whose lingering is checked. */
@@ -222,24 +219,6 @@ function disk(p: Probe): Check {
   return { name: t?.name ?? "disk space", problem: t?.problem ?? "", fix: t?.fix ?? "" };
 }
 
-/** A machine that runs another Lineclear than this one, or that cannot be read, with the command that updates it. */
-function machinesBehind(p: Probe): Check[] {
-  const mine = p.machines?.commit ?? "";
-  const stable = p.machines?.stable;
-  const short = (c: string) => c.slice(0, 7);
-  return (p.machines?.others ?? []).map(({ host, commit, relation }) => {
-    const name = `machine ${host}`;
-    const fix = `lineclear machine update ${host}`;
-    if (commit === null) return { name, problem: `${host} cannot be reached or runs a Lineclear that is too old to say its version`, fix };
-    if (commit === mine) return { name, problem: "", fix };
-    const stableNote = stable ? `; stable is ${short(stable)}, which ${stable === commit ? host : stable === mine ? "this machine" : "neither"} runs` : "";
-    const how = { behind: "older than", ahead: "newer than", different: "apart from", same: "equal to" }[relation ?? "different"];
-    const text = `${host} runs ${short(commit)}, ${how} this machine's ${short(mine)}${stableNote}`;
-    // a machine ahead of this one needs no update; this one does
-    return relation === "ahead" ? { name, problem: "", fix, info: text } : { name, problem: text, fix };
-  });
-}
-
 /** The herdr version the contract test passed with: the adapter's pin, read as a file since the CLI may not import the server. */
 export function testedHerdr(): string {
   const adapter = readFileSync(join(import.meta.dir, "..", "server", "server", "live", "herdr.ts"), "utf8");
@@ -262,28 +241,6 @@ export function herdrVersions(run: Probe["run"], here: boolean): { machine: stri
   for (const m of saved.filter((x) => x.enabled))
     out.push({ machine: m.label, version: herdrVersionOf(run(["timeout", "-k", "5", "20", ...herdrArgv(["status", "server"], m.id)])) });
   return out;
-}
-
-/** The machines of `hosts` that herdr has not saved, or has turned off: the server places a task only on a machine it knows by herdr's list. */
-export function herdrUnsaved(run: Probe["run"], hosts: string[]): string[] {
-  let saved: { id?: string; label?: string; target?: string; enabled?: boolean }[];
-  try {
-    saved = JSON.parse(run(herdrArgv(["machine", "list", "--json"])) ?? "");
-  } catch {
-    // a list that cannot be read says nothing about any machine
-    return [];
-  }
-  // the server drops a machine turned off, like one never saved
-  return hosts.filter((h) => !saved.some((m) => m.enabled !== false && [m.id, m.label, m.target].includes(h)));
-}
-
-/** A Lineclear machine that herdr does not know: `lineclear room <machine>` and placing tasks there fail until it is saved. */
-function herdrKnows(p: Probe): Check[] {
-  return (p.herdr?.unsaved ?? []).map((host) => ({
-    name: `herdr knows ${host}`,
-    problem: `herdr has no enabled machine ${host}, so new tasks never start there and \`lineclear room ${host}\` says no machine`,
-    fix: `herdr machine add ${host}  # or herdr machine enable ${host} when it is saved but turned off`,
-  }));
 }
 
 /** Every machine runs the herdr the contract test passed with: another version may have changed a call Lineclear makes. */
@@ -388,9 +345,7 @@ export function doctorChecks(probe: Probe): Check[] {
     stableBuild(p),
     lingering(p),
     disk(p),
-    ...machinesBehind(p),
     ...herdrPinned(p),
-    ...herdrKnows(p),
     listening(p),
     publishedPages(p),
     { name: "store", problem: p.store ?? "", fix: "lineclear store copy; lineclear store list; the rule loop takes a copy every hour" },

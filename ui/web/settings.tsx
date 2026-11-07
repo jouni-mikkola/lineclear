@@ -2,10 +2,6 @@ import { Collapsible } from "@base-ui/react/collapsible";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
-  AddMachine,
-  type Machine,
-  MachineList,
-  MachineSetting,
   PageTitle,
   type PartState,
   Part,
@@ -22,30 +18,21 @@ import { Models, SetupChoice } from "./settings-models.tsx";
 import type { SettingsData } from "./settings-empty.ts";
 import { useAccountActions } from "./settings-account.ts";
 
-// Settings at `/settings`: only what you set, in four sections. Models (the order per role and the accounts' prices),
-// Projects (each one's commands), Machines to add and Secrets (names only). On a desktop the sections sit on the left
+// Settings at `/settings`: only what you set, in three sections. Models (the order per role and the accounts' prices),
+// Projects (each one's commands) and Secrets (names only). On a desktop the sections sit on the left
 // and the open one on the right; on a phone they are a grouped list and a tap opens one. What is only read, a
 // machine's load and usage, is on Usage and Home. A sample state (`?state=`) changes only the page.
 
-const SECTIONS = ["Models", "Projects", "Machines to add", "Secrets"] as const;
+const SECTIONS = ["Models", "Projects", "Secrets"] as const;
 type Section = (typeof SECTIONS)[number];
 
 type Said = { text: string; failed?: boolean };
 
 const PROJECTS_SHOWN = 12;
 
-/** The machines the page shows: the server's, with a sample page's added ones standing in for its state, less those removed. */
-function shownMachines(served: Machine[], added: Machine[], gone: Set<string>): Machine[] {
-  return [...served.map((m) => added.find((a) => a.host === m.host) || m), ...added.filter((a) => !served.some((m) => m.host === a.host))].filter(
-    (m) => !gone.has(m.host),
-  );
-}
-
 export function Settings({ load, sample }: { load: Load<SettingsData>; sample: boolean }) {
   const client = useQueryClient();
   // what a sample page changed, so its motions can be seen without a server
-  const [added, setAdded] = useState<Machine[]>([]);
-  const [gone, setGone] = useState<Set<string>>(new Set());
   const [saved, setSaved] = useState<Record<string, Partial<ProjectSettings>>>({});
   const [said, setSaid] = useState<Record<string, Said>>({});
   const [open, setOpen] = useState<Section | null>(null);
@@ -61,30 +48,8 @@ export function Settings({ load, sample }: { load: Load<SettingsData>; sample: b
   if (load.status === "error") return <Part main state="error" label="Settings" empty={{ text: "" }} error={load.error} onRetry={load.retry} />;
   const d = load.status === "ok" ? load.data : undefined;
   const of = (empty: boolean) => (!d ? "loading" : empty ? "empty" : "filled");
-  const machines = d ? shownMachines(d.machines, sample ? added : [], gone) : [];
   const projects = (d?.projects ?? []).map((p) => ({ ...p, ...saved[p.name] }));
 
-  const add = async (host: string, again = false) => {
-    if (!again && machines.some((m) => m.host === host)) return tell("machine", { text: `${host} is on the list already.`, failed: true });
-    setGone((g) => new Set([...g].filter((h) => h !== host)));
-    if (sample) {
-      setAdded((a) => [...a.filter((x) => x.host !== host), { host, local: false, state: "installing" }]);
-      return tell("machine", { text: `Installing Lineclear on ${host} over SSH.` });
-    }
-    const error = await send("/api/machines", { add: host });
-    tell("machine", error ? { text: error, failed: true } : { text: `Installing Lineclear on ${host} over SSH. It takes a few minutes.` });
-    await refresh();
-  };
-  const remove = async (host: string) => {
-    setGone((g) => new Set(g).add(host));
-    if (sample) return;
-    const error = await send("/api/machines", { remove: host });
-    if (error) {
-      setGone((g) => new Set([...g].filter((h) => h !== host)));
-      tell("machine", { text: error, failed: true });
-    }
-    await refresh();
-  };
   const save = async (p: ProjectSettings, change: { check: string; health: string }) => {
     setSaved((s) => ({ ...s, [p.name]: { check: change.check, health: change.health || undefined } }));
     if (sample) return tell(p.name, { text: "Saved." });
@@ -134,7 +99,6 @@ export function Settings({ load, sample }: { load: Load<SettingsData>; sample: b
         </Part>
       </div>
     ),
-    "Machines to add": <MachinesPanel state={of(false)} machines={machines} said={said.machine} add={add} remove={remove} />,
     Secrets: <SecretNames state={of(!projects.length)} projects={projects} />,
   };
   return (
@@ -190,30 +154,6 @@ function AccountPrices({
         />
       ))}
     </div>
-  );
-}
-
-/** The machines as rows with a card behind each, and the form that adds one. */
-function MachinesPanel({
-  state,
-  machines,
-  said,
-  add,
-  remove,
-}: {
-  state: PartState;
-  machines: Machine[];
-  said?: Said;
-  add: (host: string, again?: boolean) => Promise<void>;
-  remove: (host: string) => Promise<void>;
-}) {
-  return (
-    <Part state={state} label="Machines" empty={{ text: "" }} rows={3}>
-      <MachineList rows items={machines} card={(m) => <MachineSetting m={m} onRemove={m.local ? undefined : () => void remove(m.host)} />} />
-      <div className="mt-3">
-        <AddMachine onAdd={(h) => void add(h)} said={said} />
-      </div>
-    </Part>
   );
 }
 

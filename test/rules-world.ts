@@ -3,9 +3,9 @@ import { afterAll } from "bun:test";
 import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { statusAll } from "../src/export.ts";
 import { readWaits, waitsMain } from "../src/waits.ts";
 import { decisionsPath } from "../pi/config.ts";
+import { status as statusLines } from "../src/status.ts";
 import { realWorld, tick } from "../src/rules.ts";
 
 const temps: string[] = [];
@@ -144,6 +144,6 @@ export const run = (t: ReturnType<typeof setup>, name: string, args: string[], t
 /** what lineclear status prints for this project */
 export async function status(t: ReturnType<typeof setup>) {
   const lines: string[] = [];
-  statusAll((l) => lines.push(l), t.env);
+  statusLines((l) => lines.push(l), t.env);
   return lines.join("\n");
 }

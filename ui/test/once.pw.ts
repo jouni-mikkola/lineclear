@@ -3,8 +3,7 @@ import { expect, test } from "@playwright/test";
 
 const VIEWS = ["/", "/web-shop/roadmap", "/chat", "/settings"];
 const STATES = ["filled", "long", "empty", "error", "real"];
-const COMMAND =
-  /\blineclear (move|project|doctor|plan|dispatcher|install|migrate|run|slot|check|roadmap|serve|status|retire|secrets|machine|inbox|uninstall)\b/;
+const COMMAND = /\blineclear (move|project|doctor|plan|dispatcher|install|migrate|run|slot|check|roadmap|serve|status|retire|secrets|inbox|uninstall)\b/;
 
 test("no view shows a lineclear command, or a headline that repeats the Inbox count", async ({ page }) => {
   const wrong: string[] = [];

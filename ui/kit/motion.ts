@@ -33,8 +33,6 @@ export const MOTIONS = {
   "chat-open": { ms: MS.move, what: "The Chat panel opens: it slides in from the right edge." },
   "browser-open": { ms: MS.move, what: "An agent's browser opens: its card grows in from its place and the cards after it slide over." },
   "browser-close": { ms: MS.move, what: "An agent's browser closes: its card shrinks away where it was and the cards after it slide into the gap." },
-  "machine-add": { ms: MS.move, what: "A machine is added: its card drops in at its place and the cards below slide down." },
-  "machine-state": { ms: MS.quick, what: "A machine's state changes (installing, ready, busy, broken): its new state shape pops in." },
   "model-move": { ms: MS.quick, what: "A model moves in its role's list: it slides to its new place and the one it passed slides the other way." },
   "chat-arrive": { ms: MS.move, what: "A chat message arrives: it slides up 12 px into place as it fades in." },
   "chat-typing": { ms: MS.long, what: "The Dispatcher writes: one grey dot after another rises and brightens." },

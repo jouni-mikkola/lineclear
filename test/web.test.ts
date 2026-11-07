@@ -315,7 +315,7 @@ test("an account's monthly price is set from Settings, never guessed, ", async (
   rmSync(dir, { recursive: true, force: true });
 });
 
-test("/api/settings gives the machines and each project with its secret names, never their values, and no usage", async () => {
+test("/api/settings gives each project with its secret names, never their values, and no usage", async () => {
   const { dir, handle } = api();
   const proj = join(dir, "config", "projects", "web-shop");
   mkdirSync(proj, { recursive: true });
@@ -329,9 +329,7 @@ test("/api/settings gives the machines and each project with its secret names, n
   const text = await r.text();
   expect(text).not.toContain("s3cret");
   const s = JSON.parse(text);
-  expect(Object.keys(s).sort()).toEqual(["accounts", "machines", "projects", "showPaused"]);
-  expect(s.machines[0]).toMatchObject({ local: true });
-  expect(typeof s.machines[0].limit).toBe("number");
+  expect(Object.keys(s).sort()).toEqual(["accounts", "projects", "showPaused"]);
   expect(s.projects).toEqual([
     {
       name: "web-shop",
@@ -357,37 +355,6 @@ test("/api/settings gives the machines and each project with its secret names, n
   listProjects((l) => listed.push(l), { ...process.env, LINECLEAR_CONFIG: join(dir, "config") });
   expect(listed.join("\n")).toContain("make check");
   expect(listed.join("\n")).toContain("a/y, a/x");
-  rmSync(dir, { recursive: true, force: true });
-});
-
-test("a machine is added over SSH in the background and removed, only from the server's own pages", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "lc-api-"));
-  const env = {
-    LINECLEAR_CONFIG: join(dir, "config"),
-    LINECLEAR_HOME: join(dir, "lineclear"),
-    PI_CODING_AGENT_DIR: join(dir, "pi"),
-    LINECLEAR_SERVER_BIN: "true",
-    HOME: dir,
-    PATH: process.env.PATH,
-    LINECLEAR_SSH: join(import.meta.dir, "..", "ui", "test", "fake-ssh"),
-  };
-  const handle = webApi(env);
-  expect(
-    (
-      await handle(
-        json("/api/machines", { add: "build-box" }, { "content-type": "application/json", "x-lineclear-token": PAGE_TOKEN, origin: "http://evil.example" }),
-      )
-    ).status,
-  ).toBe(403);
-  expect((await handle(json("/api/machines", { add: "-oProxyCommand=x" }))).status).toBe(400);
-  expect((await handle(json("/api/machines", { add: "build-box" }))).status).toBe(202);
-  const hosts = async () => ((await (await handle(new Request("http://127.0.0.1:7420/api/settings"))).json()) as any).machines.slice(1);
-  expect(await hosts()).toMatchObject([{ host: "build-box", state: "installing" }]);
-  await until(async () => !((await hosts())[0].state === "installing"), 50);
-  expect((await hosts())[0]).toMatchObject({ host: "build-box", state: "ready", doctor: ["ok     git", "ok     service", "All well."] });
-  expect((await handle(json("/api/machines", { remove: "build-box" }))).status).toBe(200);
-  expect(await hosts()).toEqual([]);
-  expect((await handle(json("/api/machines", { remove: "build-box" }))).status).toBe(404);
   rmSync(dir, { recursive: true, force: true });
 });
 
