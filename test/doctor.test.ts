@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { trimCache } from "../src/tmpdirs.ts";
 import { doctor, doctorChecks, herdrVersions, realProbe, testedHerdr, type Probe } from "../src/doctor.ts";
+import { setRegistry } from "../src/models.ts";
 import { storedTaskIds } from "../src/doctor-task-ids.ts";
 import { cacheEnvFile, pathsFor } from "../src/paths.ts";
 
@@ -244,6 +245,17 @@ test("a malformed models.json is a doctor problem and a good or missing one is n
   expect(problem()).toBe("");
   writeFileSync(join(dir, "models.json"), "{nope");
   expect(problem()).toContain("models.json");
+});
+
+test("doctor prints the model a new task would use", () => {
+  setRegistry([{ harness: "pi", provider: "fakeco", name: "zeta-1" }]);
+  try {
+    const check = doctorChecks(probe({})).find((c) => c.name === "new task model");
+    expect(check?.problem).toBe("");
+    expect(check?.info).toBe("fakeco/zeta-1");
+  } finally {
+    setRegistry([]);
+  }
 });
 
 test("doctor fails on a task id that two tasks hold, an alias counted, and passes on unique ids", () => {

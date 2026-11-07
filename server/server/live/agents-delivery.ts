@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { dirname } from 'node:path'
 import { herdr, paneEvents, type AgentInfo, type AgentStatus, type HerdrEvent } from './herdr.ts'
 import { findLog, logKind } from './readers/find.ts'
-import { chooseModel, effortFor, modelArg } from '../../../src/models.ts'
+import { chooseModel, effortFor, firstModel, modelArg } from '../../../src/models.ts'
 import * as task from './mfs.ts'
 import { agentEnv, BOX } from './box.ts'
 import { ROOT } from '../root.ts'
@@ -285,6 +285,12 @@ export class AgentsDelivery extends AgentsState {
     this.byName.set(r.name, r.key)
     this.save()
     task.mkdirSync(r.cwd, { recursive: true })
+    // no model set: the machine's first one, noted so the task's facts say it
+    const first = chooseModel(r.kind, r.model) ? firstModel(r.kind) : undefined
+    if (first) {
+      r.model = first
+      r.chosenModel = first
+    }
     const unset = chooseModel(r.kind, r.model)
     if (unset) throw new Error(unset)
     const pane = place ? await place() : await this.paneFor(r, was)
