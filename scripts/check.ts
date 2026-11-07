@@ -156,9 +156,12 @@ function testSteps(): Step[] {
   }
   // an install test is far slower than its size says: the committed baseline of slow files weighs it, the last run's times override
   const weights = { ...readSlowBaseline(), ...readTimes() };
-  const runs = shard
-    ? split(split(list, shard.n, weights, shardLoads(shard.n).loads)[shard.i - 1] ?? [], SHARD_PROCESSES, weights)
-    : split(list, Math.min(TEST_SHARDS, Math.max(1, Math.ceil(list.length / 6))), readTimes());
+  // bun test with no file runs every test it finds, the server's too: a share with no file runs no process
+  const runs = (
+    shard
+      ? split(split(list, shard.n, weights, shardLoads(shard.n).loads)[shard.i - 1] ?? [], SHARD_PROCESSES, weights)
+      : split(list, Math.min(TEST_SHARDS, Math.max(1, Math.ceil(list.length / 6))), readTimes())
+  ).filter((run) => run.length > 0);
   // a test waits for its event, never for a time: the limit only stops a hang, so a busy machine never reaches it
   // the tests import the server's dependencies: an install under way (a fresh worktree, a moved lockfile) leaves
   // them half there, so the tests wait for it
