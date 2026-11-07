@@ -107,7 +107,7 @@ export class EngineLaunch extends EngineStalls {
       pinned: t.pinned,
       orphaned: this.orphaned(t, status) || undefined,
       // waiting out the provider, or a backup taking over: that line shows, not what its agent last reported
-      report: this.retrying(t) || this.handing.has(t.id) ? undefined : reportOf(t.report, status),
+      report: this.handing.has(t.id) ? undefined : reportOf(t.report, status),
     }
   }
 

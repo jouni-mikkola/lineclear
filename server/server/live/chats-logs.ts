@@ -8,7 +8,6 @@ import { herdr } from './herdr.ts'
 import { logKind } from './readers/find.ts'
 import { LogTail, readerFor } from './readers/index.ts'
 import type { LogEvent } from './readers/types.ts'
-import type { Cut } from './retry.ts'
 import { findModel, modelsOf, nearest } from './models.ts'
 import { replyOnScreen } from './streaming.ts'
 import { activityOf, codexThreadLog, cutOutput, headlessJob, JobLogs, lastLine, outputAt, shown as shownStep, tailOf, type JobRec } from './activity.ts'
@@ -305,16 +304,6 @@ export class ChatsLogs {
       if (q.id.startsWith('plan:') || q.id.startsWith('ask:')) return q
     }
     return undefined
-  }
-
-  /** what cut off the agent's last turn (its provider failed), when nothing began since; never one from before it last
-   *  started (started again, or a backup agent that took over, whose own log has nothing yet) */
-  cutOff(key: string): Cut | undefined {
-    this.pull(key)
-    const ev = this.events.get(key) ?? []
-    const e = ev.findLast((e) => e.kind === 'error' || e.kind === 'turn-start' || e.kind === 'user')
-    if (e?.kind !== 'error' || e.at < (this.agents.record(key)?.started ?? 0)) return undefined
-    return { id: e.id, at: e.at, text: e.text, code: e.code, status: e.status }
   }
 
   /** its log shows a turn that ended after this time */

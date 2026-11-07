@@ -541,7 +541,6 @@ the agent's own question. A `[lineclear]` line with no kind, and any `<lineclear
 | `src/inbox.ts` `answer` | The owner answers an Inbox item | Owner |
 | `server/server/live/source.ts` `send`, `slashCommand`, `react` | The owner writes, reacts or answers a card in the chat | Owner |
 | `server/server/live/engine/engine.ts` `go`, `tell`, `youWrote` | A task starts, or the owner writes to a task not started | Step / owner |
-| `server/server/live/retry.ts` `Retries` | A turn cut off by a passing provider error (overloaded, dropped connection): carry on after 1, 2, 4, 8 minutes | Resume, at most four |
 | `server/server/live/engine/engine.ts` github, queue, `sendBack` | News of the task's own pull request (a failed check, a review), a queue line when the owner or a coordinator queues the task, a refused merge sent back | Step. github and queue lines are counted by `measure`; `sendBack` is plain text, so it is not |
 | `server/server/live/engine/engine.ts` `tell`, `source.ts` `send` | The owner or a coordinator runs `lineclear task tell` or writes in a task's chat | Owner. A coordinator is an AI, so there is none by default |
 | `server/server/live/source.ts` `relaunch` | An agent that was working stopped (herdr restarted, its CLI exited) and is started again | Resume: a `restart` line, once per restart. `measure` counts it |
@@ -562,8 +561,8 @@ account is still out and another model has room, `handover` starts the step on t
 of a step is picked by the worker from its brief, so a reviewer cut-off needs no message.
 
 Not covered: a coordinator (an AI) can still pass a line on with `task tell`, which counts as an owner message; there is
-no coordinator timer in Lineclear. Provider errors that pass by themselves (overloaded, a dropped
-connection) resume the agent up to four times with growing waits (`retry.ts`); an allowance error never does.
+no coordinator timer in Lineclear. Provider errors that pass by themselves (overloaded, a dropped connection) are
+retried by pi itself.
 
 The tests are `test/quiet.test.ts` (a burst of load, quota and status events in a tick: no tell, no Enter) and
 `server/test/quiet.test.ts` (a burst of news, health and heartbeat lines: nothing goes into a pane).

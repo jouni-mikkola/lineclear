@@ -168,16 +168,6 @@ export function taskFirst(t: { title: string; desc: string }) {
   return t.desc && t.desc !== t.title ? `${t.title}\n\n${t.desc}` : t.title
 }
 
-/** what a backup agent is told after the brief when it takes a task over: from whom and why, and what was done */
-export function handOverLine(o: { from: string; why: string; commits: string; changes: string; chat: string }) {
-  return [
-    `Taking over: ${o.from} worked on this task until now and can't go on (${o.why}). You carry on in the same worktree and branch: look at what is there and go on from it, don't start over.`,
-    `Commits on the branch so far:\n${o.commits || 'none'}`,
-    `Uncommitted changes:\n${o.changes || 'none'}`,
-    ...(o.chat ? [`The chat so far, latest last:\n\n${o.chat}`] : []),
-  ].join('\n\n')
-}
-
 /** what an agent started again on another CLI is told (a task's after its brief): who ran its role until now, and
  *  what was said and done; a task's commits and changes, none for a coordinator */
 export function restartLine(o: { from: string; to: string; chat: string; commits?: string; changes?: string }) {

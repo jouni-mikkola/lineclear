@@ -104,7 +104,7 @@ export interface TaskRec {
   askFirst?: boolean
   /** what its agent last said of its own progress (lineclear status): kept while it works or waits on you */
   report?: Reported
-  /** its backup agent took over once its agent couldn't go on (retry.ts): from which CLI, to which, and why */
+  /** its backup agent took over once its agent couldn't go on: from which CLI, to which, and why */
   tookOver?: { from: string; to: string; why: string; at: number }
   /** coordinators were told it stalled: its last sign of life then (`life`), and the report (by its time) it ran far
    *  past (`over`); each is told once, until it shows life again or reports anew */

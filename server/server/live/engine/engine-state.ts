@@ -14,7 +14,6 @@ import { hidden, type Agents, type Spec } from '../agents.ts'
 import type { Chats } from '../chats.ts'
 import { HOST, type Places, type Space } from '../places.ts'
 import { privatePrompt, taskFirst, taskPrompt } from '../prompts.ts'
-import type { Retry } from '../retry.ts'
 import { pastTimes } from '../estimates.ts'
 import type { Settings } from '../settings.ts'
 import { Briefs, withoutBrief } from './briefs.ts'
@@ -92,8 +91,6 @@ export abstract class EngineState extends Emitter<Events> {
   protected wt!: Worktrees
   /** other machines' tasks, for a task queued after one (the main copy only: it is the one that sees them) */
   peerTask?: PeerTask
-  /** its agent's turn the provider cut off (retry.ts): waited out, or given up */
-  retry?: (key: string) => Retry | undefined
   /** its backup agent is taking over */
   protected handing = new Set<string>()
   /** a CLI is installed here (a test says) */
@@ -200,13 +197,7 @@ export abstract class EngineState extends Emitter<Events> {
   abstract statusOf(t: TaskRec): TaskStatus
   abstract subOf(t: TaskRec, status?: TaskStatus): string
 
-  /** the provider cut its last turn off and it will be told to carry on, or was just now */
-  protected retrying(t: TaskRec) {
-    const r = this.mayRetry(this.key(t)) ? this.retry?.(this.key(t)) : undefined
-    return !!r && !r.over && (!!r.due || Date.now() - (r.nudged ?? 0) < 60_000)
-  }
-
-  /** a task's agent the provider cut off may be told to carry on: not stopped, paused, waiting for a go, archived or
+  /** a task's agent may be written to: not stopped, paused, waiting for a go, archived or
    *  finished since */
   mayRetry(key: string) {
     const t = this.task(key.split('/')[0])
