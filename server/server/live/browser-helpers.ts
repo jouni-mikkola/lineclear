@@ -93,11 +93,6 @@ export interface Hub {
   /** on another machine: the SSH forwards to its stream and its DevTools */
   fwd?: { port: number; close(): void }
   cdpFwd?: { port: number; remote: number; close(): void }
-  /** on another machine: its stream shared on the tailnet from there (relay.pl and tailscale serve) */
-  share?: { url: string; stop(): void; proc: unknown }
-  sharing?: boolean
-  /** panels that take frames straight from there */
-  direct: Set<BrowserClient>
 }
 
 /** a Chrome process in a task's profile, and how long it has run (ms) */
@@ -200,17 +195,4 @@ export class Cdp {
     this.closed = true
     this.ws.close()
   }
-}
-
-/** the first line a process prints */
-export async function readLine(out: ReadableStream<Uint8Array>) {
-  const r = out.getReader()
-  let s = ''
-  while (!s.includes('\n')) {
-    const { done, value } = await r.read()
-    if (done) break
-    s += new TextDecoder().decode(value)
-  }
-  r.releaseLock()
-  return s.split('\n')[0].trim()
 }

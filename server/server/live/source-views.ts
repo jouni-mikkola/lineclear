@@ -2,7 +2,6 @@ import { taskIdsSection } from './task-ids.ts'
 import { coordinatorRequestIds } from '../../shared/attention.ts'
 import { age } from '../../shared/time.ts'
 import { randomUUID } from 'node:crypto'
-import { join } from 'node:path'
 import { BODY_MAX, clip, lastReply, openCards, TITLE_MAX } from '../../shared/alerts.ts'
 import type { Action, Alert, Artifact, CardAsk, Chat, Question, Snapshot } from '../../shared/types.ts'
 import { hidden } from './agents.ts'
@@ -11,10 +10,6 @@ import { rememberReply } from './chats.ts'
 import { ended } from './engine/engine.ts'
 import type { ArtifactRec } from './artifacts.ts'
 import { BOX } from './box.ts'
-import { Mirror } from './mirror.ts'
-import { claudeProjectDir, piSessionDir } from './readers/find.ts'
-import { boxDir } from './mfs.ts'
-import * as task from './mfs.ts'
 import { HOST, NAME, placeId } from './places.ts'
 import { restartHint, type Harness } from './restart.ts'
 import { repositorySection } from './settings.ts'
@@ -25,9 +20,6 @@ import { LiveSourceState } from './source-state.ts'
 
 export class LiveSourceViews extends LiveSourceState {
   pushWarnings: () => string[] = () => []
-  /** a worker's copy of its machine's agent logs, as they grow */
-  mirror = BOX ? new Mirror(BOX) : null
-
   /** a look at this machine: limits judged, held tasks started where there is room, the screen told of new numbers */
   healthTick(now = Date.now()) {
     const at = this.health.last?.at
@@ -41,24 +33,6 @@ export class LiveSourceViews extends LiveSourceState {
     if (this.health.last?.at !== at) this.emit('snapshot')
   }
 
-  /** what a worker's mirror follows on its machine: the hooks, Claude Code's session files, and each agent's logs and
-   *  the folders its CLI writes new ones in */
-  protected followLogs() {
-    const b = BOX!
-    const day = (t: number) => {
-      const d = new Date(t)
-      return `${b.home}/.codex/sessions/${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
-    }
-    const dirs = [join(boxDir(), 'hooks'), `${b.home}/.claude/sessions`, day(Date.now()), day(Date.now() - 86_400_000)]
-    const files: string[] = []
-    for (const r of Object.values(this.agents.records)) {
-      if (r.kind === 'claude') dirs.push(task.unmirrored(claudeProjectDir(r.cwd)))
-      if (r.kind === 'pi') dirs.push(task.unmirrored(piSessionDir(r.cwd)))
-      files.push(...r.logs.map(task.unmirrored))
-    }
-    this.mirror!.follow(dirs, files)
-  }
-
   /** before it stops: the merges on their way finish (engine.drain) */
   drain() {
     return this.engine.drain()
@@ -66,7 +40,6 @@ export class LiveSourceViews extends LiveSourceState {
 
   stop() {
     this.peers?.stop()
-    this.mirror?.stop()
     this.timers.forEach(clearInterval)
     this.agents.stop()
     this.engine.stop()

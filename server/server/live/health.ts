@@ -8,8 +8,7 @@ import { readdirSync, readFileSync, readlinkSync, statfsSync, statSync } from 'n
 import { cpus, homedir, tmpdir } from 'node:os'
 import type { HealthLevel, HealthMeter } from '../../shared/types.ts'
 import type { MachineLimits } from './settings.ts'
-import { BOX, helperDir, runSync, type BoxInfo } from './box.ts'
-import { join } from 'node:path'
+import { BOX } from './box.ts'
 
 const SAMPLE_MS = 30_000
 /** the load must stay over its limit this long before the chat or the coordinator hears of it: a test run's or a build's spike is no news */
@@ -103,17 +102,8 @@ function gpus(): Gpu[] {
   return gpuSeen
 }
 
-/** another machine now, as the helper's health.pl reads it there (box.ts) */
-function boxSample(b: BoxInfo): Sample {
-  const r = runSync(['perl', join(helperDir(b.home), 'health.pl')], { timeoutMs: 15_000 })
-  const j = r.code === 0 ? (JSON.parse(r.out.toString()) as Omit<Sample, 'at'>) : null
-  if (!j) return { at: Date.now(), cores: 1, load: 0, memTotal: 0, memUsed: 0, disks: [], gpus: [] }
-  return { ...j, at: Date.now(), disks: j.disks.map((d) => ({ ...d, path: d.path === b.home ? homedir() : d.path, dev: Number(d.dev) || 0 })) }
-}
-
 /** this machine now: home and /tmp once each (one disk when they are the same) */
 export function sample(): Sample {
-  if (BOX) return boxSample(BOX)
   const read = (f: string) => {
     try {
       return readFileSync(f, 'utf8')

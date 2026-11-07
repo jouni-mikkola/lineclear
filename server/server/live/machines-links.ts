@@ -18,7 +18,6 @@ import {
   type Probe,
   type Saved,
 } from './install.ts'
-import { mirrorHomes } from './mirror.ts'
 import { q, tellRunBy, type BoxInfo } from './box.ts'
 import { MERGE_DEADLINE } from './engine/engine.ts'
 import {
@@ -309,7 +308,6 @@ export class MachinesLinks extends Emitter<Events> {
     const w = Bun.spawn([process.execPath, join(import.meta.dir, '..', 'main.ts')], {
       env: {
         ...process.env,
-        ...mirrorHomes(home, box),
         LINECLEAR_BOX: JSON.stringify(box),
         LINECLEAR_HOME: home,
         LINECLEAR_MACHINE: box.label,

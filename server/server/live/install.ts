@@ -4,10 +4,6 @@
 //   bin/lineclear        the lineclear command for agents there: it talks to Lineclear through an SSH tunnel
 //   bin/agent-browser    the pinned agent-browser for that machine's system (bin/agent-browser-bin), for the task's
 //                        shared browser, marking when an agent last used it (helper/agent-browser)
-//   hook.pl              records a Claude Code hook event (readers/hooks.ts)
-//   mirror.pl            sends the agents' log files to the main machine as they grow (mirror.ts)
-//   health.pl            how loaded the machine is (health.ts)
-//   relay.pl             shares a task's browser stream on the tailnet straight from there (browser.ts)
 //   skill/               Lineclear's skills, which agents there read
 import { createHash } from 'node:crypto'
 import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from 'node:fs'
@@ -130,10 +126,6 @@ export function helperFiles(os: string, arch: string): [string, string][] {
   const files: [string, string][] = [
     ['bin/lineclear', join(ROOT, 'helper', 'lineclear')],
     ['route.pl', join(ROOT, 'helper', 'route.pl')],
-    ['hook.pl', join(ROOT, 'helper', 'hook.pl')],
-    ['mirror.pl', join(ROOT, 'helper', 'mirror.pl')],
-    ['health.pl', join(ROOT, 'helper', 'health.pl')],
-    ['relay.pl', join(ROOT, 'helper', 'relay.pl')],
   ]
   const ab = browserBinary(os, arch)
   if (ab) files.push(['bin/agent-browser', join(ROOT, 'helper', 'agent-browser')], ['bin/agent-browser-bin', ab])

@@ -1,7 +1,7 @@
 import { dirname } from 'node:path'
 import type { BrowserDown, BrowserUp } from '../../shared/browser.ts'
 import { statSync } from 'node:fs'
-import { BOX, run as onBox } from './box.ts'
+import { run as onBox } from './box.ts'
 import { rmSync } from './mfs.ts'
 import { isTaskId, usedMark, type BrowserClient, type BrowserBridge, LEAVE_MS, IDLE_MS, type Chrome, chromesIn } from './browser-helpers.ts'
 import { BrowsersHubs } from './browser-hubs.ts'
@@ -28,7 +28,6 @@ export class BrowsersSessions extends BrowsersHubs {
       },
       end: () => {
         h.clients.delete(c)
-        h.direct.delete(c)
         h.seenAt = Date.now()
         // closed with its task: nothing is left to hand back
         if (h.clients.size || h.gone) return
@@ -68,7 +67,6 @@ export class BrowsersSessions extends BrowsersHubs {
       h.cdp?.close()
       h.fwd?.close()
       h.cdpFwd?.close()
-      this.unshare(h)
     }
     await this.end(task)
     if (forget) {
@@ -97,11 +95,7 @@ export class BrowsersSessions extends BrowsersHubs {
   /** when each task's agent last ran a command on its browser (0: never, as far as its mark says) */
   protected async usedAt(tasks: string[]): Promise<Map<string, number>> {
     const marks = tasks.map((t) => usedMark(this.env(t).AGENT_BROWSER_PROFILE))
-    if (!BOX) return new Map(tasks.map((t, i) => [t, statSync(marks[i], { throwIfNoEntry: false })?.mtimeMs ?? 0]))
-    // perl: one way to read a file's time on Linux and macOS, all of them in one go
-    const r = await onBox(['perl', '-e', 'print join(" ", map { (stat)[9] // 0 } @ARGV)', ...marks], { timeoutMs: 20_000 })
-    const at = r.out.trim().split(' ').map(Number)
-    return new Map(tasks.map((t, i) => [t, (at[i] || 0) * 1000]))
+    return new Map(tasks.map((t, i) => [t, statSync(marks[i], { throwIfNoEntry: false })?.mtimeMs ?? 0]))
   }
 
   protected idling = false

@@ -11,7 +11,6 @@
 // and the same task id notifies again once that subagent is really done.
 import { appendFileSync, closeSync, mkdirSync, openSync, readSync, renameSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { BOX, helperDir } from '../box.ts'
 import * as task from '../mfs.ts'
 import type { Background } from './background.ts'
 
@@ -163,21 +162,14 @@ export function hookSettings(dir: string, name: string, runtime = process.execPa
   const events = join(dir, `${name}.jsonl`)
   task.rmSync(events, { force: true })
   task.rmSync(`${events}.1`, { force: true })
-  let command: string
-  if (BOX) {
-    // another machine has no Lineclear to run the recorder: the helper's perl one appends the event as it came, with
-    // its time, and the main machine cuts it down as it reads the mirrored file (parseHookLines)
-    command = `perl ${q(join(helperDir(BOX.home), 'hook.pl'))} ${q(events)}`
-  } else {
-    // other agents' hooks may be running it: it is replaced whole, and only when it changed
-    const script = join(dir, 'record.cjs')
-    const text = recorderScript()
-    if (!task.existsSync(script) || task.readFileSync(script, 'utf8') !== text) {
-      task.writeFileSync(`${script}.${process.pid}`, text)
-      task.renameSync(`${script}.${process.pid}`, script)
-    }
-    command = `${q(runtime)} ${q(script)} ${q(events)}`
+  // other agents' hooks may be running it: it is replaced whole, and only when it changed
+  const script = join(dir, 'record.cjs')
+  const text = recorderScript()
+  if (!task.existsSync(script) || task.readFileSync(script, 'utf8') !== text) {
+    task.writeFileSync(`${script}.${process.pid}`, text)
+    task.renameSync(`${script}.${process.pid}`, script)
   }
+  const command = `${q(runtime)} ${q(script)} ${q(events)}`
   const one = [{ hooks: [{ type: 'command', command, timeout: 10 }] }]
   const settings = join(dir, `${name}.settings.json`)
   task.writeFileSync(settings, JSON.stringify({ hooks: Object.fromEntries(HOOK_EVENTS.map((e) => [e, one])) }, null, 2))
@@ -254,15 +246,10 @@ export function foldHook(s: Said | undefined, e: HookEvent): Said | undefined {
   }
 }
 
-export const parseHookLines = (text: string): HookEvent[] =>
+const parseHookLines = (text: string): HookEvent[] =>
   text.split('\n').flatMap((l) => {
     try {
       const e = l.trim() && JSON.parse(l)
-      // as another machine's helper writes it: the hook's whole input and when it came, cut down here
-      if (e && typeof e.raw === 'object' && typeof e.at === 'number') {
-        const picked = pickHook(e.raw, e.at)
-        return picked ? [picked] : []
-      }
       return e && typeof e.event === 'string' && typeof e.at === 'number' ? [e as HookEvent] : []
     } catch {
       return []

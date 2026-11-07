@@ -2,12 +2,10 @@
 // The SSH link itself (box.ts, machines.ts) was checked by hand against a machine saved in herdr.
 import { describe, expect, test } from 'bun:test'
 import { spawn, spawnSync } from 'node:child_process'
-import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, utimesSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { parseHookLines } from '../server/live/readers/hooks.ts'
 import { helperFiles, helperVersion } from '../server/live/install.ts'
-import { Mirror, mirrorHomes } from '../server/live/mirror.ts'
 import { carryClaudeSession } from '../server/live/agent-start.ts'
 import type { BoxInfo } from '../server/live/box.ts'
 
@@ -15,121 +13,9 @@ const root = join(import.meta.dir, '..')
 const perl = spawnSync('perl', ['-MJSON::PP', '-e1']).status === 0
 
 describe('the helper', () => {
-  test.if(perl)('hook.pl records the hook as it came, with when; the main machine cuts it down as it reads', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'shep-hook-'))
-    const f = join(dir, 'a.jsonl')
-    const input = {
-      hook_event_name: 'PreToolUse',
-      tool_name: 'AskUserQuestion',
-      tool_input: { questions: [{ question: 'Ship it?' }] },
-      tool_response: { big: 'x'.repeat(1000) },
-    }
-    expect(spawnSync('perl', [join(root, 'helper', 'hook.pl'), f], { input: JSON.stringify(input) }).status).toBe(0)
-    const line = JSON.parse(readFileSync(f, 'utf8'))
-    expect(line.raw.tool_response).toBeUndefined()
-    expect(typeof line.at).toBe('number')
-    expect(parseHookLines(readFileSync(f, 'utf8'))).toEqual([{ at: line.at, event: 'PreToolUse', tool: 'AskUserQuestion', question: 'Ship it?' }])
-  })
-
-  test.if(perl)('mirror.pl sends what a followed file gains, and a file that starts over from its start', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'shep-mirror-'))
-    const f = join(dir, 'log.jsonl')
-    writeFileSync(f, 'one\n')
-    const p = spawn('perl', [join(root, 'helper', 'mirror.pl')])
-    let out = ''
-    p.stdout.on('data', (d) => (out += d.toString()))
-    p.stdin.write(`S 0\nD ${dir}\n`)
-    const until = async (s: string) => {
-      for (let i = 0; i < 600 && !out.includes(s); i++) await Bun.sleep(100)
-      expect(out).toContain(s)
-    }
-    await until(`${f}\t0\t4\none\n`)
-    appendFileSync(f, 'two\n')
-    await until(`${f}\t4\t4\ntwo\n`)
-    writeFileSync(f, 'x\n')
-    await until(`${f}\t0\t2\nx\n`)
-    p.kill()
-  })
-
-  test.if(perl)('mirror.pl sends what an agent writes now before the rest of a backlog', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'shep-mirror-'))
-    const big = join(dir, 'old.jsonl')
-    const live = join(dir, 'live.jsonl')
-    writeFileSync(big, 'x'.repeat(16 << 20))
-    utimesSync(big, new Date(Date.now() - 3_600_000), new Date(Date.now() - 3_600_000))
-    writeFileSync(live, 'one\n')
-    const p = spawn('perl', [join(root, 'helper', 'mirror.pl')])
-    p.stdin.write(`S 0\nD ${dir}\n`)
-    let out = ''
-    p.stdout.setEncoding('latin1')
-    // the main machine is slow to read: stop reading at the live file, so mirror.pl stays blocked in the backlog
-    await new Promise<void>((done) =>
-      p.stdout.once('data', (d) => {
-        p.stdout.pause()
-        out += d
-        done()
-      }),
-    )
-    appendFileSync(live, 'two\n')
-    p.stdout.on('data', (d) => (out += d))
-    p.stdout.resume()
-    for (let i = 0; i < 100 && !out.includes(`${big}\t${15 << 20}\t`); i++) await Bun.sleep(100)
-    p.kill()
-    expect(out.indexOf(`${live}\t4\t4\ntwo\n`)).toBeGreaterThan(0)
-    expect(out.indexOf(`${live}\t4\t4\ntwo\n`)).toBeLessThan(out.indexOf(`${big}\t${8 << 20}\t`))
-  })
-
-  test.if(perl)('a mirror started again sends only what its copy lacks', async () => {
-    const there = mkdtempSync(join(tmpdir(), 'shep-mirror-'))
-    const here = mkdtempSync(join(tmpdir(), 'shep-copy-'))
-    const log = join(there, 'log.jsonl')
-    writeFileSync(log, 'one\n')
-    const copy = (f: string) => join(here, f)
-    const mirror = () => {
-      const m = new Mirror(
-        {} as BoxInfo,
-        () => Bun.spawn(['perl', join(root, 'helper', 'mirror.pl')], { stdin: 'pipe', stdout: 'pipe', stderr: 'ignore' }),
-        copy,
-      )
-      m.follow([there], [])
-      m.start()
-      return m
-    }
-    const until = async (s: string) => {
-      for (let i = 0; i < 600 && !(existsSync(copy(log)) && readFileSync(copy(log), 'utf8') === s); i++) await Bun.sleep(100)
-      expect(readFileSync(copy(log), 'utf8')).toBe(s)
-    }
-    const first = mirror()
-    await until('one\n')
-    first.stop()
-    // Lineclear starts again (an update): the new mirror goes on from what is here, and the copy shows it was not sent again
-    writeFileSync(copy(log), 'ONE\n')
-    appendFileSync(log, 'two\n')
-    const again = mirror()
-    await until('ONE\ntwo\n')
-    again.stop()
-  })
-
-  test.if(perl)('health.pl says the cores, load, memory and disks', () => {
-    const r = spawnSync('perl', [join(root, 'helper', 'health.pl')], { encoding: 'utf8' })
-    const j = JSON.parse(r.stdout)
-    expect(j.cores).toBeGreaterThan(0)
-    expect(j.memTotal).toBeGreaterThan(0)
-    expect(j.disks.length).toBeGreaterThan(0)
-  })
-
   test('its files: the command, the scripts and the skills; its version changes with them', () => {
     const files = helperFiles('Linux', 'x86_64').map(([to]) => to)
-    for (const f of [
-      'bin/lineclear',
-      'hook.pl',
-      'mirror.pl',
-      'health.pl',
-      'relay.pl',
-      'skill/lineclear/SKILL.md',
-      'skill/lineclear-coordinator/SKILL.md',
-      'skill/lineclear-agent/SKILL.md',
-    ])
+    for (const f of ['bin/lineclear', 'skill/lineclear/SKILL.md', 'skill/lineclear-coordinator/SKILL.md', 'skill/lineclear-agent/SKILL.md'])
       expect(files).toContain(f)
     expect(helperVersion('Linux', 'x86_64')).toMatch(/^[0-9a-f]{16}$/)
   })
@@ -146,17 +32,6 @@ describe('the helper', () => {
 })
 
 describe('a machine run from the main one', () => {
-  test("its home space's coordinator runs in its home folder there, and its log is read from the mirror of that machine's", () => {
-    const home = mkdtempSync(join(tmpdir(), 'shep-worker-'))
-    const box: BoxInfo = { label: 'vm-demo', target: 'vm-demo', session: 'default', herdr: 'herdr', home: '/home/user', path: '/usr/bin:/bin', os: 'Linux' }
-    const code = `const { Places } = await import(${JSON.stringify(join(root, 'server/live/places.ts'))}); const { claudeLogPath } = await import(${JSON.stringify(join(root, 'server/live/readers/find.ts'))}); const c = new Places().coordinator('p:vm-demo:~'); console.log(JSON.stringify({ cwd: c?.cwd, log: claudeLogPath(c?.cwd ?? '', 'abc') }))`
-    const r = spawnSync(process.execPath, ['-e', code], {
-      encoding: 'utf8',
-      env: { ...process.env, ...mirrorHomes(home, box), LINECLEAR_BOX: JSON.stringify(box), LINECLEAR_HOME: home, LINECLEAR_MACHINE: 'vm-demo' },
-    })
-    expect(JSON.parse(r.stdout)).toEqual({ cwd: '/home/user', log: `${home}/mirror/home/user/.claude/projects/-home-user/abc.jsonl` })
-  })
-
   // fails on ebb17d5 too; L20 fixes it
 
   test.skip("an agent's artifact commands there name no path of the main machine: the pictures and pages are copied over", () => {
@@ -196,7 +71,6 @@ describe('a machine run from the main one', () => {
       encoding: 'utf8',
       env: {
         ...process.env,
-        ...mirrorHomes(home, box),
         PATH: `${bin}:${process.env.PATH}`,
         LINECLEAR_BOX: JSON.stringify(box),
         LINECLEAR_HOME: home,
@@ -264,7 +138,6 @@ describe('a machine run from the main one', () => {
         stderr: 'pipe',
         env: {
           ...process.env,
-          ...mirrorHomes(home, box),
           PATH: `${bin}:${process.env.PATH}`,
           LINECLEAR_BOX: JSON.stringify(box),
           LINECLEAR_HOME: home,
@@ -291,48 +164,6 @@ describe('a machine run from the main one', () => {
     } finally {
       server.stop(true)
     }
-  })
-
-  test.if(perl)("a /clear there starts another session: the chat follows it, from what the agent's hooks say", () => {
-    const home = mkdtempSync(join(tmpdir(), 'shep-worker-'))
-    const box: BoxInfo = { label: 'vm-demo', target: 'vm-demo', session: 'default', herdr: 'herdr', home: '/home/user', path: '/usr/bin:/bin', os: 'Linux' }
-    const hooks = '/home/user/.lineclear/hooks/shep-machine.jsonl'
-    const project = '/home/user/.claude/projects/-home-user--lineclear-coordinators-machine'
-    const copy = `${home}/mirror${hooks}`
-    mkdirSync(join(copy, '..'), { recursive: true })
-    // as the helper's hook.pl records them there, and the mirror brings them: an earlier run's start, then its /clear
-    const hook = (raw: object) => expect(spawnSync('perl', [join(root, 'helper', 'hook.pl'), copy], { input: JSON.stringify(raw) }).status).toBe(0)
-    const at = (id: string, source: string) => ({ hook_event_name: 'SessionStart', source, session_id: id, transcript_path: `${project}/${id}.jsonl` })
-    hook(at('old', 'startup'))
-    const code = `
-      const { Agents } = await import(${JSON.stringify(join(root, 'server/live/agents.ts'))})
-      const a = new Agents()
-      const old = ${JSON.stringify(`${home}/mirror${project}/old.jsonl`)}
-      const r = { key: 'm:vm-demo', name: 'shep-machine', kind: 'claude', cwd: '/home/user/.lineclear/coordinators/machine', workspace: 'w', logs: [old], sessionId: 'd071', started: Date.now() + 60000, hooks: ${JSON.stringify(hooks)} }
-      a.records[r.key] = r
-      const seen = []
-      // its own run started after that: what the copy says of an earlier run is not followed
-      a.followSession(r.key)
-      seen.push({ id: r.sessionId, logs: [...r.logs] })
-      r.started = 0
-      a.followSession(r.key)
-      seen.push({ id: r.sessionId, logs: [...r.logs] })
-      a.followSession(r.key)
-      seen.push({ id: r.sessionId, logs: [...r.logs] })
-      console.log(JSON.stringify(seen))
-      process.exit(0)`
-    const env = { ...process.env, ...mirrorHomes(home, box), LINECLEAR_BOX: JSON.stringify(box), LINECLEAR_HOME: home, LINECLEAR_MACHINE: 'vm-demo' }
-    // /clear: the session ends, one starts and another right after; prompts go to the last
-    hook({ hook_event_name: 'SessionEnd', reason: 'clear', session_id: 'old' })
-    hook(at('79420d27', 'clear'))
-    hook(at('8ed46adf', 'clear'))
-    hook({ hook_event_name: 'UserPromptSubmit', prompt: 'hi', session_id: '8ed46adf' })
-    const r = spawnSync(process.execPath, ['-e', code], { encoding: 'utf8', env })
-    const m = (id: string) => `${home}/mirror${project}/${id}.jsonl`
-    const seen = JSON.parse(r.stdout)
-    expect(seen[0]).toEqual({ id: 'd071', logs: [m('old')] })
-    expect(seen[1]).toEqual({ id: '8ed46adf', logs: [m('old'), m('8ed46adf')] })
-    expect(seen[2]).toEqual(seen[1])
   })
 
   test('a session resumed in another folder takes its transcript along, wherever Claude Code wrote it', () => {
