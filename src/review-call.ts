@@ -122,7 +122,9 @@ function otherCompany(worker: string | undefined, reviewer: string | undefined):
   return pickReviewer(worker, [reviewer, ...offered], undefined) ?? reviewer;
 }
 
-type Reviewed = { ok: true; findings: Finding[]; model: string | undefined; note?: string; inputTokens: number; form: "light" | "full" } | { ok: false; error: string };
+type Reviewed =
+  | { ok: true; findings: Finding[]; model: string | undefined; note?: string; inputTokens: number; form: "light" | "full" }
+  | { ok: false; error: string };
 
 /** One review call. The findings are stored as JSON; the note says when the reviewer is of the worker's company. */
 export function review(i: ReviewInput, env: NodeJS.ProcessEnv = process.env): Reviewed {
@@ -147,10 +149,7 @@ export function review(i: ReviewInput, env: NodeJS.ProcessEnv = process.env): Re
   recordWork(i.task, "review", env);
   const path = reviewPath(i.task, env);
   mkdirSync(dirname(path), { recursive: true });
-  writeAtomic(
-    path,
-    `${JSON.stringify({ task: i.task, model, time: new Date().toISOString(), inputTokens, form, findings }, null, 2)}\n`,
-  );
+  writeAtomic(path, `${JSON.stringify({ task: i.task, model, time: new Date().toISOString(), inputTokens, form, findings }, null, 2)}\n`);
   return { ok: true, findings, model, note, inputTokens, form };
 }
 
