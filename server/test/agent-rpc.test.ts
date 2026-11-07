@@ -33,7 +33,7 @@ process.stdin.on('data', (d) => {
       setTimeout(() => {
         busy = false
         send({ type: 'agent_settled', aborted: false })
-      }, 100)
+      }, 600)
     }
   }
 })

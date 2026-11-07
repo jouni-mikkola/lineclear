@@ -69,7 +69,7 @@ describe('revive on herdr events', () => {
     }
   })
 
-  test('pane.exited drops the pane from the list: the agent is gone with no compare', async () => {
+  test('pane.exited makes one compare that finds the shell at its prompt', async () => {
     const { a, loose } = fixture()
     let argv = ['pi']
     const calls = spyOn(herdr, 'processInfo').mockImplementation(async () =>
@@ -84,9 +84,10 @@ describe('revive on herdr events', () => {
       a.onSuspect = () => told++
       loose.heard({ event: 'pane_exited', data: { pane_id: 'w:p3' } })
       expect(told).toBe(1)
-      expect(await a.wrong('t3/Agent')).toBe('gone')
+      expect(await a.wrong('t3/Agent')).toBe('exited')
+      expect(await a.wrong('t3/Agent')).toBe('exited')
       expect(await a.wrong('t4/Agent')).toBeUndefined()
-      expect(calls).toHaveBeenCalledTimes(0)
+      expect(calls).toHaveBeenCalledTimes(1)
     } finally {
       calls.mockRestore()
     }
