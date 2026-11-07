@@ -5,7 +5,7 @@ import { ended } from './engine/engine.ts'
 import { room } from './herdr-forward.ts'
 import { BOX, boxHome, forwardTask, machineRef } from './box.ts'
 import { HOST, NAME, placeId } from './places.ts'
-import { settingsBlock } from './prompts.ts'
+import { readSection, settingsBlock } from './prompts.ts'
 import { CATALOG, type Level } from './settings.ts'
 import { summary } from './health.ts'
 import { mainCli } from './source-helpers.ts'
@@ -124,7 +124,7 @@ export class LiveSourceCli extends LiveSourceSubcommands {
       case 'done': {
         // a task's agent may leave the id out: it reports its own task
         const id = a1 ?? (ctx.chat?.includes('/') ? ctx.chat.split('/')[0] : undefined)
-        if (!id) throw new Error(`lineclear ${a0} <id> --summary "<what changed>"`)
+        if (!id) throw new Error(`lineclear ${a0} <id> --summary "<what changed>". ${readSection('lineclear-agent', 'Procedure')}`)
         const t = this.engine.task(id)
         if (!t) throw new Error(`No task ${id}`)
         const { said, facts } = summaryOpts(p, rest)
@@ -140,7 +140,7 @@ export class LiveSourceCli extends LiveSourceSubcommands {
         const t = this.engine.task(a1 ?? '')
         if (!t) throw new Error(`No task ${a1 ?? ''}; lineclear todo <id>`)
         if (ctx.chat?.includes('/') && ctx.chat.split('/')[0].toUpperCase() !== t.id.toUpperCase())
-          throw new Error(`A task's agent says only its own task waits, not ${t.id}.`)
+          throw new Error(`A task's agent says only its own task waits, not ${t.id}. ${readSection('lineclear-agent', 'Procedure')}`)
         this.engine.todo(t.id)
         return `Noted: ${t.id} shows as To do until it gets a go. Reply in one line that you have the brief, then end your turn.`
       }
@@ -151,7 +151,7 @@ export class LiveSourceCli extends LiveSourceSubcommands {
         const t = this.engine.task(a1 ?? '')
         if (!t) throw new Error(`no task ${a1 ?? ''}; lineclear ${a0} <id>`)
         if (ctx.chat?.includes('/') && ctx.chat.split('/')[0].toUpperCase() !== t.id.toUpperCase())
-          throw new Error(`A task's agent works on its own task's pull request only, not ${t.id}'s.`)
+          throw new Error(`A task's agent works on its own task's pull request only, not ${t.id}'s. ${readSection('lineclear-agent', 'Procedure')}`)
         const r = a0 === 'pr' ? await this.engine.openPr(t.id) : await this.engine.checks(t.id)
         if (!r.ok) throw new Error(r.text)
         return r.text
@@ -166,7 +166,8 @@ export class LiveSourceCli extends LiveSourceSubcommands {
         if (!ctx.chat) throw new Error('lineclear card works from an agent Lineclear started')
         const title = a1
         const labels = p.opts.choice ?? []
-        if (!title || labels.length < 2) throw new Error('lineclear card "<question>" --choice "<label>" --choice "<label>" …')
+        if (!title || labels.length < 2)
+          throw new Error(`lineclear card "<question>" --choice "<label>" --choice "<label>" …. ${readSection('lineclear', 'Asking')}`)
         const desc = Object.fromEntries((p.opts.desc ?? []).map((d) => d.split('=').map((s) => s.trim()) as [string, string]))
         const id = `ask:${randomUUID().slice(0, 8)}`
         this.chats.post(ctx.chat, {

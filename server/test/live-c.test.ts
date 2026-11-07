@@ -6,6 +6,7 @@ import {
   settingsBlock,
   splitBrief,
   taskPrompt,
+  readSection,
   HOST,
   keyFor,
   machineName,
@@ -20,12 +21,19 @@ describe("the brief's default way of working", () => {
   test("a task's agent is told who it is, its task's facts and which skills to read; the rules are in the skills", () => {
     const p = taskPrompt({ id: 'X-1', branch: 'work/1-x', base: 'main' }, "How long this space's tasks really took: 20m.")
     expect(p).toContain('the agent of task X-1')
-    expect(p).toContain('skill/lineclear/SKILL.md first')
+    expect(p).toContain('skill/lineclear-agent/START.md first')
     expect(p).toContain('skill/lineclear-agent/SKILL.md')
     expect(p).not.toContain('lineclear-coordinator')
     expect(p).toContain('on branch work/1-x (from main)')
     expect(p).toContain("How long this space's tasks really took: 20m.")
     for (const s of ['lineclear', 'lineclear-agent', 'lineclear-coordinator']) expect(existsSync(join(ROOT, 'skill', s, 'SKILL.md'))).toBe(true)
+  })
+  test('the launch prompt and the start card together are at most 3k tokens, and a refusal names the section to read', () => {
+    const p = taskPrompt({ id: 'X-1', branch: 'work/1-x', base: 'main' }, "How long this space's tasks really took: 20m.")
+    const card = readFileSync(join(ROOT, 'skill', 'lineclear-agent', 'START.md'), 'utf8')
+    // about 4 characters a token; the launch prompt also carries a browser line and the settings, so leave room
+    expect(Math.ceil((p.length + card.length) / 4)).toBeLessThanOrEqual(2000)
+    expect(readSection('lineclear', 'Asking')).toMatch(/section "Asking" of .*skill\/lineclear\/SKILL\.md/)
   })
   const ways = { review: true, mustFix: 'major', rounds: 3, merge: 'on its own', waitChecks: false }
   test("the human's defaults only, one line each: review, the reviewer, the bar, the rounds and merge on its own", () => {
