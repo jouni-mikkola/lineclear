@@ -37,6 +37,8 @@ export interface FakeGitHub {
   /** what gh api answers for a path ("repos/acme/app/pulls/1/reviews"), without its query: each item on a line, as
    *  its --jq would pick them */
   api?: Record<string, unknown[]>
+  /** refs made by gh api POST repos/…/git/refs; making one that exists fails as GitHub's 422 does */
+  refs?: string[]
   /** gh api graphql answers with something that is no JSON */
   badGraphql?: boolean
   /** what gh run list answers: Actions' runs, newest first */
@@ -196,6 +198,12 @@ if (import.meta.main) {
         },
       }))
     out(JSON.stringify({ data: { repository: { pullRequests: { nodes } } } }))
+  }
+  if (a0 === 'api' && opt('method') === 'POST' && /\/git\/refs$/.test(args.find((x) => x.startsWith('repos/')) ?? '')) {
+    const ref = args.find((x) => x.startsWith('ref='))!.slice(4)
+    if (st.refs?.includes(ref)) fail('gh: Reference already exists (HTTP 422)')
+    ;(st.refs ??= []).push(ref)
+    out('')
   }
   if (a0 === 'api') {
     if (/^repos\/[^/]+\/[^/]+$/.test(a1 ?? '')) {

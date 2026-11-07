@@ -582,6 +582,12 @@ export async function startPoint(repo: string, base: string) {
   return r.ok ? r.out : from
 }
 
+/** Claims `refs/lineclear/claims/<name>` on the repo (creating a ref that exists fails): 'won', 'held' by another loop, or 'error'. */
+export async function claimRef(g: GitHub, cwd: string, name: string, sha: string): Promise<'won' | 'held' | 'error'> {
+  const r = await gh(g, cwd, 'api', '--method', 'POST', `repos/${g.repo}/git/refs`, '-f', `ref=refs/lineclear/claims/${name}`, '-f', `sha=${sha}`, '--silent')
+  return r.ok ? 'won' : /Reference already exists/i.test(`${r.out}\n${r.err}`) ? 'held' : 'error'
+}
+
 /** gh for one repo: its host in GH_HOST (gh can't tell github.localhost from the remote alone), never a prompt */
 const gh = (g: GitHub, cwd: string, ...args: string[]) =>
   sh(['gh', ...args], cwd, { timeoutMs: 120_000, env: { GH_HOST: g.host, GH_PROMPT_DISABLED: '1', GH_NO_UPDATE_NOTIFIER: '1', NO_COLOR: '1' } })
