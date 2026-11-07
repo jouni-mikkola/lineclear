@@ -1,13 +1,11 @@
 import { chatProblem } from './readers/index.ts'
 import { randomUUID } from 'node:crypto'
 import { herdr, type AgentInfo } from './herdr.ts'
-import { findPiLog } from './readers/find.ts'
 import { chooseModel, firstModel } from '../../../src/models.ts'
 import { putInto } from './agent-input.ts'
 import { applySpec, findSpace, launchArgs, launchFiles, paneFor, startIn } from './agent-start.ts'
 import * as task from './mfs.ts'
 import { type AgentRecord, type Spec, hidden, sleep } from './agents-helpers.ts'
-import { addLog } from './log-list.ts'
 import { BOX } from './box.ts'
 import { AgentsLink } from './agents-link.ts'
 import { isNews } from './agents-sent.ts'
@@ -27,21 +25,6 @@ export class AgentsDelivery extends AgentsLink {
 
   routed(key: string) {
     return this.reachable && !!this.info(key)?.agent && !this.record(key)?.finished && this.hasRoute(key)
-  }
-
-  /** after a command that may start another session (/new, /clear, /resume): its CLI's newest log since then; a menu it
-   *  opened may be answered a while later */
-  follow(key: string, since: number) {
-    const r = this.records[key]
-    if (!r) return
-    const look = () => {
-      const f = r.kind === 'pi' ? findPiLog(r.cwd, since - 1000) : undefined
-      if (!f || !addLog(r, f)) return
-      r.sessionId = f.match(/([0-9a-f-]{36})\.jsonl$/)?.[1] ?? r.sessionId
-      this.save()
-      this.emit('logs', key)
-    }
-    for (const ms of [1500, 5000, 15000, 60000, 180000]) setTimeout(look, ms)
   }
 
   private starts(key: string, go: () => Promise<AgentInfo | null>) {
@@ -121,8 +104,7 @@ export class AgentsDelivery extends AgentsLink {
       true,
       true,
     )
-    setTimeout(() => this.deliver(r.key), 250)
-    for (const ms of [3000, 15000]) setTimeout(() => this.discoverLog(r.key), ms)
+    void this.deliver(r.key)
     return this.live.get(r.name) ?? null
   }
 
@@ -131,7 +113,7 @@ export class AgentsDelivery extends AgentsLink {
     this.save()
     const rpc = new RpcAgent(
       args,
-      { cwd: r.cwd, env: { ...process.env, ...r.env } },
+      { cwd: r.cwd, env: { ...process.env, ...r.env, ...this.routeEnv(r) } },
       { change: () => this.rpcChanged(r.key), exit: (a) => this.rpcEnded(r.key, a) },
     )
     this.rpcs.set(r.key, rpc)
@@ -144,7 +126,6 @@ export class AgentsDelivery extends AgentsLink {
       this.save()
       throw e
     }
-    await this.bindRoutePid(r, rpc.pid)
     this.queue(
       r.key,
       [chosen ? hidden(`No model was set, so the machine's first available model was chosen: ${chosen}. Note it in your facts.`) : '', first ?? ''].filter(

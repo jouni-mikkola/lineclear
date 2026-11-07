@@ -4,7 +4,6 @@ import { agentEnv, BOX, helperDir, run } from './box.ts'
 import { ROOT } from '../root.ts'
 import type { SecretAccess } from './secret-access.ts'
 import { isAgentProcess } from './agent-process.ts'
-import { isRpcPane } from './agent-rpc.ts'
 import { type AgentRecord, ROUTING_FAILURE } from './agents-helpers.ts'
 
 export interface RouteHost {
@@ -19,9 +18,6 @@ export interface RouteHost {
 /** binds each agent's CLI process to its private `lineclear` command route (helper/route.pl) */
 export class AgentRoutes {
   private bound = new Map<string, string>()
-  /** where each agent's CLI was last bound, and whether it took */
-  private tried = new Map<string, { pane: string; at: number; ok: boolean }>()
-  private repairing = false
 
   constructor(private host: RouteHost) {}
 
@@ -41,8 +37,14 @@ export class AgentRoutes {
     return this.bindPid(r, proc?.pid)
   }
 
-  /** the same for a CLI whose pid is known (an RPC child of this server) */
-  async bindPid(r: AgentRecord, pid: number | undefined) {
+  /** the route as an environment for an RPC child of this server: its command reads it, no process is bound */
+  envFor(r: AgentRecord): Record<string, string> {
+    const chain = this.host.secretScope(r.key)
+    this.bound.set(r.key, 'env')
+    return { LINECLEAR_ROUTED: '1', LINECLEAR_SECRET_CAPABILITY: chain ? this.host.secretAccess.issue(r.key, `rpc:${r.started}`, chain) : '' }
+  }
+
+  private async bindPid(r: AgentRecord, pid: number | undefined) {
     const { records, stopping, secretAccess } = this.host
     if (!pid || r.finished || records[r.key]?.finished || stopping.has(r.key)) return this.drop(r.key)
     const env = agentEnv(r.key, ROOT)
@@ -67,30 +69,5 @@ export class AgentRoutes {
       this.bound.set(r.key, signature)
     }
     this.host.emit('routed', r.key)
-  }
-
-  /** a route is bound when an agent is first seen in its pane (a restored session), and again after a failure, at
-   *  most every 30 s: never on a timer for one that is bound */
-  async repair() {
-    if (this.repairing) return
-    this.repairing = true
-    try {
-      for (const r of Object.values(this.host.records)) {
-        const a = this.host.live.get(r.name)
-        const was = this.tried.get(r.key)
-        if (!a) this.tried.delete(r.key)
-        if (!a || isRpcPane(a.pane_id) || (was && was.pane === a.pane_id && (was.ok || Date.now() - was.at < 30_000))) continue
-        const tried = { pane: a.pane_id, at: Date.now(), ok: true }
-        this.tried.set(r.key, tried)
-        await this.bind(r, a.pane_id)
-          .then(() => (tried.ok = this.has(r.key))) // no CLI in the pane yet binds nothing
-          .catch((e) => {
-            tried.ok = false
-            console.error(`lineclear: routing ${r.key}: ${e.message}`)
-          })
-      }
-    } finally {
-      this.repairing = false
-    }
   }
 }
