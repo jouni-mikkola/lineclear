@@ -45,6 +45,36 @@ describe("the home space's herdr space", () => {
   })
 })
 
+describe('coordinator tab', () => {
+  test('restarting a coordinator three times leaves one tab', async () => {
+    const saved = { ...herdr }
+    let n = 0
+    const tabs: { tab_id: string; label: string; pane_id: string }[] = [{ tab_id: 'human', label: 'notes', pane_id: 'ph' }]
+    Object.assign(herdr, {
+      workspaces: async () => [{ workspace_id: 'w9', label: 'Tabs' }],
+      tabs: async () => tabs.map(({ pane_id, ...t }) => t),
+      panes: async () => tabs.map((t) => ({ pane_id: t.pane_id, tab_id: t.tab_id })),
+      createTab: async (_w: string, label: string) => {
+        const t = { tab_id: `t${++n}`, label, pane_id: `p${n}` }
+        tabs.push(t)
+        return { tab: { tab_id: t.tab_id }, root_pane: { pane_id: t.pane_id } }
+      },
+      agents: async () => [],
+      paneIdle: async () => true,
+      closePane: async (id: string) => void tabs.splice(0, tabs.length, ...tabs.filter((t) => t.pane_id !== id)),
+    })
+    try {
+      const rec = { workspace: 'Tabs', tab: 'coordinator', name: 'c', cwd: '/' }
+      const paneFor = (src.agents as unknown as { paneFor(r: unknown): Promise<string> }).paneFor.bind(src.agents)
+      for (let i = 0; i < 3; i++) await paneFor(rec)
+      expect(tabs.filter((t) => t.label === 'coordinator').map((t) => t.pane_id)).toEqual(['p3'])
+      expect(tabs.some((t) => t.label === 'notes')).toBe(true)
+    } finally {
+      Object.assign(herdr, saved)
+    }
+  })
+})
+
 describe('machine health', () => {
   test("past a limit: a card in the home space's chat, news with the numbers for its coordinator, once; held tasks say why", async () => {
     const machine = placeId.home()
