@@ -160,8 +160,10 @@ export class LiveSourceTaskWords extends LiveSourceSecrets {
     }
     const t = this.engine.task(rest[0] ?? '')
     if (!t) throw new Error(`No task ${rest[0] ?? ''}`)
-    switch (sub) {
-      case 'show': {
+    // the words that go by another name
+    const alias: Record<string, string> = { unarchive: 'archive', unpin: 'pin' }
+    const words: Record<string, () => string | Promise<string>> = {
+      show: async () => {
         const v = this.engine.view(t)
         if (p.flags.has('json')) return JSON.stringify(v, null, 2)
         return [
@@ -176,15 +178,15 @@ export class LiveSourceTaskWords extends LiveSourceSecrets {
         ]
           .filter(Boolean)
           .join('\n')
-      }
-      case 'tell': {
+      },
+      tell: async () => {
         // a coordinator's go to a task that waits starts it only when this machine has room
         const r = await this.engine.tell(t.id, rest.slice(1).join(' '), { gate: !ctx.chat?.includes('/') })
         if (r.held)
           return `${t.id} is held: ${r.held === 'slots' ? `all ${this.settings.machine().max} slots are taken` : 'the machine is busy'} (${this.workingLine()}). It shows as Queued and gets your message when there's room, oldest first.`
         return `Told ${t.id}.`
-      }
-      case 'queue': {
+      },
+      queue: async () => {
         const refs = p.opts.after ?? []
         if (!refs.length) throw new Error('lineclear task queue <id> --after SHE-12[,SHE-13]  (--after none clears it)')
         const none = refs.length === 1 && /^(none|nothing|-)$/i.test(refs[0].trim())
@@ -196,12 +198,12 @@ export class LiveSourceTaskWords extends LiveSourceSecrets {
             ? `${t.id} waits for no task now, but is held: ${t.held.why === 'slots' ? `all ${this.settings.machine().max} slots are taken` : 'the machine is busy'} (${this.workingLine()}). Its agent gets the go when there's room.`
             : `${t.id} waits for nothing more: its agent is told to go.`
         return none ? `${t.id} was not queued.` : `${t.id} isn't queued: what it would wait for is done already.`
-      }
-      case 'stop': {
+      },
+      stop: async () => {
         const kept = await this.engine.stopTask(t.id)
         return `Stopped ${t.id}: its agent is closed${kept.length ? `; kept ${kept.join(', ')}` : ''}. Writing to it starts it again.`
-      }
-      case 'close': {
+      },
+      close: async () => {
         if (ctx.chat?.includes('/'))
           throw new Error(
             `Coordinators close tasks. A task's agent reports with lineclear ready ${ctx.chat.split('/')[0]} (with no changes on its branch, that is Done at once).`,
@@ -209,9 +211,8 @@ export class LiveSourceTaskWords extends LiveSourceSecrets {
         const { said, facts } = summaryOpts(p)
         const { kept } = await this.engine.close(t.id, said, facts, p.flags.has('discard') || p.flags.has('force'))
         return `Closed ${t.id}: it is Done, with nothing to merge, and its agent is closed${kept.length ? `; kept ${kept.join(', ')}` : t.worktree ? '; its working folder and branch are gone' : ''}.`
-      }
-      case 'archive':
-      case 'unarchive': {
+      },
+      archive: async () => {
         if (ctx.chat?.includes('/')) throw new Error(`Only a coordinator ${sub}s tasks, when the human asks.`)
         if (sub === 'unarchive') {
           if (!t.archived) return `${t.id} isn't archived.`
@@ -223,24 +224,25 @@ export class LiveSourceTaskWords extends LiveSourceSecrets {
         const r = await this.engine.archive(t.id)
         this.emit('snapshot')
         return `Archived ${t.id}${r.stopped ? `: its agent was stopped first${r.kept.length ? `; kept ${r.kept.join(', ')}` : ''}` : ''}. It is out of every list; search and Archived still find it, and lineclear task unarchive ${t.id} brings it back.`
-      }
-      case 'pause': {
+      },
+      pause: async () => {
         if (ctx.chat?.includes('/'))
           throw new Error(`Only a coordinator pauses tasks, when the human asks. To wait yourself: lineclear todo ${ctx.chat.split('/')[0]}.`)
         await this.engine.pause(t.id)
         this.emit('snapshot')
         return `Paused ${t.id}: its agent was interrupted and it is To do. Its work, worktree and chat stay; any message to it (task tell) is the go to go on.`
-      }
-      case 'pin':
-      case 'unpin': {
+      },
+      pin: async () => {
         if (ctx.chat?.includes('/')) throw new Error(`Only a coordinator ${sub}s tasks, when the human asks.`)
         const on = sub === 'pin'
         if (!!t.pinned === on) return on ? `${t.id} is pinned already.` : `${t.id} isn't pinned.`
         this.engine.pin(t.id, on)
         this.emit('snapshot')
         return on ? `Pinned ${t.id}: it shows in Pinned at the top of its tasks.` : `Unpinned ${t.id}: it is back in its group (${this.engine.view(t).state}).`
-      }
+      },
     }
+    const name = alias[sub ?? ''] ?? sub ?? ''
+    if (Object.hasOwn(words, name)) return words[name]()
     throw new Error('lineclear task add|list|show|tell|queue|stop|close|archive|unarchive|pin|unpin|pause|merge|delete')
   }
 
