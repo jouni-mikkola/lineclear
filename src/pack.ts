@@ -19,7 +19,7 @@ function setPart(name: string, on: boolean, env: Env = process.env): string | un
   if (had === !on) return undefined; // already so: no write
   const file = switchesFile(env);
   mkdirSync(dirname(file), { recursive: true });
-  // keep the file's other settings, such as the compaction points
+  // keep the file's other settings
   writeAtomic(file, `${JSON.stringify({ ...readJson(file), off: [...off].sort() }, null, 2)}\n`);
   return undefined;
 }

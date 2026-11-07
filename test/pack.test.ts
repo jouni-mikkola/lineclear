@@ -3,7 +3,6 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { dirname, join } from "node:path";
 import pack, { PACK_ENTRY, parts, switchesFile } from "../pi/pack.ts";
 import { packMain } from "../src/pack.ts";
-import { applyCompaction, reserveFor, rolePoint, unknownWindows } from "../pi/compaction.ts";
 import { doctorChecks } from "../src/doctor.ts";
 import { extensionFile, pathsFor } from "../src/paths.ts";
 import { tmp } from "./helpers.ts";
@@ -106,91 +105,11 @@ test("doctor shows which parts are on", () => {
   expect(check?.problem).toBe("");
 });
 
-/** A pi folder with models of a large, a small and an unknown window, and the given settings. */
-function compactionSetup(settings: unknown) {
-  const root = tmp("compaction");
-  const pi = join(root, "pi");
-  mkdirSync(pi);
-  const models = [{ id: "big", contextWindow: 1_000_000 }, { id: "small", contextWindow: 128_000 }, { id: "mystery" }];
-  writeFileSync(join(pi, "models-store.json"), JSON.stringify({ p: { models } }));
-  writeFileSync(join(pi, "settings.json"), JSON.stringify(settings));
-  const env = { HOME: root, PI_CODING_AGENT_DIR: pi, LINECLEAR_CONFIG: join(root, "config") };
-  return { root, pi, env, settings: () => JSON.parse(readFileSync(join(pi, "settings.json"), "utf8")) };
-}
-
-test("compaction: a large window compacts near 150 k, a small one and an unknown one are left", () => {
-  const s = compactionSetup({});
-  expect(applyCompaction(s.env)).toEqual(["p/big"]);
-  expect(s.settings().compaction).toEqual({ keepRecentTokens: 20_000, modelOverrides: { "p/big": { reserveTokens: 850_000 } } });
-  expect(unknownWindows(s.env)).toEqual(["p/mystery"]);
-  expect(reserveFor(155_000)).toBe(16_384);
-  expect(applyCompaction(s.env)).toEqual([]); // twice: nothing changes
-});
-
-test("compaction: a value you set stays, the tail too", () => {
-  const mine = { compaction: { keepRecentTokens: 5000, modelOverrides: { "p/big": { reserveTokens: 123 } } } };
-  const s = compactionSetup(mine);
-  expect(applyCompaction(s.env)).toEqual([]);
-  expect(s.settings()).toEqual(mine);
-});
-
-test("compaction: a value the pack wrote follows a changed window", () => {
-  const s = compactionSetup({});
-  applyCompaction(s.env);
-  writeFileSync(join(s.pi, "models-store.json"), JSON.stringify({ p: { models: [{ id: "big", contextWindow: 500_000 }] } }));
-  expect(applyCompaction(s.env)).toEqual(["p/big"]);
-  expect(s.settings().compaction.modelOverrides["p/big"].reserveTokens).toBe(350_000);
-});
-
-test("doctor names a model with an unknown window", () => {
-  const s = compactionSetup({});
-  const paths = { ...pathsFor({ HOME: s.root }), extension: join(s.pi, "extensions", "lineclear.ts") };
-  const check = doctorChecks({ paths, pathDirs: [], which: () => "x", run: () => null }).find((c) => c.name.startsWith("compaction"));
-  expect(check?.name).toContain("p/mystery");
-  expect(check?.problem).toBe("");
-});
-
 test("the shipped parts hold no account, provider or owner rule", () => {
   const dir = join(import.meta.dir, "..", "pi", "parts");
   for (const f of existsSync(dir) ? readdirSync(dir) : []) {
     if (f.endsWith(".ts")) expect(readFileSync(join(dir, f), "utf8")).not.toMatch(/anthropic|openai|google|opencode|@[a-z0-9.-]+\.[a-z]+/i);
   }
-});
-
-test("compaction point: a role has its own, a pack.json value and the switch change it", () => {
-  const { env: base } = compactionSetup({});
-  const at = (chat?: string) => rolePoint({ ...base, LINECLEAR_CHAT: chat });
-  expect([at("LINE-1/Agent"), at("LINE-1/Reviewer"), at("lineclear"), at()]).toEqual([80_000, 70_000, 70_000, undefined]);
-  mkdirSync(base.LINECLEAR_CONFIG, { recursive: true });
-  writeFileSync(join(base.LINECLEAR_CONFIG, "pack.json"), JSON.stringify({ compaction: { worker: 150_000 } }));
-  expect([at("LINE-1/Agent"), at("lineclear")]).toEqual([150_000, 70_000]);
-  expect(rolePoint({ ...base, LINECLEAR_ROLE: "dispatcher" })).toBe(60_000);
-  expect(rolePoint({ ...base, LINECLEAR_CHAT: "dispatcher" }, join(base.LINECLEAR_CONFIG, "dispatcher"))).toBe(60_000);
-  writeFileSync(join(base.LINECLEAR_CONFIG, "pack.json"), JSON.stringify({ off: ["compaction-point"] }));
-  expect(at("LINE-1/Agent")).toBeUndefined();
-});
-
-test("compaction point: a turn that goes on past the point compacts once, then the agent is told to carry on", async () => {
-  const { default: part, CARRY_ON } = await import("../pi/parts/compaction-point.ts");
-  const { env: base } = compactionSetup({});
-  const handlers: ((e: { toolResults?: unknown[] }, c: { getContextUsage(): { tokens: number }; compact(o: { onComplete: () => void }): void }) => unknown)[] =
-    [];
-  const sent: string[] = [];
-  part({ on: (_e, f) => void handlers.push(f), sendUserMessage: (t) => void sent.push(t) }, { ...base, LINECLEAR_CHAT: "LINE-1/Agent" });
-  const asked: { onComplete: () => void }[] = [];
-  const turn = (tokens: number, toolResults: unknown[] = [{}]) =>
-    handlers[0]?.(
-      { toolResults },
-      { getContextUsage: () => ({ tokens, contextWindow: 1_000_000 }), compact: (o: { onComplete: () => void }) => void asked.push(o) },
-    );
-  turn(79_000);
-  turn(120_000, []);
-  expect(asked.length).toBe(0);
-  turn(81_000);
-  turn(82_000);
-  expect(asked.length).toBe(1);
-  asked[0]?.onComplete();
-  expect(sent).toEqual([CARRY_ON]);
 });
 
 /** One turn's messages: the user's, then an assistant that runs the given bash commands and says `text`. */

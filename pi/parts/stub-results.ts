@@ -1,7 +1,7 @@
 // Part of the token pack: a tool result that was used some turns ago is replaced by a stub before each call, so the
 // calls after it carry less. A stub changes the prompt from that result on, so the provider's cache is written again
-// once (the stub is the same on every later call, so it stays cached); only a big result is worth it. Writes, edits, errors, images, the chat with the owner and the notes of
-// compaction-notes (its state file) are never stubbed. Imports nothing of Lineclear.
+// once (the stub is the same on every later call, so it stays cached); only a big result is worth it. Writes, edits, errors, images, the chat with the owner and state notes
+// (lineclear-notes-*) are never stubbed. Imports nothing of Lineclear.
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";

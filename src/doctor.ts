@@ -15,7 +15,6 @@ import { parts } from "./pack.ts";
 import { readModelFile } from "./models.ts";
 import { checkoutPointers } from "./install-paths.ts";
 import { buildNames, buildProblem, buildsDir, installReleaseCommand, type RunFrom, unitCommand } from "./builds.ts";
-import { unknownWindows } from "../pi/compaction.ts";
 import { publishedAddress, serveCommand } from "./published.ts";
 import { compileCacheDir } from "./tmpdirs.ts";
 
@@ -353,13 +352,6 @@ function checkoutFree(p: Probe, env: Record<string, string | undefined>): Check 
   return { name: "installed paths", problem: found.join("; "), fix: INSTALL_AGAIN };
 }
 
-/** Models whose window pi does not know: the pack leaves their compaction as it is. Named, not a problem. */
-function compactionWindows(p: Probe): Check {
-  const unknown = unknownWindows({ ...process.env, PI_CODING_AGENT_DIR: dirname(dirname(p.paths.extension)) });
-  const shown = unknown.length === 0 ? "every model has a window" : `no window known for ${unknown.join(", ")}, compaction left as it is`;
-  return { name: `compaction: ${shown}`, problem: "", fix: "" };
-}
-
 /** The service and the command are the release build, or the problem and the install that fixes it. */
 function stableBuild(p: Probe): Check {
   const problem = p.runFrom ? buildProblem(p.runFrom, p.dataDir ?? dataDir()) : "";
@@ -403,7 +395,6 @@ export function doctorChecks(probe: Probe): Check[] {
       fix: INSTALL_AGAIN,
     },
     tokenPack(p),
-    compactionWindows(p),
     checkoutFree(p, process.env),
     service(p),
     oneServer(p),
