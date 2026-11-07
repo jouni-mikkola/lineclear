@@ -550,19 +550,3 @@ export function fail(out: (l: string) => void, message: string): number {
   out(`lineclear project: ${message}`);
   return 1;
 }
-
-/** Lineclear's own project: the one whose settings say `self`, else the one whose repo is the lineclear package. */
-export function selfProject(env = process.env): { name: string; settings: Settings } | undefined {
-  const all = listProjectNames(env)
-    .map((name) => ({ name, settings: readSettings(name, env) }))
-    .filter((p): p is { name: string; settings: Settings } => typeof p.settings !== "string");
-  const marked = all.find((p) => p.settings.self === true);
-  if (marked) return marked;
-  return all.find((p) => {
-    try {
-      return JSON.parse(readFileSync(join(p.settings.repo, "package.json"), "utf8")).name === "lineclear";
-    } catch {
-      return false;
-    }
-  });
-}
