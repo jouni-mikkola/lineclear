@@ -45,9 +45,9 @@ function diffAgainst(repo: string, base: string): string | undefined {
   return [git(repo, "diff", `-U${CONTEXT_LINES}`, from).out, ...added].join("");
 }
 
-/** The step itself: the brief up to the owner's direction block, which is long and the same for every task. */
-export function stepOfBrief(brief: string): string {
-  const at = brief.indexOf("## The owner's direction");
+/** The step and the owner's direction, without the worker's procedure that follows them: a reviewer never runs it. */
+function stepOfBrief(brief: string): string {
+  const at = brief.indexOf("This step was checked by a fresh model");
   return (at < 0 ? brief : brief.slice(0, at)).trim();
 }
 
