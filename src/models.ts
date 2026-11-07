@@ -258,6 +258,12 @@ export function chooseModel(kind: string, model?: string): string | undefined {
   return `No model is set for ${kind}. Choose one of: ${c.models.map((m) => m.id).join(", ")}.`;
 }
 
+/** the model a start takes when none is set: the first one this machine offers, with the line that notes the choice */
+export function firstModel(kind: string): { id: string; note: string } | undefined {
+  const first = modelsOf(kind)?.models[0];
+  return first && { id: first.id, note: `No model was set for ${kind}, so it started on ${first.id}, the first this machine offers. Set a default model to choose another.` };
+}
+
 /** for tests: how a fresh server reads the harnesses, before any read happened */
 export function setRegistryReader(read: () => ModelEntry[]) {
   readEntries = read;

@@ -19,6 +19,8 @@ export interface AgentRecord {
   tab?: string
   model?: string
   effort?: string
+  /** set when no model was set and the start chose the first available one: the line for the task's facts */
+  modelNote?: string
   /** instructions appended to the CLI's system prompt (or sent first, hidden, where it has no such option) */
   system?: string
   /** log files, oldest first: one per session */
