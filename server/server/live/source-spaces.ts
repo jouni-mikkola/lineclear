@@ -22,7 +22,6 @@ export class LiveSourceSpaces extends LiveSourceFiles {
     this.terms = terms
     this.agents.watchTerminals(terms)
     for (const k of terms) this.agents.screen(k).then((s) => this.emit('terminal', k, s))
-    for (const k of chats) this.agents.discoverLog(k)
   }
 
   protected async pollChats() {
@@ -120,7 +119,6 @@ export class LiveSourceSpaces extends LiveSourceFiles {
     const at = Date.now()
     this.chats.post(key, { id: `command:${at}`, who: 'you', text, cid })
     this.emit('chat', key)
-    this.agents.follow(key, at)
   }
 
   protected projectFor(p: Parsed, ctx: { chat?: string; cwd?: string }) {

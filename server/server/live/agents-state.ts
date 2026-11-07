@@ -2,7 +2,6 @@ import { Emitter } from '../source.ts'
 import { AgentRows, OutboxRows } from './agent-rows.ts'
 import { addLog, uniqueLogs } from './log-list.ts'
 import type { AgentInfo, AgentStatus } from './herdr.ts'
-import { findPiLog } from './readers/find.ts'
 import { machineNews } from './quiet.ts'
 import { mirrored } from './mfs.ts'
 import { SecretAccess } from './secret-access.ts'
@@ -82,12 +81,9 @@ export class AgentsState extends Emitter<Events> {
     return this.routes.bind(r, pane)
   }
 
-  bindRoutePid(r: AgentRecord, pid: number | undefined) {
-    return this.routes.bindPid(r, pid)
-  }
-
-  repairRoutes() {
-    return this.routes.repair()
+  /** an RPC agent's route travels in its environment: there is no process to bind */
+  routeEnv(r: AgentRecord) {
+    return this.routes.envFor(r)
   }
 
   trackName(r: AgentRecord) {
@@ -180,12 +176,6 @@ export class AgentsState extends Emitter<Events> {
   protected learnSession(key: string, a?: AgentInfo) {
     const s = a?.agent_session
     if (s?.kind === 'path') this.keepLog(key, mirrored(s.value))
-  }
-
-  /** find a log file this CLI started since the agent (re)started, when herdr didn't name one */
-  discoverLog(key: string) {
-    const r = this.records[key]
-    if (r) this.keepLog(key, r.kind === 'pi' ? findPiLog(r.cwd, r.started - 5000) : undefined)
   }
 
   /** why this agent takes nothing now */

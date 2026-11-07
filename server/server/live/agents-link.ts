@@ -125,7 +125,6 @@ export abstract class AgentsLink extends AgentsState {
     this.live = new Map(list.filter((a) => a.name).map((a) => [a.name!, a]))
     for (const [key, a] of this.rpcs) if (this.records[key]) this.live.set(this.records[key].name, this.rpcInfo(this.records[key], a))
     this.settle()
-    void this.repairRoutes()
     this.sub.set(paneEvents(list.map((x) => x.pane_id)))
   }
 
@@ -152,7 +151,7 @@ export abstract class AgentsLink extends AgentsState {
       if (was === now) continue
       this.changed(key, now, was)
     }
-    for (const r of Object.values(this.records)) if (!this.live.has(r.name) || r.finished) this.unroute(r.key)
+    for (const r of Object.values(this.records)) if ((!this.live.has(r.name) && !this.rpcs.has(r.key)) || r.finished) this.unroute(r.key)
     for (const [name, key] of this.trackedNames()) this.learnSession(key, this.live.get(name))
     for (const key of new Set(this.outbox.map((o) => o.key))) if (!this.heldBy(key)) this.deliver(key)
     this.checkStranded()

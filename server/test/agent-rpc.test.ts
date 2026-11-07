@@ -1,5 +1,5 @@
 // A task agent is a `pi --mode rpc` child: it starts, takes its brief, works and ends with no herdr call for it.
-import { describe, expect, test } from 'bun:test'
+import { afterAll, describe, expect, test } from 'bun:test'
 import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -42,6 +42,9 @@ process.stdin.on('data', (d) => {
 `,
 )
 chmodSync(join(dir, 'bin', 'pi'), 0o755)
+// a stand-in perl that records each run: an RPC start spawns none
+writeFileSync(join(dir, 'bin', 'perl'), `#!/bin/sh\necho run >> '${join(dir, 'perl.txt')}'\n`)
+chmodSync(join(dir, 'bin', 'perl'), 0o755)
 process.env.PATH = `${join(dir, 'bin')}:${process.env.PATH}`
 
 const asked: string[] = []
@@ -85,7 +88,25 @@ describe('a task agent as a pi RPC child', () => {
       expect(await Bun.file(join(dir, 'told.txt')).text()).toContain('One more thing.')
     } finally {
       a.stop()
-      herdr.close()
+    }
+  })
+
+  test('a start of 45 tasks asks herdr nothing and spawns no perl', async () => {
+    const a = new Agents()
+    const before = asked.length
+    try {
+      const keys = Array.from({ length: 45 }, (_, i) => `RPC-${i + 10}/Agent`)
+      await Promise.all(
+        keys.map((key, i) =>
+          a.ensure({ key, name: `shep-rpc-${i + 10}`, kind: 'pi', cwd: join(dir, 'wt'), workspace: 'rpc', model: 'default', rpc: true, first: 'Go.' }),
+        ),
+      )
+      expect(keys.every((k) => a.hasRoute(k))).toBe(true)
+      expect(asked.length).toBe(before)
+      expect(await Bun.file(join(dir, 'perl.txt')).exists()).toBe(false)
+      await Promise.all(keys.map((k) => a.finish(k)))
+    } finally {
+      a.stop()
     }
   })
 })
@@ -131,3 +152,5 @@ describe('the memory cap of a task agent', () => {
     expect(await new Response(calm.stdout).text()).toContain('alive')
   })
 })
+
+afterAll(() => void herdr.close())
