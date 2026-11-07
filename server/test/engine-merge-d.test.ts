@@ -187,8 +187,9 @@ describe('on GitHub: news, checks and the default way in', () => {
     // still running on the merge: nothing yet
     g.set({ runs: [run(red, '', 3, 'in_progress'), run(green, 'success', 2)] })
     await w.engine.watchMains()
-    const before = w.news.length
-    expect(w.news.length).toBe(before)
+    const reds = () => w.news.filter((n) => n.includes('went red on GitHub')).length
+    const before = reds()
+    expect(reds()).toBe(before)
     // a newer push cancelled one run; the other failed
     g.set({
       runs: [run(red, 'cancelled', 4), run(red, 'failure', 3), run(green, 'success', 2)],
@@ -196,24 +197,26 @@ describe('on GitHub: news, checks and the default way in', () => {
       logs: { '9': 'expected 1 to be 2\n##[error]Process completed with exit code 1.' },
     })
     await w.engine.watchMains()
-    expect(w.news.length).toBe(before + 1)
-    const told = w.news.at(-1)!
+    expect(reds()).toBe(before + 1)
+    const told = w.news.find((n) => n.includes('went red on GitHub'))!
     expect(told).toContain(`main went red on GitHub at ${red.slice(0, 7)}: Check failed (https://github.com/acme/app/actions/runs/3).`)
     expect(told).toContain(`Merged since it was last green (${green.slice(0, 7)}): ${t.id}: Say hello (#1).`)
     expect(told).toContain('    expected 1 to be 2')
     expect(told).toContain('fix-forward task')
     // for the project's own coordinator, by its place id (a folder's path reached no chat)
-    expect(w.newsTo.at(-1)).toBe(t.project)
+    expect(w.newsTo[w.news.indexOf(told)]).toBe(t.project)
     expect(w.places.space(t.project)).toBeDefined()
     // told once while it stays red
     await w.engine.watchMains()
-    expect(w.news.length).toBe(before + 1)
+    expect(reds()).toBe(before + 1)
+    // a fix task was opened for it
+    expect(w.engine.tasks.some((x) => x.title.startsWith('Fix main red at'))).toBe(true)
     // green again, then red again: told again
     g.set({ runs: [run('b'.repeat(40), 'success', 5), run(red, 'failure', 3)] })
     await w.engine.watchMains()
     g.set({ runs: [run('c'.repeat(40), 'failure', 6), run('b'.repeat(40), 'success', 5)] })
     await w.engine.watchMains()
-    expect(w.news.length).toBe(before + 2)
+    expect(reds()).toBe(before + 2)
   })
 
   test('GitHub slow on the merge: one lineclear merge waits for its result, and asked again while it runs joins the same merge', async () => {
