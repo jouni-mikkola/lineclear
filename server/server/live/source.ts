@@ -52,6 +52,8 @@ export class LiveSource extends LiveSourceUpkeep implements Source {
     this.agents.on('status', (key, st) => {
       if (key === '*') return this.emit('snapshot')
       this.revivals.status(key, st)
+      this.idle.status(key, st)
+      this.closeIdleIn(this.idle.next())
       this.engine.agentStatus(key)
       this.fresh(key)
       if (st !== 'working' && st !== 'blocked') this.reseat(key)

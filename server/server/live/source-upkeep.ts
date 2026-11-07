@@ -22,6 +22,7 @@ export class LiveSourceUpkeep extends LiveSourceCli {
     carryOn: (key) => this.agents.send(key, hidden(relaunchedLine(), 'restart')),
     gaveUp: (key) => void this.gaveUp(key, 'gone'),
   })
+  private idleTimer?: ReturnType<typeof setTimeout>
 
   constructor() {
     super()
@@ -44,6 +45,28 @@ export class LiveSourceUpkeep extends LiveSourceCli {
       void this.revive().catch(() => undefined)
     }, ms)
     this.reviveTimer.unref?.()
+  }
+
+  /** a pass closing idle panes in `ms`, replacing an earlier one */
+  protected closeIdleIn(ms: number | undefined) {
+    clearTimeout(this.idleTimer)
+    if (ms === undefined || process.env.NODE_ENV === 'test') return
+    this.idleTimer = setTimeout(() => void this.closeIdle().catch(() => undefined), ms)
+    this.idleTimer.unref?.()
+  }
+
+  /** panes of agents idle past the limit close; their chat stays and the next message starts them with their session.
+   *  A task agent whose task goes on stays: its task is waiting on it */
+  async closeIdle(now = Date.now()) {
+    for (const key of this.idle.due(now)) {
+      this.idle.forget(key)
+      const st = this.agents.status(key)
+      const r = this.agents.record(key)
+      const taskGoesOn = key.includes('/') && this.engine.mayRetry(key) && !!this.engine.task(key.split('/')[0])?.worktree
+      if (!r || r.finished || (st !== 'idle' && st !== 'done') || this.agents.busy(key) || this.reviving.has(key) || taskGoesOn) continue
+      await this.agents.finish(key).catch(() => undefined)
+    }
+    this.closeIdleIn(this.idle.next(now))
   }
 
   /** a coordinator that runs outside its folder (another machine's started in the main machine's path for it, where
