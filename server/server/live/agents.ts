@@ -15,23 +15,19 @@ export class Agents extends AgentsSending {
     // status and pane changes arrive as events; the session is read once it opens and when it drops and reopens
     this.sub = new Subscription(
       (e) => this.heard(e),
-      (planned) => this.subOpened(planned),
+      // opened: the session is read unless the caller read it just before opening and herdr answered
+      (planned) => {
+        this.subDown = false
+        if (!planned || !this.reachable) void this.refresh(true)
+      },
       undefined,
-      () => this.linkDown(),
+      // dropped: herdr is out of reach until it opens again and the session is read
+      () => {
+        this.subDown = true
+        if (this.stopped || !this.reachable) return
+        this.reachable = false
+        this.emit('status', '*', 'gone')
+      },
     )
-  }
-
-  /** the subscription is open: the session is read unless the caller read it just before opening and herdr answered */
-  private subOpened(planned: boolean) {
-    this.subDown = false
-    if (!planned || !this.reachable) void this.refresh(true)
-  }
-
-  /** the subscription dropped: herdr is out of reach until it opens again and the session is read */
-  private linkDown() {
-    this.subDown = true
-    if (this.stopped || !this.reachable) return
-    this.reachable = false
-    this.emit('status', '*', 'gone')
   }
 }
