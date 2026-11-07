@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 
 export type Env = Record<string, string | undefined>;
 export const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { "cache-control": "no-store" } });
+/** An error answer: `{"error": ...}` with its status. */
+export const fail = (error: string, status = 400) => json({ error }, status);
 
 /** Held by Lineclear's own pages only: set as a cookie when a page loads, and sent back in a header on each POST. */
 export const PAGE_TOKEN = randomUUID();

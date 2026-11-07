@@ -15,10 +15,9 @@ export interface InboxView {
   stepChecks?: GoChecks;
   /** For a login or a code: the agent's browser session, opened on the Agent browsers view. */
   session?: string;
-  /** The task that asked or waits, and its title when Home knows it. */
+  /** The task that asked or waits, and its title and the sentence of what it gives once it lands. */
   task: string;
   title?: string;
-  /** What the task gives once it lands, in one sentence. */
   result?: string;
   /** Since when it waits (ISO time). */
   since?: string;
@@ -29,21 +28,12 @@ export interface InboxView {
   /** A task that waits with no item: no answers here, it is answered in its chat, `/task/<id>`. */
   waiting?: true;
 }
-/** A waiting task with no Inbox item, as the Inbox view draws it. */
+
+/** A waiting task with no Inbox item. */
 export function waitingView(w: WaitingTask): InboxView {
-  return {
-    id: `task:${w.task}`,
-    project: w.project,
-    question: w.text,
-    choices: [],
-    details: "",
-    task: w.task,
-    ...(w.title ? { title: w.title } : {}),
-    ...(w.result ? { result: w.result } : {}),
-    ...(w.since ? { since: w.since } : {}),
-    ...(w.machine ? { machine: w.machine } : {}),
-    waiting: true,
-  };
+  const { task, project, text, title, result, since, machine } = w;
+  const extras = Object.entries({ title, result, since, machine }).filter(([, v]) => v);
+  return { id: `task:${task}`, project, question: text, choices: [], details: "", task, ...Object.fromEntries(extras), waiting: true };
 }
 
 /** A plan from a request, as the chat and the roadmap view draw it: its open Inbox item is the same one the Inbox shows. */

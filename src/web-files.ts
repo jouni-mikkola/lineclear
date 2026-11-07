@@ -1,4 +1,3 @@
-// The built web pages as files: where they are, and each one served, gzipped when the browser takes it.
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { extname, join, resolve, sep } from "node:path";
 
@@ -46,16 +45,4 @@ export function webResponse(dir: string, url: string, acceptEncoding = ""): Resp
     return new Response(gzipFile(file) as BodyInit, { headers: { ...headers, "content-type": type, "content-encoding": "gzip", vary: "accept-encoding" } });
   }
   return new Response(Bun.file(file), { headers: { ...headers, "content-type": type, vary: "accept-encoding" } });
-}
-
-/** A JSON answer gzipped when the browser takes it: a roadmap is a third of its size so. */
-export function gzipJson(res: Response, acceptEncoding: string): Response | Promise<Response> {
-  if (!res.headers.get("content-type")?.startsWith("application/json") || !/\bgzip\b/.test(acceptEncoding)) return res;
-  return res.arrayBuffer().then((body) => {
-    const headers = new Headers(res.headers);
-    headers.set("content-encoding", "gzip");
-    headers.append("vary", "accept-encoding");
-    headers.delete("content-length");
-    return new Response(Bun.gzipSync(new Uint8Array(body)) as BodyInit, { status: res.status, headers });
-  });
 }
