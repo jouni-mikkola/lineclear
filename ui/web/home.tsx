@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { lazy, Suspense, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { AddProject, type Browser, DispatcherHead, type DispatcherState, type InboxItem, Part, TheLine } from "../kit/index.ts";
 import { addProject, detect, findRepos, type HomeData, type Load } from "./data.ts";
 import { rowsOf } from "./home-rows.ts";
@@ -23,6 +23,7 @@ export function Home({
   sample,
   chat,
   chatState,
+  chatAsked,
   usageOpen,
   setUsageOpen,
 }: {
@@ -39,6 +40,8 @@ export function Home({
   /** The Dispatcher's chat, drawn in the column on the right. */
   chat: React.ReactNode;
   chatState: DispatcherState;
+  /** The address is `/chat`: on a phone the chat column is below the page, so it scrolls into view. */
+  chatAsked?: boolean;
   usageOpen: boolean;
   setUsageOpen: (open: boolean) => void;
 }) {
@@ -50,6 +53,10 @@ export function Home({
   // the card stays after Start, so what it said stays readable when the new project fills the page
   const [started, setStarted] = useState(false);
   const first = (home.status === "ok" && !home.data.projects.length) || started;
+  const column = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (chatAsked) column.current?.scrollIntoView({ block: "start" });
+  }, [chatAsked]);
   const repos = useQuery({ queryKey: ["repos", sample], queryFn: () => findRepos(sample), enabled: first, staleTime: Number.POSITIVE_INFINITY });
   if (home.status === "error") return <Part main state="error" label="Home" empty={{ text: "" }} error={home.error} onRetry={home.retry} />;
   const d = home.status === "ok" ? home.data : undefined;
@@ -111,6 +118,7 @@ export function Home({
         </section>
       </div>
       <aside
+        ref={column}
         aria-label="Dispatcher"
         className="flex min-h-[70dvh] flex-col border-line px-5 pb-6 lg:h-dvh lg:min-h-0 lg:w-[400px] lg:shrink-0 lg:border-l lg:px-0 lg:pb-0"
         data-chat-column

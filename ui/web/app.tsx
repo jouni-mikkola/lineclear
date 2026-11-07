@@ -182,6 +182,7 @@ function Page(p: PageProps) {
         sample={!!state}
         chat={<Chat chat={p.chat} panel />}
         chatState={p.panelState}
+        chatAsked={view === "chat"}
         usageOpen={p.usageOpen || view === "usage"}
         setUsageOpen={(o) => (o ? p.setUsageOpen(true) : view === "usage" ? p.go("/") : p.setUsageOpen(false))}
       />
