@@ -20,7 +20,7 @@ type RoleId = (typeof ROLES)[number]["id"];
 const NONE: SetupView = { harnesses: [], chosen: {} };
 
 /** The harnesses and accounts found and the models chosen per role. Read once a minute: finding them runs the harnesses. */
-const useSetup = (state: PageState | undefined) => useLoad("setup", "/api/setup", state, setupSample, NONE, true, hasLists("harnesses"), 60_000);
+export const useSetup = (state: PageState | undefined) => useLoad("setup", "/api/setup", state, setupSample, NONE, true, hasLists("harnesses"), 60_000);
 
 type Said = { text: string; failed?: boolean };
 
