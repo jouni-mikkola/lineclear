@@ -1,0 +1,102 @@
+name: install
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - install.sh
+      - pi/kit.json
+      - src/install-paths.ts
+      - src/uninstall.ts
+      - src/builds.ts
+      - .github/workflows/install.yml
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  install:
+    # A fresh Ubuntu virtual machine with systemd.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # The test tags are local, so the installer clones the checked-out workspace, not GitHub.
+      LINECLEAR_REPO: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          ref: ${{ github.sha }}
+
+      # pi needs Node.js 22.19 or newer, and its installer cannot ask for it without a terminal.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Start a systemd user session
+        run: |
+          sudo loginctl enable-linger "$USER"
+          uid=$(id -u)
+          until [ -S "/run/user/$uid/bus" ]; do sleep 1; done
+          echo "XDG_RUNTIME_DIR=/run/user/$uid" >> "$GITHUB_ENV"
+          echo "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus" >> "$GITHUB_ENV"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
+
+      # The release wants the pi and the packages pinned in pi/kit.json, not the newest pi the installer would take.
+      - name: Install the pinned agent kit
+        run: |
+          npm install -g "@earendil-works/pi-coding-agent@$(node -p 'require("./pi/kit.json").pi')"
+          node -e 'for (const [n, v] of Object.entries(require("./pi/kit.json").packages)) console.log(`npm:${n}@${v}`)' |
+            while read -r spec; do pi install "$spec"; done
+          pi --version
+
+      # A user installs a release, so the test tags the commit as one, in the checked-out copy only.
+      - name: Install the commit as a release
+        run: |
+          git tag v0.0.1 "$(git rev-parse HEAD)"
+          LINECLEAR_REF=v0.0.1 sh install.sh
+          test "$(readlink ~/.lineclear/builds/current)" = "$HOME/.lineclear/builds/0.0.1"
+
+      # The update's smoke check starts a coordinator chat, and pi will not start an agent without a model set.
+      - name: A newer release waits as a candidate
+        run: |
+          # the install starts the service and returns; `lineclear set` needs its port open
+          for _ in $(seq 60); do curl -fsS -m 3 -o /dev/null http://127.0.0.1:7421/api/snapshot && break; sleep 1; done
+          curl -fsS -m 3 -o /dev/null http://127.0.0.1:7421/api/snapshot
+          lineclear set coordinator.model claude-bridge/claude-sonnet-5-5
+          git tag v0.0.2 "$(git rev-parse HEAD)"
+          LINECLEAR_REF=v0.0.2 sh < install.sh
+          test -f ~/.lineclear/builds/0.0.2/.release
+          test "$(readlink ~/.lineclear/builds/current)" = "$HOME/.lineclear/builds/0.0.1"
+
+      - name: Doctor passes
+        run: |
+          lineclear doctor > "$RUNNER_TEMP/doctor" || true
+          cat "$RUNNER_TEMP/doctor"
+          if grep '^FAILED' "$RUNNER_TEMP/doctor"; then exit 1; fi
+          grep -q '^ok ' "$RUNNER_TEMP/doctor"
+
+      - name: A second install changes no file
+        run: |
+          # the server writes reads-cache.json and outbox.json as it runs, whatever the installer does
+          snap() {
+            find ~/.lineclear ~/.config/systemd/user ~/.local/bin/lineclear ~/.pi/agent/extensions/lineclear.ts \
+              -type f ! -name reads-cache.json ! -name outbox.json -print0 | sort -z | xargs -0 sha256sum
+            find ~/.lineclear ~/.config/systemd/user ~/.local/bin/lineclear ~/.pi/agent/extensions/lineclear.ts \
+              -type l -printf '%p %l\n' | sort
+          }
+          snap > "$RUNNER_TEMP/before"
+          LINECLEAR_REF=v0.0.2 sh < install.sh
+          snap > "$RUNNER_TEMP/after"
+          diff "$RUNNER_TEMP/before" "$RUNNER_TEMP/after"
+
+      - name: Uninstall leaves none of Lineclear's files
+        run: |
+          lineclear uninstall --all
+          # ~/.lineclear holds the user's tasks and builds, and uninstall keeps it
+          for p in ~/.local/share/lineclear ~/.lineclear/builds ~/.config/lineclear ~/.local/bin/lineclear \
+            ~/.pi/agent/extensions/lineclear.ts ~/.config/systemd/user/lineclear.service; do
+            if [ -e "$p" ] || [ -L "$p" ]; then echo "left behind: $p"; exit 1; fi
+          done
+          if systemctl --user is-active --quiet lineclear.service; then echo "service still running"; exit 1; fi

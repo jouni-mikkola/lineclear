@@ -1,0 +1,114 @@
+---
+name: lineclear-agent
+description: How a Lineclear task's agent takes its task from brief to merged - waiting for a go or a queue, working in its worktree, status reports, asking the human, the review its brief's Settings block asks for, proof in your chat, the ready summary and facts, the merge, refused merges and GitHub news on its pull request. Use when you are the agent of a Lineclear task, from its first message (the brief) until it is Done. Not for coordinators making, queuing or closing tasks (lineclear-coordinator), and not for chat lines or cards in general (lineclear).
+---
+
+# Lineclear agent
+
+## Trigger
+
+You are one Lineclear task's agent: your first message is its brief.
+
+## Scope
+
+The task from its brief to Done: the smallest change that does the brief. Follow-ups are named, not done. How to
+build, check and review the work is your own judgment.
+
+## Inputs
+
+- The brief: the human's words, then its Settings block, one line per setting, the source you follow: Review (on or
+  off), Reviewer, Must fix (the least severity to fix), Review rounds (at most), Merge (on its own, after GitHub
+  checks, or ask the human first) and Agent (what you run on, only so you know). A line in brackets says who changed
+  it from Lineclear's default. The brief's own words win over it.
+- Your prompt: the task id, worktree and branch, and how long this space's tasks took.
+- The repo's rules (`AGENTS.md`, `CLAUDE.md`, `REVIEW.md` where they exist), which say where its full checks run.
+
+## Roles
+
+- You decide what to fix and when it works.
+- A reviewer only reports: it never edits, and never says whether to merge.
+- The human decides each choice the brief leaves open that no experiment can settle, the merge when the brief says to
+  ask first, and anything irreversible (deleting data, production deploys, force-pushing others' branches, messages
+  outside), whatever the Merge setting says.
+
+## Procedure
+
+1. **Wait when told.** A brief that says to wait: `lineclear todo <id>`, one line that you have it, end your turn; a
+   later message that is not the go is answered, then `lineclear todo <id>` again. Queued after other tasks: one line
+   that you wait, end your turn, and start on `<go>`; a message that is a go: `lineclear task queue <id> --after none`
+   and start.
+2. **Work** in your worktree and branch only. Say how far along you are, `lineclear status <id> "<at most 40
+   characters>" --done <0-100> --left <5m, 1h20m>`, once you know the size of the work: `--left` is your own time until
+   `ready`, and Lineclear shows nothing you didn't report. Ask the human only what no experiment can settle: once, a
+   card with your recommended choice first, then end your turn (a turn ended without `ready` and nothing running in
+   the background shows Needs you). Decide the rest yourself and list those decisions in the facts.
+3. **Review**, unless Review is off or the brief says none: fresh eyes that didn't write the change (a subagent, or
+   a headless `pi -p` as the Reviewer setting suggests). Run a headless one in the
+   foreground, its stdin closed (or it waits on stdin forever) and under a timeout, with your shell's timeout at its
+   most: `timeout 540 pi -p "<prompt>" < /dev/null`. Never in the background, and never end
+   your turn while a review runs. Timed out or failed: one subagent review instead. Give it the authoritative command from your launch prompt and `LINECLEAR_CHAT=<task-id>/Reviewer` (never an inherited other task), the brief, the diff and the
+   repo's rules, never your own reasoning; ask for what this change
+   broke, left undone or added beyond the brief, each with proof and tagged critical (breaks or loses users' work),
+   major (a user would hit it, or it proves a claim false), minor (rarely hit) or trivial (style). These are major too,
+   since no check finds them: logic that repeats what the code already does elsewhere, a name that misleads, dead code
+   the change left behind, a comment that says what instead of why, and a change outside the step's files. When the
+   brief carries part pages, a change that breaks a part's invariant or its interface is critical. Fix every finding at
+   or above Must fix, then review again; stop once a round has none at or above it, or after Review rounds. Never agree
+   with a finding just to end the loop: one you judge wrong goes in the facts with why. Findings below the bar go in
+   the facts, unfixed; an open choice no experiment can settle goes to the human as a card.
+4. **Proof.** In your chat: what changed in one to three plain lines, each proof with a one-line caption, and a "Not
+   proven" list. Every proof is real and from this branch now; never staged, and a mocked test is no proof of what
+   users see. A bug fix first reproduces the bug: the same repro failing before and passing after. Its files stay out
+   of the commit.
+5. **Rebase** on the base. On GitHub, `lineclear pr <id>` pushes and opens a draft pull request; run it again after
+   each new commit. Once GitHub's checks passed on it, rebase again only for a conflict: each push runs them again.
+6. **Ready.** `lineclear ready <id> --summary "<what changed>" --facts "<facts>"`. The summary is at most 160
+   characters of plain words on what the human now sees or can do; detail goes in the chat or the proof. The facts are
+   for agents and the record, never the human's card, in this order, any failure moved to the front:
+
+       --facts "PR #31 (or branch work/7-x) · commit 1a2b3c4 · checks passed (bun run test, GitHub) · review: 2 rounds,
+       1 major fixed, 2 minor left (…) · decided: … · follow-ups: … · not proven: iOS Safari"
+
+7. **Merge.** When Settings merge on their own, `lineclear ready` is your last command: end your turn. Lineclear ends
+   your process, merges the branch, and starts you again only when a check fails, with the failing lines. Fix it,
+   commit, run `lineclear ready` again. Otherwise merge as the brief says: `lineclear merge <id>` (after `lineclear checks <id>` when it says to wait for GitHub's
+   checks), or ask first with `lineclear card "Merge <id>?" --choice "Merge" --choice "Not yet"`, end your turn and
+   merge on the yes. Run it in the foreground, on its own, and wait for its answer: it answers within two minutes.
+   Never in the background, piped into `tail`, or with your turn ended before it answers. No answer: do what it says.
+   From the first merge the task shows Merging: see it through. Once merged, leave the worktree alone: Lineclear puts
+   it away when your turn ends.
+8. Tell the human in one line that it is merged. Anything about setting up or testing this repo the next agent would
+   need and `AGENTS.md` lacks goes in one line, `For AGENTS.md: <the line>`, for the human to accept; never commit it.
+
+## Outputs
+
+The change committed on the branch, the proof in your chat, the ready summary and facts, then
+Done or the merge question.
+
+## Exceptions
+
+- `lineclear merge` reports a conflict: rebase, check, push and merge again, without asking. It says **You have a new
+  message in your chat**: handle that first, then merge again.
+- News from GitHub after ready (a failed check, a review, a comment) is only passed on. A failure your change caused:
+  fix it. One outside it (the base is red too): say so in one line. A clear wish that fits the brief: do it. Anything
+  else goes to the human in one short message. Then `lineclear ready` again.
+- A red check you can't fix, or a must-fix finding left open: report it ready with that at the front of the facts, and
+  don't merge.
+
+## Secret credentials
+
+Keep the launch-provisioned `LINECLEAR_SECRET_FILE` reference when forwarding tool environments. A reviewer you
+start may inherit your same-space authority; never include credential contents in its prompt, arguments or review
+output. A separate reviewer started by Lineclear receives its own scoped credential. Secret access failures are not
+fixed by changing chat/cwd, adding headers or starting a server. Legacy shared executors may need an approved restart;
+report that operational follow-up instead of using an unauthenticated fallback.
+
+## QC
+
+- Nothing merged on a red check you know of, or past "ask the human first"; nothing irreversible without their yes.
+- Each thing the brief asked for has a real proof or a "Not proven" line.
+- The summary says what changed for the human; failures lead the facts.
+
+## References
+
+[lineclear](../lineclear/SKILL.md): chat lines, cards.
