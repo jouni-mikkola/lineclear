@@ -11,6 +11,9 @@ import { EngineHandoff } from './engine-handoff.ts'
 const QUEUE_WAIT_MS = 15 * 60_000
 /** how long a ready task's agent may finish its turn before the board merges without ending it */
 const TURN_END_WAIT_MS = 2 * 60_000
+/** a merge at the head of the lane that found main red: it goes back to wait outside the lane */
+const HELD = Symbol('held by a red main')
+type Landed = { ok: boolean; error?: string; note?: string }
 
 export class EngineLand extends EngineHandoff {
   /**
@@ -64,11 +67,10 @@ export class EngineLand extends EngineHandoff {
     let run = this.landings.get(t.id)
     if (!run) {
       const repo = this.places.space(t.project)?.path ?? ''
-      // a red main holds every merge but its own fix, so one failure is not followed by more merges onto it. A held
-      // merge waits outside the lane until main is green, so the fix is never queued behind it
-      const held = t.by !== 'main-green' && !!this.data.red?.[repo]
-      run = held ? this.untilGreen(repo).then(() => this.enterLane(t, repo, !!opts.self)) : this.enterLane(t, repo, !!opts.self)
-      this.landings.set(t.id, run)
+      run = this.landWhenGreen(t, repo, !!opts.self)
+      const now = run
+      this.landings.set(t.id, now)
+      now.catch(() => undefined).then(() => this.landings.get(t.id) === now && this.landings.delete(t.id))
     }
     // its caller waits for the end, merged or stopped with a reason, however long git, GitHub or the check line take.
     // Past the deadline it may be gone (its shell moved it to the background): an error is then also sent to the agent
@@ -78,16 +80,33 @@ export class EngineLand extends EngineHandoff {
 
   protected redPoll = 5_000
 
-  protected async untilGreen(repo: string) {
-    while (this.data.red?.[repo] ) await Bun.sleep(this.redPoll)
+  /** a red main holds every merge but its own fix */
+  private heldByRed(t: TaskRec, repo: string) {
+    return t.by !== 'main-green' && !!this.data.red?.[repo]
+  }
+
+  /**
+   * One failure is not followed by more merges onto it. A held merge waits outside the lane until main is green, so
+   * the fix is never queued behind it, and looks again when its turn in the lane comes.
+   */
+  private async landWhenGreen(t: TaskRec, repo: string, self: boolean): Promise<Landed> {
+    for (;;) {
+      while (this.heldByRed(t, repo)) {
+        if (this.closing) return { ok: false, error: `Lineclear is restarting: nothing was merged. Run lineclear merge ${t.id} again in a minute.` }
+        await Bun.sleep(this.redPoll)
+      }
+      const r = await this.enterLane(t, repo, self)
+      if (r !== HELD) return r
+    }
   }
 
   /** a task's merge queued in its repo's lane, which takes one merge at a time */
-  private enterLane(t: TaskRec, repo: string, self: boolean) {
+  private enterLane(t: TaskRec, repo: string, self: boolean): Promise<Landed | typeof HELD> {
     const now = (this.merging.get(repo) ?? Promise.resolve())
-      .then(() => this.head(t, repo, self))
+      .then<Landed | typeof HELD>(() => (this.heldByRed(t, repo) ? HELD : this.head(t, repo, self)))
       // stopped short with nothing more to wait for (failed checks, GitHub refused): Ready again, or back at work
       .then(async (r) => {
+        if (r === HELD) return r
         if (!r.ok && t.landing?.step === 'merge') this.land(t)
         // what task show says when the caller never heard
         t.mergeStopped = r.ok ? undefined : (r.error ?? 'Merge failed.').slice(0, 300)
@@ -96,9 +115,7 @@ export class EngineLand extends EngineHandoff {
         this.landings.delete(t.id)
         return Lane.tellIfLeft(this.callerLeft.delete(t.id), r, (m) => this.sendBack(t, m))
       })
-    this.landings.set(t.id, now)
     const tail = now.catch(() => undefined)
-    tail.then(() => this.landings.get(t.id) === now && this.landings.delete(t.id))
     // the next merge into this repo waits until this one is really through, however long: two at once would write
     // over each other's main
     this.merging.set(repo, tail)
