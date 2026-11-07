@@ -18,6 +18,7 @@ import { appendFileSync } from 'node:fs'
 const send = (o) => process.stdout.write(JSON.stringify(o) + '\\n')
 let buf = ''
 let busy = false
+let timer
 process.stdin.on('data', (d) => {
   buf += d
   for (let i = buf.indexOf('\\n'); i >= 0; i = buf.indexOf('\\n')) {
@@ -30,9 +31,10 @@ process.stdin.on('data', (d) => {
       appendFileSync('${join(dir, 'told.txt')}', c.message + '\\n')
       send({ id: c.id, type: 'response', command: 'prompt', success: true, data: { disposition: 'started' } })
       send({ type: 'agent_start' })
-      setTimeout(() => {
+      clearTimeout(timer)
+      timer = setTimeout(() => {
         busy = false
-        send({ type: 'agent_settled', aborted: false })
+        send({ type: 'agent_settled', aborted: c.message.includes('STOP') })
       }, 600)
     }
   }
@@ -71,6 +73,11 @@ describe('a task agent as a pi RPC child', () => {
       await a.send(key, 'One more thing.')
       await until(() => a.status(key) === 'idle')
       await until(() => a.waiting(key).length === 0)
+      expect(a.aborted(key)).toBe(false)
+      await a.send(key, 'STOP now.')
+      await until(() => a.status(key) === 'working')
+      await until(() => a.status(key) === 'idle')
+      expect(a.aborted(key)).toBe(true)
       await a.finish(key)
       expect(a.status(key)).toBe('gone')
       expect(asked.filter((s) => s.includes('shep-rpc-1') || s.includes('rpc:'))).toEqual([])

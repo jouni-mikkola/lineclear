@@ -51,7 +51,6 @@ describe('To do: its agent waits for a go', () => {
     expect(w.engine.statusOf(t)).toBe('todo')
     // a go in its chat; its turn ends without it saying it waits again: it needs you, never To do
     await w.engine.tell(t.id, 'go')
-    w.agentIs(key, 'working')
     w.agentIs(key, 'idle')
     await until(() => w.engine.statusOf(t) === 'need')
   })

@@ -61,7 +61,6 @@ export interface TaskRec {
   reportedAt?: number
   /** when it was told that it is Ready with no review and no merge: once per Ready */
   readyNudged?: number
-  /** its brief was sent again because its agent never began on it: once */
   /** its place was put away once done: agent, space, worktree and branch (what lost nothing) */
   cleaned?: boolean
   /** what putting it away kept, and why ("~/x (uncommitted changes)") */

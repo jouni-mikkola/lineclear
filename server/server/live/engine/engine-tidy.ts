@@ -262,7 +262,7 @@ export class EngineTidy extends EngineMerge {
     }
     this.begun(t)
     this.relook(t)
-    if (st === 'working') this.answering.delete(t.id)
+    if (st === 'working' || st === 'idle') this.answering.delete(t.id)
     // at work: the go reached it
     if (st === 'working' && t.going) t.going = undefined
     // paused, it stopped; at work again on its own after that, it isn't paused any more

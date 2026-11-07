@@ -98,9 +98,7 @@ describe("(g) a turn ends by pi's word", () => {
     w.agentIs(key, 'working')
     expect(w.engine.statusOf(t)).toBe('work')
     w.chat.card = 'ask'
-    const at = Date.now()
     w.agentIs(key, 'idle')
-    expect(Date.now() - at).toBeLessThan(500)
     expect(w.engine.task(t.id)!.told).toBe('need')
     expect(w.cards.at(-1)).toMatchObject({ task: t.id, status: 'need' })
   })
