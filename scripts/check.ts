@@ -40,6 +40,7 @@ import {
 import { fastGates } from "./fast-gates.ts";
 import { describeFailure, type Failure, outsideChange, parseFailures } from "./failures.ts";
 import { changedSince } from "./gates/tools.ts";
+import { aloneArgs, judge, readQuarantine } from "./quarantine.ts";
 
 // Every step but the server's (below) runs with TMPDIR in a folder of this run, on disk. Each test process clears its own
 // folder inside it (tmp-scope.ts), so anything left in it when the steps end was left by a process that did not get
@@ -220,6 +221,32 @@ async function run(step: Step): Promise<{ code: number; failing: Failure[]; outp
   return { code: await p.exited, failing: [...parseFailures(out), ...parseFailures(err)], output: out + err };
 }
 
+/** Each failed test runs again alone, the root's and the server's alike. A flake (passes alone) in test/quarantine.json, or with room left in it, no longer fails the step. */
+async function rerunAlone(step: Step, failing: Failure[]): Promise<{ real: Failure[]; notes: string[] }> {
+  const passes = new Map<string, boolean>();
+  // the server's entries are listed as `server/<file>`; its step prints files from its own folder
+  const inServerStep = step.cwd === "server";
+  const listed = readQuarantine()
+    .filter((q) => q.file.startsWith("server/") === inServerStep)
+    .map((q) => ({ ...q, file: q.file.replace(/^server\//, "") }));
+  for (const f of failing) {
+    const p = Bun.spawn([process.execPath, ...aloneArgs(f)], {
+      cwd: step.cwd,
+      stdin: "ignore",
+      stdout: "ignore",
+      stderr: "ignore",
+      env: step.cwd === "server" ? serverEnv : env,
+    });
+    passes.set(`${f.file}\0${f.test}`, (await p.exited) === 0);
+  }
+  const verdict = judge(failing, (f) => passes.get(`${f.file}\0${f.test}`) === true, listed);
+  const notes = [
+    ...verdict.quarantined.map((f) => `check: quarantined flake, passed alone: ${f.file} > ${f.test}`),
+    ...verdict.unlisted.map((f) => `check: flake, passed alone: ${f.file} > ${f.test}: add it to test/quarantine.json with its fix task`),
+  ];
+  return { real: verdict.real, notes };
+}
+
 // read again once the steps are through: the machine may have got busy while they ran
 const measure = loadFactorMeter();
 let factor = measure();
@@ -233,9 +260,15 @@ async function runStep(step: Step): Promise<boolean> {
   await null;
   for (const need of step.needs ?? []) if (!(await outcome.get(need))) return false;
   const at = performance.now();
-  const { code, failing, output } = await run(step);
+  const first = await run(step);
+  const { failing, output } = first;
   const isTests = step.name.startsWith("tests");
-  const ok = code === 0;
+  let ok = first.code === 0;
+  if (!ok && failing.length > 0 && (isTests || step.name === "server tests")) {
+    const { real, notes } = await rerunAlone(step, failing);
+    if (notes.length > 0) console.error(notes.join("\n"));
+    ok = real.length === 0;
+  }
   times.push({ step: step.name, seconds: (performance.now() - at) / 1000, ok });
   if (!ok) {
     console.error(
