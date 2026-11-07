@@ -7,7 +7,7 @@ import { readJson } from "../pi/config.ts";
 import { failureTail } from "./secrets.ts";
 import { copiesProblem, runByNote } from "./store-copies.ts";
 import { follows, type ReleaseState, readRelease, releaseLines } from "./release.ts";
-import { cacheEnvFile, dataDir, extensionFile, INSTALL_URL, type Paths, SERVICE, serverBin } from "./paths.ts";
+import { cacheEnvFile, dataDir, extensionFile, INSTALL_URL, type Paths, SERVICE } from "./paths.ts";
 import { diskTrouble, freeBytes } from "./health.ts";
 import { readModelFile } from "./models.ts";
 import { checkoutPointers } from "./install-paths.ts";
