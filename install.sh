@@ -2,8 +2,9 @@
 # Installs Lineclear, and updates it when run again:
 #   curl -fsSL https://raw.githubusercontent.com/jouni-mikkola/lineclear/main/install.sh | sh
 # LINECLEAR_REF picks a branch, tag or full commit id (default: main). LINECLEAR_REPO picks another repository.
-# A release tag (v1.2.3, made by `bun run release`) is built in
-# ~/.lineclear/builds/1.2.3 and run from builds/current, with the build before it as builds/previous.
+# Every version is built once in ~/.lineclear/builds/<name> (the release number, or the commit for a branch), with no .git.
+# An update points builds/current at the new build, with the build before it as builds/previous; a failed update points
+# current back. The service and the command run from builds/current.
 # The work is in functions and runs on the last line, so a cut download does nothing.
 set -eu
 
@@ -65,7 +66,7 @@ drop_old_extensions() {
 
 # The commit a ref names on the remote, or nothing when the ref is not a branch or tag there.
 remote_commit() {
-  git -C "$app" ls-remote origin "refs/heads/$ref" "refs/tags/$ref" "refs/tags/$ref^{}" |
+  git ls-remote "$repo" "refs/heads/$ref" "refs/tags/$ref" "refs/tags/$ref^{}" |
     awk '{ if ($2 ~ /\^\{\}$/) peeled = $1; else first = (first == "" ? $1 : first) } END { print (peeled != "" ? peeled : first) }'
 }
 
@@ -111,115 +112,81 @@ install_tools() {
 }
 
 # A promotion has just installed and built this commit in the cache's next clone (it says so in .lineclear-built): copy that
-# work when next is at $head and its lockfiles match, so the same commit is not built twice. Returns 1 (nothing copied) otherwise.
+# work into the build folder $1 when next is at $head and its lockfiles match, so the same commit is not built twice.
+# Returns 1 (nothing copied) otherwise.
 reuse_next() {
   next=${XDG_CACHE_HOME:-$HOME/.cache}/lineclear/next
-  [ "$next" != "$app" ] && [ -d "$next/ui/web/dist" ] && [ -d "$next/node_modules" ] && [ -d "$next/server/node_modules" ] || return 1
+  [ "$next" != "$1" ] && [ -d "$next/ui/web/dist" ] && [ -d "$next/node_modules" ] && [ -d "$next/server/node_modules" ] || return 1
   [ "$(git -C "$next" rev-parse HEAD 2>/dev/null || true)" = "$head" ] && [ "$(cat "$next/.lineclear-built" 2>/dev/null || true)" = "$head" ] || return 1
-  cmp -s "$next/bun.lock" "$app/bun.lock" && cmp -s "$next/server/bun.lock" "$app/server/bun.lock" || return 1
+  cmp -s "$next/bun.lock" "$1/bun.lock" && cmp -s "$next/server/bun.lock" "$1/server/bun.lock" || return 1
   say "Lineclear: reusing the build of $(printf %.7s "$head")"
-  rm -rf "$app/node_modules" "$app/server/node_modules" "$app/ui/web/dist"
-  cp -a "$next/node_modules" "$app/node_modules" && cp -a "$next/server/node_modules" "$app/server/node_modules" \
-    && cp -a "$next/ui/web/dist" "$app/ui/web/dist" || { rm -rf "$app/node_modules" "$app/server/node_modules" "$app/ui/web/dist"; return 1; }
+  cp -a "$next/node_modules" "$1/node_modules" && cp -a "$next/server/node_modules" "$1/server/node_modules" \
+    && cp -a "$next/ui/web/dist" "$1/ui/web/dist" || { rm -rf "$1/node_modules" "$1/server/node_modules" "$1/ui/web/dist"; return 1; }
 }
 
-# Installs the dependencies and builds the web pages for the commit in $app, unless that was done for it already.
-# The stamp says which commit they were made for, so a failed install is tried again.
+# Installs the dependencies and builds the web pages of the fresh checkout $1 (of commit $head).
 build_deps() {
-  stamp=$app/node_modules/.lineclear-installed
-  head=$(git -C "$app" rev-parse HEAD)
-  [ "$(cat "$stamp" 2>/dev/null || true)" != "$head" ] || return 0
-  if reuse_next; then printf '%s\n' "$head" >"$stamp"; changed=1; return 0; fi
-  (cd "$app" && bun install --frozen-lockfile --silent) || return 1
+  reuse_next "$1" && return 0
+  (cd "$1" && bun install --frozen-lockfile --silent) || return 1
   # the fork's push code, which sends the Inbox alerts, needs its own packages
-  (cd "$app/server" && bun install --frozen-lockfile --silent) || return 1
+  (cd "$1/server" && bun install --frozen-lockfile --silent) || return 1
   say "Lineclear: building the web pages"
-  (cd "$app" && quiet bun run web:build) || return 1
-  printf '%s\n' "$head" >"$stamp"
-  changed=1
+  (cd "$1" && quiet bun run web:build)
 }
 
-# A release (a version tag made by `bun run release`) is built once in its own folder, builds/<version>, with no .git. Its
-# .release file is written last, so a folder without one is an unfinished build and is made again.
+# A release is a version tag made by `bun run release`.
 is_release() { printf '%s' "$ref" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; }
 builds_dir() { printf '%s/builds' "$(data_dir)"; }
 
-# install_release: builds the tag in $ref and points builds/current at it, builds/previous at the build it replaces.
-# Sets changed=1 when current moved. The service and the command run from builds/current.
-install_release() {
-  changed=0
-  builds=$(builds_dir)
-  dest=$builds/${ref#v}
+# point <target> <link>: points the link at the target in one step, so no reader ever finds it missing.
+point() {
+  rm -f "$2.new"
+  ln -s "$1" "$2.new" && mv -fT "$2.new" "$2"
+}
+
+# install_build: builds the wanted version once in builds/<name> and points builds/current at it, builds/previous at the
+# build it replaces. Its .built file is written last, so a folder without one is an unfinished build and is made again.
+# A release build also has .release, which doctor looks for; a build of a branch does not, so doctor still asks for a release.
+# Sets changed=1 when current moved, and arms the rollback when a running service was on an earlier build.
+install_build() {
   mkdir -p "$builds"
-  if [ ! -f "$dest/.release" ]; then
-    say "Lineclear: installing release ${ref#v}"
-    rm -rf "$dest"
-    git clone -q --branch "$ref" "$repo" "$dest" >/dev/null 2>&1 || { rm -rf "$dest"; die "could not get the release $ref from $repo"; }
-    root=$app; app=$dest
-    build_deps || { rm -rf "$dest"; die "building the release failed"; }
-    app=$root
-    rm -rf "$dest/.git"
-    printf '%s\n' "${ref#v}" >"$dest/.release"
+  want=$(remote_commit)
+  if is_release; then name=${ref#v}; else name=$(printf '%.12s' "${want:-$ref}"); fi
+  dest=$builds/$name
+  if [ -f "$dest/.built" ] || [ -f "$dest/.release" ]; then
+    say "Lineclear: $name is built already"
   else
-    say "Lineclear: release ${ref#v} is built already"
+    say "Lineclear: installing $name"
+    rm -rf "$dest"
+    mkdir -p "$dest"
+    git -C "$dest" init -q && git -C "$dest" remote add origin "$repo" && git -C "$dest" fetch -q --depth 1 origin "$ref" \
+      && git -C "$dest" checkout -q -f --detach FETCH_HEAD || { rm -rf "$dest"; die "could not get $ref from $repo"; }
+    head=$(git -C "$dest" rev-parse HEAD)
+    build_deps "$dest" || { rm -rf "$dest"; die "building $name failed"; }
+    rm -rf "$dest/.git"
+    if is_release; then printf '%s\n' "$name" >"$dest/.release"; fi
+    printf '%s\n' "$name" >"$dest/.built"
   fi
   was=$(readlink "$builds/current" 2>/dev/null || true)
-  if [ "$was" != "$dest" ]; then
-    [ -z "$was" ] || ln -sfn "$was" "$builds/previous"
-    ln -sfn "$dest" "$builds/current"
-    changed=1
+  # an install made before builds/ ran from a checkout in $app: it is the build to go back to
+  if [ -z "$was" ] && [ -d "$app/.git" ]; then was=$app; fi
+  [ "$was" != "$dest" ] || return 0
+  if [ -n "$was" ]; then
+    point "$was" "$builds/previous"
+    if [ "$active" -eq 1 ]; then armed=1; fi
   fi
-  code=$builds/current
-  link "$code/bin/lineclear" "$bindir/lineclear"
-  extension_file "$code" "$ext"
-  drop_old_extensions "$(dirname "$ext")"
-  say "Lineclear: command in $bindir, pi extension in $ext"
+  point "$dest" "$builds/current"
+  changed=1
 }
 
-# The update failed: builds/current goes back to the build before it.
-rollback_release() {
-  was=$(readlink "$builds/previous" 2>/dev/null || true)
-  say "Lineclear: the update failed ($1)."
-  if [ -n "$was" ] && [ -d "$was" ]; then
-    ln -sfn "$was" "$builds/current"
-    restore_projects
-    restart_all || true
-    say "Lineclear: back on $(basename "$was")"
-  fi
-  exit 1
-}
-
-# Puts the wanted version in $app. Sets changed=1 when the code is new.
-install_lineclear() {
-  changed=0
-  if [ ! -d "$app/.git" ]; then
-    [ -e "$app" ] && [ -n "$(ls -A "$app" | grep -v '^store-copies$')" ] && die "$app exists and is not a Lineclear checkout. Move it away, then run this again."
-    say "Lineclear: installing $ref"
-    mkdir -p "$app"
-    git -C "$app" init -q
-    git -C "$app" remote add origin "$repo"
-    changed=1
-  else
-    # set-url rewrites .git/config even when the URL is the same: a second install changes no file
-    [ "$(git -C "$app" remote get-url origin 2>/dev/null)" = "$repo" ] || git -C "$app" remote set-url origin "$repo"
-    want=$(remote_commit)
-    [ -n "$want" ] || want=$ref
-    if [ "$(git -C "$app" rev-parse HEAD 2>/dev/null || true)" = "$want" ]; then
-      say "Lineclear: already at $ref"
-    else
-      say "Lineclear: updating to $ref"
-      changed=1
-    fi
-  fi
-  if [ "$changed" -eq 1 ]; then
-    git -C "$app" fetch -q --depth 1 origin "$ref"
-    git -C "$app" checkout -q -f --detach FETCH_HEAD
-  fi
-  build_deps || die "building the dependencies failed"
-  link "$app/bin/lineclear" "$bindir/lineclear"
-  extension_file "$app" "$ext"
-  drop_old_extensions "$(dirname "$ext")"
-  say "Lineclear: command in $bindir, pi extension in $ext"
+# Removes the builds that are neither current nor previous.
+prune_builds() {
+  keep_now=$(readlink "$builds/current" 2>/dev/null || true)
+  keep_was=$(readlink "$builds/previous" 2>/dev/null || true)
+  for old in "$builds"/*; do
+    [ -d "$old" ] && [ ! -L "$old" ] || continue
+    [ "$old" = "$keep_now" ] || [ "$old" = "$keep_was" ] || rm -rf "$old"
+  done
 }
 
 # write_unit <file> <description> <command>: writes a user unit when its text changed. Sets changed=1 when it did.
@@ -299,12 +266,7 @@ install_service() {
   fi
   systemctl --user enable --now lineclear.service >/dev/null 2>&1 || die "the service did not start. Run 'systemctl --user status lineclear.service'."
   if [ "$changed" -eq 1 ]; then restart_all; fi
-  sleep 1
-  if systemctl --user is-active --quiet lineclear.service; then
-    say "Service: lineclear.service is running"
-  else
-    say "Service: lineclear.service is not staying up. See 'systemctl --user status lineclear.service'."
-  fi
+  say "Service: lineclear.service is started; the check after an update waits for it"
 }
 
 projects_dir() { printf '%s/projects' "${LINECLEAR_CONFIG:-$HOME/.config/lineclear}"; }
@@ -396,63 +358,57 @@ restore_store() {
   rm -f "$(data_dir)/store-refused.txt"
 }
 
-# The version and the task count after a rollback, said and checked: a rollback that leaves either wrong is told, not hidden.
-verify_back() {
-  problems=
-  [ "$(git -C "$app" rev-parse HEAD 2>/dev/null || true)" = "$prev" ] || problems="the version is not $short"
-  if store_lost; then
-    if restore_store && restart_all; then say "Lineclear: the update had lost tasks; the store is back ($tasks_before tasks)"; else problems="$problems; the store lost tasks and could not be put back from $store_copy"; fi
-    store_lost && problems="$problems; the store holds fewer than the $tasks_before tasks from before"
-  fi
-  problems=$(printf '%s' "$problems" | sed 's/^; //')
-  if [ -n "$problems" ]; then
-    say "Lineclear: after the rollback: $problems. Run 'lineclear doctor'."
-    bun "$app/scripts/smoke.ts" post "After putting $short back: $problems." >/dev/null 2>&1 || true
-  fi
-}
-
-# rollback <what failed>: posts the Inbox item, puts the previous version back and restarts the service on it.
+# The single way back. It posts the Inbox item, points builds/current at builds/previous, puts the projects' settings and
+# a store that lost tasks back, and restarts the service on the old build.
 rollback() {
   armed=0
-  short=$(printf '%.7s' "$prev")
-  say "Lineclear: the update failed ($1). Putting $short back."
-  bun "$app/scripts/smoke.ts" post "The update to $(git -C "$app" rev-parse --short HEAD 2>/dev/null || echo new) failed: $1. Putting $short back." >/dev/null 2>&1 ||
-    say "Lineclear: could not post the Inbox item"
-  # the new version may have half built the packages, and may have changed the projects: both are made right again
-  rm -f "$app/node_modules/.lineclear-installed"
-  if git -C "$app" checkout -q -f --detach "$prev" && build_deps && restore_projects && restart_all; then
-    say "Lineclear: back on $short"
-    verify_back
-  else
-    say "Lineclear: could not put $short back. Run 'lineclear doctor'."
-    bun "$app/scripts/smoke.ts" post "Putting $short back failed. Lineclear may not be running: run lineclear doctor." >/dev/null 2>&1 || true
+  was=$(readlink "$builds/previous" 2>/dev/null || true)
+  say "Lineclear: the update failed ($1)."
+  if [ -z "$was" ] || [ ! -d "$was" ]; then
+    say "Lineclear: there is no earlier build to go back to. Run 'lineclear doctor'."
+    exit 1
   fi
+  short=$(basename "$was")
+  say "Lineclear: putting $short back."
+  bun "$was/scripts/smoke.ts" post "The update to $(basename "$dest") failed: $1. Putting $short back." >/dev/null 2>&1 ||
+    say "Lineclear: could not post the Inbox item"
+  point "$was" "$builds/current"
+  rm -f "$builds/previous"
+  rm -rf "$dest" # a failed build is made again next time
+  problems=
+  restore_projects && restart_all || problems="the service did not restart"
+  if store_lost; then
+    if restore_store && restart_all; then say "Lineclear: the update had lost tasks; the store is back ($tasks_before tasks)"; else problems="$problems; the store lost tasks and could not be put back from $store_copy"; fi
+  fi
+  if store_lost; then problems="$problems; the store holds fewer than the $tasks_before tasks from before"; fi
+  problems=$(printf '%s' "$problems" | sed 's/^; //')
+  if [ -n "$problems" ]; then
+    say "Lineclear: after putting $short back: $problems. Run 'lineclear doctor'."
+    bun "$was/scripts/smoke.ts" post "After putting $short back: $problems." >/dev/null 2>&1 || true
+  else
+    say "Lineclear: back on $short"
+  fi
+  exit 1
 }
 
 on_exit() {
-  code=$?
+  status=$?
   trap - EXIT
   rm -rf "${projects_before:-}"
-  if [ "$armed" -eq 1 ] && [ "$code" -ne 0 ] && [ "$(git -C "$app" rev-parse HEAD 2>/dev/null || true)" != "$prev" ]; then
-    rollback "the install stopped before it finished"
-  fi
-  exit "$code"
+  if [ "$armed" -eq 1 ] && [ "$status" -ne 0 ]; then rollback "the install stopped before it finished"; fi
+  exit "$status"
 }
 
-fail_update() { if is_release; then rollback_release "$1"; else rollback "$1"; fi; }
-
-# After the restart: the web pages, the Lineclear API and a chat message must work within 2 minutes, and each project
-# must be Running or Paused as it was.
+# After the restart: the web pages, the Lineclear API and a chat message must work, and each project must be Running
+# or Paused as it was. The smoke check ends when they do.
 smoke() {
-  say "Lineclear: checking the new version (up to 2 minutes)"
-  failed=$(bun "$code/scripts/smoke.ts" check "$projects_before" "$api_before" 2>&1) && {
-    if store_lost; then
-      fail_update "the task store holds $(store_tasks "$(data_dir)") tasks, it held $tasks_before before the update"
-      exit 1
-    fi
-    say "Lineclear: the new version works"; return 0; }
-  fail_update "$(printf '%s' "$failed" | tr '\n' ';' | sed 's/;$//;s/;/; /g')"
-  exit 1
+  say "Lineclear: checking the new version"
+  failed=$(bun "$code/scripts/smoke.ts" check "$projects_before" "$api_before" 2>&1) ||
+    rollback "$(printf '%s' "$failed" | tr '\n' ';' | sed 's/;$//;s/;/; /g')"
+  if store_lost; then
+    rollback "the task store holds $(store_tasks "$(data_dir)") tasks, it held $tasks_before before the update"
+  fi
+  say "Lineclear: the new version works"
 }
 
 # Lingering starts the user service at boot with no login. Where it needs root, the one command is printed instead.
@@ -467,26 +423,6 @@ enable_linger() {
   fi
 }
 
-# The install of a release: see install_release. A failed smoke check puts builds/previous back as current.
-main_release() {
-  install_tools
-  armed=0; api_before=noapi
-  projects_before=$(mktemp -d)
-  active=0
-  if systemctl --user is-active --quiet lineclear.service 2>/dev/null; then
-    active=1
-    save_projects "$projects_before"
-    if api_up; then api_before=api; fi
-  fi
-  save_store
-  install_release
-  "$bindir/lineclear" store copy >/dev/null 2>&1 || true
-  install_service
-  if [ "$active" -eq 1 ] && [ "$changed" -eq 1 ]; then smoke; fi
-  rm -rf "$projects_before"
-  enable_linger
-  say "Done. Run 'lineclear doctor' to check it."
-}
 
 main() {
   repo=${LINECLEAR_REPO:-https://github.com/jouni-mikkola/lineclear.git}
@@ -499,32 +435,31 @@ main() {
   path_before=$PATH
   PATH="$bindir:$HOME/.bun/bin:$PATH"
   export PATH
-  code=$app
-  if is_release; then main_release; return; fi
+  builds=$(builds_dir)
+  code=$builds/current
+  changed=0; armed=0; api_before=noapi; active=0
+  projects_before=$(mktemp -d)
+  # a stop (Ctrl-C, a dropped SSH session) runs the EXIT trap too
+  trap 'exit 130' INT TERM HUP
+  trap on_exit EXIT
 
   install_tools
-  # The version running now is kept: a failed update puts it back (rollback).
-  prev=; armed=0; api_before=noapi
-  projects_before=$(mktemp -d)
-  if [ -d "$app/.git" ] && systemctl --user is-active --quiet lineclear.service 2>/dev/null; then
-    prev=$(git -C "$app" rev-parse HEAD 2>/dev/null || true)
-    if [ -n "$prev" ]; then
-      save_projects "$projects_before"
-      if api_up; then api_before=api; else api_before=noapi; fi
-      armed=1
-      # a stop (Ctrl-C, a dropped SSH session) runs the EXIT trap too
-      trap 'exit 130' INT TERM HUP
-      trap on_exit EXIT
-    fi
+  if systemctl --user is-active --quiet lineclear.service 2>/dev/null; then
+    active=1
+    save_projects "$projects_before"
+    if api_up; then api_before=api; fi
   fi
-  [ -d "$app/.git" ] && save_store
-  install_lineclear
+  save_store
+  install_build
+  link "$code/bin/lineclear" "$bindir/lineclear"
+  extension_file "$code" "$ext"
+  drop_old_extensions "$(dirname "$ext")"
+  say "Lineclear: command in $bindir, pi extension in $ext"
   "$bindir/lineclear" store copy >/dev/null 2>&1 || true # the hourly copy doctor looks for, at once
-  [ -z "$prev" ] || [ "$(git -C "$app" rev-parse HEAD)" = "$prev" ] || git -C "$app" update-ref refs/lineclear/previous "$prev"
   install_service
-  if [ "$armed" -eq 1 ] && [ "$(git -C "$app" rev-parse HEAD)" != "$prev" ]; then smoke; fi
+  if [ "$armed" -eq 1 ]; then smoke; fi
   armed=0
-  rm -rf "$projects_before"
+  prune_builds
   enable_linger
 
   case ":$path_before:" in

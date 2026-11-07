@@ -1,14 +1,16 @@
 import { beforeAll, expect, setDefaultTimeout, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, readdirSync, readlinkSync, rmSync, writeFileSync } from "node:fs";
+import { basename, join } from "node:path";
 import { loadFactor } from "../scripts/check-speed.ts";
-import { sh } from "./helpers.ts";
 import { installFixture } from "./install-fixture.ts";
 
 // Each test runs install.sh for real: 30 s covers an idle machine, and the limit grows with the load.
 setDefaultTimeout(30_000 * loadFactor());
 
-const { home, repo, state, app, git, install, passes } = await installFixture();
+const { home, repo, state, current, git, install, passes } = await installFixture();
+
+/** The build folder the service runs from. */
+const running = () => readlinkSync(current);
 
 // two files, so the rollback tests run beside the install tests and each other in other jobs
 beforeAll(() => passes(install()), 180_000);
@@ -42,30 +44,29 @@ const inbox = (): { kind: string; question: string }[] => {
 };
 
 test("an update that breaks the chat is rolled back, and the Inbox says so", () => {
-  const before = sh(["git", "-C", app, "rev-parse", "HEAD"]).out.trim();
+  const before = running();
   const restarts = () =>
     readFileSync(join(state, "systemctl.log"), "utf8")
       .split("\n")
       .filter((l) => l.includes("--user restart lineclear.service")).length;
   const restartedBefore = restarts();
-  const { r, good } = installBroken("chat");
-  expect(before).toBe(good);
+  const { r } = installBroken("chat");
   expect(r.code).not.toBe(0);
-  expect(sh(["git", "-C", app, "rev-parse", "HEAD"]).out.trim()).toBe(before);
-  expect(existsSync(join(app, "BROKEN"))).toBe(false);
+  expect(running()).toBe(before);
+  expect(existsSync(join(current, "BROKEN"))).toBe(false);
   expect(restarts()).toBe(restartedBefore + 2); // on the new version, then back on the old one
   const items = inbox();
   expect(items).toHaveLength(1);
   expect(items[0]!.kind).toBe("stuck");
   expect(items[0]!.question).toContain("a coordinator chat does not accept a message");
-  expect(items[0]!.question).toContain(`Putting ${before.slice(0, 7)} back`);
+  expect(items[0]!.question).toContain(`Putting ${basename(before)} back`);
 }, 180_000);
 
 test("an update that pauses a Running project is rolled back too", () => {
   const { r, after } = installBroken("paused");
   expect(r.code).not.toBe(0);
   expect(after.paused).toBeUndefined(); // the project is Running again, not only the code back
-  expect(existsSync(join(app, "BROKEN"))).toBe(false);
+  expect(existsSync(join(current, "BROKEN"))).toBe(false);
   const items = inbox();
   expect(items).toHaveLength(2);
   expect(items[1]?.question).toContain("p is Paused, it was Running");
