@@ -27,9 +27,16 @@ export interface WorkLine {
   reason: string;
 }
 
-/** One line of work done for `task` on this machine (or `machine` when the server acts for another). */
-export function recordWork(task: string, work: Work, env: Env = process.env, machine = machineOf(env)): void {
+const REPEAT_SPAN_MS = 30 * 60_000;
+const lastWritten = new Map<string, number>();
+
+/** One line of work done for `task` on this machine (or `machine` when the server acts for another). The same line again within half an hour is not written: a tick that starts the same agent over and over is one fact. */
+export function recordWork(task: string, work: Work, env: Env = process.env, machine = machineOf(env), now = Date.now()): void {
   const file = decisionsFile(env);
+  const key = `${file}\n${task}\n${work}\n${machine}`;
+  const before = lastWritten.get(key);
+  if (before !== undefined && now - before < REPEAT_SPAN_MS) return;
+  lastWritten.set(key, now);
   mkdirSync(dirname(file), { recursive: true });
   const line: WorkLine = { time: new Date().toISOString(), project: "-", step: task, kind: "run", work, machine, reason: `${work} ran on ${machine}` };
   appendFileSync(file, `${JSON.stringify(line)}\n`);
