@@ -25,6 +25,12 @@ test("a missing tool is one problem with its installer command", () => {
   expect(herdr?.fix).toBe("curl -fsSL https://herdr.dev/install.sh | sh");
 });
 
+test("doctor prints the model a new task would use", () => {
+  const lines: string[] = [];
+  doctor(probe({ newTaskModel: "fakeco/zeta-1" }), (l) => lines.push(l));
+  expect(lines).toContain("ok     new task model: fakeco/zeta-1");
+});
+
 test("doctor does not ask for herdr-projects 2.0 to be installed", () => {
   const names = doctorChecks(probe()).map((c) => c.name);
   expect(names).not.toContain("herdr-projects");

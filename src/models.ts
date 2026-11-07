@@ -258,6 +258,16 @@ export function chooseModel(kind: string, model?: string): string | undefined {
   return `No model is set for ${kind}. Choose one of: ${c.models.map((m) => m.id).join(", ")}.`;
 }
 
+/** the model a start takes when none is set: the first one pi lists, nothing for a CLI that picks its own */
+export const defaultModel = (kind: string): string | undefined => modelsOf(kind)?.models[0]?.id;
+
+/** the model a start runs on, and the note for its facts when Lineclear chose it; no pick when the CLI lists nothing */
+export function startModel(kind: string, model?: string): { model?: string; note?: string } {
+  if (!chooseModel(kind, model)) return { model };
+  const pick = defaultModel(kind);
+  return pick ? { model: pick, note: `No model was set for ${kind}, so Lineclear chose ${pick}, the first one available.` } : { model };
+}
+
 /** for tests: how a fresh server reads the harnesses, before any read happened */
 export function setRegistryReader(read: () => ModelEntry[]) {
   readEntries = read;

@@ -1,6 +1,6 @@
 // pi's models and effort levels, as the registry lists them (src/models.ts)
 import { describe, expect, test } from 'bun:test'
-import { chooseModel, findModel, modelsOf, nearest, setRegistry, setRegistryReader } from '../../src/models.ts'
+import { chooseModel, findModel, modelsOf, nearest, setRegistry, setRegistryReader, startModel } from '../../src/models.ts'
 
 describe('reading what pi takes', () => {
   test('the registry lists a model no table knows, and a start with no model set is refused', () => {
@@ -17,6 +17,23 @@ describe('reading what pi takes', () => {
     }
     expect(modelsOf('pi')!.models).toEqual([])
     expect(chooseModel('pi')).toBeUndefined()
+  })
+  test('a start with no model takes the first available one and notes it', () => {
+    setRegistry([
+      { harness: 'pi', provider: 'fakeco', name: 'zeta-1' },
+      { harness: 'pi', provider: 'fakeco', name: 'zeta-2' },
+    ])
+    try {
+      const s = startModel('pi', '')
+      expect(s.model).toBe('fakeco/zeta-1')
+      expect(s.note).toContain('fakeco/zeta-1')
+      expect(chooseModel('pi', s.model)).toBeUndefined()
+      expect(startModel('pi', 'zeta-2')).toEqual({ model: 'zeta-2' })
+      expect(startModel('gemini')).toEqual({ model: undefined })
+    } finally {
+      setRegistry([])
+    }
+    expect(startModel('pi', '').note).toBeUndefined()
   })
   test('a fresh server reads the registry before it answers the first time', () => {
     setRegistryReader(() => [{ harness: 'pi', provider: 'fakeco', name: 'zeta-1' }])

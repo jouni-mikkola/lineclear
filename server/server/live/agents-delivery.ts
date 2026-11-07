@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { dirname } from 'node:path'
 import { herdr, paneEvents, type AgentInfo, type AgentStatus, type HerdrEvent } from './herdr.ts'
 import { findLog, logKind } from './readers/find.ts'
-import { chooseModel, effortFor, modelArg } from '../../../src/models.ts'
+import { chooseModel, effortFor, startModel, modelArg } from '../../../src/models.ts'
 import * as task from './mfs.ts'
 import { agentEnv, BOX } from './box.ts'
 import { ROOT } from '../root.ts'
@@ -285,8 +285,13 @@ export class AgentsDelivery extends AgentsState {
     this.byName.set(r.name, r.key)
     this.save()
     task.mkdirSync(r.cwd, { recursive: true })
-    const unset = chooseModel(r.kind, r.model)
+    const start = startModel(r.kind, r.model)
+    const unset = chooseModel(r.kind, start.model)
     if (unset) throw new Error(unset)
+    if (start.note) {
+      r.model = start.model
+      this.save()
+    }
     const pane = place ? await place() : await this.paneFor(r, was)
     this.startedIn.set(r.key, pane)
     const args = this.args(r, !!resume)
@@ -324,6 +329,7 @@ export class AgentsDelivery extends AgentsState {
       [
         r.kind !== 'pi' && (!resume || changedPrompt) && r.system ? hidden(r.system) : '',
         lost ? hidden('Your earlier conversation could not be resumed. Read your brief and your branch, then carry on from where you were.') : '',
+        start.note ? hidden(start.note) : '',
         first ?? '',
       ].filter(Boolean),
       true,

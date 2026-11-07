@@ -65,6 +65,8 @@ export interface Probe {
   ci?: boolean;
   /** The failed starts of the last 24 hours, one entry per machine. */
   starts?: MachineStarts[];
+  /** The model a new task would use when none is set (nothing: another CLI picks its own). */
+  newTaskModel?: string;
 }
 
 export function realProbe(paths: Paths, env: Record<string, string | undefined> = process.env): Probe {
@@ -353,6 +355,7 @@ export function doctorChecks(probe: Probe): Check[] {
       skip: !p.runBy,
     },
     taskIdsUnique(p),
+    ...(p.newTaskModel ? [{ name: "new task model", problem: "", fix: "", info: p.newTaskModel }] : []),
     ...(p.starts ?? []).map((m) => ({ name: "failed starts", problem: "", fix: "", info: startsLine(m).replace(/^failed starts /, "") })),
   ];
 }
