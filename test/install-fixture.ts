@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect } from "bun:test";
-import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { makeStubs, sh, tmp } from "./helpers.ts";
@@ -81,6 +81,34 @@ setInterval(() => {}, 1000);`,
   /** it exited 0; when not, the failure shows what it printed */
   const passes = (r: { code: number | null; out: string }) => expect({ code: r.code, out: r.code ? r.out : "" }).toEqual({ code: 0, out: "" });
 
+  /** Commits a version that breaks the service the way BROKEN says, installs it, and puts the repository back. */
+  function installBroken(how: string) {
+    // the project p is Running before the update
+    const dir = join(home, ".config/lineclear/projects/p");
+    mkdirSync(dir, { recursive: true });
+    const settings = join(dir, "settings.json");
+    writeFileSync(settings, JSON.stringify({ repo, space: "p", check: "true", models: {} }));
+    writeFileSync(join(repo, "BROKEN"), `${how}\n`);
+    git("add", "-A");
+    git("commit", "-q", "-m", `broken: ${how}`);
+    const good = git("rev-parse", "HEAD~1").out.trim();
+    const r = install();
+    const after = JSON.parse(readFileSync(settings, "utf8"));
+    rmSync(dir, { recursive: true });
+    git("reset", "-q", "--hard", good);
+    return { r, good, after };
+  }
+  // The Inbox items on disk (read here, not through src/inbox.ts: importing that module early changes other test files)
+  const inbox = (): { kind: string; question: string }[] => {
+    const dir = join(home, ".config/lineclear/inbox");
+    return existsSync(dir)
+      ? readdirSync(dir)
+          .filter((f) => f.endsWith(".json"))
+          .sort((a, b) => parseInt(a, 10) - parseInt(b, 10))
+          .map((f) => JSON.parse(readFileSync(join(dir, f), "utf8")))
+      : [];
+  };
+
   /**
    * Every file under home with its size, mode and mtime (or link target), to see that a run changed nothing. A run
    * that rewrites a file with the same content counts as a change too; hashing the 20,000 files of node_modules took
@@ -127,5 +155,5 @@ setInterval(() => {}, 1000);`,
     sh(["rm", "-rf", root]);
   });
 
-  return { root, home, repo, stubs, state, git, app, service, env, install, wellButBuild, passes, snapshot, lineclear };
+  return { root, home, repo, stubs, state, git, app, service, env, install, wellButBuild, passes, snapshot, lineclear, installBroken, inbox };
 }
