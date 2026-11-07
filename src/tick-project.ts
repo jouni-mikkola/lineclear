@@ -303,6 +303,8 @@ function whyStale(s: Starting, step: Step): string | undefined {
   const open = [...here, ...remote].find(
     (x) => x.status !== "done" && (x.title.startsWith(`${step.id} `) || (x.id !== undefined && state.taskSteps?.[x.id] === step.id)),
   );
+  const closed = closedSteps(s.steps, here, state.taskSteps, remote).get(step.id);
+  if (closed) return `${closed} closed with nothing to merge for this step`;
   if (open) return `${open.id ?? open.title} for this step is not done (${open.status}), so it does not start twice`;
   return undefined;
 }
