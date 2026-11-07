@@ -10,11 +10,9 @@
     "web:build": "bunx --bun vite build --config ui/web/vite.config.ts",
     "ui:test": "bun install --frozen-lockfile --silent && bun run web:build && playwright test",
     "ui:changed": "bun scripts/ui-changed.ts",
-    "shots": "bun run web:build && playwright test --config playwright.shots.config.ts",
     "types": "tsc --noEmit",
     "test": "bun test ./test",
     "dispatcher:eval": "bun test/dispatcher-eval/run.ts",
-    "shots:check": "bun scripts/shots-check.ts",
     "gates": "bun scripts/gates/run.ts",
     "check": "bun scripts/check.ts",
     "release": "bun scripts/release-tag.ts"

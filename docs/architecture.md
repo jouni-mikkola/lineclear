@@ -18,7 +18,7 @@ imports count for the borders but not for cycles, since they are gone when the c
 | `bin` | `bin/` | the `lineclear` command | `cli` |
 | `kit` | `ui/kit/` | the design system's parts and motion | `brand`, `cli` |
 | `web` | `ui/web/` | the pages `lineclear run` serves | `kit`, `brand`, `cli` |
-| `ui-test` | `ui/test/`, `ui/shots/`, `ui/budget/`, `playwright.config.ts`, `playwright.shots.config.ts`, `playwright.budget.config.ts` | the UI bar's browser tests and their fixture | `web`, `kit`, `brand`, `cli`, `pi` |
+| `ui-test` | `ui/test/`, `ui/budget/`, `playwright.config.ts`, `playwright.budget.config.ts` | the UI bar's browser tests and their fixture | `web`, `kit`, `brand`, `cli`, `pi` |
 | `gates` | `scripts/gates/` | the check's gates | none |
 | `scripts` | `scripts/` | repo tools: the check, the smoke check, measurements | `cli`, `brand`, `gates`, `check-line` |
 | `tests` | `test/` | the bun tests, one file per command | `cli`, `pi`, `kit`, `web`, `brand`, `scripts`, `gates`, `ui-test`, `check-line`, `registry` |

@@ -15,10 +15,6 @@ Lineclear is your own software team on your own machines. You talk to one contac
 - **Reviewer**: an AI from another company than the worker. It checks the change against the step.
 - **Inbox**: brings you only a real decision, as a button on your phone.
 
-<p align="center"><img src="docs/shots/home-1440.png" alt="Home at 1440 px: one thing waits for you, each project as a track with its steps, spend and usage." width="720"></p>
-
-Home, on the demo data of `lineclear run --demo`. More views are in [docs/shots](docs/shots/list.md).
-
 ## What it needs
 
 - Linux, `curl` and `git`. With systemd user services, Lineclear starts by itself.
