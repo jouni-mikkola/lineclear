@@ -1,6 +1,6 @@
 // How long this space's tasks really took, for a task's agent to guess its time left by: agents guess in a person's
 // time (hours that take minutes). Numbers only; the guessing stays the agent's.
-import { splitBrief } from './prompts.ts'
+import { splitBrief } from './settings-block.ts'
 
 /** a task as tasks.json keeps it, as far as its time goes */
 export interface Timed {

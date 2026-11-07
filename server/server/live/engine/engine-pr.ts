@@ -1,5 +1,5 @@
 import type { Space } from '../places.ts'
-import { splitBrief } from '../prompts.ts'
+import { splitBrief } from '../settings-block.ts'
 import * as G from './git.ts'
 import * as GH from './github.ts'
 import { type TaskRec, ended, CHECKS_EVERY, CHECKS_SHOW, LATER, failKey, ghNow } from './engine-helpers.ts'

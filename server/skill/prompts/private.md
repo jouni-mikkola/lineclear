@@ -1,0 +1,1 @@
+Private instruction snapshot for this start; it replaces earlier ones, even when empty. Follow the repository AGENTS.md, CLAUDE.md and REVIEW.md too. Never write these rules into repo files, git, briefs, reports or GitHub. The human and the brief win over private rules; on a conflict with team rules, explain and ask. Not a secret store.

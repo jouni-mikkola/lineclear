@@ -11,7 +11,7 @@ const { Engine } = await import('../server/live/engine/engine.ts')
 const { Places } = await import('../server/live/places.ts')
 export const { placeId } = await import('../server/live/places.ts')
 export const { Settings } = await import('../server/live/settings.ts')
-export const { settingsBlock } = await import('../server/live/prompts.ts')
+export const { settingsBlock } = await import('../server/live/settings-block.ts')
 const store = await import('../server/store.ts')
 /** a test's tasks.json or agents.json is the whole of them: the rows earlier tests left go, and the file is imported again */
 export const writeJson = (name: string, value: unknown) => {

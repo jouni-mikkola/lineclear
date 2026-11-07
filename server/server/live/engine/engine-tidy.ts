@@ -1,7 +1,7 @@
 import { exists } from '../mfs.ts'
 import type { TaskStatus } from '../../../shared/types.ts'
 import { ROUTING_FAILURE } from '../agents.ts'
-import { splitBrief } from '../prompts.ts'
+import { splitBrief } from '../settings-block.ts'
 import { type TaskRec, ended, archiveAfterMs } from './engine-helpers.ts'
 import { EngineMerge } from './engine-merge.ts'
 import { move } from './phase.ts'
