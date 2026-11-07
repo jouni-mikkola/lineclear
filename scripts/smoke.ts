@@ -20,7 +20,7 @@ interface Target {
 }
 
 const live: Target = {
-  web: `http://127.0.0.1:${env.LINECLEAR_WEB_PORT ?? env.LINECLEAR_PORT ?? 7420}`,
+  web: `http://127.0.0.1:${env.LINECLEAR_WEB_PORT ?? env.LINECLEAR_PORT ?? 7421}`,
   api() {
     try {
       return JSON.parse(readFileSync(join(dataDir(env), "server.json"), "utf8")).port;
@@ -134,7 +134,7 @@ async function freePort(): Promise<number> {
   return port;
 }
 
-/** Starts the checkout's service (`serve` for the API, `run` for the pages) on free ports and checks it. */
+/** Starts the checkout's one service (pages and API on one port) on a free port and checks it. */
 export async function checkBranch(root: string, limit = seconds): Promise<string[]> {
   // a fresh checkout has no built pages; a build that fails is a service that cannot start
   if (existsSync(join(root, "ui", "web")) && !existsSync(join(root, "ui", "web", "dist"))) {
@@ -142,7 +142,7 @@ export async function checkBranch(root: string, limit = seconds): Promise<string
     if (built.exitCode !== 0) return [`the web pages do not build (${`${built.stderr}${built.stdout}`.trim().split("\n").pop()})`];
   }
   const scratch = mkdtempSync(join(tmpdir(), "lineclear-smoke-"));
-  const [webPort, apiPort] = [await freePort(), await freePort()];
+  const port = await freePort();
   // its own HOME and sockets: the service must not reach this machine's herdr or the browsers of running tasks
   mkdirSync(join(scratch, "home"));
   // `run` refuses to start until every role has a model (setupGate)
@@ -161,31 +161,29 @@ export async function checkBranch(root: string, limit = seconds): Promise<string
     LINECLEAR_CONFIG: join(scratch, "config"),
     XDG_DATA_HOME: join(scratch, "data"),
   };
-  const start = (verb: string, port: number) =>
-    Bun.spawn(["bun", join(root, "bin", "lineclear"), verb], {
-      cwd: root,
-      env: { ...base, LINECLEAR_PORT: String(port) },
-      stdin: "ignore",
-      stdout: "ignore",
-      stderr: "ignore",
-    });
-  const services = [start("serve", apiPort), start("run", webPort)];
+  const service = Bun.spawn(["bun", join(root, "bin", "lineclear"), "run"], {
+    cwd: root,
+    env: { ...base, LINECLEAR_PORT: String(port) },
+    stdin: "ignore",
+    stdout: "ignore",
+    stderr: "ignore",
+  });
   // the lane stops a slow check with a signal: the services must not outlive it
   for (const sig of ["SIGTERM", "SIGINT"] as const) {
     process.on(sig, () => {
-      for (const p of services) p.kill();
+      service.kill();
       rmSync(scratch, { recursive: true, force: true });
       process.exit(1);
     });
   }
   try {
     // a service that stops by itself will not answer: say so at once, not when the time is up
-    const stopped = Promise.race(services.map((p, i) => p.exited.then((code) => [`the ${i ? "web" : "API"} service stopped with exit code ${code}`])));
-    const target: Target = { web: `http://127.0.0.1:${webPort}`, api: () => apiPort };
+    const stopped = service.exited.then((code) => [`the service stopped with exit code ${code}`]);
+    const target: Target = { web: `http://127.0.0.1:${port}`, api: () => port };
     return await Promise.race([check({}, true, limit, target, true), stopped]);
   } finally {
-    for (const p of services) p.kill();
-    await Promise.all(services.map((p) => p.exited));
+    service.kill();
+    await service.exited;
     rmSync(scratch, { recursive: true, force: true });
   }
 }

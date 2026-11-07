@@ -247,13 +247,12 @@ board_port() {
   echo "${board:-7421}"
 }
 
-# Task links open the web pages (and the board) from your phone, so both ports must be published on the tailnet.
+# Task links open the web pages and the board from your phone, so the server's one port must be published on the tailnet.
 publish_ports() {
   command -v tailscale >/dev/null 2>&1 || return 0
-  for port in "${LINECLEAR_WEB_PORT:-${LINECLEAR_PORT:-7420}}" "$(board_port)"; do
-    tailscale serve --bg --https="$port" "http://127.0.0.1:$port" >/dev/null 2>&1 \
-      || say "Tailscale: port $port was not published. Run 'tailscale serve --bg --https=$port http://127.0.0.1:$port'."
-  done
+  port=$(board_port)
+  tailscale serve --bg --https="$port" "http://127.0.0.1:$port" >/dev/null 2>&1 \
+    || say "Tailscale: port $port was not published. Run 'tailscale serve --bg --https=$port http://127.0.0.1:$port'."
 }
 
 # Node, npm and pnpm write their compile cache to /tmp, which is RAM on many machines. This puts it on disk for every user service and session.
@@ -271,21 +270,21 @@ install_compile_cache() {
 install_service() {
   if ! systemctl --user show-environment >/dev/null 2>&1; then
     say "Service: this machine has no systemd user services, so nothing starts Lineclear for you."
-    say "Start it with 'lineclear run --board 7421' and keep that terminal open (in herdr or tmux, say)."
+    say "Start it with 'lineclear run' and keep that terminal open (in herdr or tmux, say)."
     return 0
   fi
   units=$(dirname "$unit")
   install_compile_cache
-  write_unit "$unit" Lineclear "$(command -v bun) $code/bin/lineclear run"
-  # The board (tasks, chats, merges) and herdr (the agents' terminals) get a unit too, unless they already have one.
-  # asks the port the data folder records: a board on another port, or a test's own, is still a board
-  if ! ls "$units"/lineclear-serve-*.service >/dev/null 2>&1 && curl -s -o /dev/null --max-time 2 "http://127.0.0.1:$(board_port)/" 2>/dev/null; then
-    say "Service: a board already answers on port $(board_port), so it gets no unit of its own."
-  elif ! ls "$units"/lineclear-serve-*.service >/dev/null 2>&1; then
-    write_unit "$units/lineclear-serve-7421.service" "Lineclear board" "$(command -v bun) $code/bin/lineclear serve --port 7421"
-    systemctl --user enable --now lineclear-serve-7421.service >/dev/null 2>&1 || say "Service: the board did not start. See 'systemctl --user status lineclear-serve-7421.service'."
-  fi
+  write_unit "$unit" Lineclear "$(command -v bun) $code/bin/lineclear run --port $(board_port)"
+  # One process serves the rules, the web pages and the board, so an older separate board unit goes.
+  for old in "$units"/lineclear-serve-*.service; do
+    [ -f "$old" ] || continue
+    systemctl --user disable --now "$(basename "$old")" >/dev/null 2>&1 || true
+    rm -f "$old"
+    changed=1
+  done
   publish_ports
+  # herdr (the agents' terminals) gets a unit unless one runs
   if [ ! -f "$units/lineclear-herdr.service" ] && ! herdr status server 2>/dev/null | grep -q 'status: running'; then
     write_unit "$units/lineclear-herdr.service" "herdr server for Lineclear's agents" "$(command -v herdr) server"
     systemctl --user enable --now lineclear-herdr.service >/dev/null 2>&1 || say "Service: herdr did not start. See 'systemctl --user status lineclear-herdr.service'."
@@ -312,13 +311,8 @@ save_projects() {
   return 0
 }
 
-# The board's Lineclear server runs as its own unit (lineclear-serve-<port>), so a new version needs it restarted too.
 restart_all() {
-  systemctl --user restart lineclear.service || return 1
-  for u in $(systemctl --user list-units --state=active --plain --no-legend 'lineclear-serve-*.service' 2>/dev/null | awk '{print $1}'); do
-    systemctl --user restart "$u" || true
-  done
-  return 0
+  systemctl --user restart lineclear.service
 }
 
 # The settings as they were before the update, put back so a broken version cannot leave a project Running or Paused.
@@ -388,9 +382,6 @@ store_lost() {
 restore_store() {
   [ -n "${store_copy:-}" ] && [ -d "$store_copy" ] || return 1
   systemctl --user stop lineclear.service 2>/dev/null || true
-  for u in $(systemctl --user list-units --state=active --plain --no-legend 'lineclear-serve-*.service' 2>/dev/null | awk '{print $1}'); do
-    systemctl --user stop "$u" 2>/dev/null || true
-  done
   for f in "$store_copy"/*; do
     [ "$(basename "$f")" = source ] || cp -p "$f" "$(data_dir)/" || return 1
   done

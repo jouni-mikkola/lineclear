@@ -3,7 +3,7 @@ import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { extname, join, resolve, sep } from "node:path";
 
 /** Lineclear's web pages, built with Vite by `bun run web:build`. */
-export const WEB_ROOT = resolve(import.meta.dir, "..", "ui", "web");
+const WEB_ROOT = resolve(import.meta.dir, "..", "ui", "web");
 
 /** Where `bun run web:build` puts the built pages. */
 export const WEB_DIST = join(WEB_ROOT, "dist");

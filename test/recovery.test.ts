@@ -10,7 +10,7 @@ import { chooseModels } from "./helpers.ts";
 const temps: string[] = [];
 afterAll(() => temps.forEach((d) => rmSync(d, { recursive: true, force: true })));
 
-const CLI = join(import.meta.dir, "..", "bin", "lineclear");
+const RULES = join(import.meta.dir, "..", "src", "rules.ts");
 
 test("no source file writes a state file in place", () => {
   // Allowed: the one-time code file in a private temp folder.
@@ -92,8 +92,14 @@ esac`,
 
 type Machine = ReturnType<typeof machine>;
 
-/** Starts the service the way systemd does and returns it. */
-const start = (m: Machine) => Bun.spawn([process.execPath, CLI, "run"], { env: m.vars, stdin: "ignore", stdout: "ignore", stderr: "ignore" });
+/** Starts the service's rule loop and returns it (the server around it has its own tests). */
+const start = (m: Machine) =>
+  Bun.spawn([process.execPath, "-e", `import { runMain } from ${JSON.stringify(RULES)}; process.exit(await runMain([], console.log));`], {
+    env: m.vars,
+    stdin: "ignore",
+    stdout: "ignore",
+    stderr: "ignore",
+  });
 
 async function until(ok: () => boolean, ms = 30_000) {
   const end = Date.now() + ms;

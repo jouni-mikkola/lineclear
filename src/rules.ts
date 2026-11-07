@@ -5,7 +5,6 @@ import { configDir, decisionsPath } from "../pi/config.ts";
 import { routeAsks } from "./asks.ts";
 import { settlePlans } from "./autoplan.ts";
 import { copyStoreQuietly } from "./store-copies.ts";
-import { startBoard } from "./board.ts";
 import { freshDecisions } from "./decision-dedupe.ts";
 import { answerCard, closeItem, closeSettledUpdates, isOpen, type Item, readItems } from "./inbox.ts";
 import { listProjectNames, projectsDir, readSettings, type Settings } from "./project.ts";
@@ -196,14 +195,11 @@ async function tickAway(out: (l: string) => void): Promise<void> {
 export interface RunDeps {
   tick?: (world: World, dryRun: boolean) => Decision[] | Promise<Decision[]>;
   tickMs?: number;
-  /** Starts the web server; the CLI passes it, so this module does not import the web part. */
-  web?: (out: (l: string) => void) => Promise<{ stop(): void } | undefined>;
   signals?: { once(e: string, f: (...a: any[]) => void): unknown; on(e: string, f: (...a: any[]) => void): unknown };
 }
 
 export async function runMain(args: string[], out: (l: string) => void, world: World = realWorld(), deps: RunDeps = {}): Promise<number> {
-  const at = args.indexOf("--board");
-  const bad = args.find((a, i) => a !== "--once" && a !== "--dry-run" && !(at >= 0 && (i === at || i === at + 1)));
+  const bad = args.find((a) => a !== "--once" && a !== "--dry-run");
   if (bad !== undefined || (args.includes("--dry-run") && !args.includes("--once"))) {
     out(bad !== undefined ? `lineclear run: unknown option '${bad}'` : "lineclear run: --dry-run needs --once");
     return 2;
@@ -234,12 +230,6 @@ export async function runMain(args: string[], out: (l: string) => void, world: W
       if (ticking === mine) ticking = undefined;
     }));
   };
-  const served = at < 0 ? undefined : await startBoard(Number(args[at + 1]), out);
-  if (served && "error" in served) {
-    out(`lineclear run: ${served.error}`);
-    return 1;
-  }
-  const web = await deps.web?.(out);
   const sig = deps.signals ?? process;
   return new Promise((resolve) => {
     const timer = setInterval(safely, deps.tickMs ?? TICK_MS);
@@ -247,8 +237,6 @@ export async function runMain(args: string[], out: (l: string) => void, world: W
     const stop = (reason: string) => {
       console.error(`lineclear run: stopping: ${reason}`);
       clearInterval(timer);
-      web?.stop();
-      served?.stop();
       void (ticking ?? Promise.resolve()).then(() => resolve(0));
     };
     const survive = (what: string) => (e: unknown) =>

@@ -1,7 +1,13 @@
+import { EventEmitter } from "node:events";
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { writeAtomic } from "../pi/atomic.ts";
+import { startHerdr } from "./board.ts";
 import { dataDir, serverBin } from "./paths.ts";
+import { realPush } from "./notify.ts";
+import { runMain } from "./rules.ts";
+import { WEB_DIST } from "./web-files.ts";
+import { webHandler } from "./web.ts";
 
 const server = join(import.meta.dir, "..", "server");
 
@@ -19,7 +25,42 @@ export function piByDefault(env: NodeJS.ProcessEnv = process.env): void {
   writeAtomic(file, `${JSON.stringify({ machine: {}, spaces: {}, everywhere: Object.fromEntries(PI_ROLES.map((k) => [k, "pi"])) }, null, 2)}\n`);
 }
 
-/** Starts the server in server/ and stays up until it stops. Installs it on first use. */
+/**
+ * What the board's server runs beside the board, in its own process and on its port: the web pages with their data, and
+ * the rule loop. The server loads this file from LINECLEAR_MOUNT. A test run (it sets LINECLEAR_DOCTOR_FILE)
+ * serves fixed data and runs no loop.
+ * @public
+ */
+export async function mount(env: NodeJS.ProcessEnv = process.env) {
+  const dir = env.LINECLEAR_WEB_DIST ?? WEB_DIST;
+  const built = existsSync(join(dir, "index.html"));
+  if (!built) console.error("lineclear: no web pages: they are not built. Run: bun run web:build");
+  const real = env.LINECLEAR_DOCTOR_FILE === undefined;
+  // the push code is loaded first: while it loads, LINECLEAR_HOME is set, and nothing that copies the environment may start before that ends
+  const push = real ? realPush() : undefined;
+  await push?.catch(() => undefined);
+  const web = built ? webHandler(dir, env, push) : undefined;
+  // the loop's stop signals come from here; a stray error is survived as the loop always did, not left to end the board
+  const stopper = new EventEmitter();
+  const signals = {
+    once: (e: string, f: (...a: any[]) => void) => stopper.once(e, f),
+    on: (e: string, f: (...a: any[]) => void) => (e === "uncaughtException" || e === "unhandledRejection" ? process.on(e, f) : stopper.on(e, f)),
+  };
+  const loop = real ? runMain([], console.log, undefined, { signals }) : Promise.resolve(0);
+  let stopping = false;
+  void loop.then((code) => stopping || console.error(`lineclear: the rule loop ended (${code}), the server runs on without it`));
+  return {
+    fetch: async (req: Request) => web?.fetch(req),
+    async stop() {
+      stopping = true;
+      web?.stop();
+      stopper.emit("SIGTERM");
+      await loop;
+    },
+  };
+}
+
+/** Starts herdr's server and the one server in server/ (the board, the web pages and the rule loop) and stays up until it stops. Installs it on first use. */
 export async function serveMain(args: string[], out: (line: string) => void): Promise<number> {
   let port: string | undefined;
   for (let i = 0; i < args.length; i++) {
@@ -34,7 +75,10 @@ export async function serveMain(args: string[], out: (line: string) => void): Pr
   const step = async (cmd: string[]) => (await Bun.spawn(cmd, { cwd: server, stdin: "ignore", stdout: "inherit", stderr: "inherit" }).exited) === 0;
   if (!existsSync(join(server, "node_modules")) && !(await step(["bun", "install", "--frozen-lockfile"]))) return 1;
   piByDefault();
-  const env = { ...process.env, ...(port === undefined ? {} : { LINECLEAR_PORT: port }) };
+  // the merge lane's smoke check (LINECLEAR_SCRATCH) must not start a herdr of its own
+  const herdr = process.env.LINECLEAR_SCRATCH ? undefined : await startHerdr(out);
+  if (herdr) return (out(`lineclear serve: ${herdr}`), 1);
+  const env = { ...process.env, LINECLEAR_MOUNT: join(import.meta.dir, "serve.ts"), ...(port === undefined ? {} : { LINECLEAR_PORT: port }) };
   const child = Bun.spawn(["bun", "main.ts"], { cwd: join(server, "server"), env, stdin: "ignore", stdout: "inherit", stderr: "inherit" });
   for (const sig of ["SIGINT", "SIGTERM"] as const) process.on(sig, () => child.kill(sig));
   return child.exited;

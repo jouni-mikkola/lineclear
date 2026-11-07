@@ -17,7 +17,6 @@ import { setupMain } from "./setup.ts";
 import { project } from "./project-cli.ts";
 import { roadmapMain } from "./roadmap-cli.ts";
 import { runMain } from "./rules.ts";
-import { startWeb } from "./web.ts";
 import { secrets, totp } from "../server/server/live/secrets.ts";
 import { topMain } from "./top-cmd.ts";
 import { boardMain, isBoardJob, serveMain } from "./serve.ts";
@@ -32,8 +31,8 @@ export const commands: Record<string, string> = {
   project: "Add, list, change, remove and check projects",
   roadmap: "Check or show the roadmap (roadmap show <id> prints one step)",
   setup: "Choose a model for the worker, reviewer, planner and step checker from the logged-in harnesses (the reviewer from another company than the worker)",
-  run: "Run the rule loop and serve the web pages (--once, --dry-run; --board <port> also starts herdr and the board where no service does)",
-  serve: "Serve the board (the web server): serve --port <port>",
+  run: "Run Lineclear's one server: the same as serve. One tick of the rules: --once (--dry-run shows it)",
+  serve: "Run Lineclear's one server: the rule loop, the web pages and the board on one port: serve --port <port>",
   space: "The board's spaces: space add <path> --name <name>, space list, space rename, space remove",
   task: "The board's tasks: task add, list, show, tell, stop, close (task --help lists them)",
   show: "Show the board's few settings: show [--space <name>]",
@@ -167,7 +166,13 @@ function inboxCommand(rest: string[], out: Out): number | Promise<number> {
 const COMMANDS: Record<string, (rest: string[], out: Out) => number | Promise<number>> = {
   top: (_rest, out) => topMain(out),
   roadmap: roadmapMain,
-  run: (rest, out) => runMain(rest, out, undefined, { web: startWeb }),
+  run: (rest, out) =>
+    rest.includes("--once") || rest.includes("--dry-run")
+      ? runMain(rest, out)
+      : serveMain(
+          rest.map((a) => (a === "--board" ? "--port" : a)),
+          out,
+        ),
   serve: serveMain,
   secrets,
   totp,

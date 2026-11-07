@@ -67,8 +67,8 @@ export const serverBin = (env: Env = process.env) => env.LINECLEAR_SERVER_BIN ??
 /** pi's own folder: its settings, extensions, packages and session files. */
 export const piDir = (env: Env = process.env) => env.PI_CODING_AGENT_DIR ?? join(homedir(), ".pi", "agent");
 
-/** The port the stable web pages listen on when nothing sets one (src/web-address.ts). */
-const STABLE_PORT = 7420;
+/** The port the stable server listens on when nothing sets one (src/web-address.ts). */
+const STABLE_PORT = 7421;
 
 /** The port in the stable board's `server.json`, when it has written one. */
 function stableBoardPort(stableData: string): unknown {
@@ -104,7 +104,9 @@ export function stableRefusal(root: string, args: string[], env: Env = process.e
   const used: string[] = [];
   if (resolve(configDir(env)) === join(account, ".config", "lineclear")) used.push("the stable config folder");
   if (resolve(dataDir(env)) === stableData) used.push("the stable data folder");
-  const flag = args.find((a) => a.startsWith("--port="))?.slice(7) ?? (args.includes("--port") ? args[args.indexOf("--port") + 1] : undefined);
+  const flag =
+    args.find((a) => a.startsWith("--port="))?.slice(7) ??
+    (args.includes("--port") ? args[args.indexOf("--port") + 1] : args.includes("--board") ? args[args.indexOf("--board") + 1] : undefined);
   // a command that serves listens on the stable port when no other is given
   const serves = ["run", "serve"].includes(args[0] ?? "");
   const set = flag ?? env.LINECLEAR_WEB_PORT ?? env.LINECLEAR_PORT ?? (serves ? String(STABLE_PORT) : undefined);
