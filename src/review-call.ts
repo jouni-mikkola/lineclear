@@ -45,6 +45,12 @@ function diffAgainst(repo: string, base: string): string | undefined {
   return [git(repo, "diff", `-U${CONTEXT_LINES}`, from).out, ...added].join("");
 }
 
+/** The step and the owner's direction, without the worker's procedure that follows them: a reviewer never runs it. */
+function stepOfBrief(brief: string): string {
+  const at = brief.indexOf("This step was checked by a fresh model");
+  return (at < 0 ? brief : brief.slice(0, at)).trim();
+}
+
 function reviewQuestion(brief: string, diff: string, rules: string): string {
   return [
     "You review a code change. You have no tools: everything you need is below. Report what this change broke, left undone or added beyond the brief, each with proof from the diff.",
@@ -54,7 +60,7 @@ function reviewQuestion(brief: string, diff: string, rules: string): string {
     "No finding: answer the single line NONE.",
     "",
     "BRIEF",
-    brief,
+    stepOfBrief(brief),
     "",
     "THE REPO'S RULES",
     rules || "(none)",
