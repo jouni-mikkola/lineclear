@@ -3,12 +3,13 @@ import { existsSync, lstatSync, readFileSync, readlinkSync } from "node:fs";
 import { herdrArgv, herdrVersionOf } from "./herdr.ts";
 import { userInfo } from "node:os";
 import { delimiter, dirname, join } from "node:path";
-import { readJson } from "../pi/config.ts";
+import { configDir, readJson } from "../pi/config.ts";
 import { failureTail } from "../server/server/live/secrets.ts";
 import { copiesProblem, runByNote } from "./store-copies.ts";
 import { cacheEnvFile, dataDir, extensionFile, INSTALL_URL, type Paths, SERVICE } from "./paths.ts";
 import { diskTrouble, freeBytes } from "./health.ts";
 import { firstModel, readModelFile } from "./models.ts";
+import { readSetup, type Setup, setupRoles } from "./project.ts";
 import { checkoutPointers } from "./install-paths.ts";
 import { buildNames, buildProblem, buildsDir, installReleaseCommand, type RunFrom, unitCommand } from "./builds.ts";
 import { publishedAddress, serveCommand } from "./published.ts";
@@ -30,6 +31,8 @@ export interface Check {
 /** What doctor asks of the machine, so a test can answer without one. */
 export interface Probe {
   paths: Paths;
+  /** The model chosen for each role. Without it the roles are not checked. */
+  setup?: Setup;
   /** Lineclear's data folder. */
   dataDir?: string;
   /** Whether Lineclear's own server runs now. */
@@ -70,6 +73,7 @@ export interface Probe {
 export function realProbe(paths: Paths, env: Record<string, string | undefined> = process.env): Probe {
   const probe: Probe = {
     paths,
+    setup: storedSetup(env),
     dataDir: dataDir(env),
     running: () => {
       try {
@@ -299,6 +303,23 @@ function newTaskModel(): Check {
   return { name: "model", problem: "", fix: "", info: model ? `a new task with no model set starts on ${model}` : "pi lists no model yet" };
 }
 
+/** The chosen models, or undefined on a machine that has chosen none yet (a fresh install has nothing to lose). */
+function storedSetup(env: Record<string, string | undefined>): Setup | undefined {
+  const setup = readSetup(env);
+  return existsSync(join(configDir(env), "settings.json")) ? setup : undefined;
+}
+
+const ROLE_WORDS: Record<string, string> = { stepChecker: "step checker" };
+
+/** One check per role with no model: a lost setting fails every start of that role. */
+function roleModels(p: Probe): Check[] {
+  const { setup } = p;
+  if (!setup) return [];
+  return setupRoles
+    .filter((role) => !setup[role])
+    .map((role) => ({ name: `${role} model`, problem: `no model chosen for the ${ROLE_WORDS[role] ?? role}`, fix: "lineclear setup" }));
+}
+
 /** The service and the command are the release build, or the problem and the install that fixes it. */
 function stableBuild(p: Probe): Check {
   const problem = p.runFrom ? buildProblem(p.runFrom, p.dataDir ?? dataDir()) : "";
@@ -347,6 +368,7 @@ export function doctorChecks(probe: Probe): Check[] {
     compileCache(p),
     stableBuild(p),
     newTaskModel(),
+    ...roleModels(p),
     lingering(p),
     disk(p),
     ...herdrPinned(p),

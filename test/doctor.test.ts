@@ -8,8 +8,10 @@ import { doctor, doctorChecks, herdrVersions, realProbe, testedHerdr, type Probe
 import { storedTaskIds } from "../src/doctor-task-ids.ts";
 import { cacheEnvFile, pathsFor } from "../src/paths.ts";
 import { setRegistry } from "../src/models.ts";
+import { setupRoles } from "../src/project.ts";
 
 const paths = pathsFor({ HOME: "/nonexistent-home" });
+const realSetup = (env: Record<string, string>) => realProbe(paths, env).setup;
 const probe = (over: Partial<Probe> = {}): Probe => ({
   dataDir: "/nonexistent-home/data",
   paths,
@@ -273,5 +275,36 @@ test("doctor prints the model a new task would use", () => {
     expect(doctorChecks(probe()).find((c) => c.name === "model")?.info).toBe("a new task with no model set starts on fakeco/zeta-1");
   } finally {
     setRegistry([]);
+  }
+});
+
+test("doctor names each role whose model a settings migration lost, and none when all are kept", () => {
+  const dir = mkdtempSync(join(tmpdir(), "doctor-roles-"));
+  const env = { LINECLEAR_CONFIG: dir };
+  const roleProblems = () => doctorChecks(probe({ setup: realSetup(env) })).filter((c) => c.name.endsWith(" model") && c.problem);
+  try {
+    // the old store held no models, so the migration to settings.json carries none over
+    writeFileSync(join(dir, "setup.json"), JSON.stringify({}));
+    const lines: string[] = [];
+    const code = doctor(probe({ setup: realSetup(env), which: (c) => `/usr/bin/${c}` }), (l) => lines.push(l));
+    const lost = lines.filter((l) => l.startsWith("FAILED") && l.includes(" model:"));
+    expect(lost).toHaveLength(setupRoles.length);
+    expect(lost.join("\n")).toContain("step checker");
+    expect(code).toBe(1);
+
+    const full = Object.fromEntries(setupRoles.map((r) => [r, `p/${r}`]));
+    writeFileSync(join(dir, "settings.json"), JSON.stringify({ setup: full }));
+    expect(roleProblems()).toHaveLength(0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a machine with no settings file yet has no role to lose", () => {
+  const dir = mkdtempSync(join(tmpdir(), "doctor-fresh-"));
+  try {
+    expect(realSetup({ LINECLEAR_CONFIG: dir })).toBeUndefined();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
