@@ -128,28 +128,39 @@ export function Frame({
         <a href={PATHS.home} aria-label="Lineclear, Home" className="flex h-9 items-center rounded-sm hover:opacity-80">
           <span className="contents" dangerouslySetInnerHTML={{ __html: __WORDMARK__ }} />
         </a>
-        <a
-          href={PATHS.settings}
-          aria-current={view === "settings" ? "page" : undefined}
-          className={`grid size-9 shrink-0 place-items-center rounded-full hover:bg-raised3 hover:text-fg ${view === "settings" ? "bg-raised3 text-fg" : "bg-raised2 text-fg2"}`}
-          data-gear
-        >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.7"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
+        <div className="flex items-center gap-2">
+          <a
+            href={PATHS.chat}
+            aria-label="Chat with the Dispatcher"
+            className="flex h-9 items-center gap-2 rounded-full border border-line bg-raised px-3 text-sm text-fg hover:border-fg3 focus-visible:outline-2 focus-visible:outline-accent"
+            data-chat-entry
           >
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" />
-          </svg>
-          <span className="sr-only">Settings</span>
-        </a>
+            <DispatcherIcon size={18} className="text-fg2" />
+            Chat
+          </a>
+          <a
+            href={PATHS.settings}
+            aria-current={view === "settings" ? "page" : undefined}
+            className={`grid size-9 shrink-0 place-items-center rounded-full hover:bg-raised3 hover:text-fg ${view === "settings" ? "bg-raised3 text-fg" : "bg-raised2 text-fg2"}`}
+            data-gear
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" />
+            </svg>
+            <span className="sr-only">Settings</span>
+          </a>
+        </div>
       </header>
       {panel && hasPanel(view) && !showPanel && (
         <button
@@ -159,7 +170,7 @@ export function Frame({
           className="fixed right-6 top-6 z-30 hidden h-11 items-center gap-2 rounded-full border border-line bg-raised px-4 text-fg hover:border-fg3 focus-visible:outline-2 focus-visible:outline-accent lg:flex"
           data-chat-open
         >
-          <DispatcherIcon size={20} className="text-accent" />
+          <DispatcherIcon size={20} className="text-fg2" />
           Chat
         </button>
       )}

@@ -90,6 +90,19 @@ test.describe("live", () => {
   test.skip(({ viewport }) => viewport?.width !== 1440, "the live chat is checked once, at 1440 px");
   useFakeLineclear();
 
+  test("a fresh install's panel on Home has no line, repeated or sample, and keeps its composer", async ({ page }) => {
+    await page.goto("/");
+    const column = page.locator("[data-chat-column]");
+    await expect(column.locator('[data-chat="ready"]')).toBeVisible();
+    await expect(column.locator("[data-chat-empty]")).toBeVisible();
+    await expect(column.locator("[data-composer]")).toBeVisible();
+    const lines = await column.locator("[data-key]").allInnerTexts();
+    expect(lines).toEqual([]);
+    expect(new Set(lines).size).toBe(lines.length);
+    const text = await column.innerText();
+    for (const sample of ["14 of 30 steps", "Pay with a saved card", "Burn-down", "checkout-review.png", "Add CSV export"]) expect(text).not.toContain(sample);
+  });
+
   test("an example question goes with one tap, the Dispatcher writes, and its answer shows as markdown", async ({ page }) => {
     await open(page);
     await expect(page.locator("[data-chat-empty]")).toBeVisible();
