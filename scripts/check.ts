@@ -5,7 +5,7 @@
 // `--full` runs everything the light check has, never a browser: checks are light and run on GitHub (docs/numbers.md). `--changed`
 // is the worker's loop.
 // The budget is 180 s on a machine that is not busy (docs/numbers.md); a busy one is slower for reasons outside the change.
-// Nothing runs on an owner's machine: no tests and no tsc (307 MB and 2 cores each for every agent's worktree).
+// Nothing runs on an owner's machine: no tests and no tsc (each costs hundreds of MB and two cores per worktree).
 // GitHub runs the types and the tests (.github/workflows/check.yml): `lineclear pr` pushes the branch and
 // `lineclear checks` waits for the result.
 if (!process.env.GITHUB_ACTIONS) {
