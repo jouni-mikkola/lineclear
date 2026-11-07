@@ -116,3 +116,38 @@ The reviewer ran in 2 of the last 20 done tasks' session folders, so its tokens 
 Runs of `check.yml` on main, the last 50: 21 success, 16 failure, 13 cancelled
 (`gh run list --workflow check.yml --branch main --limit 50`). The cancelled runs are from before the workflow's
 `concurrency` group stopped cancelling runs on main. The full check now runs in 8 shards.
+
+### Speed and stability, measured again after L450 to L460
+
+Measured with `bun scripts/core-baseline.ts` on a 28-core machine (load about 2, 5 tasks working) from main at
+`5b35b57`. This board is new: it holds 22 tasks over 9 hours, so some samples are small (the run count is in each row).
+
+| Measure | Before: median / p90 | Now: median / p90 | Target | Holds |
+| --- | --- | --- | --- | --- |
+| Task add to first tool call | 22 s / 131 s | 23.5 s / 24.6 s (13 runs) | 10 s / 30 s | p90 yes, median no |
+| Briefs sent again | 22 of 194 | 0 of 13 | 0 | yes |
+| `task list` | 0.23 s / 0.23 s | 0.03 s / 0.03 s | p90 0.1 s | yes |
+| `show` | 0.09 s / 0.09 s | 0.03 s / 0.03 s | p90 0.1 s | yes |
+| `room` | 0.47 s / 0.68 s | 0.03 s / 0.03 s | p90 0.1 s | yes |
+| `GET /api/snapshot` | 24.5 MB, 0.19 s / 0.28 s | 0.1 MB, under 0.01 s | 0.2 MB, p90 0.05 s | yes |
+| `check.yml` on main, whole run | 73 s / 92 s | 47 s / 68 s (20 runs) | 45 s / 60 s | no |
+| Slowest shard (5/8) | 203 s worst | 35 s / 61 s, worst 189 s | | one shard is the tail |
+| Runs cancelled on main | 13 of 50 | 0 of the last 20 | 0 | yes |
+| Runs failed on main | 16 of 50 | 10 of the last 20, all in one burst; the last 10 are green | | burst, not steady |
+| Agent new input per task | 79 k / 280 k | 76 k / 195 k (14 runs) | 40 k / 150 k | no |
+| Agent cache reads per task | 1303 k / 11076 k | 2429 k / 16731 k | | up |
+| Reviewer new input per task | too few runs | 73 k / 133 k (8 runs) | | |
+| `prompts.ts` size | 13418 bytes | 10067 bytes | 9400 bytes | no |
+| Coordinator and Dispatcher tokens | 227 k, 38 k / 12.7 M, 2.8 M | no session files on this machine | 1000 k, 500 k p90 | not measurable |
+| Stall-kind lines in `decisions.jsonl` | 15.5 per hour | 0 in 10 hours (the file starts today) | 2 per hour | yes, on a short sample |
+| Failed starts in `lineclear doctor` | none recorded | `doctor` lists no machine line | one line per machine | not seen |
+
+Lost agent time on this board, from `tasks.json` and `decisions.jsonl` (all of today):
+
+- Six tasks (VEL-17 to VEL-22) started for the one step L436, five of them working at once.
+- Six tasks (VEL-9 to VEL-14) ended in 0.4 minutes with "Nothing to merge": their steps had already landed.
+- Every start takes 23 to 25 s, with almost no spread, so a fixed wait sits in the start path.
+- Main failed 10 of the last 20 runs in one burst, with three "Fix main red" commits after it.
+- The shard `full check (5/8)` took up to 189 s while the others took 43 s or less.
+- One start of this task failed with "No model is set for pi".
+- `decisions.jsonl` holds 4519 `run` lines in 10 hours (648 KB), 450 per hour of no signal.
