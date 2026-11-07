@@ -183,7 +183,7 @@ export function projects(state: PageState): Project[] {
     const things = ["the login form", "the import", "the merge lane", "the usage chart", "a flaky test", "the inbox card", "the doctor", "the install"];
     const states: TaskState[] = ["queued", "queued", "work", "queued", "need", "queued", "work", "queued"];
     // `many` spreads 200 tasks over the projects, `tasks200` puts them all in one
-    const ps = base.map((p) => ({ ...p, total: p.total + 80, tasks: [] as Task[] }));
+    const ps = base.map((p, n) => ({ ...p, total: state === "many" || n === 0 ? p.total + 80 : p.total, tasks: [] as Task[] }));
     const into = (i: number) => ps[state === "many" ? i % ps.length : 0];
     for (let i = 0; i < 200; i++) {
       const stage = i % 11 === 0 ? "review" : i % 13 === 0 ? "ready" : undefined;

@@ -106,9 +106,9 @@ Result: A project's roadmap shows its phase bar in the track style with a count 
 - files: ui/web/roadmap, ui/test/roadmap.pw.ts
 
 ### W10 The demo covers every state
-Result: `lineclear run --demo` has chats, artifacts, changes, a long task title and 200 tasks, so each state of the UI bar can be shot.
+Result: the demo states (`?state=` on the pages `lineclear run` serves) have a chat, changes, a long task title and 200 tasks in one project, so each state of the UI bar can be shot. The task page has no Artifacts tab yet, so there is no artifact state.
 - why: F22: demo tasks have no chat, so the task tabs and the long-text and 200-item states cannot be reached.
-- done when: The demo has one task with a chat, an artifact and a change, one with a 200-character title and a project with 200 tasks; `ui/test` shoots each at 1440 and 390 px.
+- done when: The demo has one task with a chat and a change, one with a 200-character title (`?state=title`) and a project with 200 tasks (`?state=tasks200`); `ui/test` shoots each at 1440 and 390 px.
 - locks: none
 - after: none
-- files: src/demo.ts, ui/web/samples.ts, ui/test
+- files: ui/web/samples.ts, ui/test
