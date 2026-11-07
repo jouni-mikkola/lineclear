@@ -30,6 +30,9 @@ function applySpec(r: AgentRecord, spec: Omit<Spec, 'first' | 'pane' | 'was' | '
   })
 }
 
+/** how soon a hand-over to an agent that is still starting is tried again */
+const STARTING_RETRY_MS = 300
+
 export class AgentsDelivery extends AgentsState {
   pauseDelivery(key: string, on: boolean) {
     if (on) this.deliveryPaused.add(key)
@@ -460,11 +463,12 @@ export class AgentsDelivery extends AgentsState {
     if (hold === 'menu') return
     const n = (this.backoff.get(key)?.n ?? 0) + 1
     // an agent still starting is asked again soon: a long backoff there is most of a new task's start time
-    const wait = hold === 'start' ? Math.min(this.backoffMs, 500) : Math.min(this.backoffMs * 2 ** (n - 1), this.backoffMax)
+    const wait = hold === 'start' ? Math.min(this.backoffMs, STARTING_RETRY_MS) : Math.min(this.backoffMs * 2 ** (n - 1), this.backoffMax)
     this.backoff.set(key, { n, until: Date.now() + wait })
     this.giveUpOnBriefs(key)
-    // just started, not herdr's named agent yet: tried again on the next refresh, for a while
+    // just started, not herdr's named agent yet: tried again at once, for a while
     if (hold === 'start') {
+      setTimeout(() => void this.deliver(key), wait + 10)
       const since = this.unready.get(key) ?? Date.now()
       this.unready.set(key, since)
       if (Date.now() - since < this.unreadyFor) return

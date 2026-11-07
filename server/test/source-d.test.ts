@@ -333,6 +333,35 @@ describe('what you send shows at once', () => {
       agents.outbox = agents.outbox.filter((o) => o.key !== chat)
     }
   })
+  test('a brief an agent still starting refuses is asked for again within a second', async () => {
+    const agents = src.agents
+    agents.outbox = agents.outbox.filter((o) => o.key !== chat)
+    const { prompt, beforeInput, status } = { prompt: herdr.prompt, beforeInput: agents.beforeInput, status: agents.status }
+    const record = agents.records[chat]
+    agents.records[chat] = { ...(record ?? {}), key: chat, name: 'fresh' } as (typeof agents.records)[string]
+    agents.beforeInput = async () => undefined
+    agents.status = () => 'idle' as ReturnType<typeof status>
+    agents.backoff.clear()
+    let calls = 0
+    herdr.prompt = (async (name: string) => {
+      if (++calls < 3) throw Object.assign(new Error(`agent ${name} is not ready`), { code: 'agent_not_ready' })
+    }) as typeof prompt
+    try {
+      agents.outbox.push({ id: 'b3', key: chat, text: 'the brief', at: Date.now(), brief: true })
+      await agents.deliver(chat)
+      const until = Date.now() + 1500
+      while (agents.outbox.some((o) => o.id === 'b3') && Date.now() < until) await new Promise((r) => setTimeout(r, 50))
+      expect(calls).toBe(3)
+      expect(agents.outbox.some((o) => o.id === 'b3')).toBe(false)
+    } finally {
+      Object.assign(herdr, { prompt })
+      Object.assign(agents, { status, beforeInput })
+      agents.backoff.clear()
+      if (record) agents.records[chat] = record
+      else delete agents.records[chat]
+      agents.outbox = agents.outbox.filter((o) => o.key !== chat)
+    }
+  })
   test('its files carry the id too', async () => {
     const shot = await src.upload(chat, 'shot.png', new Uint8Array([1]))
     await as('blocked', () => src.act({ type: 'send', chat, text: '', attachments: [shot], cid: 'c2' }))
