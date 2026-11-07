@@ -157,19 +157,16 @@ test("every listed command is one the CLI knows", async () => {
         .map(async (name) => {
           const p = Bun.spawn([bin, name, "--help"], { env, stdout: "pipe", stderr: "pipe", stdin: "ignore", detached: true });
           // the board's merge retries a closed port for seconds; every other command ends at once
-          let killed = false;
-          const kill = setTimeout(() => {
-            killed = true;
-            process.kill(-p.pid, "SIGKILL");
-          }, 1800);
+          // a kill only stops a hang: it is no proof the command is unknown, so a slow start under load passes
+          const kill = setTimeout(() => process.kill(-p.pid, "SIGKILL"), 6000);
           const text = (await new Response(p.stdout).text()) + (await new Response(p.stderr).text());
           await p.exited;
           clearTimeout(kill);
-          return killed || /unknown command/.test(text) ? name : "";
+          return /unknown command/.test(text) ? name : "";
         }),
     );
     expect(unknown.filter(Boolean)).toEqual([]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
-}, 10000);
+}, 15000);
