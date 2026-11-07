@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { createAtomic } from "../pi/atomic.ts";
 import { herdrArgv } from "./herdr.ts";
 import { join } from "node:path";
 import { fileClash, stepHeld, stepNeeds } from "./parts.ts";
@@ -117,7 +118,7 @@ export function claimStart(dir: string, step: string, now: number): string | und
     rmSync(file, { force: true });
   } catch {}
   try {
-    writeFileSync(file, String(now), { flag: "wx" });
+    createAtomic(file, String(now));
     return undefined;
   } catch {
     return "another start for this step claimed it just now, so it does not start twice";
