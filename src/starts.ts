@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, linkSync, mkdirSync, readdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { herdrArgv } from "./herdr.ts";
 import { join } from "node:path";
 import { fileClash, stepHeld, stepNeeds } from "./parts.ts";
@@ -135,16 +135,33 @@ const CLAIM_MS = 120_000;
  */
 export function claimStep(dir: string, step: string, now: Date): string | undefined {
   mkdirSync(dir, { recursive: true });
-  const file = join(dir, `${step.replace(/[^\w.-]/g, "_")}.claim`);
+  const file = claimFile(dir, step);
+  // The claim is linked in with its time already written, so no reader sees an empty file.
+  const temp = `${file}.${process.pid}`;
+  writeFileSync(temp, String(now.getTime()));
   try {
-    writeFileSync(file, String(now.getTime()), { flag: "wx" });
-    return undefined;
-  } catch {
-    const ago = now.getTime() - Number(readFileSync(file, "utf8"));
-    if (ago < CLAIM_MS) return `step ${step} was claimed for a start ${Math.round(ago / 1000)} s ago`;
-    writeFileSync(file, String(now.getTime()));
-    return undefined;
+    for (let tries = 0; tries < 2; tries++) {
+      try {
+        linkSync(temp, file);
+        return undefined;
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
+        const ago = now.getTime() - Number(readFileSync(file, "utf8"));
+        if (ago < CLAIM_MS) return `step ${step} was claimed for a start ${Math.round(ago / 1000)} s ago`;
+        unlinkSync(file);
+      }
+    }
+    return `step ${step} is being claimed by another loop`;
+  } finally {
+    rmSync(temp, { force: true });
   }
+}
+
+const claimFile = (dir: string, step: string) => join(dir, `${step.replace(/[^\w.-]/g, "_")}.claim`);
+
+/** Gives the claim back when the start did not happen, so the next tick may try. */
+export function releaseStep(dir: string, step: string): void {
+  rmSync(claimFile(dir, step), { force: true });
 }
 
 /** After a tick: the steps skipped for locks count one more tick, every other step starts over. */

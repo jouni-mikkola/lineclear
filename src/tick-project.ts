@@ -14,7 +14,7 @@ import { askMachines, type Candidate, mostRoom, type Room, roomLack } from "./sp
 import { routineWorker } from "./routine.ts";
 import { askKey, availability, climbStalls, revertLast, reviewerFor, serviceAccounts } from "./stalls.ts";
 import { THIS_MACHINE } from "./start-failures.ts";
-import { bindStarts, claimStep, liveSteps, recordStart, lockWhy, reservedLocks, settleLockWaits } from "./starts.ts";
+import { bindStarts, claimStep, liveSteps, releaseStep, recordStart, lockWhy, reservedLocks, settleLockWaits } from "./starts.ts";
 import type { Wait } from "./waits.ts";
 import type { World } from "./world.ts";
 
@@ -344,6 +344,7 @@ function startStep(s: Starting, step: Step): boolean {
     }
     const err = addStepTask(s, step, host, worker, reviewer);
     if (err) {
+      releaseStep(join(projectsDir(env), t.name, "claims"), step.id);
       note("skip", `task add failed: ${err}`, step.id, host ?? THIS_MACHINE);
       return false;
     }

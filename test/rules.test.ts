@@ -611,4 +611,5 @@ test("one agent per step: a landed step starts no agent", () => {
   const t = setup({ steps: [step("A", "none")], commits: ["start", "LIN-1: A Title A"] });
   t.doTick();
   expect(t.adds()).toEqual([]);
+  expect(t.decisions().some((x) => x.kind === "start")).toBe(false);
 });
