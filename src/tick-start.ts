@@ -7,7 +7,7 @@ import type { Settings } from "./project.ts";
 import { type checkRoadmap, doneIds, isFrozen, resultFlag, type StepStatus, type Task } from "./roadmap.ts";
 import { routineWorker } from "./routine.ts";
 import type { Decision, State } from "./rules.ts";
-import { type Candidate, mostRoom, type NewTask, type Room, roomLack } from "./spread.ts";
+import { bookRoom, type Candidate, mostRoom, type NewTask, type Room, roomLack, roomSlots } from "./spread.ts";
 import { askKey, availability, reviewerFor } from "./stalls.ts";
 import { THIS_MACHINE } from "./start-failures.ts";
 import { lockWhy, recordStart, reservedLocks, settleLockWaits } from "./starts.ts";
@@ -62,7 +62,7 @@ export function capacityOf(t: Tick, tasks: Task[], waits: Wait[], rooms: Map<str
   for (const [host, r] of rooms) {
     const lack = roomLack(r);
     if (lack) remoteLack.push(`${host}: ${lack}`);
-    else remoteFree.set(host, (r.max ?? 0) - r.working);
+    else remoteFree.set(host, roomSlots(r));
   }
   return {
     max,
@@ -206,10 +206,10 @@ function planStep(s: Starting, step: Step): Planned | undefined {
   const candidates: Candidate[] = [
     ...(localRoom ? [{ host: undefined, load: world.load() + cap.startedHere, loadLimit: limit, free: cap.free }] : []),
     ...[...cap.remoteFree]
-      .filter(([, n]) => n > 0)
       .flatMap(([h, n]) => {
         const r = s.rooms.get(h);
-        return r ? [{ host: h, load: r.load, loadLimit: r.loadLimit, free: n }] : [];
+        const free = r ? Math.min(n, roomSlots(r)) : 0;
+        return r && free > 0 ? [{ host: h, load: r.load, loadLimit: r.loadLimit, free }] : [];
       }),
   ];
   const host = mostRoom(candidates)?.host;
@@ -222,7 +222,7 @@ function planStep(s: Starting, step: Step): Planned | undefined {
     cap.free -= 1;
     cap.startedHere += 1;
   } else {
-    if (remoteRoom) remoteRoom.load += 1;
+    if (remoteRoom) bookRoom(remoteRoom);
     cap.remoteFree.set(host, (cap.remoteFree.get(host) ?? 0) - 1);
   }
   for (const l of stepHeld(step)) s.held.set(l, step.id);

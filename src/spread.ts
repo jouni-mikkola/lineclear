@@ -14,8 +14,9 @@ type Env = Record<string, string | undefined>;
 // A project's steps may run on other machines. There is one server and one task store: a machine's room is what the
 // server's snapshot says of it (its worker's own read, its tasks at work, its slots). A machine that cannot be reached is a text, never a throw.
 
-/** A machine with less memory free than this takes no new task. */
-const MIN_FREE_KB = 1024 * 1024;
+/** Memory a machine keeps for itself, and what each new agent is counted to take, in KiB. */
+export const MEM_RESERVE_KB = 1024 * 1024;
+export const MEM_PER_AGENT_KB = 1024 * 1024;
 
 /** What one machine says about its room for a project's steps. */
 export interface Room {
@@ -104,12 +105,25 @@ export function mostRoom(candidates: Candidate[]): Candidate | undefined {
   return candidates.reduce<Candidate | undefined>((best, c) => (best === undefined || better(c, best) ? c : best), undefined);
 }
 
+/** How many more agents the machine's free memory holds: `floor((free - reserve) / per-agent)`; unlimited when it does not say. */
+export const memorySlots = (r: Room) => (r.freeKb === undefined ? Infinity : Math.max(0, Math.floor((r.freeKb - MEM_RESERVE_KB) / MEM_PER_AGENT_KB)));
+
+/** Task slots the machine has left for new starts: its free slots, held down by its memory. */
+export const roomSlots = (r: Room) => Math.max(0, Math.min((r.max ?? 0) - r.working, memorySlots(r)));
+
+/** Counts one placed task against the machine's load, slots and memory, so the next placement in the tick sees it. */
+export function bookRoom(r: Room) {
+  r.load += 1;
+  r.working += 1;
+  if (r.freeKb !== undefined) r.freeKb -= MEM_PER_AGENT_KB;
+}
+
 /** Why the machine takes no new task now, or undefined when it has room. */
 export function roomLack(r: Room): string | undefined {
   if (r.max === undefined) return "cannot read its slots from the server";
   if (r.working >= r.max) return `no free slot (${r.working} of ${r.max} working)`;
   if (r.load > r.loadLimit) return `load average ${r.load.toFixed(1)} is above its limit of ${r.loadLimit}`;
-  if (r.freeKb !== undefined && r.freeKb < MIN_FREE_KB) return `only ${Math.round(r.freeKb / 1024)} MiB of memory is free (it needs ${MIN_FREE_KB / 1024})`;
+  if (memorySlots(r) < 1) return `only ${Math.round((r.freeKb ?? 0) / 1024)} MiB of memory is free (it needs ${(MEM_RESERVE_KB + MEM_PER_AGENT_KB) / 1024})`;
   return undefined;
 }
 
