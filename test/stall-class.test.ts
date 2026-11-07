@@ -44,6 +44,7 @@ function setup(list: T[] = [{ id: "LIN-5", title: "A Alpha", status: "work" }], 
     LINECLEAR_HOME: join(dir, "home"),
     LINECLEAR_STORE_COPIES: join(dir, "copies"),
     XDG_CACHE_HOME: join(dir, "cache"),
+    PI_CODING_AGENT_DIR: join(dir, "pi"),
   };
   const { world, clock, log, adds, cards, tasks } = fakeWorld(env, list, ROADMAP, commits);
   const decisions = () => decisionsSince<Decision>(env, 0);
