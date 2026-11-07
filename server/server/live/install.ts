@@ -56,19 +56,22 @@ export interface Probe {
   helper: string
 }
 
-const PROBE = `
-echo "home=$HOME"
-echo "os=$(uname -s)"
-echo "arch=$(uname -m)"
+/** the probe, a script that runs on the machine and prints one JSON object */
+export const PROBE = `
+js() { printf '"%s"' "$(printf %s "$1" | sed -e 's/\\\\/\\\\\\\\/g' -e 's/"/\\\\"/g')"; }
 lp=$("\${SHELL:-/bin/sh}" -lc 'echo "@@$PATH@@"' 2>/dev/null </dev/null | sed -n 's/.*@@\\(.*\\)@@.*/\\1/p' | tail -n 1)
 [ -n "$lp" ] || lp="$PATH"
 lp="$HOME/.local/bin:$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:$lp"
-echo "path=$lp"
 PATH="$lp"
-for t in herdr git perl gh claude pi tar; do if command -v $t >/dev/null 2>&1; then echo "tool.$t=$(command -v $t)"; fi; done
-perl -MJSON::PP -e1 2>/dev/null && echo "tool.jsonpp=1"
-cat "$HOME/.lineclear/helper/version" 2>/dev/null | sed 's/^/helper=/'
-true
+printf '{"home":%s,"os":%s,"arch":%s,"path":%s,"tools":{' "$(js "$HOME")" "$(js "$(uname -s)")" "$(js "$(uname -m)")" "$(js "$lp")"
+sep=
+for t in herdr git perl gh claude pi tar; do
+  c=$(command -v $t 2>/dev/null) || continue
+  printf '%s"%s":%s' "$sep" "$t" "$(js "$c")"
+  sep=,
+done
+if perl -MJSON::PP -e1 2>/dev/null; then printf '%s"jsonpp":"1"' "$sep"; fi
+printf '},"helper":%s}\\n' "$(js "$(cat "$HOME/.lineclear/helper/version" 2>/dev/null)")"
 `
 
 /** the machine says who runs its tasks, so its own task list and doctor can tell; the probe's one call carries it */
@@ -80,26 +83,11 @@ const tellRunBy = () => {
 export async function probe(target: string): Promise<Probe> {
   const r = await onMachine(target, `${tellRunBy()}\n${PROBE}`, { timeoutMs: 30_000 })
   if (r.code !== 0) throw new Error(r.err.split('\n').pop() || `ssh ${target} failed`)
-  const kv = Object.fromEntries(
-    r.out
-      .split('\n')
-      .map((l) => l.match(/^([\w.]+)=(.*)$/))
-      .filter((m): m is RegExpMatchArray => !!m)
-      .map((m) => [m[1], m[2]]),
-  )
-  const tools = Object.fromEntries(
-    Object.entries(kv)
-      .filter(([k]) => k.startsWith('tool.'))
-      .map(([k, v]) => [k.slice(5), !!v]),
-  )
+  const found = JSON.parse(r.out.trim().split('\n').pop() ?? '') as Omit<Probe, 'herdr' | 'tools'> & { tools: Record<string, string> }
   return {
-    home: kv.home,
-    os: kv.os,
-    arch: kv.arch,
-    path: kv.path,
-    herdr: kv['tool.herdr'] ?? 'herdr',
-    tools,
-    helper: kv.helper ?? '',
+    ...found,
+    herdr: found.tools.herdr ?? 'herdr',
+    tools: Object.fromEntries(Object.entries(found.tools).map(([k, v]) => [k, !!v])),
   }
 }
 
@@ -180,19 +168,33 @@ function tarOf(files: [string, string][], version: string) {
   return Buffer.concat(blocks)
 }
 
-/** put the helper there (again): the folder's old files are replaced, its hooks, inbox and prompts stay */
+/** the script that puts a helper tar (on stdin) in `dir`: a folder per version, and one symlink (current) that switches
+ * to it in one rename, so a `lineclear` starting at any moment finds a whole helper. The two newest versions stay, for
+ * agents already running from the older one. Hooks, inbox and prompts stay. */
+export const installScript = (dir: string, version: string) => `
+set -e; d=${quote(dir)}; ver=${quote(version)}
+mkdir -p "$d/v" "$d/hooks" "$d/inbox" "$d/prompts"
+if [ ! -d "$d/v/$ver" ]; then
+  t=$(mktemp -d "$d/v/.new.XXXXXX"); tar xf - -C "$t"; chmod 755 "$t"; mv "$t" "$d/v/$ver"
+fi
+prev=$(readlink "$d/current" 2>/dev/null || true)
+ln -s "v/$ver" "$d/.current.$$"
+perl -e 'rename($ARGV[0], $ARGV[1]) or die "rename: $!"' "$d/.current.$$" "$d/current"
+for n in bin skill route.pl version; do
+  [ -L "$d/$n" ] || { rm -rf "$d/$n"; ln -s "current/$n" "$d/$n"; }
+done
+if [ "$prev" != "v/$ver" ]; then
+  for old in "$d"/v/*; do
+    case "$old" in "$d/v/$ver"|"$d/$prev") ;; *) rm -rf "$old" ;; esac
+  done
+fi
+`
+
+/** put the helper there (again): a new version folder is switched in, the old one stays beside it */
 export async function installHelper(target: string, p: Probe) {
   const version = helperVersion()
-  const dir = helperDir(p.home)
   const tar = tarOf(helperFiles(), version)
-  const r = await onMachine(
-    target,
-    `set -e; d=${quote(dir)}; mkdir -p "$d"; rm -rf "$d/skill" "$d/bin"; tar xf - -C "$d"; mkdir -p "$d/hooks" "$d/inbox" "$d/prompts"`,
-    {
-      stdin: tar,
-      timeoutMs: 180_000,
-    },
-  )
+  const r = await onMachine(target, installScript(helperDir(p.home), version), { stdin: tar, timeoutMs: 180_000 })
   if (r.code !== 0) throw new Error(`Could not put the helper on the machine: ${r.err || `exit ${r.code}`}`)
   return version
 }
