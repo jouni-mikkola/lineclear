@@ -7,9 +7,7 @@ import type { Chats } from '../chats.ts'
 import { HOST, type Places, type Space } from '../places.ts'
 import type { Settings } from '../settings.ts'
 import { TaskRows } from './task-rows.ts'
-import { AsyncLocalStorage } from 'node:async_hooks'
 import { join } from 'node:path'
-import { HeadWatch } from './lane-watch.ts'
 import type { Worktrees } from './worktrees.ts'
 import { type Phase, move } from './phase.ts'
 import { type TaskRec, ended, type PeerTask, splitRef, MERGE_DEADLINE, type Events } from './engine-helpers.ts'
@@ -39,17 +37,14 @@ export abstract class EngineState extends Emitter<Events> {
   protected merging = new Map<string, Promise<unknown>>()
   /** merges past the deadline: their caller may be gone, so an error not sent back yet goes to the chat */
   protected callerLeft = new Set<string>()
-  /** merges the lane released while they ran: whatever they still do changes nothing */
-  protected cut = new Set<number>()
-  /** the run each lane head's merge has, so a released one is told from the task's next */
-  protected runOf = new Map<string, number>()
-  protected runs = 0
-  protected inRun = new AsyncLocalStorage<number>()
   /** merges released in a row, per task: the second restarts its agent */
   protected released = new Map<string, number>()
   /** the way to end the merge of a task that holds its lane */
   protected frees = new Map<string, (r: { ok: false; error: string; freed: true }) => void>()
-  protected headWatch = new HeadWatch()
+  /** per repo, the commit its main is red at in the required check, kept by the main watch */
+  protected heldRed = new Map<string, string>()
+  /** how long a merge may hold its repo's line before the lane releases it; none: the project's turn limit (tests shorten it) */
+  headLimitMs?: number
   /** each task's merge while it runs */
   protected landings = new Map<string, Promise<{ ok: boolean; error?: string; note?: string }>>()
   /** how long a stopping Lineclear waits for the merges on their way, and after which a merge's caller may be gone
@@ -170,6 +165,8 @@ export abstract class EngineState extends Emitter<Events> {
   /* ---------- status: from the agent alone (status.ts) ---------- */
 
   abstract statusOf(t: TaskRec): TaskStatus
+  /** lets go of a merge that held its line past its limit (engine-tidy) */
+  declare protected releaseHead: (t: TaskRec, ctl: AbortController, limitMs: number) => Promise<void>
   abstract subOf(t: TaskRec, status?: TaskStatus): string
 
   /** a task's agent may be written to: not stopped, paused, waiting for a go, archived or

@@ -3,7 +3,7 @@ import { readTasks } from "./task-read.ts";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { guardGroup, killGroup } from "./process-group.ts";
-import * as Q from "../server/server/live/engine/machine.ts";
+import * as Q from "./machine-limits.ts";
 import { storedLoginAdvice } from "../server/server/live/secrets.ts";
 import { listProjectNames, readSettings } from "./project.ts";
 import { day } from "./progress.ts";

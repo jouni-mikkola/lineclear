@@ -55,7 +55,7 @@ test("--version says unknown in a copy with no .git", () => {
   mkdirSync(join(dir, "bin"));
   cpSync("src", join(dir, "src"), { recursive: true });
   cpSync("pi", join(dir, "pi"), { recursive: true });
-  for (const shared of ["server/server/live/engine/machine.ts", "server/server/live/secrets.ts", "server/server/store.ts"]) {
+  for (const shared of ["server/server/live/secrets.ts", "server/server/store.ts"]) {
     mkdirSync(dirname(join(dir, shared)), { recursive: true });
     cpSync(shared, join(dir, shared));
   }

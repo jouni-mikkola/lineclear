@@ -1,8 +1,15 @@
 // git for tasks: what a fresh worktree starts from and gets copied in, whether its work is in main, commits, rebasing
 // on main and merging into it. herdr itself makes and removes task worktrees (worktrees.ts).
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { join } from 'node:path'
 import { remoteBox, run } from '../box.ts'
 import { exists } from '../mfs.ts'
+
+/** the signal of the merge a step belongs to: once aborted, the step's process group ends */
+export const stepSignal = new AsyncLocalStorage<AbortSignal>()
+
+/** how long one git step may run before its process group is ended */
+const STEP_TIMEOUT_MS = 10 * 60_000
 
 export interface Run {
   ok: boolean
@@ -22,12 +29,24 @@ export async function sh(
     const r = await run(cmd, { cwd, env: { GIT_TERMINAL_PROMPT: '0', ...opts.env }, timeoutMs: opts.timeoutMs })
     return { ok: r.code === 0, code: r.code, out: r.out.trimEnd(), err: r.err.trimEnd() }
   }
-  const p = Bun.spawn(cmd, { cwd, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, GIT_TERMINAL_PROMPT: '0', ...opts.env } })
+  const p = Bun.spawn(cmd, { cwd, stdout: 'pipe', stderr: 'pipe', detached: true, env: { ...process.env, GIT_TERMINAL_PROMPT: '0', ...opts.env } })
   opts.onPid?.(p.pid)
   let timedOut = false
-  const t = opts.timeoutMs ? setTimeout(() => ((timedOut = true), p.kill()), opts.timeoutMs) : null
+  // its own group, so what it started ends with it
+  const end = () => {
+    try {
+      process.kill(-p.pid, 'SIGKILL')
+    } catch {
+      p.kill('SIGKILL')
+    }
+  }
+  const timer = setTimeout(() => ((timedOut = true), end()), opts.timeoutMs ?? STEP_TIMEOUT_MS)
+  const signal = stepSignal.getStore()
+  if (signal?.aborted) end()
+  signal?.addEventListener('abort', end, { once: true })
   const [out, err, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited])
-  if (t) clearTimeout(t)
+  clearTimeout(timer)
+  signal?.removeEventListener('abort', end)
   return { ok: code === 0 && !timedOut, code: timedOut ? 124 : code, out: out.trimEnd(), err: timedOut ? `${err}\ntimed out` : err.trimEnd() }
 }
 

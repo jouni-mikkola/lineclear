@@ -1,5 +1,5 @@
 /** The merge lane's stall as the owner reads it: a head that hangs, and a task the lane let go. */
-/** The lane lets a head go after this long without progress (server/server/live/engine/lane-watch.ts). */
+/** The lane lets a head go after this long without progress. */
 const LANE_IDLE_MS = 15 * 60_000;
 
 /** Steps a head only passes through: a check may run long, these do not. */

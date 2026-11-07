@@ -180,7 +180,7 @@ export class EnginePr extends EngineLaunch {
   /** a ready task's next step into main (Merging), or none: Ready again, or back at work */
   protected land(t: TaskRec, step?: Lane.Landing['step'], due?: number) {
     // a merge the lane released goes no further
-    if (step && this.cut.has(this.inRun.getStore() ?? -1)) throw new Error(`${t.id}'s merge was released by the lane`)
+    if (step && G.stepSignal.getStore()?.aborted) throw new Error(`${t.id}'s merge was released by the lane`)
     if (!t.reported || ended(t)) return
     t.landing = step ? { step, at: Date.now(), due } : undefined
     this.save()
