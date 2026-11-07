@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-            - run: git fetch --no-tags origin main:main
+      - run: git fetch --no-tags origin main:main
         if: github.base_ref == 'main'
       # Tests commit in fresh repos, which need an identity and a default branch the runner lacks
       - run: |
@@ -39,7 +39,7 @@ jobs:
           git config --global user.email ci@localhost
           git config --global init.defaultBranch main
       - uses: oven-sh/setup-bun@v2
-            - uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', 'server/bun.lock') }}
