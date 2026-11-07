@@ -99,7 +99,7 @@ export class LiveSourceCli extends LiveSourceSubcommands {
     secret: ({ a1, rest, p, ctx }) => this.secretCommand(a1, rest, p, ctx),
   }
 
-  protected async command(p: Parsed, ctx: Ctx): Promise<string> {
+  protected command(p: Parsed, ctx: Ctx): string | Promise<string> {
     const [a0, a1, ...rest] = p.words
     if (!a0 || a0 === 'help' || p.flags.has('help')) return HELP
     const word = Object.hasOwn(this.words, a0) ? this.words[a0] : undefined
