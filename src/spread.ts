@@ -232,23 +232,14 @@ const failure = (r: Ran) => (r.code === 0 ? undefined : (r.err || r.out).trim().
  */
 function readyCmds(host: string, space: string, origin: string, env: Env, project?: string): (Cmd & { why: string })[] {
   const clone = {
-    argv: sshArgs(env, host, `sh -c ${quote(`set -e\n${REMOTE_PATH}\n${cloneScript(origin, cloneDir(space))}`)}`),
+    argv: sshArgs(env, host, `set -e\n${REMOTE_PATH}\n${cloneScript(origin, cloneDir(space))}`),
     timeoutMs: ADD_TIMEOUT_MS,
     why: "",
   };
   const text = project === undefined ? "" : secretsText(project, env, host);
   if (text === "") return [clone];
   const script = `"$HOME/.local/bin/lineclear" secrets import ${quote(space)} >/dev/null`;
-<<<<<<< HEAD
-  try {
-    const p = Bun.spawnSync(sshArgs(env, host, script), { stdin: Buffer.from(text), timeout: 60_000, env: env as Record<string, string> });
-    return p.exitCode === 0 ? undefined : `its secrets did not arrive: ${(p.stderr.toString() || `exit ${p.exitCode}`).trim().split("\n").at(-1)}`;
-  } catch (e) {
-    return `its secrets did not arrive: ${(e as Error).message}`;
-  }
-=======
-  return [{ argv: sshArgs(env, host, `sh -c ${quote(script)}`), stdin: text, timeoutMs: 60_000, why: "its secrets did not arrive: " }, clone];
->>>>>>> 5536534 (VEL-574: One tick starts all free steps)
+  return [{ argv: sshArgs(env, host, script), stdin: text, timeoutMs: 60_000, why: "its secrets did not arrive: " }, clone];
 }
 
 /**
@@ -289,23 +280,4 @@ export function addTasksAt(space: string, origin: string | undefined, tasks: New
     const i = go.indexOf(t);
     return i < 0 ? notReady.get(t.host as string) : failure(ran[i] as Ran);
   });
-<<<<<<< HEAD
-  return p.exitCode === 0 ? undefined : (p.stderr.toString() || p.stdout.toString()).trim().split("\n").slice(-3).join(" ") || `exit ${p.exitCode}`;
-}
-
-/** Runs a command on a machine with stdin. Returns the last lines of its error, or undefined when it succeeded. */
-function runScript(host: string, script: string, stdin: string, env: Env): string | undefined {
-  try {
-    const p = Bun.spawnSync(sshArgs(env, host, script), { stdin: Buffer.from(stdin), timeout: 5 * 60_000, env: env as Record<string, string> });
-    return p.exitCode === 0 ? undefined : (p.stderr.toString() || p.stdout.toString()).trim().split("\n").slice(-3).join(" ") || `exit ${p.exitCode}`;
-  } catch (e) {
-    return (e as Error).message;
-  }
-}
-
-/** Clones a project's repo on a machine, or brings it up to date, with no task. Returns an error text, or undefined. */
-function cloneOn(host: string, space: string, origin: string, env: Env = process.env): string | undefined {
-  return runScript(host, `set -e\n${REMOTE_PATH}\n${cloneScript(origin, cloneDir(space))}`, "", env);
-=======
->>>>>>> 5536534 (VEL-574: One tick starts all free steps)
 }
