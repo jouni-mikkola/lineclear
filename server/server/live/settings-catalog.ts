@@ -10,6 +10,7 @@ import { OWN_ZONE, validZone } from './trigger.ts'
 const FALLBACK_KINDS = [
   'pi',
   'claude',
+  'codex',
   'gemini',
   'cursor',
   'devin',
