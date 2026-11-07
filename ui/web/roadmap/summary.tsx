@@ -52,11 +52,11 @@ export function LineOfRoadmap({ line, project }: { line: RoadmapLine; project: s
       {line.text}
     </p>
   );
-  if (!head) return <div className="mb-6">{text}</div>;
+  if (!head) return <div className="mb-4">{text}</div>;
   return (
     <a
       href={roadmapPath(project, head)}
-      className="mb-6 flex min-h-12 items-center py-2 hover:text-fg"
+      className="mb-4 flex min-h-12 items-center py-2 hover:text-fg"
       aria-label={`${line.text} Opens the critical path.`}
       data-critical-path-link
     >

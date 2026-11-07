@@ -168,7 +168,7 @@ export function PhaseLine({ phases, current, project, byId }: { phases: Phase[];
           type="button"
           onClick={() => setList((l) => !l)}
           aria-expanded={list}
-          className="mt-2 flex h-12 w-full items-center gap-3 rounded-lg bg-raised px-4 text-left hover:bg-raised3 focus-visible:outline-2 focus-visible:outline-accent"
+          className="mt-2 flex h-12 w-full items-center gap-2 rounded-lg bg-raised px-4 text-left hover:bg-raised3 focus-visible:outline-2 focus-visible:outline-accent"
           data-phase-row
         >
           <span className="min-w-0 flex-1 break-words text-fg">{shown.name}</span>
@@ -198,7 +198,7 @@ export function PhaseLine({ phases, current, project, byId }: { phases: Phase[];
       </div>
       <p className="mt-4 hidden break-words text-fg md:block" data-open-phase>
         {shown.name}
-        <span className="ml-3 text-sm tabular-nums text-fg3">{`${doneCount(shown)} of ${shown.steps.length} done`}</span>
+        <span className="ml-2 text-sm tabular-nums text-fg3">{`${doneCount(shown)} of ${shown.steps.length} done`}</span>
       </p>
       <Track key={shown.name} phase={shown} project={project} byId={byId} rise={picked} />
     </section>
