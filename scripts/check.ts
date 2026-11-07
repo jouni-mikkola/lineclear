@@ -232,7 +232,7 @@ const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** Runs one failed test alone, in the folder and with the env its step ran in: true when it passes (and something ran). */
 function passesAlone(f: Failure, server: boolean): boolean {
-  const name = escapeRegex(f.test.replaceAll(" > ", " "));
+  const name = `^${escapeRegex(f.test.replaceAll(" > ", " "))}$`;
   const r = Bun.spawnSync(["bun", "test", "--timeout", "120000", f.file.startsWith(".") ? f.file : `./${f.file}`, "-t", name], {
     cwd: server ? "server" : undefined,
     env: { ...(server ? serverEnv : env), LINECLEAR_TEST_RUNNER: "1" },
@@ -252,7 +252,7 @@ function afterRerun(step: Step, failing: Failure[], output: string): boolean {
   if (failing.length === 0 || (listed !== undefined && listed !== failing.length)) return false;
   const verdict = judge(failing, readQuarantine(QUARANTINE), (f) => passesAlone(f, step.cwd === "server"));
   for (const f of verdict.quarantined) console.log(`check: quarantined, failed once and passed alone: ${f.file} > ${f.test}`);
-  if (verdict.flaky.length > 0) {
+  if (verdict.flaky.length > 0 && verdict.broken.length === 0) {
     writeQuarantine(QUARANTINE, verdict.next);
     for (const f of verdict.flaky) console.log(`check: flaky, failed once and passed alone, now in ${QUARANTINE} (file its fix task): ${f.file} > ${f.test}`);
   }

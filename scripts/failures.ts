@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 // Reads the failures a `bun test` step printed, for the check's own output and its outside-the-change test.
 
@@ -95,11 +95,8 @@ export const failCount = (output: string): number | undefined => {
 };
 
 export function readQuarantine(path: string): Quarantined[] {
-  try {
-    return JSON.parse(readFileSync(path, "utf8")) as Quarantined[];
-  } catch {
-    return [];
-  }
+  // a missing file is an empty quarantine, a damaged one is an error: writing over it would lose the tests it holds
+  return existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")) as Quarantined[]) : [];
 }
 
 export const writeQuarantine = (path: string, list: Quarantined[]): void => writeFileSync(path, `${JSON.stringify(list, null, 2)}\n`);
