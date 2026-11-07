@@ -224,7 +224,7 @@ function thirdWorld() {
   copyFileSync(join(THIRD, "models.json"), join(home, "models.json"));
   process.env.LINECLEAR_HOME = home;
   // the self project lists what the registry fixture offers; the track picks its models from that, priced by pi's own store
-  const registry = readRegistry(harnesses({ PI_BIN: join(THIRD, "registry.sh"), OPENCODE_BIN: "/nonexistent/opencode" })).map((m) => `${m.provider}/${m.name}`);
+  const registry = readRegistry(harnesses({ PI_BIN: join(THIRD, "registry.sh") })).map((m) => `${m.provider}/${m.name}`);
   const config = join(dir, "config");
   const pi = join(dir, "pi");
   mkdirSync(pi);

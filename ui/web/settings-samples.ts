@@ -141,7 +141,6 @@ const FOUND = {
         { account: "openai-codex", models: ["vendor-b/model-review", "vendor-b/model-lite"] },
       ],
     },
-    { name: "opencode", accounts: [{ account: "opencode-go", models: ["vendor-c/model-pro"] }] },
   ],
   chosen: { worker: "vendor-a/model-mid" },
 };
@@ -153,10 +152,12 @@ export function setupSample(state: PageState): SetupView {
     return {
       harnesses: [
         {
-          name: "opencode",
-          accounts: [{ account: "openrouter", models: ["openrouter/some-provider/a-model-with-a-really-long-name-and-version-2026-10-01-preview"] }],
+          name: "pi",
+          accounts: [
+            { account: "openrouter", models: ["openrouter/some-provider/a-model-with-a-really-long-name-and-version-2026-10-01-preview"] },
+            ...(FOUND.harnesses[0]?.accounts ?? []),
+          ],
         },
-        ...FOUND.harnesses,
       ],
       chosen: { worker: "openrouter/some-provider/a-model-with-a-really-long-name-and-version-2026-10-01-preview" },
     };

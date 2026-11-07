@@ -13,17 +13,14 @@ function fake(body: string): string {
 
 test("a model found nowhere in the repo is returned", () => {
   const pi = fake(`printf 'provider model context\\nacme zorblax-9 1M\\n'`);
-  const oc = fake(`echo acme2/zorblax-10`);
-  const reg = readRegistry(harnesses({ PI_BIN: pi, OPENCODE_BIN: oc }));
+  const reg = readRegistry(harnesses({ PI_BIN: pi }));
   expect(reg).toContainEqual({ harness: "pi", provider: "acme", name: "zorblax-9" });
-  expect(reg).toContainEqual({ harness: "opencode", provider: "acme2", name: "zorblax-10" });
 });
 
-test("a harness that fails or is missing adds nothing and breaks no other", () => {
-  const pi = fake(`printf 'provider model\\nacme zorblax-9\\n'`);
+test("a harness that fails or is missing adds nothing", () => {
   const bad = fake(`echo oops/model; exit 1`);
-  expect(readRegistry(harnesses({ PI_BIN: pi, OPENCODE_BIN: bad }))).toEqual([{ harness: "pi", provider: "acme", name: "zorblax-9" }]);
-  expect(readRegistry(harnesses({ PI_BIN: bad, OPENCODE_BIN: "/nonexistent/x" }))).toEqual([]);
+  expect(readRegistry(harnesses({ PI_BIN: bad }))).toEqual([]);
+  expect(readRegistry(harnesses({ PI_BIN: "/nonexistent/x" }))).toEqual([]);
 });
 
 const reg = [

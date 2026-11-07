@@ -125,11 +125,7 @@ export function SetupPanel() {
   const view = load.status === "ok" ? load.data : undefined;
   const state: PartState = !view ? "loading" : view.harnesses.length ? "filled" : "empty";
   return (
-    <Part
-      state={state}
-      label="Models"
-      empty={{ text: "No harness is logged in.", hint: "Log in to pi or opencode on this machine, then open this page again." }}
-    >
+    <Part state={state} label="Models" empty={{ text: "No harness is logged in.", hint: "Log in to pi on this machine, then open this page again." }}>
       {view && (
         <div className="space-y-4" data-setup>
           <Found harnesses={view.harnesses} />

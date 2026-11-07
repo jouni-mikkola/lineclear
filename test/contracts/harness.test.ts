@@ -117,7 +117,7 @@ test("only the harness-*.ts adapters name a harness's sessions folder", () => {
 });
 
 test("a harness that is not installed is left out of the registry and fails nothing", () => {
-  const none = { PI_BIN: "/nonexistent/pi", OPENCODE_BIN: "/nonexistent/opencode" };
+  const none = { PI_BIN: "/nonexistent/pi" };
   expect(readRegistry(harnesses(none))).toEqual([]);
   for (const { harness, setup } of adapters) expect(harness.readSessions("/w/x", setup().env)).toEqual([]);
 });

@@ -63,7 +63,7 @@ function world(api: number, web: number): World {
   const dir = mkdtempSync(join(diskTmpRoot(), "canary-"));
   const stub = join(dir, "stub");
   mkdirSync(stub);
-  for (const cli of ["claude", "codex", "pi"]) {
+  for (const cli of ["claude", "pi"]) {
     writeFileSync(join(stub, cli), STUB);
     chmodSync(join(stub, cli), 0o755);
   }

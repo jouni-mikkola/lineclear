@@ -23,19 +23,8 @@ const parseTable = (out: string) =>
       return provider && name ? [{ provider, name }] : [];
     });
 
-/** opencode prints `provider/model` per line; the model name may hold slashes. */
-const parseSlashed = (out: string) =>
-  out.split("\n").flatMap((line) => {
-    const id = line.trim();
-    const cut = id.indexOf("/");
-    return cut > 0 && cut < id.length - 1 && !/\s/.test(id) ? [{ provider: id.slice(0, cut), name: id.slice(cut + 1) }] : [];
-  });
-
 export function harnesses(env: NodeJS.ProcessEnv = process.env): Harness[] {
-  return [
-    { name: "pi", cmd: [env.PI_BIN ?? "pi", "--list-models"], parse: parseTable },
-    { name: "opencode", cmd: [env.OPENCODE_BIN ?? "opencode", "models"], parse: parseSlashed },
-  ];
+  return [{ name: "pi", cmd: [env.PI_BIN ?? "pi", "--list-models"], parse: parseTable }];
 }
 
 function listOne(h: Harness): ModelEntry[] {
