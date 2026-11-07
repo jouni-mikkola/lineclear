@@ -7,7 +7,7 @@ export function sessionFolder(worktree: string): string {
   return `--${worktree.replace(/^\//, "").replace(/\//g, "-")}--`;
 }
 
-export const sessionsRoot = (home: string) => join(home, "sessions");
+const sessionsRoot = (home: string) => join(home, "sessions");
 
 /** The `.jsonl` files of a folder, by name; none when it is missing or not a folder. */
 function jsonlFiles(folder: string): string[] {
@@ -27,16 +27,6 @@ export const sessionFolderPath = (worktree: string, env: Record<string, string |
 /** The text of each session file of a working folder, none when it has no sessions. */
 export const readSessions = (worktree: string, env: Record<string, string | undefined>): string[] =>
   worktree ? jsonlFiles(sessionFolderPath(worktree, env)).map((f) => readFileSync(f, "utf8")) : [];
-
-/** Every session file pi keeps, by folder. */
-export function allSessionFiles(env: Record<string, string | undefined>): string[][] {
-  const root = sessionsRoot(piDir(env));
-  try {
-    return readdirSync(root).map((name) => jsonlFiles(join(root, name)));
-  } catch {
-    return [];
-  }
-}
 
 const USAGE_LIMIT = /usage limit|quota|\b429\b.*(limit|too many|rate)|(limit|too many|rate).*\b429\b/i;
 
