@@ -40,6 +40,7 @@ import {
 import { fastGates } from "./fast-gates.ts";
 import { describeFailure, type Failure, outsideChange, parseFailures } from "./failures.ts";
 import { changedSince } from "./gates/tools.ts";
+import { judge, readQuarantine, writeQuarantine } from "./quarantine.ts";
 
 // Every step but the server's (below) runs with TMPDIR in a folder of this run, on disk. Each test process clears its own
 // folder inside it (tmp-scope.ts), so anything left in it when the steps end was left by a process that did not get
@@ -227,6 +228,35 @@ const started = performance.now();
 const times: StepTime[] = [];
 const outcome = new Map<string, Promise<boolean>>();
 
+/** Runs a failed test alone, in the folder its step ran in: true when it passes. */
+async function passesAlone(cwd: string | undefined, f: Failure): Promise<boolean> {
+  // bun joins describe names with a space in its -t match
+  const pattern = `^${f.test.replaceAll(" > ", " ").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`;
+  const p = Bun.spawn(["bun", "test", "--timeout", "120000", f.file, "-t", pattern], {
+    cwd,
+    stdin: "ignore",
+    stdout: "ignore",
+    stderr: "ignore",
+    env: cwd === "server" ? serverEnv : env,
+  });
+  return (await p.exited) === 0;
+}
+
+/** A tests step that failed only on flakes: each failure passes alone, or is quarantined and then passes alone. */
+async function onlyFlakes(step: Step, failing: Failure[]): Promise<boolean> {
+  if (failing.length === 0 || !step.name.includes("tests")) return false;
+  // the quarantine names files from the repo root
+  const prefix = step.cwd ? `${step.cwd}/` : "";
+  const root = failing.map((f) => ({ ...f, file: `${prefix}${f.file.replace(/^\.\//, "")}` }));
+  const verdict = await judge(root, readQuarantine(), process.env.LINECLEAR_TASK_ID ?? "unfiled", (f) =>
+    passesAlone(step.cwd, { ...f, file: f.file.slice(prefix.length) }),
+  );
+  if (verdict.blocking.length > 0) return false;
+  writeQuarantine(verdict.quarantine);
+  console.error(`check: ${step.name}: flaky, passed alone, in test/quarantine.json:\n${verdict.tolerated.map((f) => `  ${describeFailure(f)}`).join("\n")}`);
+  return true;
+}
+
 /** Runs one step after the steps it needs. Resolves to whether it passed; a step skipped for a failed need counts as failed. */
 async function runStep(step: Step): Promise<boolean> {
   // every step is in the map before any looks for its needs, whatever their order in the plan
@@ -235,7 +265,7 @@ async function runStep(step: Step): Promise<boolean> {
   const at = performance.now();
   const { code, failing, output } = await run(step);
   const isTests = step.name.startsWith("tests");
-  const ok = code === 0;
+  const ok = code === 0 || (await onlyFlakes(step, failing));
   times.push({ step: step.name, seconds: (performance.now() - at) / 1000, ok });
   if (!ok) {
     console.error(
