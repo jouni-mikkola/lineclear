@@ -11,7 +11,7 @@ const SKILLS = join(OWN, 'skill')
 const skill = (name: string) => join(SKILLS, name, 'SKILL.md')
 
 const commandLine = (chat: string) =>
-  `Your authoritative command is LINECLEAR_CHAT=${JSON.stringify(chat)} ${join(OWN, 'bin', 'lineclear')}. Use it if a shell finds another lineclear. Never start a server to repair routing.`
+  `Your authoritative command is LINECLEAR_CHAT=${JSON.stringify(chat)} ${join(OWN, 'bin', 'lineclear')}. Use it if a shell finds another lineclear. Never start a server to repair routing. For a dev/demo server use the repo command with --url <URL>.`
 
 const base = (who: string, own: string) =>
   `You are ${who}, running inside Lineclear (the board the human uses). Read ${skill('lineclear')} first, then ${skill(own)}. The human reads your replies in a calm chat: keep them short and plain.`
@@ -110,7 +110,7 @@ export function coordinatorPrompt(place: { role: 'space' | 'home' | 'main'; name
       ? ''
       : place.role === 'home'
         ? `\n\nThis is ${place.machine}'s home space: you also look after the machine and add spaces on it (lineclear space add).`
-        : `\n\nThis is the home space of the main machine, ${place.machine}: you also look after this machine and you keep the overview of every machine (lineclear task list).`
+        : `\n\nThis is the home space of the main machine, ${place.machine}: you also look after this machine and you keep the overview of every machine, which alerts reach the phone.`
   return `${base(who, 'lineclear-coordinator')}\n\n${commandLine(place.chat ?? place.name)}${duties}`
 }
 
@@ -133,7 +133,7 @@ export function taskFirst(t: { title: string; desc: string }) {
 export function restartLine(o: { from: string; to: string; chat: string; commits?: string; changes?: string }) {
   const task = o.commits !== undefined
   return [
-    `Restarted: the human restarted this ${task ? 'task' : 'chat'} on ${o.to}. ${o.from} ran it until now; carry on in the same ${task ? 'worktree' : 'folder'}, don't start over.`,
+    `Restarted: the human restarted this ${task ? 'task' : 'chat'} on ${o.to}. ${o.from} ran it until now; carry on in the same ${task ? 'worktree and branch' : 'folder'}, don't start over.`,
     ...(task ? [`Commits on the branch so far:\n${o.commits || 'none'}`, `Uncommitted changes:\n${o.changes || 'none'}`] : []),
     ...(o.chat ? [`The chat so far, latest last:\n\n${o.chat}`] : []),
     'If nothing is left, reply in one short line and end your turn.',
@@ -145,7 +145,7 @@ export function relaunchedLine() {
 }
 
 export function resumedLine(on: string) {
-  return `The human restarted you on ${on}, session as it was. Carry on; if nothing is left, reply with only <no-reply>restarted</no-reply>.`
+  return `The human restarted you on ${on}, session as it was. Carry on; if idle, reply with only <no-reply>restarted</no-reply>.`
 }
 
 /** what a queued task is told: with its brief (start), queued while running (later), or its wait changed */
@@ -175,12 +175,12 @@ export function prNewsLine(id: string, pr: { number: number; url: string }, news
 /** Personal settings are supplemental to repository rules and the human's requests. */
 export function privatePrompt(own: string, reviewer?: string): string {
   return [
-    'Private instruction snapshot for this start; it replaces earlier ones, even when empty. Follow the repository AGENTS.md, CLAUDE.md and REVIEW.md too. Never write these rules into repository instruction files, git, briefs, reports or GitHub. Human instructions and the brief win over them; if they conflict with team rules, explain and ask. Not a secret store.',
+    'Private instruction snapshot for this start; it replaces earlier ones, even when empty. Follow the repository AGENTS.md, CLAUDE.md and REVIEW.md too. Never write these rules into repository instruction files, git, briefs, reports or GitHub. Human instructions and the brief win over private rules; if private and team rules conflict, explain and ask. Not a secret store.',
     own,
     ...(reviewer === undefined
       ? []
       : [
-          'Reviewer handoff only: the next block is for reviewers, not you. Give it and the precedence/privacy rules above to every fresh reviewer prompt, never your task-only rules.',
+          'Reviewer handoff only: the next block is for reviewers, not you. Give it and the precedence/privacy rules above to every fresh reviewer, never your task-only rules.',
           reviewer,
         ]),
   ].join('\n\n')

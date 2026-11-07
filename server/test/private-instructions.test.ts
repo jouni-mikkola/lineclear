@@ -69,7 +69,7 @@ describe('private instructions', () => {
     const task = privatePrompt(s.instructions('task'), s.instructions('reviewer'))
     expect(task).not.toContain('Coordinator only.')
     expect(task).toContain('Reviewer handoff only')
-    expect(task).toContain('every fresh reviewer prompt')
+    expect(task).toContain('every fresh reviewer')
     expect(task).toContain('Human instructions and the brief win')
     expect(task).toContain('Never write these rules into repository instruction files, git')
     expect(task).toContain('Follow the repository AGENTS.md, CLAUDE.md and REVIEW.md too')
