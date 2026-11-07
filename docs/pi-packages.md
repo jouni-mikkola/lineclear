@@ -12,7 +12,7 @@ real tasks as plain pi.
 | [billion-context](https://www.npmjs.com/package/billion-context) | 0.1.212 | A proxy between the agent and the model's HTTP API that compresses old turns | Skip: does nothing with the bridge |
 | [context-mode](https://www.npmjs.com/package/context-mode) | 2.1.5 | Runs tool work in a sandbox and keeps big outputs in a local SQLite index | Skip: no saving, more tokens on edits |
 | [pi-subagents](https://www.npmjs.com/package/pi-subagents) | 0.86.0 | Child pi sessions: scout, reviewer, worker, workflows | Skip: breaks in the foreground, costs 8x on a review |
-| [pi-lens](https://www.npmjs.com/package/pi-lens) | 4.4.10 | LSP, linters and type checks after every edit | Skip: same result, slower |
+| [pi-lens](https://www.npmjs.com/package/pi-lens) | 4.4.10 | LSP, linters and type checks after every edit | Skip: same result, 3x slower, up to 1.4 GB per agent |
 | [pi-simplify](https://www.npmjs.com/package/pi-simplify) | 0.2.3 | A `/simplify` command: one prompt to tidy the changed lines | Skip: one prompt, the review step already does it |
 
 ## How it was measured
@@ -93,6 +93,20 @@ before `(this space)`, and `lineclear show` prints two.
 - **Same result, slower.** Both runs passed, as all plain runs did. After each edit it added a line such as "typescript
   silent: diagnostics are incomplete" or "clean · 2856 ms". The repo's own `bun run types` and `bun run gates` gave
   the agent the same facts at the end.
+- **A second measurement, a one-line edit with a type error** (`src/paths.ts`, `claude-bridge` haiku; tests, scans,
+  format and whole-repo tools off in `~/.pi-lens/config.json`):
+
+  | Setup | Time | Peak memory | Caught the new error? |
+  | --- | --- | --- | --- |
+  | pi-lens | 127 s | 1.4 GB | No: it reported old findings |
+  | pi-lens, the agent calls `lens_diagnostics` | 169 s | 0.6 GB | Only when asked |
+  | `--no-lens` | 46 s | 0.3 GB | No lens; `bun run types` reports it |
+
+- **Too heavy for parallel agents.** A machine runs 10 to 30 task agents. At 0.6 to 1.4 GB each, that is 6 to 42 GB
+  of language servers for feedback the agent gets anyway from `bun run types`, and the task took 2.8x longer.
+  It could fit in two narrower shapes, neither measured: the reviewer alone (one per task, read-only, short), or one
+  language server per machine shared by all agents. pi-lens starts one per session, so the shared shape needs other
+  code.
 - **Risk.** 300,000 lines. It can install tools on its own (gopls, gems, pipx packages), starts language servers
   outside Lineclear's check slots, and writes state to `~/.pi-lens`. It may pay off on a codebase without its own
   type check and linter; Lineclear has both.
@@ -114,7 +128,7 @@ and merge tasks. The board can see, stop and restart each pane.
 | billion-context | No. A proxy and TLS interception under every agent, outside the board's view | No | pi's compaction settings; `pi/fresh-dispatcher.ts` (40 lines), which cuts the Dispatcher's context to the latest request |
 | context-mode | Partly. Per task, but it adds a second memory beside pi's session | No | AGENTS.md's read rules; the machine's own output caps |
 | pi-subagents | Partly. It fills the "pi subagent" half of the Reviewer setting, but hides work in children the board does not see. Delegation in Lineclear is a task: its own pane, worktree and check | Little. The review launch is a prompt today, not code | Tasks and coordinators; `server/server/live/readers/background.ts`, which finds background work by its command |
-| pi-lens | Yes in shape (per agent, per edit), no in cost: language servers run outside the check slots of `pi/heavy-tool.ts` | No | `bun run check` and `bun run gates` |
+| pi-lens | Yes in shape (per agent, per edit), no in cost: up to 1.4 GB per agent, run outside the check slots of `pi/heavy-tool.ts`. Maybe for the reviewer only, or one shared server per machine | No | `bun run check` and `bun run gates` |
 | pi-simplify | Yes, but adds nothing | No | The review step |
 
 None would cut Lineclear's code: the overlaps are small files or rules, not modules. The best long-term candidate is
