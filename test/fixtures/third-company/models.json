@@ -1,0 +1,11 @@
+{
+  "providers": {
+    "quillon": { "company": "quillon-labs" },
+    "vexor": { "company": "vexor-ai" }
+  },
+  "models": {
+    "quillon/lumen-3": { "tier": "high", "cost": 6 },
+    "quillon/lumen-3-mini": { "tier": "small", "cost": 1 },
+    "vexor/praxis-2": { "tier": "good", "cost": 3 }
+  }
+}
