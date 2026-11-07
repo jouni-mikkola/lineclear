@@ -64,31 +64,46 @@ export class EngineLand extends EngineHandoff {
     let run = this.landings.get(t.id)
     if (!run) {
       const repo = this.places.space(t.project)?.path ?? ''
-      const now = (this.merging.get(repo) ?? Promise.resolve())
-        .then(() => this.head(t, repo, !!opts.self))
-        // stopped short with nothing more to wait for (failed checks, GitHub refused): Ready again, or back at work
-        .then(async (r) => {
-          if (!r.ok && t.landing?.step === 'merge') this.land(t)
-          // what task show says when the caller never heard
-          t.mergeStopped = r.ok ? undefined : (r.error ?? 'Merge failed.').slice(0, 300)
-          this.save()
-          // over before its caller hears: one asking right after starts a merge of its own, never joins this answer
-          this.landings.delete(t.id)
-          return Lane.tellIfLeft(this.callerLeft.delete(t.id), r, (m) => this.sendBack(t, m))
-        })
-      run = now
-      this.landings.set(t.id, now)
-      const tail = now.catch(() => undefined)
-      tail.then(() => this.landings.get(t.id) === now && this.landings.delete(t.id))
-      // the next merge into this repo waits until this one is really through, however long: two at once would write
-      // over each other's main
-      this.merging.set(repo, tail)
-      tail.then(() => this.merging.get(repo) === tail && this.merging.delete(repo))
+      // a red main holds every merge but its own fix, so one failure is not followed by more merges onto it. A held
+      // merge waits outside the lane until main is green, so the fix is never queued behind it
+      const held = t.by !== 'main-green' && !!this.data.red?.[repo]
+      run = held ? this.untilGreen(repo).then(() => this.enterLane(t, repo, !!opts.self)) : this.enterLane(t, repo, !!opts.self)
+      this.landings.set(t.id, run)
     }
     // its caller waits for the end, merged or stopped with a reason, however long git, GitHub or the check line take.
     // Past the deadline it may be gone (its shell moved it to the background): an error is then also sent to the agent
     const late = setTimeout(() => this.landings.has(t.id) && this.callerLeft.add(t.id), this.mergeDeadline)
     return run.finally(() => clearTimeout(late))
+  }
+
+  protected redPoll = 5_000
+
+  protected async untilGreen(repo: string) {
+    while (this.data.red?.[repo] ) await Bun.sleep(this.redPoll)
+  }
+
+  /** a task's merge queued in its repo's lane, which takes one merge at a time */
+  private enterLane(t: TaskRec, repo: string, self: boolean) {
+    const now = (this.merging.get(repo) ?? Promise.resolve())
+      .then(() => this.head(t, repo, self))
+      // stopped short with nothing more to wait for (failed checks, GitHub refused): Ready again, or back at work
+      .then(async (r) => {
+        if (!r.ok && t.landing?.step === 'merge') this.land(t)
+        // what task show says when the caller never heard
+        t.mergeStopped = r.ok ? undefined : (r.error ?? 'Merge failed.').slice(0, 300)
+        this.save()
+        // over before its caller hears: one asking right after starts a merge of its own, never joins this answer
+        this.landings.delete(t.id)
+        return Lane.tellIfLeft(this.callerLeft.delete(t.id), r, (m) => this.sendBack(t, m))
+      })
+    this.landings.set(t.id, now)
+    const tail = now.catch(() => undefined)
+    tail.then(() => this.landings.get(t.id) === now && this.landings.delete(t.id))
+    // the next merge into this repo waits until this one is really through, however long: two at once would write
+    // over each other's main
+    this.merging.set(repo, tail)
+    tail.then(() => this.merging.get(repo) === tail && this.merging.delete(repo))
+    return now
   }
 
   /** a task's merge while it holds its repo's lane: the head, which the lane lets go when it hangs (watchHeads) */
