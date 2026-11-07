@@ -273,7 +273,7 @@ test("the CLI, the roadmap view and Home give one roadmap the same line: counts,
     now,
   );
   expect(view.ok.line).toEqual(home.line as RoadmapLine);
-  expect(lines[0]).toBe(view.ok.line.text);
+  expect(lines[0]).toBe(`${view.ok.line.text} ${view.ok.line.detail}`);
   expect(view.ok.line).toMatchObject({ done: 1, work: 2, waiting: 0, left: 1, total: 4 });
   // one step merged in the last 7 days, three left: 21 days; all three hold the same lock
   expect(view.ok.line.finish).toBe(now - (now % 3_600_000) + 3 * 7 * 86_400_000);
@@ -293,6 +293,8 @@ test("the line counts steps waiting for you, names the longest chain, and says s
   const none = roadmapLine(plan, marks, whereTo(plan, [], 0, NOW), 0);
   expect(none.finish).toBeUndefined();
   expect(none.text).toContain("No finish date yet");
+  expect(none.detail).toContain("Nothing has merged");
+  expect(line.text.length).toBeLessThan(80);
   expect(roadmapLine({ steps: [st("A", [], true)] }, new Map(), {}, 0).text).toBe("The only step is done.");
 });
 

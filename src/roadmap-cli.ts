@@ -96,7 +96,7 @@ export function roadmapMain(
   // the same line the roadmap view and Home show
   const line = lineOfRoadmap(repo, space as string, tasks, env, now);
   if (line && !flags.has("--json")) {
-    out(line.text);
+    out(line.detail ? `${line.text} ${line.detail}` : line.text);
     if (line.path) out(`Critical path: ${line.path.join(" > ")}`);
   }
   printStatus(status, new Map(parsed.steps.map((s) => [s.id, resultOf(s)])), flags.has("--json"), out);

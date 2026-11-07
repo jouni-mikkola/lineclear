@@ -86,6 +86,16 @@ test("Lineclear's own roadmap, at this width", async ({ page }) => {
   await expect(page).toHaveScreenshot("roadmap-this.png", { fullPage: true, mask: [page.locator("[data-roadmap-line]")] });
 });
 
+test("the status is short, its reason sits in Details and a card shows no result that repeats its title", async ({ page }) => {
+  await fresh(page, "lineclear");
+  const line = page.locator("[data-roadmap-line]");
+  expect(((await line.textContent()) ?? "").length).toBeLessThan(80);
+  await expect(page.locator("[data-roadmap-detail]")).toHaveCount(1);
+  const cards = await page.locator("[data-step]").count();
+  expect(cards).toBeGreaterThan(0);
+  await expect(page.locator("[data-step] [data-result]")).toHaveCount(0);
+});
+
 test("a roadmap of Now, Next and Later lists, at this width", async ({ page }) => {
   startFixture();
   writeListRoadmap();
