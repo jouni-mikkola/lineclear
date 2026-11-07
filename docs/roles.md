@@ -212,7 +212,7 @@ Result: The night watch is one message the rule loop sends only on a stall, and 
 - files: src/night-watch.ts, src/rules.ts, src/store-copies.ts
 
 ### L609 Swarm against one agent
-Result: A table shows merged steps per hour and tokens per merged step on the devbox, swarm against one agent, and names each role that costs too much.
+Result: A table shows merged steps per hour and tokens per merged step on the devbox, swarm against one agent, and names roles that cost too much.
 - why: parallel work is worth keeping only if it merges more steps an hour for no more tokens each; no number says so today.
 - done when: a doc in `docs/numbers.md` has two runs on the devbox on the same 5 steps with disjoint locks: the swarm as it runs and one pi agent in a row with the same model and review setting; each run lists merged steps per hour and tokens per merged step summed over every role; then the swarm run repeated with the planner, the coordinator, the night watch and the Inbox off one at a time. Each role whose run costs more tokens or time per merged step than it saves gets a step that deletes it.
 - locks: swarm-measure
