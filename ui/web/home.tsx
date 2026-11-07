@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { AddProject, type Browser, DispatcherHead, type DispatcherState, type InboxItem, Part, TheLine } from "../kit/index.ts";
+import { DoctorLine } from "./alerts.tsx";
 import { addProject, detect, findRepos, type HomeData, type Load } from "./data.ts";
 import { rowsOf } from "./home-rows.ts";
 import { TaskTable } from "./home-table.tsx";
@@ -71,16 +72,7 @@ export function Home({
       <h1 className="sr-only">Home</h1>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 px-5 pt-4 md:px-10 lg:py-6 lg:pr-6">
         <InboxStrip open={open} held={held} onChoose={choose} onUndo={undo} ask={ask} errors={errors} read={asksRead} />
-        {([["doctor", d?.doctor]] as const).map(
-          ([kind, lines]) =>
-            !!lines?.length && (
-              <ul key={kind} aria-label={kind} className="flex flex-col gap-1 text-sm text-caution" {...{ [`data-${kind}`]: "" }}>
-                {lines.map((line) => (
-                  <li key={line}>{line}</li>
-                ))}
-              </ul>
-            ),
-        )}
+        {!!d?.doctor?.length && <DoctorLine lines={d.doctor} />}
         {first && (
           <div data-part="First project">
             <AddProject

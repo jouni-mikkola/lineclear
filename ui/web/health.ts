@@ -85,3 +85,8 @@ export function useTrouble(sample?: Trouble): Trouble | undefined {
   );
   return sample ?? live;
 }
+
+/** The one line Home shows for the doctor's findings; the findings themselves stay behind Details. */
+export function doctorSummary(count: number): string {
+  return count === 1 ? "1 thing on this machine needs fixing" : `${count} things on this machine need fixing`;
+}
