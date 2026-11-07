@@ -1,16 +1,71 @@
 import { randomUUID } from 'node:crypto'
-import { herdr } from './herdr.ts'
+import { herdr, type AgentInfo, type HerdrEvent } from './herdr.ts'
 import { holdBack, machineNews } from './quiet.ts'
-import { agentWrong } from './revive.ts'
+import { paneWrong, type Wrong } from './revive.ts'
 import { holdFrom, sleep, type OutItem, type Hold, type SendOpts, type Sent } from './agents-helpers.ts'
 import { LATELY, isNews } from './agents-state.ts'
 import { putInto } from './agent-input.ts'
 import { AgentsDelivery } from './agents-delivery.ts'
 
 export class AgentsSending extends AgentsDelivery {
-  wrong(key: string) {
+  /** told when a pane needs its process compared: the news that revives is herdr's, nothing is polled for it */
+  onSuspect?: () => void
+  /** the pane each agent's process was last compared in: a new pane (a start, or herdr back) is compared once */
+  protected compared = new Map<string, string>()
+  /** agents whose pane is to be compared: new, or its CLI exited */
+  protected due = new Set<string>()
+  /** what the last compare found wrong with each agent's pane */
+  protected verdict = new Map<string, Wrong | undefined>()
+
+  protected override take(list: AgentInfo[]) {
+    super.take(list)
+    for (const key of this.byName.values()) {
+      const pane = this.info(key)?.pane_id
+      if (!pane) {
+        this.compared.delete(key)
+        this.verdict.delete(key)
+        this.due.delete(key)
+      } else if (this.compared.get(key) !== pane) {
+        this.compared.set(key, pane)
+        this.due.add(key)
+      }
+    }
+    if (this.due.size) this.onSuspect?.()
+  }
+
+  protected override heard(e: HerdrEvent) {
+    if (e.event === 'pane_exited') {
+      const id = ((e.data.pane ?? e.data) as Partial<AgentInfo>).pane_id
+      const key = [...this.byName.values()].find((k) => this.info(k)?.pane_id === id)
+      if (key) {
+        this.due.add(key)
+        this.onSuspect?.()
+      }
+    }
+    super.heard(e)
+  }
+
+  /** whether any agent's pane waits for its compare */
+  get suspects() {
+    return this.due.size > 0
+  }
+
+  /** what is wrong with an agent's run: gone from herdr, or (see paneWrong) exited or on outdated files; null when herdr
+   *  can't say. Asks herdr only for a pane not compared yet. Outdated files are left alone while it works or asks (a
+   *  turn is never cut for this) */
+  async wrong(key: string): Promise<Wrong | undefined | null> {
     const r = this.records[key]
-    return agentWrong(r?.kind, this.info(key), r ? this.filesOf(r) : {})
+    if (!r?.kind) return undefined
+    const a = this.info(key)
+    if (!a) return 'gone'
+    if (this.due.has(key)) {
+      const p = await herdr.processInfo(a.pane_id).catch(() => null)
+      if (!p) return null
+      this.due.delete(key)
+      this.verdict.set(key, paneWrong(r.kind, p, this.filesOf(r)))
+    }
+    const w = this.verdict.get(key)
+    return w === 'stale' && (a.agent_status === 'working' || a.agent_status === 'blocked') ? undefined : w
   }
 
   wasWorking(key: string) {

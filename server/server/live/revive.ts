@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { basename } from 'node:path'
 import { decide } from './engine/lane-watch.ts'
-import { herdr, type AgentInfo, type ProcessInfo } from './herdr.ts'
+import { herdr, type ProcessInfo } from './herdr.ts'
 
 /** gone from herdr; its CLI exited, the shell at its prompt; or it runs on other files than it would start with now */
 export type Wrong = 'gone' | 'exited' | 'stale'
@@ -36,17 +36,6 @@ function sameValue(flag: string, got: string, want: string) {
 export function paneWrong(kind: string, p: ProcessInfo, want: Record<string, string>): Wrong | undefined {
   if (p.shell_pid && p.foreground_process_group_id === p.shell_pid) return 'exited'
   return staleFlag(kind, p, want) ? 'stale' : undefined
-}
-
-/** what is wrong with an agent's run: gone from herdr, or (see paneWrong) exited or on outdated files; null when herdr can't
- *  say. Outdated files are left alone while it works or asks (a turn is never cut for this) */
-export async function agentWrong(kind: string | undefined, a: AgentInfo | undefined, want: Record<string, string>): Promise<Wrong | undefined | null> {
-  if (!kind) return undefined
-  if (!a) return 'gone'
-  const p = await herdr.processInfo(a.pane_id).catch(() => null)
-  if (!p) return null
-  const w = paneWrong(kind, p, want)
-  return w === 'stale' && (a.agent_status === 'working' || a.agent_status === 'blocked') ? undefined : w
 }
 
 /** the first flag its CLI runs without, or with another value than Lineclear starts it with now */
@@ -109,6 +98,16 @@ export class Revivals {
   skip(key: string) {
     this.wrong.delete(key)
     this.well.delete(key)
+  }
+
+  /** how long until a key seen wrong may be started again, or undefined when it isn't waiting: the deadline to wake at,
+   *  instead of looking on a timer */
+  wait(key: string, now = Date.now()): number | undefined {
+    const since = this.wrong.get(key)
+    if (since === undefined || this.given.has(key)) return undefined
+    const tries = this.tries.get(key) ?? []
+    const gap = tries.length ? tries[tries.length - 1] + (this.times.gaps[tries.length] ?? 0) : 0
+    return Math.max(0, since + this.times.grace - now, gap - now)
   }
 
   /** seen wrong: 'go' to start it again now, 'give-up' once when its tries are used up, 'loop' once when it is wrong

@@ -11,6 +11,32 @@ import { OVERVIEW_MAX, REPLY_AFTER_CARD } from './source-helpers.ts'
 import { LiveSourceCli } from './source-cli.ts'
 
 export class LiveSourceUpkeep extends LiveSourceCli {
+  private reviveAt = Infinity
+  private reviveTimer?: ReturnType<typeof setTimeout>
+
+  constructor() {
+    super()
+    // herdr's word is what revives: a pane to compare, or an agent's status changing (gone, or its turn over)
+    this.agents.onSuspect = () => this.reviveIn(0)
+    this.agents.on('status', () => this.reviveIn(0))
+  }
+
+  /** a revive pass in `ms`, unless one is due sooner; the pass says when the next is due. It reads what events kept, and
+   *  asks herdr only for a pane not compared yet */
+  protected reviveIn(ms: number) {
+    // tests call revive() with their own clock
+    if (process.env.NODE_ENV === 'test') return
+    const at = Date.now() + ms
+    if (at >= this.reviveAt) return
+    clearTimeout(this.reviveTimer)
+    this.reviveAt = at
+    this.reviveTimer = setTimeout(() => {
+      this.reviveAt = Infinity
+      void this.revive().catch(() => undefined)
+    }, ms)
+    this.reviveTimer.unref?.()
+  }
+
   /** a coordinator that runs outside its folder (another machine's started in the main machine's path for it, where
    *  that machine had no such folder, or a home space's that was its machine's coordinator): started again in its own,
    *  with its session, once its turn is over */
@@ -40,7 +66,8 @@ export class LiveSourceUpkeep extends LiveSourceCli {
    * an older command after it restarted): started again, resuming their session, a few times at most (revive.ts)
    */
   async revive(now = Date.now()) {
-    if (!this.agents.reachable || now - this.agents.lastReach > 10_000) return
+    if (!this.agents.reachable) return
+    let next = this.agents.suspects ? 5000 : Infinity
     for (const key of Object.keys(this.agents.records)) {
       if (this.reviving.has(key)) continue
       if (!this.keepsRunning(key)) {
@@ -48,14 +75,19 @@ export class LiveSourceUpkeep extends LiveSourceCli {
         continue
       }
       const why = await this.agents.wrong(key)
-      if (why === null) continue
+      if (why === null) {
+        next = Math.min(next, 5000)
+        continue
+      }
       if (!why) this.revivals.fine(key, now)
       else {
         const go = this.revivals.seen(key, now, why === 'stale' ? why : '')
         if (go === 'go') void this.relaunch(key, why)
         else if (go) void this.gaveUp(key, why)
+        next = Math.min(next, this.revivals.wait(key, now) ?? Infinity)
       }
     }
+    if (next < Infinity) this.reviveIn(next)
   }
 
   protected async relaunch(key: string, why: Wrong) {
