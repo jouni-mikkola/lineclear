@@ -24,11 +24,10 @@ test("a task's chat in every state, at this width", async ({ page }) => {
   }
 });
 
-test("a task's chat shows reactions, a reply, a plan's steps and its own head", async ({ page }) => {
+test("a task's chat shows a reply, a plan's steps and its own head", async ({ page }) => {
   await page.goto("/task/WEB-3?state=task");
   await page.waitForSelector("[data-thread]");
   await expect(page.locator("[data-task-head]")).toContainText("WEB-3");
-  await expect(page.locator("[data-reaction]").first()).toBeVisible();
   await expect(page.locator("[data-quote]")).toBeVisible();
   await expect(page.locator("[data-plan-steps] li")).toHaveCount(3);
   await page.locator("[data-reply]").first().click();

@@ -1,12 +1,9 @@
 import { stripHidden } from './agents.ts'
-import { agentLines, parseUserLine } from './chatlines.ts'
+import { agentLines } from './agentlines.ts'
 import type { LogEvent } from './readers/types.ts'
 
-/** a line of yours the agent will answer: words of yours, not Lineclear's hidden news and not only reactions */
-export const yours = (text: string) =>
-  stripHidden(text)
-    .split('\n')
-    .some((ln) => ln.trim() && !['react', 'unreact'].includes(parseUserLine(ln.trim())?.kind ?? ''))
+/** a line of yours the agent will answer: words of yours, not Lineclear's hidden news and */
+export const yours = (text: string) => !!stripHidden(text)
 
 /** The turn the agent is in, by its log: one your message started ('yours'), one it started itself on Lineclear's news,
  *  its background work waking it ('own', with that turn's id), or none ('over': its reply ended the

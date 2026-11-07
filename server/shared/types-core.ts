@@ -273,13 +273,6 @@ export interface Question {
   elsewhere?: { label: string; chat: string; name: string }
 }
 
-export interface Reaction {
-  emoji: string
-  by: 'me' | 'them' | 'both'
-  /** sent while the agent shows a menu or is starting: waits like a typed message */
-  pending?: boolean
-}
-
 /** A reply's quote of the message it answers */
 export interface ReplyQuote {
   /** none when that message is no longer in the chat (only the quote is known) */

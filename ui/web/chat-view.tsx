@@ -17,7 +17,7 @@ import {
   Typing,
   useKeyboardInset,
 } from "../kit/index.ts";
-import { Quote, Reactions } from "../kit/task-chat.tsx";
+import { Quote, ReplyButton } from "../kit/chat-reply.tsx";
 import { TaskNote } from "../kit/task-head.tsx";
 import { QUESTIONS } from "./samples.ts";
 import type { Pending, useChat } from "./chat.tsx";
@@ -55,7 +55,7 @@ function rows(
   view: ChatView,
   pending: Pending[],
   retry: (cid: string) => void,
-  chat: Pick<ReturnType<typeof useChat>, "plans" | "planErrors" | "answerPlan" | "choose" | "react" | "setReplyTo">,
+  chat: Pick<ReturnType<typeof useChat>, "plans" | "planErrors" | "answerPlan" | "choose" | "setReplyTo">,
   rich: boolean,
 ): ThreadItem[] {
   const out: ThreadItem[] = view.messages.map((m) => ({
@@ -68,15 +68,7 @@ function rows(
     ...(m.reply ? { above: <Quote text={m.reply.text} /> } : {}),
     ...(rich
       ? {
-          below: (
-            <Reactions
-              item={{
-                reactions: m.reactions,
-                onReact: (emoji) => void chat.react(m.id, emoji),
-                onReply: () => chat.setReplyTo({ id: m.id, text: m.text ?? m.file?.name ?? "" }),
-              }}
-            />
-          ),
+          below: <ReplyButton onReply={() => chat.setReplyTo({ id: m.id, text: m.text ?? m.file?.name ?? "" })} />,
         }
       : {}),
   }));
@@ -230,7 +222,7 @@ export function Chat({
   const online = chat.online && !chat.lost;
   const items = useMemo(
     () => (view ? rows(view, pending, chat.retry, chat, !!task) : []),
-    [view, pending, chat.retry, chat.plans, chat.planErrors, chat.choose, chat.answerPlan, chat.react, chat.setReplyTo, task],
+    [view, pending, chat.retry, chat.plans, chat.planErrors, chat.choose, chat.answerPlan, chat.setReplyTo, task],
   );
   const onImage = useCallback((src: string, alt: string) => setImage({ src, alt }), []);
   const writing = !!view?.writing && view.state === "ready";

@@ -1,4 +1,4 @@
-// The start of a message as a reaction or a reply quotes it: one line of plain words. The server quotes with it, and the
+// The start of a message as a reply quotes it: one line of plain words. The server quotes with it, and the
 // screen shows a reply's quote with it at once, before the server has it.
 
 export function excerpt(text: string, n = 60) {

@@ -54,7 +54,7 @@ describe('merging from the command', () => {
     ;(src as unknown as { onCard(t: unknown, s: string, sub: string): void }).onCard({ ...t, pr, posted: 'done|x' }, 'done', 'x')
     expect(src.chats.chat(place).messages.find((m) => m.card?.status === 'done')?.card?.pr).toEqual(pr)
   })
-  test("a merged task gets a Done card in its project's chat, which takes reactions like a message", async () => {
+  test("a merged task gets a Done card in its project's chat, as a message", async () => {
     const { t, place } = await workedTask('carded')
     await src.engine.done(t.id, 'Added x.txt.')
     expect((await src.cli(['merge', t.id], {})).out).toContain('Merged')
@@ -62,20 +62,6 @@ describe('merging from the command', () => {
     const cards = () => src.chats.chat(place).messages.filter((m) => m.card?.status === 'done')
     // one line of a few words: its summary is in the task
     expect(cards().map((m) => [m.card!.status, m.card!.text, m.text])).toEqual([['done', 'is merged', `${t.id} is merged`]])
-    // a tap on it sends the reaction as a chat line quoting the card
-    const sent: string[] = []
-    const send = src.agents.send
-    src.agents.send = (async (_k: string, text: string) => (sent.push(text), { waiting: false })) as typeof send
-    try {
-      expect(await src.act({ type: 'react', chat: place, message: cards()[0].id, emoji: '🎉' })).toEqual({})
-    } finally {
-      src.agents.send = send
-    }
-    expect(sent).toEqual([`<reaction from="${src.user}" emoji="🎉" to="${t.id} is merged"/>`])
-    // read back from the log, it lands on the card
-    const ev = (src.chats as unknown as { events: Map<string, unknown[]> }).events
-    ev.set(place, [...(ev.get(place) ?? []), { kind: 'user', id: 'r1', at: Date.now() + 10, text: sent[0] }])
-    expect(cards()[0].reactions).toEqual([{ emoji: '🎉', by: 'me' }])
   })
   test("a coordinator's <no-reply> after the news shows nothing in the chat; its words do", async () => {
     const { t, place } = await workedTask('noted')

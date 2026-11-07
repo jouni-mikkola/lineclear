@@ -2,21 +2,6 @@ import { agentLines, excerpt, findQuoted, line, matches, parseReply, parseUserLi
 import { describe, expect, test } from 'bun:test'
 
 describe('chat lines', () => {
-  test('a reaction quotes the start of the message and reads back', () => {
-    const l = line.react('Elias', '👍', 'PR #52 is ready to merge')
-    expect(l).toBe('<reaction from="Elias" emoji="👍" to="PR #52 is ready to merge"/>')
-    expect(parseUserLine(l)).toEqual({ kind: 'react', emoji: '👍', to: 'PR #52 is ready to merge' })
-    expect(line.unreact('Elias', '👍', 'x')).toBe('<reaction-removed from="Elias" emoji="👍" to="x"/>')
-    expect(parseUserLine(line.unreact('Elias', '👍', 'x'))?.kind).toBe('unreact')
-  })
-  test('any emoji from the full picker makes the same line, skin tones and joined ones too', () => {
-    for (const e of ['🚀', '👍🏽', '🧑🏿\u200D💻', '❤️\u200D🔥', '🏳️\u200D🌈', '1️⃣', '🇸🇪']) {
-      expect(parseUserLine(line.react('Elias', e, 'Done'))).toEqual({ kind: 'react', emoji: e, to: 'Done' })
-      expect(parseUserLine(line.unreactFile('Elias', e, 'a.png', '/x/a.png'))).toEqual({ kind: 'unreact', emoji: e, to: 'a.png', path: '/x/a.png' })
-      expect(agentLines(`<react emoji="${e}" to="Go"/>`).reactions).toEqual([{ emoji: e, to: 'Go' }])
-      expect(agentLines(`[react ${e} to "Go"]`).reactions).toEqual([{ emoji: e, to: 'Go' }])
-    }
-  })
   test('long messages are quoted short, and still match', () => {
     const long = 'Seven things. gtm asks whether to rerun CI on main, GTM-15 is ready to merge, HP-201 needs a call on Pinned'
     const q = excerpt(long)
@@ -37,8 +22,6 @@ describe('chat lines', () => {
     expect(parseUserLine('<b>bold</b>')).toBeNull()
   })
   test('the older [square bracket] lines still read back', () => {
-    expect(parseUserLine('[Elias reacted 👍 to "PR #52 is ready to merge"]')).toEqual({ kind: 'react', emoji: '👍', to: 'PR #52 is ready to merge' })
-    expect(parseUserLine('[Elias removed 👍 from a.png: /x/a.png]')).toEqual({ kind: 'unreact', emoji: '👍', to: 'a.png', path: '/x/a.png' })
     expect(parseUserLine('[Elias answered "Rerun CI on main?": Rerun it]')).toEqual({ kind: 'answer', title: 'Rerun CI on main?', answer: 'Rerun it' })
     expect(parseUserLine('[Elias attached screenshot.png: ~/inbox/screenshot.png]')).toEqual({
       kind: 'attach',
@@ -52,26 +35,6 @@ describe('chat lines', () => {
       rest: ['[Elias attached a.png: /inbox/a.png]'],
     })
   })
-  test('a reaction to a file names its path, so two files of one name stay apart', () => {
-    const l = line.reactFile('Elias', '👍', 'screenshot.png', '/inbox/a-screenshot.png')
-    expect(l).toBe('<reaction from="Elias" emoji="👍" file="screenshot.png" path="/inbox/a-screenshot.png"/>')
-    expect(parseUserLine(l)).toEqual({ kind: 'react', emoji: '👍', to: 'screenshot.png', path: '/inbox/a-screenshot.png' })
-    expect(parseUserLine(line.unreactFile('Elias', '👍', 'a.png', '/x/a.png'))).toMatchObject({ kind: 'unreact', path: '/x/a.png' })
-    // a quoted message with a colon or quotes in it is still a message
-    expect(parseUserLine(line.react('Elias', '👍', 'Note: say "done"'))).toEqual({ kind: 'react', emoji: '👍', to: 'Note: say “done”' })
-    expect(agentLines('<react emoji="👀" file="shot.png" path="/inbox/b-shot.png"/>\nOn it.').reactions).toEqual([
-      { emoji: '👀', to: 'shot.png', path: '/inbox/b-shot.png' },
-    ])
-    expect(agentLines('[react 👀 to shot.png: /inbox/b-shot.png]\nOn it.').reactions).toEqual([{ emoji: '👀', to: 'shot.png', path: '/inbox/b-shot.png' }])
-  })
-  test("the agent's own reactions come out of its reply", () => {
-    const r = agentLines('<react emoji="👀" to="What needs me today?"/>\nLooking now.')
-    expect(r.reactions).toEqual([{ emoji: '👀', to: 'What needs me today?' }])
-    expect(r.text).toBe('Looking now.')
-    // straight quotes an agent copied into its quote don't break it
-    expect(agentLines('<react emoji="👍" to="Say "go" when ready"/>').reactions).toEqual([{ emoji: '👍', to: 'Say "go" when ready' }])
-    expect(agentLines('[react 👀 to "What needs me today?"]\nLooking now.')).toEqual(r)
-  })
   test('a reply quotes the start of the message it answers, and reads back with its files', () => {
     const l = line.reply('Elias', 'Tests pass on the branch. Want me to merge?', 'Yes, merge it')
     expect(l).toBe('<reply from="Elias" to="Tests pass on the branch. Want me to merge?">Yes, merge it</reply>')
@@ -83,7 +46,8 @@ describe('chat lines', () => {
     // a reply with only a file
     expect(parseReply(`${line.reply('Elias', 'shot.png', '')}\n${line.attach('Elias', 'b.png', '/inbox/b.png')}`)?.text).toBe('')
     expect(parseReply('Just words')).toBeNull()
-    expect(parseReply(line.react('Elias', '👍', 'Go'))).toBeNull()
+    // straight quotes an agent copied into its quote don't break it
+    expect(agentLines('<reply to="Say "go" when ready"/>\nOk.').reply).toEqual({ to: 'Say "go" when ready' })
     // an agent's reply line is no reply of yours
     expect(parseReply('<reply to="Go"/>')).toBeNull()
   })
@@ -98,17 +62,17 @@ describe('chat lines', () => {
     expect(parseUserLine(userLines(own)[0])).toMatchObject({ answer: 'Start\n<answer>Blue</answer>\nEnd' })
   })
   test("the agent's reply line comes out of its reply, the first one counts", () => {
-    const r = agentLines('<reply to="What needs me today?"/>\n<react emoji="👀" to="Hi"/>\nThree things.')
-    expect(r).toEqual({ text: 'Three things.', reactions: [{ emoji: '👀', to: 'Hi' }], reply: { to: 'What needs me today?' } })
+    const r = agentLines('<reply to="What needs me today?"/>\nThree things.')
+    expect(r).toEqual({ text: 'Three things.', reply: { to: 'What needs me today?' } })
     expect(agentLines('<reply file="shot.png" path="/inbox/b-shot.png"/>\nSeen it.').reply).toEqual({ to: 'shot.png', path: '/inbox/b-shot.png' })
     // its words inside the reply's tags
-    expect(agentLines('<reply to="Hi">\nThree things.\n</reply>')).toEqual({ text: 'Three things.', reactions: [], reply: { to: 'Hi' } })
-    expect(agentLines('<reply to="Hi">Three things.</reply>')).toEqual({ text: 'Three things.', reactions: [], reply: { to: 'Hi' } })
+    expect(agentLines('<reply to="Hi">\nThree things.\n</reply>')).toEqual({ text: 'Three things.', reply: { to: 'Hi' } })
+    expect(agentLines('<reply to="Hi">Three things.</reply>')).toEqual({ text: 'Three things.', reply: { to: 'Hi' } })
     expect(agentLines('No reply here.').reply).toBeUndefined()
     // a reply line inside its words stays words
     expect(agentLines('Write <reply to="x"/> on a line of its own.').text).toBe('Write <reply to="x"/> on a line of its own.')
     // the older form
-    expect(agentLines('[reply to "What needs me today?"]\n[react 👀 to "Hi"]\nThree things.')).toEqual(r)
+    expect(agentLines('[reply to "What needs me today?"]\nThree things.')).toEqual(r)
     expect(agentLines('[reply to shot.png: /inbox/b-shot.png]\nSeen it.').reply).toEqual({ to: 'shot.png', path: '/inbox/b-shot.png' })
     expect(agentLines('Write [reply to "x"] on a line of its own.').text).toBe('Write [reply to "x"] on a line of its own.')
   })
@@ -120,10 +84,6 @@ describe('chat lines', () => {
     expect(agentLines('`<No-Reply>merged</No-Reply>`').text).toBe('')
     expect(agentLines('<reply to="SHE-9 is ready"/>\n<no-reply>already on it</no-reply>').text).toBe('')
     expect(agentLines('[reply to "SHE-9 is ready"]\n<no-reply>already on it</no-reply>').text).toBe('')
-    expect(agentLines('<react emoji="👍" to="SHE-50 is done"/>\n<no-reply>a thumbs up</no-reply>')).toEqual({
-      text: '',
-      reactions: [{ emoji: '👍', to: 'SHE-50 is done' }],
-    })
     expect(agentLines('<no-reply>merged</no-reply>\nSHE-51 can start now.').text).toBe('<no-reply>merged</no-reply>\nSHE-51 can start now.')
     expect(agentLines('<no-reply>a</no-reply> <no-reply>b</no-reply>').text).toBe('<no-reply>a</no-reply> <no-reply>b</no-reply>')
     expect(agentLines('Write <no-reply>why</no-reply> when news needs nothing.').text).toBe('Write <no-reply>why</no-reply> when news needs nothing.')
@@ -133,7 +93,6 @@ describe('chat lines', () => {
   test('the older markers still say nothing: [[noted]], any [[...]], a lone [noted]', () => {
     expect(agentLines('[[noted]]').text).toBe('')
     expect(agentLines('\n[[noted]]\n').text).toBe('')
-    expect(agentLines('[react 👍 to "SHE-50 is done"]\n[[noted]]')).toEqual({ text: '', reactions: [{ emoji: '👍', to: 'SHE-50 is done' }] })
     expect(agentLines('[[noted]]\nSHE-51 can start now.').text).toBe('[[noted]]\nSHE-51 can start now.')
     expect(agentLines('[Noted]').text).toBe('[Noted]')
     expect(agentLines('[[skip]]').text).toBe('')

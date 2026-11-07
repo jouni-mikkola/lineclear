@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import type { Message } from '../../shared/types.ts'
 
 /** a menu the CLI shows in its terminal (permission prompts and the like), read from the screen */
 export interface ScreenMenu {
@@ -15,6 +16,14 @@ export interface ScreenMenu {
   reject?: string
   /** The visible prompt, including security context that must not be lost. */
   screen?: string
+}
+
+/** a menu in the terminal as a question card, posted by Lineclear */
+export function menuCard(key: string, menu: ScreenMenu, to: string, asks: string): Message {
+  const id = menuId(key, menu)
+  const choices = menu.choices.map((label, i) => ({ label, description: menu.descriptions?.[i] }))
+  const { title, screen, multi, reject } = menu
+  return { id, who: 'agent', at: Date.now(), question: { id, title, screen, terminal: true, noNote: true, multi, reject, kind: 'Form', choices, to, asks } }
 }
 
 /** A card's identity excludes the cursor, but includes the full permission being granted. */

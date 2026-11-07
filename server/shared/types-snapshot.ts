@@ -21,7 +21,6 @@ export type Action =
       message it answers */
   /** space: sent from a needs-you card in that space's chat (CardAsk) */
   | { type: 'send'; chat: string; text: string; attachments?: string[]; cid?: string; reply?: string; space?: string }
-  | { type: 'react'; chat: string; message: string; emoji: string }
   /** the smoke check after an update (install.sh): a hidden line that asks for no reply. It answers no open card */
   | { type: 'probe'; chat: string }
   /** a secret kept at a level (all, m:<machine>, p:<machine>:<space>), or removed (null); kept on the main machine, so

@@ -25,7 +25,7 @@ export interface ThreadItem {
   onChoose?: (choice: number) => Promise<string | undefined>;
   /** Something the Dispatcher shows that is not words, such as a plan to approve. */
   card?: ReactNode;
-  /** Shown above the words (the message it answers) and below them (reactions): a task's chat sets them. */
+  /** Shown above the words (the message it answers) and below them (a button to reply): a task's chat sets them. */
   above?: ReactNode;
   below?: ReactNode;
 }

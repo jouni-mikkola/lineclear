@@ -180,13 +180,10 @@ describe('what you send shows at once', () => {
     try {
       expect(await as('working', () => src.act({ type: 'send', chat, text: 'Also the README', cid: 'w1' }))).toMatchObject({ waiting: false })
       expect(typed).toEqual(['Also the README'])
-      // a reaction goes in at once too
-      await as('working', () => agents.send(chat, '<reaction from="Elias" emoji="👍" to="x"/>', { reaction: { message: 'm', emoji: '👍' } }))
-      expect(typed).toHaveLength(2)
       // a CLI command waits for the turn to end
       expect(await as('working', () => agents.send(chat, '/compact', { idle: true }))).toMatchObject({ waiting: true, waitsFor: 'turn' })
       await as('working', () => agents.deliver(chat))
-      expect(typed).toHaveLength(2)
+      expect(typed).toHaveLength(1)
       await as('idle', () => agents.deliver(chat))
       expect(typed.at(-1)).toBe('/compact')
       // a menu came up just as it was typed: it waits for the menu instead of failing

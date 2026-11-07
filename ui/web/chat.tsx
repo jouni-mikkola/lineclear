@@ -173,15 +173,6 @@ export function useChat(sample: ChatState | undefined, on: boolean, api = "/api/
   };
   /** The message the next one answers. */
   const [replyTo, setReplyTo] = useState<{ id: string; text: string }>();
-  /** Puts your reaction on a message, or takes it off; the chat then shows it. */
-  const react = useCallback(
-    async (message: string, emoji: string): Promise<string | undefined> => {
-      if (sample) return undefined;
-      const r = await post(`${api}/react`, { message, emoji });
-      return r.ok ? undefined : r.error;
-    },
-    [sample, api],
-  );
   /** Sends one again under the same id: Lineclear takes an id once, so a message that did go in is not sent twice. */
   const latest = useRef(pending);
   latest.current = pending;
@@ -200,5 +191,5 @@ export function useChat(sample: ChatState | undefined, on: boolean, api = "/api/
     },
     [sample, api],
   );
-  return { view, pending, attached, online, lost, attach, remove, send, retry, plans, planErrors, answerPlan, choose, react, replyTo, setReplyTo };
+  return { view, pending, attached, online, lost, attach, remove, send, retry, plans, planErrors, answerPlan, choose, replyTo, setReplyTo };
 }

@@ -75,9 +75,8 @@ describe('a reply counts once it streams', () => {
     expect(reads('[[', '[[noted', '[[noted]]')).toBe(false)
     expect(reads('<b>Six</b>', '<b>Six</b> seconds')).toBe(true)
     expect(reads('[', 'S')).toBe(false)
-    expect(reads('<re', '<react emoji="👍" to="SH')).toBe(false)
-    // its reaction line first, then the marker: still hidden; a reply line first, then words: those count
-    expect(reads('<react emoji="👍" to="SHE-9"/>\n<no-re', '<react emoji="👍" to="SHE-9"/>\n<no-reply>a 👍</no-reply>')).toBe(false)
+    expect(reads('<re', '<reply to="SH')).toBe(false)
+    // a reply line first, then words: those count
     expect(reads('<reply to="SHE-9"/>\nIt is', '<reply to="SHE-9"/>\nIt is merged')).toBe(true)
     expect(reads('Six', 'Six seconds', undefined)).toBe(true)
   })

@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import type { ChatControls, Question } from '../../shared/types.ts'
 import { HOME, readJson, writeJson } from '../store.ts'
 import { stripHidden, type Agents, type OutItem } from './agents.ts'
-import { agentLines } from './chatlines.ts'
+import { agentLines } from './agentlines.ts'
 import { herdr } from './herdr.ts'
 import { logKind } from './readers/find.ts'
 import { LogTail, readerFor } from './readers/index.ts'
@@ -291,8 +291,8 @@ export class ChatsLogs {
 
   /**
    * What you or a coordinator wrote to this agent that it hasn't read yet: still waiting to go in, or typed in since its
-   * turn began and not in its log since (Claude Code takes text typed mid-turn at its next step). Reactions and
-   * Lineclear's own hidden lines aside.
+   * turn began and not in its log since (Claude Code takes text typed mid-turn at its next step). Lineclear's
+   * own hidden lines aside.
    */
   unseen(key: string): OutItem[] {
     this.pull(key)
@@ -302,7 +302,7 @@ export class ChatsLogs {
     const flat = (t: string) => stripHidden(t).replace(/\s+/g, ' ').trim()
     const same = (a: string, b: string) => a.startsWith(b.slice(0, 40)) || b.startsWith(a.slice(0, 40)) || /\[Pasted text #\d/.test(a)
     const read = (o: OutItem) => ev.some((e) => e.kind === 'user' && e.at >= o.at - 5000 && same(flat(e.text), flat(o.text)))
-    const mine = (o: OutItem) => !o.reaction && yours(o.text)
+    const mine = (o: OutItem) => yours(o.text)
     return [...this.agents.waiting(key).filter(mine), ...this.agents.typedSince(key, start).filter((o) => mine(o) && !read(o))]
   }
 

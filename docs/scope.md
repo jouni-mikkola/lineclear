@@ -28,7 +28,7 @@ tracked `.ts`, `.tsx`, `.css`, `.sh` and `.pl` file and the `bin` scripts outsid
 | --- | --- | --- |
 | D1 | The demo world and `lineclear run --demo` | gone |
 | D2 | Every agent CLI but pi: the catalog is pi only (73 lines); the log readers, trust prompts and test samples of the others are left | open: L472 |
-| D3 | The parts of the old board screen no page uses: sidebar order, unread, folders, slash commands, the side panel, the activity rows. Their files are gone; reactions in `chatlines.ts` and `task-chat.tsx` are left | open: L471 |
+| D3 | The parts of the old board screen no page uses: sidebar order, unread, folders, slash commands, the side panel, the activity rows. Their files are gone, and so are the emoji marks on a message | done: L471 |
 | D4 | The agent-browser stack, so playwright-cli (`src/browsers.ts`) is the one browser | gone |
 | D5 | Automations and their triggers | gone |
 | D6 | Artifacts | gone |
@@ -36,7 +36,7 @@ tracked `.ts`, `.tsx`, `.css`, `.sh` and `.pl` file and the `bin` scripts outsid
 | D8 | Search and "since you last looked" | gone |
 | D9 | The second secrets command | gone |
 
-The open areas hold about 650 lines (D2: the readers, `trust.ts`, `streaming.ts`, `runtime.ts`; D3: reactions) of 47311.
+The open areas hold about 650 lines (D2: the readers, `trust.ts`, `streaming.ts`, `runtime.ts`; D3: done) of 47311.
 D1, D4 to D9 are met: no demo switch, automation, artifact, plugin or search code is left. The `?state=` sample pages are
 not the demo world; their data still ships in the bundle (L470).
 
@@ -68,7 +68,7 @@ css, shell, perl and the `bin` scripts; counted by `.ts` and `.tsx` alone it is 
 | `server/helper/` | Machines | 454 | keep | the helper on another machine, until L95 |
 | `server/bin/` | Install | 4 | keep | the server's command |
 | `server/server/live/box.ts` | Machines | 295 | keep | SSH to another machine until herdr's forwarding does it all (L95) |
-| `server/server/live/chatlines.ts` | Dispatcher | 255 | keep | trim: no reactions or artifact lines (D3, D6) |
+| `server/server/live/chatlines.ts` | Dispatcher | 90 | keep | trim: no artifact lines (D6) |
 | `server/server/live/chats*` | Dispatcher | 936 | keep | chats, the Dispatcher's among them |
 | `server/server/live/engine/` | Run | 3066 | keep | tasks: launch, briefs, worktrees, state, retire |
 | `server/server/live/engine/branch-work.ts` | Review and merge | 19 | keep | what a branch holds before a merge |
@@ -234,7 +234,6 @@ css, shell, perl and the `bin` scripts; counted by `.ts` and `.tsx` alone it is 
 | `ui/kit/no-dispatcher.tsx` | Dispatcher | 36 | keep | chat with no Dispatcher yet |
 | `ui/kit/settings.tsx` | Models | 183 | keep | Settings parts |
 | `ui/kit/spend-charts.tsx` | Models | 271 | keep | spend per account |
-| `ui/kit/task-chat.tsx` | View | 75 | keep | a task's chat; drop reactions (D3) |
 | `ui/web/` | View | 4004 | keep | the pages |
 | `ui/web/chat*` | Dispatcher | 754 | keep | the chat view |
 | `ui/web/inbox-strip.tsx` | Inbox | 345 | keep | the ask strip |

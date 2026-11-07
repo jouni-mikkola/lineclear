@@ -15,14 +15,6 @@ async function uploadFile(req: Request, chat: Chat): Promise<Response> {
   return "error" in saved ? json({ error: saved.error }, saved.status) : json(saved, 201);
 }
 
-async function reactTo(body: unknown, chat: Chat): Promise<Response> {
-  const { message, emoji } = body as { message?: unknown; emoji?: unknown };
-  if (typeof message !== "string" || !message || typeof emoji !== "string" || !emoji || emoji.length > 16)
-    return json({ error: "Send the message's id and an emoji." }, 400);
-  const failed = await chat.react(message, emoji);
-  return failed ? json({ error: failed.error }, failed.status) : json({ reacted: true });
-}
-
 async function answerCard(body: unknown, chat: Chat): Promise<Response> {
   const { question, choice } = body as { question?: unknown; choice?: unknown };
   if (typeof question !== "string" || !question || typeof choice !== "number" || !Number.isInteger(choice) || choice < 0)
@@ -45,7 +37,7 @@ function readFile(req: Request, url: URL, chat: Chat, p: string, env: Env): Resp
   return p === "/image" ? namedImageResponse(path, env) : chat.file(path);
 }
 
-const POSTS = new Set(["/", "/files", "/answer", "/react"]);
+const POSTS = new Set(["/", "/files", "/answer"]);
 
 /** One chat under `root` (the Dispatcher's or a task's): its live view, a message to it, and the files that go with one. */
 export async function chatApi(req: Request, url: URL, chat: () => Chat, env: Env, root: string): Promise<Response> {
@@ -59,7 +51,6 @@ export async function chatApi(req: Request, url: URL, chat: () => Chat, env: Env
   if (!ownPage(req, url, env)) return json({ error: "The Dispatcher takes messages only from Lineclear's own pages." }, 403);
   if (p === "/files") return uploadFile(req, chat());
   const body = await req.json().catch(() => ({}));
-  if (p === "/react") return reactTo(body, chat());
   if (p === "/answer") return answerCard(body, chat());
   return sendMessage(body, chat());
 }
