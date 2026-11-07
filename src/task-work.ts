@@ -27,9 +27,22 @@ export interface WorkLine {
   reason: string;
 }
 
-/** One line of work done for `task` on this machine (or `machine` when the server acts for another). */
+const REPEAT_SPAN_MS = 30 * 60_000;
+const lastWritten = new Map<string, number>();
+
+/** One line of work done for `task` on this machine (or `machine` when the server acts for another). The same work again within half an hour adds no line. */
 export function recordWork(task: string, work: Work, env: Env = process.env, machine = machineOf(env)): void {
   const file = decisionsFile(env);
+  const key = `${file}\0${task}\0${work}\0${machine}`;
+  const now = Date.now();
+  // after a restart the memory is empty: the file still knows
+  const before =
+    lastWritten.get(key) ?? Math.max(0, ...readWork(env).filter((w) => w.step === task && w.work === work && w.machine === machine).map((w) => Date.parse(w.time)));
+  if (now - before < REPEAT_SPAN_MS) {
+    lastWritten.set(key, before);
+    return;
+  }
+  lastWritten.set(key, now);
   mkdirSync(dirname(file), { recursive: true });
   const line: WorkLine = { time: new Date().toISOString(), project: "-", step: task, kind: "run", work, machine, reason: `${work} ran on ${machine}` };
   appendFileSync(file, `${JSON.stringify(line)}\n`);
