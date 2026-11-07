@@ -247,7 +247,7 @@ export const ghNow = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z')
 
 export const troubleOf = (e: unknown) => ((e as Error)?.message ?? String(e)).split('\n')[0].slice(0, 90)
 
-/** a title fits one row: one too long (from an automation saved before the limit) is cut at a word */
+/** a title fits one row: one too long (saved before the limit) is cut at a word */
 export const short = (title: string) =>
   title.length > TITLE_MAX
     ? `${title

@@ -181,10 +181,9 @@ export const CATALOG: Section[] = [
     rows: [{ label: 'Notify', key: NOTIFY_KEY, value: NOTIFY_DEFAULT, options: [...NOTIFY] }],
   },
   {
-    // the zone every time rule's times are in: automations
     name: 'Time zone',
     levels: ['all'],
-    about: 'The time zone of every schedule: automations, on every machine.',
+    about: 'The time zone of every schedule, on every machine.',
     rows: [{ label: 'Time zone', key: 'time.zone', value: OWN_ZONE, text: true }],
   },
   {
