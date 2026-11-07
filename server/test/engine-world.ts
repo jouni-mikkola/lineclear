@@ -56,11 +56,10 @@ export function world(herdr = fakeHerdr(), o: { boot?: string } = {}) {
   const agents = {
     routed: (key: string) => routed[key] ?? false,
     ensure: async (s: { key: string; first?: string; cwd: string; kind: string; pane?: () => Promise<string> }) => {
-      const pane = await s.pane?.()
-      if (pane) {
-        panes[s.key] = pane
-        herdr.agentPanes.add(pane)
-      }
+      // herdr gives an agent a pane of its own; the engine does not ask for one
+      const pane = `${s.key}:pane`
+      panes[s.key] = pane
+      herdr.agentPanes.add(pane)
       started.push({ ...s, pane })
       records[s.key] = { kind: s.kind, started: Date.now() }
       status[s.key] = o.boot ?? 'working'
