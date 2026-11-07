@@ -170,3 +170,55 @@ test("every listed command is one the CLI knows", async () => {
     rmSync(dir, { recursive: true, force: true });
   }
 }, 15000);
+
+const ANSWER_P90_MS = 100;
+const p90 = (ms: number[]): number => [...ms].sort((a, b) => a - b)[Math.ceil(ms.length * 0.9) - 1] ?? 0;
+
+test("the lineclear command's own start takes at most 100 ms, p90", async () => {
+  const server = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => Response.json({ out: "ok\n", code: 0 }) });
+  try {
+    const env = { ...process.env, LINECLEAR_URL: `http://127.0.0.1:${server.port}`, LINECLEAR_CHAT: "", HOME: mkdtempSync(join(tmpdir(), "lc-speed-")) };
+    const ms: number[] = [];
+    for (let i = 0; i < 8; i++) {
+      const at = performance.now();
+      const p = Bun.spawn(["perl", "server/helper/route.pl", join(process.cwd(), "server/helper/lineclear"), "show"], { env, stdout: "pipe", stderr: "pipe" });
+      expect(await new Response(p.stdout).text()).toBe("ok\n");
+      // the first run warms the file cache
+      if (i > 0) ms.push(performance.now() - at);
+    }
+    expect(p90(ms)).toBeLessThanOrEqual(ANSWER_P90_MS);
+  } finally {
+    server.stop(true);
+  }
+});
+
+test("room, task list and show are answered in 100 ms, p90", () => {
+  const script = `
+    const { mkdtempSync } = require("node:fs");
+    const { tmpdir } = require("node:os");
+    const { join } = require("node:path");
+    process.env.LINECLEAR_HOME = mkdtempSync(join(tmpdir(), "lc-speed-home-"));
+    process.env.HERDR_SOCKET_PATH = join(process.env.LINECLEAR_HOME, "no-herdr.sock");
+    process.env.NODE_ENV = "test";
+    const { LiveSource } = await import("./server/live/source.ts");
+    const src = new LiveSource();
+    const times = {};
+    for (const args of [["room"], ["task", "list"], ["show"]]) {
+      await src.cli(args, {});
+      const ms = [];
+      for (let i = 0; i < 7; i++) {
+        const at = performance.now();
+        const r = await src.cli(args, {});
+        ms.push(performance.now() - at);
+        if (r.code) throw new Error(args.join(" ") + ": " + r.out);
+      }
+      times[args.join(" ")] = ms;
+    }
+    console.log(JSON.stringify(times));
+    process.exit(0);`;
+  const p = Bun.spawnSync(["bun", "-e", script], { cwd: "server", env: { ...process.env, LINECLEAR_CHAT: "" } });
+  expect(p.stderr.toString()).toBe("");
+  const times = JSON.parse(p.stdout.toString().trim().split("\n").pop() ?? "{}") as Record<string, number[]>;
+  expect(Object.keys(times)).toEqual(["room", "task list", "show"]);
+  for (const ms of Object.values(times)) expect(p90(ms)).toBeLessThanOrEqual(ANSWER_P90_MS);
+}, 10000);

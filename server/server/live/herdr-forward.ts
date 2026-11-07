@@ -1,5 +1,7 @@
 // The adapter's other half: herdr's own forwarding to a machine saved in herdr, and the small read of a machine's room.
 // A call is the same call with `--machine <label-or-id>`; Lineclear keeps no script for it.
+import { readFileSync } from 'node:fs'
+import { availableParallelism, loadavg } from 'node:os'
 import { adapter, type Call, HerdrError, rpc, type WorkspaceInfo } from './herdr.ts'
 
 /** the same call on a machine saved in herdr: `herdr --machine <label-or-id> <command>`, herdr's own forwarding over its
@@ -113,9 +115,21 @@ export interface Room {
 const ROOM_LINE =
   'printf \'ROOM %s %s %s %s\\n\' "$(cut -d\' \' -f1 /proc/loadavg)" "$(nproc)" "$(awk \'/MemAvailable/{print $2}\' /proc/meminfo)" "$(awk \'/MemTotal/{print $2}\' /proc/meminfo)"'
 
-/** a machine's room, read over the same connection as every other call: a tab runs one line there, is read, and is closed */
+/** this machine's room, from its own /proc: no tab to open, so it answers at once */
+function localRoom(): Room | undefined {
+  try {
+    const meminfo = readFileSync('/proc/meminfo', 'utf8')
+    const kb = (key: string) => Number(new RegExp(`^${key}:\\s+(\\d+)`, 'm').exec(meminfo)?.[1])
+    return { load: loadavg()[0], cores: availableParallelism(), freeKb: kb('MemAvailable'), totalKb: kb('MemTotal') }
+  } catch {
+    return undefined
+  }
+}
+
+/** a machine's room: this one from /proc, a saved one over the same connection as every other call (a tab runs one line there, is read, and is closed) */
 export async function room(machine?: string): Promise<Room | undefined> {
-  const call: Call = machine ? forwarded(machine) : rpc
+  if (!machine) return localRoom()
+  const call: Call = forwarded(machine)
   try {
     const workspace = (await call<{ workspaces: WorkspaceInfo[] }>('workspace.list')).workspaces[0]?.workspace_id
     if (!workspace) return undefined

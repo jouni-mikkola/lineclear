@@ -14,6 +14,8 @@ export const ago = (t: number) => (age(t) === 'now' ? 'just now' : `${age(t)} ag
 // made once: building a formatter on each call is slow, and every snapshot words several times
 const CLOCK = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' })
 
+const DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' })
+
 /** the time of day, "14:05" */
 export function clock(t: number) {
   return CLOCK.format(t)
@@ -24,5 +26,5 @@ export function clockWithDay(t: number) {
   const d = new Date(t)
   const today = new Date().toDateString() === d.toDateString()
   const hm = clock(t)
-  return today ? `today ${hm}` : `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} ${hm}`
+  return today ? `today ${hm}` : `${DAY.format(d)} ${hm}`
 }
