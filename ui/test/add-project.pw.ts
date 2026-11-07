@@ -64,6 +64,8 @@ test.describe("live", () => {
     await page.waitForTimeout(1100);
     await page.goto("/");
     const fixes = page.locator("[data-doctor] li");
+    // the fix commands sit behind Details
+    await page.locator("[data-doctor]").getByRole("button", { name: "Details" }).click({ timeout: 15_000 });
     // the page asks again every 1.5 s: the first answer comes before the doctor has looked
     await expect(fixes.first()).toBeVisible({ timeout: 15_000 });
     const shown = await fixes.first().innerText();

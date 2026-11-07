@@ -38,7 +38,8 @@ test("seven doctor findings are one line and a Details row, their commands only 
     expect((await line.boundingBox())?.height).toBeLessThan(60);
     expect(await page.locator("body").textContent()).not.toMatch(/curl|fix-1/);
     const first = await page.locator("[data-line], [data-part]").first().boundingBox();
-    expect(first?.y ?? 0).toBeLessThan(400);
+    expect(first).not.toBeNull();
+    expect(first?.y).toBeLessThan(400);
     await line.getByRole("button", { name: "Details" }).click();
     await expect(line).toContainText("curl -fsS");
   }
