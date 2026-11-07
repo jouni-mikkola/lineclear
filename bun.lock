@@ -19,7 +19,6 @@
         "@types/react-dom": "^19.3.0",
         "@vitejs/plugin-react": "^6.1.2",
         "axe-core": "^4.14.0",
-        "jscpd": "5.4.2",
         "knip": "6.44.1",
         "tailwindcss": "^4.3.3",
         "typescript": "^5.6.0",
@@ -263,24 +262,6 @@
     "graceful-fs": ["graceful-fs@4.2.11", "", {}, "sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ=="],
 
     "jiti": ["jiti@2.7.0", "", { "bin": { "jiti": "lib/jiti-cli.mjs" } }, "sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ=="],
-
-    "jscpd": ["jscpd@5.4.2", "", { "optionalDependencies": { "jscpd-darwin-arm64": "5.4.2", "jscpd-darwin-x64": "5.4.2", "jscpd-linux-arm64-gnu": "5.4.2", "jscpd-linux-arm64-musl": "5.4.2", "jscpd-linux-x64-gnu": "5.4.2", "jscpd-linux-x64-musl": "5.4.2", "jscpd-windows-arm64-msvc": "5.4.2", "jscpd-windows-x64-msvc": "5.4.2" }, "bin": { "jscpd": "run-jscpd.js" } }, "sha512-bxZ1ObA4NyWBcM7Zh+QoGrdcMovbCxrDofFaLo2Lwgk/Axe/e45VYu8EM+mpPx2CpU/QGCoktONRnaRZl8Yq2w=="],
-
-    "jscpd-darwin-arm64": ["jscpd-darwin-arm64@5.4.2", "", { "os": "darwin", "cpu": "arm64" }, "sha512-EGoPYQZqESW2kJfxKZrUYsYWhzq2Irk6sBQQWZ7VPAGj2wwk3n8HtDP2FnJOiHWZtSz55I8zQWldzIrD55B5Vw=="],
-
-    "jscpd-darwin-x64": ["jscpd-darwin-x64@5.4.2", "", { "os": "darwin", "cpu": "x64" }, "sha512-/bz/rgoahqeK0p5r+KjeTTS59d7bZpMxD7hQ4CaQ0qKZWBZIyu7hRdExzJ7/KrCEJ5cmRogvXX1jhFqldYLNXw=="],
-
-    "jscpd-linux-arm64-gnu": ["jscpd-linux-arm64-gnu@5.4.2", "", { "os": "linux", "cpu": "arm64", "libc": "glibc" }, "sha512-YW/eX+mOYZmT/A3QEARYmJQoVQNV/cfecKCobNXZcD3mE57drpKHmJnvuL9uS85z0cUKWGCM57JVkVz6Y9oxxw=="],
-
-    "jscpd-linux-arm64-musl": ["jscpd-linux-arm64-musl@5.4.2", "", { "os": "linux", "cpu": "arm64", "libc": "musl" }, "sha512-jOLTO8YVRz65NaeYNeXoIf13yOPWhbM61xKXpv51DXQ2BXce6XfgPaJVeDCOM5s+8mt6aDtq0BZ8zptNeqGuIw=="],
-
-    "jscpd-linux-x64-gnu": ["jscpd-linux-x64-gnu@5.4.2", "", { "os": "linux", "cpu": "x64", "libc": "glibc" }, "sha512-eAmKLxx+pIOEX4lZ342CCCjL5bvf+a3gdmaaVHXiGIx2Zr3zKkF32YkfuN2sCvCui5I/wnely80XsRvVVFO47Q=="],
-
-    "jscpd-linux-x64-musl": ["jscpd-linux-x64-musl@5.4.2", "", { "os": "linux", "cpu": "x64", "libc": "musl" }, "sha512-ers9YFscD6DrmhyjBDXo/L+yBKcclHdWTFLMulYVGLcoGRKfBFhmK08MI3ajN/GMmCpJu7rkDYKL3egdfE8OIw=="],
-
-    "jscpd-windows-arm64-msvc": ["jscpd-windows-arm64-msvc@5.4.2", "", { "os": "win32", "cpu": "arm64" }, "sha512-kOhVw4cVhN8T9jr3OVThB3pPpbff0ITHTwpJ/+4EGzMkbf0y6QtPpHDzRgiHJj7u1FSTBXTI6VhPhDUhT/os1g=="],
-
-    "jscpd-windows-x64-msvc": ["jscpd-windows-x64-msvc@5.4.2", "", { "os": "win32", "cpu": "x64" }, "sha512-BuR5DCV7F/G5ukMEIzCrz43ea5C0t0ALcP7v+opOWefoi4aiQYCEmtoRwfXMM/zjOmNYmvJBDDfeH05U9uuzEg=="],
 
     "knip": ["knip@6.44.1", "", { "dependencies": { "formatly": "^0.11.4", "get-tsconfig": "4.14.3", "jiti": "^2.7.0", "oxc-parser": "^0.155.0", "oxc-resolver": "11.24.2", "picomatch": "^4.0.7", "smol-toml": "^1.9.0", "strip-json-comments": "5.0.3", "tinyglobby": "^0.2.17", "unbash": "^6.0.1", "yaml": "^2.9.1", "zod": "^4.6.5" }, "bin": { "knip": "bin/knip.js", "knip-bun": "bin/knip-bun.js" } }, "sha512-Hbd8nvkIsNgFfXgC7Jsb5LHv7jj6VwA3tmfHd53XPX2z9Vc9RnAZqV0BIiP4OrtYqKwCoLseFHQZerb1bNlbSw=="],
 
