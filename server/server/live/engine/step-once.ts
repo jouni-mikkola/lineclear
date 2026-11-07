@@ -40,6 +40,22 @@ export function whyStepRefused(title: string, open: { id: string; title: string 
   return undefined
 }
 
+/** The board's claims on steps being started: one process holds them, so two requests at the same instant meet here. */
+export class StepClaims {
+  private held = new Map<string, string>()
+  /** Claims a step of a repo for a task being added; returns the earlier holder's name when it is taken. */
+  take(repo: string, step: string, by: string): string | undefined {
+    const key = `${repo}#${step}`
+    const first = this.held.get(key)
+    if (first !== undefined) return first
+    this.held.set(key, by)
+    return undefined
+  }
+  release(repo: string, step: string) {
+    this.held.delete(`${repo}#${step}`)
+  }
+}
+
 /** The newest commits of a base (the remote's copy when there is one), for `landedIn`. */
 export async function commitsOf(repo: string, base: string): Promise<Commit[]> {
   const remote = await git(repo, 'rev-parse', '--verify', '--quiet', `refs/remotes/origin/${base}`)
