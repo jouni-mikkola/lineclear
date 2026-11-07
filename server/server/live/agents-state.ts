@@ -76,8 +76,9 @@ export class AgentsState extends Emitter<Events> {
   backoff = new Map<string, { until: number; n: number }>()
   backoffMs = 2000
   backoffMax = 60_000
-  /** an agent herdr won't take a prompt for this long gets the text typed into its pane instead */
-  paneAfter = 10_000
+  /** an agent herdr won't take a prompt for this long gets the text typed into its pane instead. This was the fixed wait in every start:
+   *  10 s of refused prompts before the brief was typed in, so a start took 23 s. The pane holds its CLI by then, and a shell prompt is never typed into. */
+  paneAfter = 2_000
   /** a message without a screen's id (the brief) still not in after this long is given up on */
   briefFor = 300_000
   /** the pane each agent was last started in, to find it again when herdr lists it without its name */
