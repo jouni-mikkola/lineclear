@@ -100,7 +100,7 @@ Each step is in [ROADMAP.md](../ROADMAP.md), or dropped with the step that does 
 - L750 A task end leaves nothing: in ROADMAP.md; the session sweep is L805's.
 
 - L751 Budgets are set per role: in ROADMAP.md, after L798 and L502 in place of L736 and L742.
-- L752 Any repo gets an agent: in ROADMAP.md, with no `after` (L506, which replaced L732, is merged).
+- L752 Any repo gets an agent: in ROADMAP.md, on `engine/install.ts` where `storePath` is, with no `after` (L506, which replaced L732, is merged).
 
 - L753 The helper goes in atomically: dropped, L590 did it (merged).
 - L754 Updates drain a machine: dropped, L591 does it (ROADMAP.md).

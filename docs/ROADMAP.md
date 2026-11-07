@@ -393,9 +393,9 @@ Result: `server/scripts/test.ts` is deleted, and the root test command is the on
 ### L773 One file per measure
 Result: Each measure has its own page in `docs/numbers/`, so two measuring steps never edit one file.
 - why: `docs/numbers.md` is one file for every measure; 11 PRs changed it, 1 with a conflict.
-- done when: each section of `docs/numbers.md` is a page `docs/numbers/<measure>.md`; `docs/numbers.md` keeps only a pointer to the folder (10 lines or fewer), so every link to it still holds; `core-baseline.ts`, `check-speed.ts` and `check.ts` name the page they write; the brief of a reopened step (`src/brief.ts`) sends its proof to a page of `docs/numbers/`. It runs after the open steps that write `docs/numbers.md` (L609, L586).
+- done when: each section of `docs/numbers.md` is a page `docs/numbers/<measure>.md`; `docs/numbers.md` keeps only a pointer to the folder (10 lines or fewer), so every link to it still holds; `core-baseline.ts`, `check-speed.ts` and `check.ts` name the page they write; the brief of a reopened step (`src/brief.ts`) sends its proof to a page of `docs/numbers/`, and its file hint leaves out the whole folder. It runs after the open steps that write `docs/numbers.md` (L609, L586).
 - locks: none
-- after: L760, L609, L586
+- after: L609, L586
 - files: docs/numbers.md, docs/numbers/, scripts/check-speed.ts, scripts/core-baseline.ts, scripts/check.ts, src/brief.ts
 
 ### L774 Collisions can be measured
@@ -403,7 +403,7 @@ Result: One command prints how many merged PRs hit a rebase conflict and which f
 - why: the collision numbers of the layout plan were taken by hand; the layout's goal needs a number anyone can rerun.
 - done when: `bun scripts/core-baseline.ts collisions <n>` replays the force pushes of the last n merged PRs with `git merge-tree` and prints conflicting PRs per 100 and files touched by more than 10 PRs; a test replays a planted conflict and sees it counted.
 - locks: none
-- after: L773
+- after: none
 - files: scripts/core-baseline.ts, test/core-baseline.test.ts
 
 ### L764 Every roadmap is split
@@ -604,7 +604,7 @@ Result: A small repo with no package.json and no Lineclear setup gets a worktree
 - done when: a test adds a 3-file repo with a shell check command, starts one step and sees worktree, brief, ready and merge with 0 errors; `storePath` runs only when a lock file exists.
 - locks: none
 - after: none
-- files: server/server/live/engine/git.ts, server/test/any-repo-start.test.ts
+- files: server/server/live/engine/install.ts, server/test/any-repo-start.test.ts
 
 ### L718 Any repo runs the loop
 Result: The core loop test passes on a second small repo with a plain GitHub PR check and on one with no remote, with no Lineclear setup.
