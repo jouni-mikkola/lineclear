@@ -30,16 +30,17 @@ async function loop(killAt?: Point) {
   sh('git init -q -b main && git config user.email t@t && git config user.name T && echo hi > README.md && git add -A && git commit -qm init', dir)
   const pi = fakePi()
   const engines: InstanceType<typeof Engine>[] = []
+  let places = new Places()
   const boot = () => {
     const settings = new Settings()
     settings.set('machine.maxTasks', '50')
-    const places = new Places()
+    places = new Places()
     const e = new Engine(pi.forEngine() as never, pi.chats as never, places, settings)
     engines.push(e)
     return e
   }
   let engine = boot()
-  const project = (await engine.places.add(dir, `loop-${killAt ?? 'none'}`)).name
+  const project = (await places.add(dir, `loop-${killAt ?? 'none'}`)).name
   /** the server is killed here: its timers stop, and a new one reads the same store */
   const point = (at: Point) => {
     if (at !== killAt) return
