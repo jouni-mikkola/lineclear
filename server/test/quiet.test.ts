@@ -1,5 +1,6 @@
 // Machine news never wakes an AI: a burst of health, news and heartbeat lines reaches no agent's pane.
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, spyOn, test } from 'bun:test'
+import { herdr } from '../server/live/herdr.ts'
 import { Agents, hidden } from '../server/live/agents.ts'
 import { held, machineNews } from '../server/live/quiet.ts'
 
@@ -19,8 +20,7 @@ describe('what counts as machine news', () => {
 
 test('a burst of health, news and heartbeat lines is held back: nothing goes into any agent', async () => {
   const a = new Agents()
-  let put = 0
-  ;(a as any).put = async () => void put++
+  const prompt = spyOn(herdr, 'prompt').mockResolvedValue(undefined as never)
   const before = held.length
   const burst = [
     hidden('CPU load is 9.1', 'health', { kind: 'cpu' }),
@@ -31,7 +31,8 @@ test('a burst of health, news and heartbeat lines is held back: nothing goes int
   for (const key of ['demo', 'LIN-9/Agent']) for (const text of burst) await a.send(key, text)
   // news a coordinator asked to hear (the requested-news mailbox) is held too
   await a.send('demo', hidden('LIN-9 is ready', 'news'), { cid: 'requested-news:1' })
-  expect(put).toBe(0)
+  expect(prompt).not.toHaveBeenCalled()
+  prompt.mockRestore()
   expect(a.outbox).toEqual([])
   expect(held.length - before).toBe(9)
   a.stop()
