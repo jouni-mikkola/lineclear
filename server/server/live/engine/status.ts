@@ -1,4 +1,4 @@
-import type { TaskStatus } from '../../../shared/types.ts'
+import type { TaskStatus } from '../../../shared/types/task.ts'
 import { CLI_NAME } from '../settings.ts'
 import * as Lane from './lane.ts'
 import { askOf, fitStatus } from './status-line.ts'

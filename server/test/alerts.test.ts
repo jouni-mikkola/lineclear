@@ -2,7 +2,9 @@
 // the app icon's count.
 import { describe, expect, test } from 'bun:test'
 import { alertUrl, BROWSERS_LINK, taskLink, askText, BODY_MAX, keptTags, pushPayload, taskAlert, TITLE_MAX, waiting } from '../shared/alerts.ts'
-import type { Chat, Question, Snapshot } from '../shared/types.ts'
+import type { Chat } from '../shared/types/chat.ts'
+import type { Question } from '../shared/types/question.ts'
+import type { Snapshot } from '../shared/types/snapshot.ts'
 
 const GTM = 'p:vm-str:gtm'
 const agentSays = (key: string, ...messages: Chat['messages']): Chat => ({ key, cli: 'Claude Code', messages })

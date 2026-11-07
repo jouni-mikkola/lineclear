@@ -1,5 +1,6 @@
 import { clock } from '../../shared/time.ts'
-import { slugify, type Machine, type Place } from '../../shared/types.ts'
+import { slugify, type Place } from '../../shared/types/place.ts'
+import type { Machine } from '../../shared/types/machine.ts'
 import type { Agents } from './agents.ts'
 import type { Engine } from './engine/engine.ts'
 import { room } from './herdr-forward.ts'

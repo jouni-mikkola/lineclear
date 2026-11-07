@@ -1,5 +1,5 @@
 // A task's status line: an agent's own words, or its last question, cut to fit.
-import { STATUS_MAX } from '../../../shared/types.ts'
+import { STATUS_MAX } from '../../../shared/types/task.ts'
 
 /** A status line cut to STATUS_MAX characters at a word, so it ends cleanly: no half word, no dangling comma or "and". */
 export function fitStatus(text: string) {

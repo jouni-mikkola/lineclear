@@ -1,6 +1,7 @@
 import { existsSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
-import type { ChatControls, Question } from '../../shared/types.ts'
+import type { ChatControls } from '../../shared/types/chat.ts'
+import type { Question } from '../../shared/types/question.ts'
 import { HOME, readJson, writeJson } from '../store.ts'
 import { stripHidden, type Agents, type OutItem } from './agents.ts'
 import { agentLines } from './agentlines.ts'

@@ -1,5 +1,5 @@
 // CLI observations only. Launch preferences and model catalog defaults are deliberately not inputs.
-import type { AgentRuntime } from '../../shared/types.ts'
+import type { AgentRuntime } from '../../shared/types/chat.ts'
 import type { LogEvent } from './readers/types.ts'
 
 export function sessionRuntime(events: LogEvent[], file: string | undefined, started: number): AgentRuntime | undefined {

@@ -1,5 +1,5 @@
 import { exists } from '../mfs.ts'
-import type { Question } from '../../../shared/types.ts'
+import type { Question } from '../../../shared/types/question.ts'
 import { hidden } from '../agents.ts'
 import { restartLine, resumedLine, taskFirst } from '../prompts.ts'
 import { CLI_NAME } from '../settings.ts'

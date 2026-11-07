@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { mkdirSync, openSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
-import type { Chat } from '../../shared/types.ts'
+import type { Chat } from '../../shared/types/chat.ts'
 import { HOME, writeJson } from '../store.ts'
 import { boxInfo, helperVersion, installHelper, lacks, machineStatus, probe, savedMachines, type Probe, type Saved } from './install.ts'
 import { MERGE_DEADLINE } from './engine/engine.ts'

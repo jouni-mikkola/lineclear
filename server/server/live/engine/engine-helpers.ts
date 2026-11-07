@@ -1,4 +1,5 @@
-import { TITLE_MAX, type Report, type Task, type TaskStatus, type UpdateCard } from '../../../shared/types.ts'
+import { TITLE_MAX, type Report, type Task, type TaskStatus } from '../../../shared/types/task.ts'
+import type { UpdateCard } from '../../../shared/types/card.ts'
 import { HOST } from '../places.ts'
 import type * as GH from './github.ts'
 import type * as Lane from './lane.ts'

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { clock } from '../../shared/time.ts'
-import type { Chat } from '../../shared/types.ts'
+import type { Chat } from '../../shared/types/chat.ts'
 import { type Link, workerHome } from './machines-helpers.ts'
 import { MachinesLinks } from './machines-links.ts'
 

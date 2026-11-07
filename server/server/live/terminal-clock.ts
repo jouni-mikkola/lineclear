@@ -1,5 +1,5 @@
 // herdr sends no event when a pane's output changes, so a terminal on screen is read again on a clock.
-import type { TermScreen } from '../../shared/types.ts'
+import type { TermScreen } from '../../shared/types/event.ts'
 
 /** a terminal is read at most once in this time and only this many are watched: 2 reads a second at most */
 const MIN_PERIOD_MS = 1000

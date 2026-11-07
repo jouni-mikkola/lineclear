@@ -1,4 +1,4 @@
-import type { RestartInfo } from '../../shared/types.ts'
+import type { RestartInfo } from '../../shared/types/restart.ts'
 import { one, type Parsed } from './args.ts'
 import { machineRef, runOn } from './box.ts'
 import { CLIS, kindOf } from './settings.ts'

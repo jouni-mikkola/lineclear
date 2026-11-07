@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { Task } from '../../shared/types.ts'
+import type { Task } from '../../shared/types/task.ts'
 import { readMain } from '../store.ts'
 import type { Parsed } from './args.ts'
 

@@ -2,7 +2,12 @@
 // worker and the screen. An iPhone shows no buttons on an alert, so its words alone must let you decide from the lock
 // screen: the title says the task and what it needs, the body the question or the card's choices.
 import { excerpt } from './excerpt.ts'
-import { splitFacts, type Alert, type Chat, type Message, type Question, type Snapshot } from './types.ts'
+import { splitFacts } from './types/task.ts'
+import type { Alert } from './types/alert.ts'
+import type { Chat } from './types/chat.ts'
+import type { Message } from './types/message.ts'
+import type { Question } from './types/question.ts'
+import type { Snapshot } from './types/snapshot.ts'
 
 /** about what an iPhone's lock screen shows of a title (one line) and of a body (a few lines) */
 export const TITLE_MAX = 40

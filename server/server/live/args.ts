@@ -1,5 +1,5 @@
 // Reads a lineclear command line: positional words and --options (repeatable ones collect into lists).
-import { splitFacts, STATUS_MAX, SUMMARY_MAX, TITLE_MAX } from '../../shared/types.ts'
+import { splitFacts, STATUS_MAX, SUMMARY_MAX, TITLE_MAX } from '../../shared/types/task.ts'
 
 export interface Parsed {
   words: string[]

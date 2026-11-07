@@ -1,4 +1,6 @@
-import type { Message, Question, SecretAsk, UpdateCard } from '../../shared/types.ts'
+import type { Message, SecretAsk } from '../../shared/types/message.ts'
+import type { Question } from '../../shared/types/question.ts'
+import type { UpdateCard } from '../../shared/types/card.ts'
 import type { Parsed } from './chatlines.ts'
 import type { LogEvent } from './readers/types.ts'
 

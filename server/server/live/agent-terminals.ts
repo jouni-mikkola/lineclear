@@ -1,4 +1,4 @@
-import type { TermScreen } from '../../shared/types.ts'
+import type { TermScreen } from '../../shared/types/event.ts'
 import { herdr, type AgentInfo } from './herdr.ts'
 import { TerminalClock } from './terminal-clock.ts'
 import { BOX } from './box.ts'

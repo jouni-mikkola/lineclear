@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import type { TermScreen } from '../../shared/types.ts'
+import type { TermScreen } from '../../shared/types/event.ts'
 import type { AgentInfo, AgentStatus } from './herdr.ts'
 import { tag } from './chatlines.ts'
 import { boxDir } from './mfs.ts'

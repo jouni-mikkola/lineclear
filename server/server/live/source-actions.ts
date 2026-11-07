@@ -1,4 +1,6 @@
-import { asEmoji, NAME_MAX, nameProblem, type Action } from '../../shared/types.ts'
+import { asEmoji } from '../../shared/types/machine.ts'
+import { NAME_MAX, nameProblem } from '../../shared/types/place.ts'
+import type { Action } from '../../shared/types/action.ts'
 import { hidden } from './agents.ts'
 import { line } from './chatlines.ts'
 import { BOX } from './box.ts'

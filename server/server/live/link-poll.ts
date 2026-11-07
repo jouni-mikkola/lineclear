@@ -1,5 +1,6 @@
 import { join } from 'node:path'
-import type { Action, Snapshot } from '../../shared/types.ts'
+import type { Action } from '../../shared/types/action.ts'
+import type { Snapshot } from '../../shared/types/snapshot.ts'
 import { clock } from '../../shared/time.ts'
 import { Emitter } from '../source.ts'
 import { readJson } from '../store.ts'

@@ -259,7 +259,7 @@ describe('choice cards', () => {
 describe("a coordinator's question", () => {
   test("sends no alert of its own (the main machine's home space picks what buzzes); a second answer is refused", async () => {
     const chat = placeId.home()
-    const alerts: import('../shared/types.ts').Alert[] = []
+    const alerts: import('../shared/types/alert.ts').Alert[] = []
     const off = src.on('alert', (a) => void alerts.push(a))
     try {
       await src.cli(['ask', 'Rerun CI?', '--choice', 'Rerun it', '--choice', 'Leave it'], { chat })
@@ -296,7 +296,7 @@ describe("a coordinator's alert about a task", () => {
     const { t } = await workedTask('alerted')
     await until(() => src.engine.statusOf(t) === 'need', 'the task to need you')
     expect(src.engine.statusOf(t)).toBe('need')
-    const alerts: import('../shared/types.ts').Alert[] = []
+    const alerts: import('../shared/types/alert.ts').Alert[] = []
     const off = src.on('alert', (a) => void alerts.push(a))
     try {
       await src.cli(['alert', 'Needs a look', '--body', 'It could not start', '--task', t.id], { chat: placeId.home() })

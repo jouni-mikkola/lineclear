@@ -1,5 +1,5 @@
 import { openCards } from '../../shared/alerts.ts'
-import type { Action } from '../../shared/types.ts'
+import type { Action } from '../../shared/types/action.ts'
 import { line } from './chatlines.ts'
 import { menuId, menuKeys } from './chats.ts'
 import { LiveSourceSpaces } from './source-spaces.ts'

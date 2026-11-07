@@ -1,4 +1,4 @@
-import { doneNewestFirst, type Task } from '../../shared/types.ts'
+import { doneNewestFirst, type Task } from '../../shared/types/task.ts'
 import { one, summaryOpts, type Parsed } from './args.ts'
 import { checkTitle } from './engine/engine.ts'
 import { ended } from './engine/engine-helpers.ts'

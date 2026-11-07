@@ -1,5 +1,6 @@
 import { clip } from '../../shared/alerts.ts'
-import type { TaskStatus, UpdateCard } from '../../shared/types.ts'
+import type { TaskStatus } from '../../shared/types/task.ts'
+import type { UpdateCard } from '../../shared/types/card.ts'
 import type { Overview } from '../source.ts'
 import { hidden } from './agents.ts'
 import type { TaskRec } from './engine/engine.ts'

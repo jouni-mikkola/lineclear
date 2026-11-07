@@ -7,7 +7,7 @@ import { Subscription } from '../server/live/herdr.ts'
 import { Tunnel } from '../server/live/tunnel.ts'
 import { Machines } from '../server/live/machines.ts'
 import { until } from './until.ts'
-import type { Snapshot } from '../shared/types.ts'
+import type { Snapshot } from '../shared/types/snapshot.ts'
 
 describe('machine link recovery', () => {
   test('retry delay is bounded and only stable success resets it', () => {

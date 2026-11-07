@@ -1,5 +1,5 @@
 import { exists } from '../mfs.ts'
-import type { TaskStatus } from '../../../shared/types.ts'
+import type { TaskStatus } from '../../../shared/types/task.ts'
 import { ROUTING_FAILURE } from '../agents.ts'
 import { splitBrief } from '../settings-block.ts'
 import { type TaskRec, ended, archiveAfterMs } from './engine-helpers.ts'
