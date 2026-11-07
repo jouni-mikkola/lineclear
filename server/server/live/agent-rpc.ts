@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
+import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:child_process'
 
 /** the pane id an RPC agent shows in the agent list: it has no pane, and nothing asks herdr about it */
 export const rpcPane = (key: string) => `rpc:${key}`
@@ -7,6 +7,29 @@ export const isRpcPane = (pane?: string) => !!pane?.startsWith('rpc:')
 
 /** the CLI an RPC agent runs: found on PATH, as herdr's panes find it */
 const KIND = process.env.LINECLEAR_PI ?? 'pi'
+
+interface MemoryCap {
+  high: string
+  max: string
+}
+
+/** an agent needs about 420 MB: past `high` it is slowed, past `max` the kernel kills it and nothing else */
+const MEMORY_CAP: MemoryCap = { high: '450M', max: '700M' }
+
+let systemdFound: boolean | undefined
+
+/** true when a user scope can be made here; probed once, a machine without systemd runs agents plain */
+export function hasSystemd(): boolean {
+  systemdFound ??= spawnSync('systemd-run', ['--user', '--scope', '-q', 'true'], { stdio: 'ignore' }).status === 0
+  return systemdFound
+}
+
+/** the command and argv of an RPC agent: inside a capped systemd scope when systemd is there, plain otherwise. Swap is off so the cap holds */
+export function rpcCommand(args: string[], systemd = hasSystemd(), cap = MEMORY_CAP): [string, string[]] {
+  const pi = ['--mode', 'rpc', ...args]
+  if (!systemd) return [KIND, pi]
+  return ['systemd-run', ['--user', '--scope', '-q', '-p', `MemoryHigh=${cap.high}`, '-p', `MemoryMax=${cap.max}`, '-p', 'MemorySwapMax=0', KIND, ...pi]]
+}
 
 const FIRST_EVENT_MS = 20_000
 
@@ -35,7 +58,8 @@ export class RpcAgent {
     opts: { cwd: string; env: NodeJS.ProcessEnv },
     private on: { change: (a: RpcAgent) => void; exit: (a: RpcAgent) => void },
   ) {
-    this.child = spawn(KIND, ['--mode', 'rpc', ...args], { cwd: opts.cwd, env: opts.env, stdio: ['pipe', 'pipe', 'pipe'] })
+    const [cmd, argv] = rpcCommand(args)
+    this.child = spawn(cmd, argv, { cwd: opts.cwd, env: opts.env, stdio: ['pipe', 'pipe', 'pipe'] })
     this.child.stdout.setEncoding('utf8')
     this.child.stdout.on('data', (chunk: string) => this.read(chunk))
     this.child.stderr.on('data', () => undefined)

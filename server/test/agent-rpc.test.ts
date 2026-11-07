@@ -54,6 +54,7 @@ const herdr = createServer((c) => {
 await new Promise<void>((r) => herdr.listen(process.env.HERDR_SOCKET_PATH!, r))
 
 const { Agents } = await import('../server/live/agents.ts')
+const { rpcCommand, hasSystemd } = await import('../server/live/agent-rpc.ts')
 
 const until = async (ok: () => boolean, ms = 5000) => {
   for (const end = Date.now() + ms; !ok(); await Bun.sleep(20)) if (Date.now() > end) throw new Error('timed out')
@@ -86,5 +87,47 @@ describe('a task agent as a pi RPC child', () => {
       a.stop()
       herdr.close()
     }
+  })
+})
+
+describe('the memory cap of a task agent', () => {
+  test('argv is a capped systemd scope when systemd is there', () => {
+    const [cmd, argv] = rpcCommand(['--model', 'm'], true)
+    expect(cmd).toBe('systemd-run')
+    expect(argv).toEqual([
+      '--user',
+      '--scope',
+      '-q',
+      '-p',
+      'MemoryHigh=450M',
+      '-p',
+      'MemoryMax=700M',
+      '-p',
+      'MemorySwapMax=0',
+      'pi',
+      '--mode',
+      'rpc',
+      '--model',
+      'm',
+    ])
+  })
+
+  test('argv is plain when systemd is not there', () => {
+    expect(rpcCommand(['--model', 'm'], false)).toEqual(['pi', ['--mode', 'rpc', '--model', 'm']])
+  })
+
+  test.skipIf(!hasSystemd())('a child that allocates 1 GB is killed while a second agent keeps running', async () => {
+    // memory.high is left at max here: it only slows a process, the kill is memory.max
+    const cap = { high: '700M', max: '700M' }
+    const greedy = "const b = Buffer.alloc(1e9, 1); console.log('survived', b.length)"
+    const [cmd, argv] = rpcCommand([], true, cap)
+    const scope = argv.slice(0, argv.indexOf('pi'))
+    const spawnIt = (code: string) => Bun.spawn([cmd, ...scope, process.execPath, '-e', code], { stdout: 'pipe', stderr: 'ignore' })
+    const calm = spawnIt("await Bun.sleep(800); console.log('alive')")
+    const big = spawnIt(greedy)
+    expect(await big.exited).not.toBe(0)
+    expect(await new Response(big.stdout).text()).not.toContain('survived')
+    expect(await calm.exited).toBe(0)
+    expect(await new Response(calm.stdout).text()).toContain('alive')
   })
 })
