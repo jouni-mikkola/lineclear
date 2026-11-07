@@ -191,16 +191,6 @@ export class EngineHandoff extends EnginePr {
     this.agents.dropOutboxWhere?.((key) => this.endedKey(key))
   }
 
-  /** its brief never arrived: the task says so instead of showing Working */
-  briefLost(key: string) {
-    const t = this.task(key.split('/')[0])
-    if (!t || key !== this.key(t) || ended(t)) return
-    move(t, 'brief-over')
-    t.trouble = 'brief not delivered'
-    this.settle(t)
-    this.save()
-  }
-
   /**
    * Close a task with nothing to merge: Done with its summary (what it said when ready, else "Nothing to merge"). Its agent
    * stops and its space closes; its worktree and branch go when they hold nothing unsaved or unmerged, else they are

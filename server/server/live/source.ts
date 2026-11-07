@@ -67,7 +67,6 @@ export class LiveSource extends LiveSourceUpkeep implements Source {
       this.engine.sent(item.key)
       this.emit('chat', item.key)
     })
-    this.agents.on('undelivered', (key) => this.engine.briefLost(key))
     this.agents.on('failed', (key) => this.emit('chat', key))
     this.agents.on('output', (key, screen) => {
       if (this.terms.includes(key)) this.emit('terminal', key, screen)

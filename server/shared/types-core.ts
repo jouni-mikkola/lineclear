@@ -173,8 +173,6 @@ export interface AgentHerdr {
   status: string
   /** the path of its pi session file */
   session?: string
-  /** its pane still shows the pasted brief */
-  pasted: boolean
   /** when the event or snapshot it comes from arrived (ms) */
   at: number
 }

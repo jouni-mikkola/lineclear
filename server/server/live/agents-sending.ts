@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { herdr, type AgentInfo, type HerdrEvent } from './herdr.ts'
 import { holdBack, machineNews } from './quiet.ts'
 import { paneWrong, type Wrong } from './revive.ts'
-import { holdFrom, sleep, type OutItem, type Hold, type SendOpts, type Sent } from './agents-helpers.ts'
+import { sleep, type OutItem, type Hold, type SendOpts, type Sent } from './agents-helpers.ts'
 import { isNews } from './agents-sent.ts'
 import { putInto } from './agent-input.ts'
 import { isRpcPane } from './agent-rpc.ts'
@@ -104,7 +104,7 @@ export class AgentsSending extends AgentsDelivery {
    *  waits for the prompt to go; a starting agent takes no input yet; a CLI command waits for the turn to end. Anything
    *  else goes in even mid-turn: the CLI takes it at its next step. */
   holdOf(key: string, item?: Pick<OutItem, 'idle'>): Hold | undefined {
-    return this.heldBy(key, item) ?? (this.unready.has(key) ? 'start' : undefined)
+    return this.heldBy(key, item)
   }
 
   /** what you send: in at once, unless the agent is on a menu or still starting (see holdOf). What a screen sent (with its
@@ -149,19 +149,14 @@ export class AgentsSending extends AgentsDelivery {
     }
     await this.beforeInput?.(key)
     if (this.unwanted(item)) return { waiting: false, item }
-    let hold: Hold | undefined
     if (!this.holdOf(key, item) && !this.outbox.some((o) => o.key === key)) {
       try {
-        await putInto(this, key, item)
-        this.unready.delete(key)
+        const disposition = await putInto(this, key, item)
         this.went(item)
         this.emit('sent', item)
-        return { waiting: false, item }
+        return { waiting: false, item, ...(disposition ? { disposition } : {}) }
       } catch (e) {
-        // a menu came up just now, or the agent just started and herdr doesn't take input for it yet: it waits
-        hold = holdFrom(e)
-        if (hold === 'start' && !this.unready.has(key)) this.unready.set(key, Date.now())
-        if (cid && !hold) throw new Error(`The agent didn't take it: ${(e as Error).message}`)
+        if (cid) throw new Error(`The agent didn't take it: ${(e as Error).message}`)
       }
     }
     this.outbox.push(item)
@@ -171,7 +166,7 @@ export class AgentsSending extends AgentsDelivery {
         .then(() => this.deliver(key))
         .catch(() => undefined)
     else this.deliver(key)
-    return { waiting: true, waitsFor: hold ?? this.whyWaits(key), item }
+    return { waiting: true, waitsFor: this.whyWaits(key), item }
   }
 
   /** why what waits for this agent waits: the first in line holds the rest */
