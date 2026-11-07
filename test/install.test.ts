@@ -131,8 +131,14 @@ afterAll(() => {
 });
 
 test("install adds Lineclear, the extension and the service, and doctor passes", () => {
+  const extDir = join(home, ".pi/agent/extensions");
+  mkdirSync(extDir, { recursive: true });
+  for (const f of ["quota-switch.ts", "quota-switch.json", "api-guard.ts", "claude-bridge-b.ts"]) writeFileSync(join(extDir, f), "// left by an older tool\n");
   const r = install();
   passes(r);
+  // the account fallback is native now; the bridge's second account stays
+  for (const f of ["quota-switch.ts", "quota-switch.json", "api-guard.ts"]) expect(existsSync(join(extDir, f))).toBe(false);
+  expect(existsSync(join(extDir, "claude-bridge-b.ts"))).toBe(true);
   expect(existsSync(join(state, "lineclear"))).toBe(false); // no herdr-projects 2.0 plugin
   expect(existsSync(join(home, ".local/share/lineclear/bin/lineclear"))).toBe(true);
   const ext = join(home, ".pi/agent/extensions/lineclear.ts");
