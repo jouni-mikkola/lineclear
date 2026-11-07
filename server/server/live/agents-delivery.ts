@@ -466,12 +466,15 @@ export class AgentsDelivery extends AgentsState {
     const wait = hold === 'start' ? Math.min(this.backoffMs, STARTING_RETRY_MS) : Math.min(this.backoffMs * 2 ** (n - 1), this.backoffMax)
     this.backoff.set(key, { n, until: Date.now() + wait })
     this.giveUpOnBriefs(key)
-    // just started, not herdr's named agent yet: tried again at once, for a while
+    // just started, not herdr's named agent yet: tried again shortly, for a while
     if (hold === 'start') {
-      setTimeout(() => void this.deliver(key), wait + 10)
       const since = this.unready.get(key) ?? Date.now()
       this.unready.set(key, since)
-      if (Date.now() - since < this.unreadyFor) return
+      if (Date.now() - since < this.unreadyFor) {
+        const retry = setTimeout(() => void (!this.stopped && this.deliver(key)), wait + 10)
+        retry.unref?.()
+        return
+      }
       this.unready.delete(key)
     }
     this.backoff.delete(key)

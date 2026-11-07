@@ -333,7 +333,7 @@ describe('what you send shows at once', () => {
       agents.outbox = agents.outbox.filter((o) => o.key !== chat)
     }
   })
-  test('a brief an agent still starting refuses is asked for again within a second', async () => {
+  test('a brief an agent still starting refuses is asked for again after a short wait, not a doubling one', async () => {
     const agents = src.agents
     agents.outbox = agents.outbox.filter((o) => o.key !== chat)
     const { prompt, beforeInput, status } = { prompt: herdr.prompt, beforeInput: agents.beforeInput, status: agents.status }
@@ -348,9 +348,15 @@ describe('what you send shows at once', () => {
     }) as typeof prompt
     try {
       agents.outbox.push({ id: 'b3', key: chat, text: 'the brief', at: Date.now(), brief: true })
+      for (const n of [1, 2]) {
+        agents.backoff.clear()
+        await agents.deliver(chat)
+        expect(calls).toBe(n)
+        // the wait to the next try stays short however often it was refused
+        expect((agents.backoff.get(chat)?.until ?? 0) - Date.now()).toBeLessThanOrEqual(300)
+      }
+      agents.backoff.clear()
       await agents.deliver(chat)
-      const until = Date.now() + 1500
-      while (agents.outbox.some((o) => o.id === 'b3') && Date.now() < until) await new Promise((r) => setTimeout(r, 50))
       expect(calls).toBe(3)
       expect(agents.outbox.some((o) => o.id === 'b3')).toBe(false)
     } finally {
