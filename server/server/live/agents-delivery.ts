@@ -454,7 +454,19 @@ export class AgentsDelivery extends AgentsState {
     const env = r.env ?? {}
     const ws = await this.space(r.workspace, was)
     if (!ws) return (await herdr.createWorkspace(r.workspace, r.cwd, env)).root_pane.pane_id
-    return (await herdr.createTab(ws.workspace_id, r.tab ?? r.name, r.cwd, env)).root_pane.pane_id
+    const tab = r.tab ?? r.name
+    // a coordinator is one per space: its earlier tabs (dead, or restored by herdr after a restart) go when it starts again.
+    // A tab with a split, a running command or an agent is the human's, and stays
+    const older = tab === 'coordinator' ? await herdr.tabs(ws.workspace_id).catch(() => []) : []
+    const made = await herdr.createTab(ws.workspace_id, tab, r.cwd, env)
+    const gone = older.filter((t) => t.label === tab && t.tab_id !== made.tab?.tab_id && (t.pane_count ?? 1) === 1)
+    if (gone.length) {
+      const [panes, agents] = await Promise.all([herdr.panes(ws.workspace_id), herdr.agents()]).catch(() => [[], []] as const)
+      for (const t of gone)
+        for (const p of panes.filter((p) => p.tab_id === t.tab_id && !agents.some((a) => a.pane_id === p.pane_id)))
+          if (await herdr.paneIdle(p.pane_id).catch(() => false)) await herdr.closePane(p.pane_id).catch(() => undefined)
+    }
+    return made.root_pane.pane_id
   }
 
   /** hand over what waited, oldest first, while the agent can take it */
