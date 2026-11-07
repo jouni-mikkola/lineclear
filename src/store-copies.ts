@@ -1,5 +1,6 @@
+import { Database } from "bun:sqlite";
 import { readTasksKept } from "./tasks-kept.ts";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { writeAtomic } from "../pi/atomic.ts";
@@ -24,9 +25,37 @@ export function taskCount(dir: string): number {
 
 export interface StoreCopy {
   name: string;
-  dir: string;
+  /** The one file of the copy. */
+  file: string;
   tasks: number;
   source: string;
+}
+
+const COPY_EXT = ".sqlite";
+const STORE_DB = "store.sqlite";
+/** Tables a copy adds to the vacuumed store: the other files of the data folder (gzipped) and a few facts. */
+const FILES = "copy_files";
+const META = "copy_meta";
+/** Never in a copy: secrets and push keys. */
+const SECRET_FILES = new Set(["vault.json", "vapid.json", "push.json", "secrets.json"]);
+/** Where the last failed copy is written, in the data folder, so doctor can name it when the copies folder is the broken part. */
+const ERROR_FILE = "store-copy-error";
+/** The folder of the task briefs, which tasks.json points at. */
+const BRIEFS = "tasks";
+
+const meta = (db: Database, key: string) => (db.query(`SELECT value FROM ${META} WHERE key = ?`).get(key) as { value: string } | null)?.value ?? "";
+
+/** The facts of one copy file, or null when the file is not a copy. */
+function readCopy(file: string): Omit<StoreCopy, "name"> | null {
+  let db: Database | undefined;
+  try {
+    db = new Database(file, { readonly: true });
+    return { file, source: meta(db, "source"), tasks: Number(meta(db, "tasks")) };
+  } catch {
+    return null;
+  } finally {
+    db?.close();
+  }
 }
 
 /** The copies, newest first. */
@@ -34,50 +63,60 @@ export function listCopies(env: Env = process.env): StoreCopy[] {
   const root = storeCopiesDir(env);
   if (!existsSync(root)) return [];
   return readdirSync(root)
-    .filter((name) => !name.endsWith(".part") && statSync(join(root, name)).isDirectory())
+    .filter((f) => f.endsWith(COPY_EXT))
     .sort()
     .reverse()
-    .map((name) => {
-      const dir = join(root, name);
-      let source = "";
-      try {
-        source = readFileSync(join(dir, "source"), "utf8").trim();
-      } catch {
-        // a copy from before the source was named
-      }
-      return { name, dir, tasks: taskCount(dir), source };
+    .flatMap((f) => {
+      const c = readCopy(join(root, f));
+      return c ? [{ name: f.slice(0, -COPY_EXT.length), ...c }] : [];
     });
 }
 
-/** The folder of the task briefs, which tasks.json points at. */
-const BRIEFS = "tasks";
-
-/** Each brief file of one data folder into another, each put in place whole. */
-function copyBriefs(from: string, to: string): void {
-  if (!existsSync(join(from, BRIEFS))) return;
-  for (const f of readdirSync(join(from, BRIEFS), { recursive: true, withFileTypes: true })) {
-    if (!f.isFile()) continue;
-    const rel = join(f.parentPath.slice(join(from, BRIEFS).length), f.name);
-    const dest = join(to, BRIEFS, rel);
-    mkdirSync(dirname(dest), { recursive: true });
-    copyFileSync(join(f.parentPath, f.name), `${dest}.tmp`);
-    renameSync(`${dest}.tmp`, dest);
-  }
+/** The files a copy keeps, as paths under the data folder: its top files without secrets, and the briefs. Folders (helper, chatlog, browser) are rebuilt and can be large. */
+function copiedPaths(from: string): string[] {
+  const top = readdirSync(from, { withFileTypes: true })
+    .filter((e) => e.isFile() && !e.name.endsWith(".tmp") && !e.name.endsWith(".sock") && !SECRET_FILES.has(e.name))
+    .filter((e) => !e.name.startsWith(STORE_DB) && !e.name.startsWith("task-ids.sqlite") && e.name !== ERROR_FILE)
+    .map((e) => e.name);
+  if (!existsSync(join(from, BRIEFS))) return top;
+  const briefs = readdirSync(join(from, BRIEFS), { recursive: true, withFileTypes: true })
+    .filter((f) => f.isFile() && !f.name.endsWith(".tmp"))
+    .map((f) => join(BRIEFS, f.parentPath.slice(join(from, BRIEFS).length), f.name));
+  return [...top, ...briefs];
 }
 
 const stamp = (now: Date) => now.toISOString().replace(/[:.]/g, "-").slice(0, 19);
 /** When a copy was taken, from its name. */
 const takenAt = (name: string) => Date.parse(`${name.replace(/^[a-z]+-/, "").replace(/T(\d\d)-(\d\d)-(\d\d)$/, "T$1:$2:$3")}Z`);
 
-/** The files at the top of the data folder: the store. Folders (helper, chatlog, browser) are rebuilt and can be large. */
-const storeFiles = (from: string) =>
-  readdirSync(from, { withFileTypes: true })
-    .filter((e) => e.isFile() && !e.name.endsWith(".tmp") && !e.name.endsWith(".sock"))
-    .map((e) => e.name);
+/** The store through VACUUM INTO (one moment), then the other files and the facts into the same file. */
+function writeCopy(from: string, file: string): void {
+  const hasStore = existsSync(join(from, STORE_DB));
+  const src = hasStore ? new Database(join(from, STORE_DB), { readonly: true }) : new Database(":memory:");
+  try {
+    src.exec(`VACUUM INTO '${file.replaceAll("'", "''")}'`);
+  } finally {
+    src.close();
+  }
+  const db = new Database(file);
+  try {
+    db.exec(`CREATE TABLE ${FILES} (path TEXT PRIMARY KEY, body BLOB NOT NULL); CREATE TABLE ${META} (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
+    db.transaction(() => {
+      const put = db.prepare(`INSERT INTO ${FILES} (path, body) VALUES (?, ?)`);
+      for (const p of copiedPaths(from)) put.run(p, Bun.gzipSync(readFileSync(join(from, p))));
+      const fact = db.prepare(`INSERT INTO ${META} (key, value) VALUES (?, ?)`);
+      fact.run("source", from);
+      fact.run("tasks", String(taskCount(from)));
+      fact.run("store", hasStore ? "1" : "0");
+    })();
+  } finally {
+    db.close();
+  }
+}
 
 /**
- * Copies the store aside as `<kind>-<time>`. An hourly copy of an emptied store is not taken while the newest copy
- * held tasks, so a wiped store cannot push the last good copies out. Returns the copy's name, or "" when none was taken.
+ * Copies the store aside as one file, `<kind>-<time>.sqlite`. An hourly copy of an emptied store is not taken while the
+ * newest copy held tasks, so a wiped store cannot push the last good copies out. Returns the copy's name, or "" when none was taken.
  */
 export function copyStore(kind: "hourly" | "update", now = new Date(), env: Env = process.env): string {
   const from = dataDir(env);
@@ -90,14 +129,16 @@ export function copyStore(kind: "hourly" | "update", now = new Date(), env: Env 
   }
   const name = `${kind}-${stamp(now)}`;
   const root = storeCopiesDir(env);
-  const part = join(root, `${name}.part`);
-  rmSync(part, { recursive: true, force: true });
-  mkdirSync(part, { recursive: true });
-  for (const f of storeFiles(from)) copyFileSync(join(from, f), join(part, f));
-  // the briefs, which tasks.json points at
-  copyBriefs(from, part);
-  writeAtomic(join(part, "source"), `${from}\n`);
-  renameSync(part, join(root, name));
+  const part = join(root, `${name}${COPY_EXT}.part`);
+  mkdirSync(root, { recursive: true });
+  rmSync(part, { force: true });
+  try {
+    writeCopy(from, part);
+    renameSync(part, join(root, `${name}${COPY_EXT}`));
+  } catch (e) {
+    rmSync(part, { force: true });
+    throw e;
+  }
   prune(kind, env);
   return name;
 }
@@ -107,22 +148,54 @@ function prune(kind: "hourly" | "update", env: Env): void {
   for (const c of listCopies(env)
     .filter((x) => x.name.startsWith(`${kind}-`))
     .slice(keep))
-    rmSync(c.dir, { recursive: true, force: true });
+    rmSync(c.file, { force: true });
 }
 
-/** Puts a copy's files back into the data folder. Nothing else in the folder is touched. */
+/** Puts a copy back into the data folder: the store file whole, and the other files it holds. Nothing else in the folder is touched. */
 export function restoreCopy(name: string, env: Env = process.env): number {
   const c = listCopies(env).find((x) => x.name === name);
   if (!c) throw new Error(`no copy named ${name}`);
   const to = dataDir(env);
   mkdirSync(to, { recursive: true });
-  for (const f of storeFiles(c.dir)) if (f !== "source") copyFileSync(join(c.dir, f), join(to, f));
-  copyBriefs(c.dir, to);
+  const db = new Database(c.file, { readonly: true });
+  try {
+    for (const row of db.query(`SELECT path, body FROM ${FILES}`).all() as { path: string; body: Uint8Array<ArrayBuffer> }[]) {
+      const dest = join(to, row.path);
+      mkdirSync(dirname(dest), { recursive: true });
+      writeFileSync(`${dest}.tmp`, Bun.gunzipSync(row.body));
+      renameSync(`${dest}.tmp`, dest);
+    }
+    if (meta(db, "store") === "1") restoreStoreFile(c.file, to);
+  } finally {
+    db.close();
+  }
   return c.tasks;
 }
 
-/** For doctor: what is wrong with the local copies, or "". Fine when a copy is fresh. */
+/** The store file back as it was, without the tables a copy adds. The old file's write-ahead log goes, or it would replay over the copy. */
+function restoreStoreFile(copy: string, to: string): void {
+  const tmp = join(to, `${STORE_DB}.tmp`);
+  rmSync(tmp, { force: true });
+  copyFileSync(copy, tmp);
+  const db = new Database(tmp);
+  try {
+    db.exec(`DROP TABLE ${FILES}; DROP TABLE ${META}; VACUUM`);
+  } finally {
+    db.close();
+  }
+  rmSync(join(to, `${STORE_DB}-wal`), { force: true });
+  rmSync(join(to, `${STORE_DB}-shm`), { force: true });
+  renameSync(tmp, join(to, STORE_DB));
+}
+
+/** For doctor: what is wrong with the local copies, or "". Fine when a copy is fresh and the last try did not fail. */
 export function copiesProblem(env: Env = process.env, now = new Date()): string {
+  try {
+    const failed = readFileSync(join(dataDir(env), ERROR_FILE), "utf8").trim();
+    if (failed) return `the last copy of the store failed: ${failed}`;
+  } catch {
+    // no failure noted
+  }
   const newest = listCopies(env).find((c) => c.name.startsWith("hourly-"));
   if (!newest) return `no copy of the store in ${storeCopiesDir(env)}`;
   return now.getTime() - takenAt(newest.name) > FRESH_MS ? `the newest copy of the store (${newest.name}) is over 3 hours old` : "";
@@ -154,12 +227,18 @@ export function storeMain(args: string[], out: (l: string) => void, env: Env = p
   return 2;
 }
 
-/** The loop's part: an hourly copy. A failed copy must not stop the tick; doctor names a stale one. */
+/** The loop's part: an hourly copy. A failed copy does not stop the tick: its error is kept for doctor, and a good copy clears it. */
 export function copyStoreQuietly(env: Env = process.env, now = new Date()): void {
+  const note = join(dataDir(env), ERROR_FILE);
   try {
     copyStore("hourly", now, env);
-  } catch {
-    // doctor reports copies that stop coming
+    rmSync(note, { force: true });
+  } catch (e) {
+    try {
+      writeAtomic(note, `${(e as Error).message.replace(/\s+/g, " ")}\n`);
+    } catch {
+      // the data folder itself is unwritable: doctor reports the stale copy
+    }
   }
 }
 
