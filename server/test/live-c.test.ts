@@ -164,7 +164,7 @@ describe('interactive chat capabilities', () => {
       expect(row.options!.filter((v) => v !== 'off').map((v) => KIND[v])).toEqual(CHAT_KINDS)
       const before = settings.get(key)
       for (const value of ['Antigravity', 'Gemini', 'Cursor']) {
-        expect(settings.set(key, value)).toMatchObject({ ok: false, error: expect.stringContaining('not an agent herdr can start') })
+        expect(settings.set(key, value)).toMatchObject({ ok: false, error: expect.stringContaining('pi is the only one') })
         expect(settings.get(key)).toBe(before)
       }
     }
