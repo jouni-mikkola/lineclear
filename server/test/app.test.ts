@@ -2,7 +2,7 @@
 import { afterAll, describe, expect, test } from 'bun:test'
 import { startApp } from '../server/app.ts'
 import type { Push } from '../server/push.ts'
-import type { Alert } from '../shared/types.ts'
+import type { Alert } from '../shared/types/alert.ts'
 import { Emitter, type Source, type SourceEvents } from '../server/source.ts'
 
 const acted: unknown[] = []

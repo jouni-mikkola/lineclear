@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, renameSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
-import type { Chat } from '../../shared/types.ts'
+import type { Chat } from '../../shared/types/chat.ts'
 import { HOME, readJson, writeJson } from '../store.ts'
 import type { Probe, Saved } from './install.ts'
 

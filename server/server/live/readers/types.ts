@@ -1,5 +1,5 @@
 // What pi's log file says, in the shape the chat reads. Readers keep only what the chat shows.
-import type { AgentRuntime } from '../../../shared/types.ts'
+import type { AgentRuntime } from '../../../shared/types/chat.ts'
 
 interface CliChoice {
   label: string

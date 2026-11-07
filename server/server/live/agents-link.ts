@@ -4,7 +4,8 @@ import { AgentTerminals } from './agent-terminals.ts'
 import { listAfter } from './agent-events.ts'
 import { BOX } from './box.ts'
 import { AgentsState } from './agents-state.ts'
-import type { AgentHerdr, TermScreen } from '../../shared/types.ts'
+import type { AgentHerdr } from '../../shared/types/task.ts'
+import type { TermScreen } from '../../shared/types/event.ts'
 
 /** The link to herdr: the session read on open and when the subscription drops, the events between, and what follows from
  *  the agents herdr lists. What goes into a pane is the delivery's job. */

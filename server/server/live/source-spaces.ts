@@ -1,4 +1,4 @@
-import { STATUS_MAX } from '../../shared/types.ts'
+import { STATUS_MAX } from '../../shared/types/task.ts'
 import { one, type Parsed } from './args.ts'
 import { fitStatus } from './engine/status-line.ts'
 import { HOST, NAME, placeId } from './places.ts'

@@ -1,7 +1,7 @@
 // Push alerts to installed web apps (Web Push with this server's own VAPID keys).
 import webpush from 'web-push'
 import { pushPayload } from '../shared/alerts.ts'
-import type { Alert } from '../shared/types.ts'
+import type { Alert } from '../shared/types/alert.ts'
 import { readJson, writeJson } from './store.ts'
 
 export const DEFAULT_PUSH_CONTACT = 'https://github.com/eliasstravik/herdr-projects'

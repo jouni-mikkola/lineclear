@@ -1,5 +1,5 @@
 import { cpus, totalmem } from 'node:os'
-import type { SettingSection } from '../../shared/types.ts'
+import type { SettingSection } from '../../shared/types/settings.ts'
 import { settingsBlock, settingsLines, type Said } from './settings-block.ts'
 import { agentRow } from './settings-catalog.ts'
 import { defaultMaxTasks, kindOfLevel, defaultOf, CATALOG } from './settings-sections.ts'

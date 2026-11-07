@@ -1,4 +1,4 @@
-import type { SettingSection } from '../../shared/types.ts'
+import type { SettingSection } from '../../shared/types/settings.ts'
 import { CATALOG, numOf } from './settings-sections.ts'
 import { numValue, refuse } from './settings-rules.ts'
 

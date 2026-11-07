@@ -26,7 +26,6 @@ The hubs: files that most changes edit, whatever their job.
 | `docs/architecture.md` | 17 | 2 | the borders table: a new module is a new row |
 | `server/server/live/source-cli.ts` | 16 | 2 | the board's words: one object of inline handlers |
 | `server/server/live/prompts.ts` | 11 | 2 | every role's prompt text in one file |
-| `server/shared/types-core.ts`, `types-snapshot.ts` | 11, 8 | 2 | wire types of every domain in two files |
 | `docs/numbers.md` | 11 | 1 | every measure in one file |
 | `knip.jsonc` | 7 | 3 | a new entry file is a new line |
 | `pi/extension.ts`, `server/server/app.ts` | 9, 9 | 3, 3 | every hook, every route |

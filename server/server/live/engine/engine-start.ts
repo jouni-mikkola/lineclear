@@ -1,7 +1,7 @@
 import { chooseModel, firstModel } from '../../../../src/models.ts'
 import { exists } from '../mfs.ts'
 import { agentEnv } from '../box.ts'
-import type { Task } from '../../../shared/types.ts'
+import type { Task } from '../../../shared/types/task.ts'
 import { machineOf, recordWork } from '../../../../src/task-work.ts'
 import { ROOT } from '../../root.ts'
 import type { Spec } from '../agents.ts'

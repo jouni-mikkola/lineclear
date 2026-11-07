@@ -1,6 +1,6 @@
 import { answersTo, renameLater, type TaskIds } from '../task-ids.ts'
 import { onMachine, type BoxInfo } from '../box.ts'
-import type { TaskStatus } from '../../../shared/types.ts'
+import type { TaskStatus } from '../../../shared/types/task.ts'
 import { Emitter } from '../../source.ts'
 import type { Agents } from '../agents.ts'
 import type { Chats } from '../chats.ts'

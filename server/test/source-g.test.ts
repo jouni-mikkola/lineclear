@@ -161,7 +161,7 @@ describe('machine health', () => {
 describe('new messages', () => {
   test("a new coordinator message alerts as one; a task's card and a task's chat don't", () => {
     const key = placeId.home()
-    const alerts: import('../shared/types.ts').Alert[] = []
+    const alerts: import('../shared/types/alert.ts').Alert[] = []
     const off = src.on('alert', (a) => void (a.message && alerts.push(a)))
     src.chats.post(key, {
       id: 'unread-q',

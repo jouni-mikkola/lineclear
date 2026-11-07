@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import type { Message } from '../../shared/types.ts'
+import type { Message } from '../../shared/types/message.ts'
 
 /** a menu the CLI shows in its terminal (permission prompts and the like), read from the screen */
 export interface ScreenMenu {

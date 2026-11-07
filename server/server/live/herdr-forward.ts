@@ -2,7 +2,7 @@
 // A call is the same call with `--machine <label-or-id>`; Lineclear keeps no script for it.
 import { readFileSync } from 'node:fs'
 import { availableParallelism, freemem, loadavg, totalmem } from 'node:os'
-import type { Room } from '../../shared/types.ts'
+import type { Room } from '../../shared/types/machine.ts'
 import { adapter, type Call, HerdrError, rpc } from './herdr.ts'
 
 /** the same call on a machine saved in herdr: `herdr --machine <label-or-id> <command>`, herdr's own forwarding over its

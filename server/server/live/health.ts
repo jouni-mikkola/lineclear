@@ -6,7 +6,7 @@
 // numbers decide when Lineclear starts more tasks (engine.release).
 import { readdirSync, readFileSync, readlinkSync, statfsSync, statSync } from 'node:fs'
 import { cpus, homedir, tmpdir } from 'node:os'
-import type { HealthLevel, HealthMeter } from '../../shared/types.ts'
+import type { HealthLevel, HealthMeter } from '../../shared/types/machine.ts'
 import type { MachineLimits } from './settings.ts'
 import { BOX } from './box.ts'
 import { db, importOnce, tx } from '../store.ts'

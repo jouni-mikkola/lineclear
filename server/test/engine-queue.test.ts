@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { Task } from '../shared/types.ts'
+import type { Task } from '../shared/types/task.ts'
 import { sh, repo, world, until, started, placeId, writeJson } from './engine-world.ts'
 
 describe('To do: its agent waits for a go', () => {

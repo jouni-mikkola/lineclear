@@ -1,4 +1,5 @@
-import { cardMessage, type Chat, type Message } from '../../shared/types.ts'
+import { cardMessage, type Message } from '../../shared/types/message.ts'
+import type { Chat } from '../../shared/types/chat.ts'
 import { stripHidden } from './agents.ts'
 import { agentLines } from './agentlines.ts'
 import { excerpt } from './chatlines.ts'

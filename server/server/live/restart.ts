@@ -2,7 +2,9 @@
 // another one takes over from it with the role's prompt and what was said and done so far (prompts.ts restartLine).
 // What the restart sheet offers (restartInfo) and the calm hint a chat shows once Settings say something else than
 // what its agent runs on (restartHint) come from here.
-import type { Message, RestartCli, RestartHint, RestartInfo } from '../../shared/types.ts'
+import type { Message } from '../../shared/types/message.ts'
+import type { RestartCli, RestartInfo } from '../../shared/types/restart.ts'
+import type { RestartHint } from '../../shared/types/chat.ts'
 import { effortFor, effortsOf, findModel, modelArg, modelsOf } from '../../../src/models.ts'
 import { chatProblem } from './readers/index.ts'
 import { CLI_NAME } from './settings.ts'

@@ -1,4 +1,4 @@
-import type { Message } from '../../shared/types.ts'
+import type { Message } from '../../shared/types/message.ts'
 import { stripHidden } from './agents.ts'
 import { parseUserLine } from './chatlines.ts'
 import { parseReply, userLines } from './chatquotes.ts'

@@ -1,4 +1,4 @@
-import type { Task } from '../../shared/types.ts'
+import type { Task } from '../../shared/types/task.ts'
 import type { Parsed } from './args.ts'
 import { NAME } from './places.ts'
 import { statusLine } from './source-helpers.ts'

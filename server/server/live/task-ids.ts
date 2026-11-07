@@ -3,7 +3,7 @@
 import { Database } from 'bun:sqlite'
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
-import type { SettingSection } from '../../shared/types.ts'
+import type { SettingSection } from '../../shared/types/settings.ts'
 import { HOME } from '../store.ts'
 import type { Space } from './places.ts'
 

@@ -14,7 +14,7 @@ import { dataDir } from '../../../src/paths.ts'
 import { listProjectNames, readSettings } from '../../../src/project.ts'
 import { quote } from '../../../src/ssh.ts'
 import { parseTotpKey, totpCode } from '../../../src/totp.ts'
-import type { SettingSection } from '../../shared/types.ts'
+import type { SettingSection } from '../../shared/types/settings.ts'
 
 const FILE = 'vault.json'
 

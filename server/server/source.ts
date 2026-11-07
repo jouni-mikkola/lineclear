@@ -1,5 +1,9 @@
 // A source fills the view model and carries out actions. The live source reads herdr and the CLIs' logs.
-import type { Action, Alert, Chat, Snapshot, TermScreen } from '../shared/types.ts'
+import type { Action } from '../shared/types/action.ts'
+import type { Alert } from '../shared/types/alert.ts'
+import type { Chat } from '../shared/types/chat.ts'
+import type { Snapshot } from '../shared/types/snapshot.ts'
+import type { TermScreen } from '../shared/types/event.ts'
 
 export type SourceEvents = {
   snapshot: []

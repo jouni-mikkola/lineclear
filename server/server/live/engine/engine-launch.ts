@@ -1,4 +1,4 @@
-import type { Task } from '../../../shared/types.ts'
+import type { Task } from '../../../shared/types/task.ts'
 import { hidden } from '../agents.ts'
 import { placeId } from '../places.ts'
 import { goLine, queuedLine, taskFirst } from '../prompts.ts'

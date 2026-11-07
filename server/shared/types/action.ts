@@ -1,21 +1,3 @@
-import type { Place, Machine, Task } from './types-core.ts'
-import type { SettingSection, Chat } from './types-chat.ts'
-
-export interface Snapshot {
-  name: string
-  host: string
-  /** every space */
-  places: Place[]
-  /** the machines, as headings over their spaces */
-  machines: Machine[]
-  tasks: Task[]
-  /** open coordinator questions, by place id (a choice card's id, or "blocked" on the CLI's own menu): counted as waiting on you */
-  asks: Record<string, string>
-  settings: SettingSection[]
-  /** where the human's name in chat lines comes from */
-  user: string
-}
-
 export type Action =
   /** cid: the screen's own id for what it sent, which comes back on the message (Message.cid); reply: the id of the
       message it answers */
@@ -60,19 +42,3 @@ export type Action =
       not place: never sent on to another), and nothing else changes: its folder, repo, herdr space and task ids stay */
   /** a machine's emoji too: '' takes it away, none leaves it */
   | { type: 'rename'; id: string; name: string; emoji?: string }
-
-/** an agent's terminal as herdr draws it: its recent lines (ANSI), and the pane's size in cells (none from an older
- *  machine) */
-export interface TermScreen {
-  ansi: string
-  cols?: number
-  rows?: number
-}
-
-export type ServerEvent =
-  | { type: 'snapshot'; snapshot: Snapshot }
-  | { type: 'chat'; chat: Chat }
-  | ({ type: 'terminal'; chat: string } & TermScreen)
-  | { type: 'offline'; since: number }
-  /** the answer to a screen's ping: its link still works */
-  | { type: 'pong' }
