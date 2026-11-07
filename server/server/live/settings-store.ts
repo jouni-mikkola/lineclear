@@ -4,6 +4,7 @@ import type { SettingSection } from '../../shared/types.ts'
 import { readJson, writeJson } from '../store.ts'
 import type { SetBy } from '../../shared/brief.ts'
 import { settingsBlock, settingsLines, type Said, type Ways } from './prompts.ts'
+import { adoptModel, projectModel } from './project-models.ts'
 import { effortFor, effortsOf, findModel, knowsModels, modelsOf } from '../../../src/models.ts'
 import {
   type MachineLimits,
@@ -72,6 +73,7 @@ export class Settings {
         machine: keep(raw.machine),
         spaces: Object.fromEntries(Object.entries(spaces).map(([k, v]) => [k, keep(v)])),
       }
+      this.moveModels()
       // settings no longer kept (Coordinator timer's old limits and wake picks) leave the file too
       if (JSON.stringify(this.d) !== JSON.stringify(raw)) this.save()
       return
@@ -91,6 +93,16 @@ export class Settings {
       machine: Object.fromEntries(Object.entries(old).filter(([k]) => mine(k))),
       spaces: {},
     }
+  }
+
+  /** task.model and reviewer.model once lived here: a space's goes to the head of its project's list, then every
+   *  copy leaves the file (the project's lists are the one place a role's model is set) */
+  private moveModels() {
+    if (this.seed) return
+    const list = { 'task.model': 'task', 'reviewer.model': 'reviewer' }
+    for (const [space, values] of Object.entries(this.d.spaces))
+      for (const [key, role] of Object.entries(list)) if (values[key] && values[key] !== 'default') adoptModel(space, role, values[key])
+    for (const values of [this.d.everywhere, this.d.machine, ...Object.values(this.d.spaces)]) for (const key of Object.keys(list)) delete values[key]
   }
 
   private save() {
@@ -179,7 +191,7 @@ export class Settings {
             .models.map((m) => m.label)
             .join(' · ')}.`
         : undefined
-    const model = this.pick(`${role}.model`, l).value
+    const model = this.storedModel(role, l)
     const levels = effortsOf(kind, model)
     if (levels.includes(value.trim().toLowerCase())) return undefined
     return levels.length
@@ -275,8 +287,13 @@ export class Settings {
     return this.modelAt(role, kind ?? this.kindOf(role, l), l)
   }
 
+  /** a role's model: the head of its project's list for a space, the stored pick elsewhere */
+  private storedModel(role: Role, l: Level): string {
+    return (typeof l === 'object' ? projectModel(l.space, role) : undefined) ?? this.pick(`${role}.model`, l).value
+  }
+
   private modelAt(role: Role, kind: string | undefined, l: Level): { model?: string; effort?: string } {
-    const stored = this.pick(`${role}.model`, l).value
+    const stored = this.storedModel(role, l)
     if (!kind) return {}
     const model = stored === 'default' ? undefined : knowsModels(kind) ? findModel(kind, stored)?.id : modelsOf(kind) ? stored : undefined
     return { model, effort: effortFor(kind, this.pick(`${role}.effort`, l).value, model) }
