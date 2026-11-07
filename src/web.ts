@@ -1,7 +1,7 @@
 import { existsSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { browsers } from "./browsers.ts";
-import type { HomeData, PiSpend } from "./home-data.ts";
+import type { HomeData } from "./home-data.ts";
 import { type ProjectsFeed, projectsFeed, readProjects as readProjectsNow } from "./projects-feed.ts";
 import { machinesView } from "./machines.ts";
 import type { RoadmapRead } from "./roadmap-view.ts";
@@ -70,8 +70,7 @@ function keptAside<T>(read: () => Promise<T>, ms: number, now: () => number): Ke
  * with `lineclear plan`, newest first: its goal, where it stands, the steps it adds, and its open Inbox item.
  * Projects are read again at most once a second. The slow reads run aside, in a process of their own, and answer
  * with the last value while a new one is read: each roadmap at most once a second (one older than a minute is waited
- * for), spend and usage, from pi's session files, once a minute. `/api/home` never waits for a slow read: spend and usage are
- * in it once read. A POST must be JSON from this server's own pages.
+ * for). A POST must be JSON from this server's own pages.
  */
 export function webApi(
   env: Env = process.env,
@@ -82,7 +81,6 @@ export function webApi(
   feed?: ProjectsFeed,
 ) {
   let projects: { at: number; data: HomeData["projects"] } | undefined;
-  const pi = keptAside(() => aside("spend") as Promise<PiSpend>, 60_000, now);
   const roadmaps = new Map<string, Kept<RoadmapRead>>();
   const warmed = new Set<string>();
   const roadmap = (name: string) => {
@@ -130,7 +128,6 @@ export function webApi(
     now,
     aside,
     push,
-    pi,
     readProjects,
     forgetProjects: () => {
       projects = undefined;

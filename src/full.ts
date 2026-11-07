@@ -84,22 +84,11 @@ const DEAD =
 /** The provider's refusal in a failed call's text, or undefined when it is anything else. */
 export const readDead = (text: string): string | undefined => (DEAD.test(text) ? text.replace(/\s+/g, " ").trim().slice(0, 200) : undefined);
 
-/** Marks an account unusable with the provider's error; it has no reset, so only clearFull brings it back. */
+/** Marks an account unusable with the provider's error; it has no reset. */
 export function markDead(provider: string, error: string, env = process.env): void {
   const accounts = readAccounts(env);
   const { resetAt: _r, window: _w, ...old } = accounts[provider] ?? { kind: "subscription" as const };
   accounts[provider] = { ...old, out: true, dead: error };
-  writeAccounts(accounts, env);
-}
-
-/** Marks an account usable again: its provider reports room in every window. */
-export function clearFull(provider: string, env = process.env): void {
-  const accounts = readAccounts(env);
-  const old = accounts[provider];
-  // A refused account stays out: a usage poll that sees room says nothing about its access.
-  if (!old?.out || old.dead) return;
-  const { out: _o, resetAt: _r, window: _w, ...rest } = old;
-  accounts[provider] = rest;
   writeAccounts(accounts, env);
 }
 

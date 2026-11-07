@@ -12,7 +12,6 @@ import { closeSync, existsSync, openSync, readSync, statSync } from "node:fs";
 import { writeAtomic } from "../pi/atomic.ts";
 import { agentName } from "./starts.ts";
 import { namesUsageLimit } from "./harness-pi.ts";
-import { rankByRoom } from "./pace.ts";
 import type { Decision, State, World } from "./rules.ts";
 import { DAY } from "./time.ts";
 export interface StallCard {
@@ -335,5 +334,5 @@ export function reviewerFor(worker: string, settings: Settings, world: World, of
   const first = world.reviewerSetting(settings.space);
   const list = first === undefined ? settings.models.reviewer : [first, ...settings.models.reviewer.filter((m) => m !== first)];
   // Models of the worker list come last: a different model of the worker's company is the fallback.
-  return pickReviewer(worker, rankByRoom([...list, ...settings.models.worker], env, now).order, offered, (m) => availability(m, env, now) !== "out");
+  return pickReviewer(worker, [...list, ...settings.models.worker], offered, (m) => availability(m, env, now) !== "out");
 }

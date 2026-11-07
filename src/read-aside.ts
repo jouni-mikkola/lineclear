@@ -1,9 +1,8 @@
 import { dirname, join } from "node:path";
-import { piSpendAndUsage } from "./home-data.ts";
 import { roadmapData } from "./roadmap-view.ts";
 
 // The web server's slow reads, each in a process of its own so that the server keeps answering while it runs:
-// `bun src/read-aside.ts spend|roadmap <project>` prints the result as JSON.
+// `bun src/read-aside.ts roadmap <project>` prints the result as JSON.
 
 type Env = Record<string, string | undefined>;
 export type Aside = (what: "spend" | "dispatcher" | "roadmap" | "step", arg?: string) => Promise<unknown>;
@@ -26,7 +25,7 @@ export function readAside(env: Env): Aside {
 
 if (import.meta.main) {
   const [what, arg] = process.argv.slice(2);
-  const read = what === "spend" ? piSpendAndUsage() : what === "roadmap" && arg ? roadmapData(arg) : undefined;
+  const read = what === "roadmap" && arg ? roadmapData(arg) : undefined;
   if (read === undefined) {
     console.error("usage: bun src/read-aside.ts spend|roadmap <project>");
     process.exit(2);

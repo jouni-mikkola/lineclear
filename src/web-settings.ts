@@ -1,5 +1,4 @@
 import { type Account, readAccounts } from "./full.ts";
-import type { PiSpend } from "./home-data.ts";
 import { type AskBefore, askBefore, listProjectNames, readSettings, type Role } from "./project.ts";
 import { secretNames } from "./secrets.ts";
 import type { MachineView } from "./machines.ts";
@@ -30,18 +29,16 @@ export interface AccountSetting {
   kind: Account["kind"];
   price?: number;
   currency?: string;
-  /** The owner stopped using it: usage and spend leave it out. */
+  /** The owner stopped using it: it is left out. */
   retired?: boolean;
 }
 
-/** The accounts used this month or with a price or a retirement noted, as the owner set them. One with no price, no use and no retirement is not listed. */
-export function accountSettings(env: Env, spent?: PiSpend): AccountSetting[] {
+/** The accounts with a price or a retirement noted, as the owner set them. One with no price, no use and no retirement is not listed. */
+export function accountSettings(env: Env): AccountSetting[] {
   const noted = readAccounts(env as NodeJS.ProcessEnv);
-  const used = new Set([...(spent?.monthAccounts ?? []), ...(spent?.active ?? [])]);
-  const names = new Set([...Object.keys(noted), ...used]);
-  return [...names]
+  return Object.keys(noted)
     .sort()
-    .filter((account) => used.has(account) || noted[account]?.price !== undefined || noted[account]?.retired)
+    .filter((account) => noted[account]?.price !== undefined || noted[account]?.retired)
     .map((account) => {
       const a = noted[account];
       return {

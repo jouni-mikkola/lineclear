@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { homeData, lastCards, spendAndUsage, taskState } from "../src/home-data.ts";
+import { homeData, lastCards, taskState } from "../src/home-data.ts";
 import { type RoadmapLine, roadmapLine, whereTo } from "../src/progress.ts";
 import { roadmapMain } from "../src/roadmap-cli.ts";
 import { roadmapData } from "../src/roadmap-view.ts";
 import { tmp } from "./helpers.ts";
 
-import { NOW, project, repo, sh, usage } from "./home-fixtures.ts";
+import { NOW, project, repo, sh } from "./home-fixtures.ts";
 
 describe("taskState", () => {
   test("merged is done, a dropped task is left out", () => {
@@ -37,25 +37,6 @@ test("lastCards keeps the text and time of the latest card of each task over all
   expect(texts.get("A-1")).toEqual({ at: 5, text: "new" });
   expect(texts.get("A-2")?.text).toBe("two");
   expect(texts.size).toBe(2);
-});
-
-test("spendAndUsage: 14 days of $ and the accounts used in the last day", () => {
-  const price = { input: 1_000_000, output: 0, cacheRead: 0, cacheWrite: 0 }; // $1 a token
-  const r = spendAndUsage(
-    [
-      { at: NOW - 1000, account: "a", usage: usage(3) },
-      { at: NOW - 2000, account: "b", usage: usage(1) },
-      { at: NOW - 3 * 86_400_000, account: "a", usage: usage(5) },
-      { at: NOW - 30 * 86_400_000, account: "a", usage: usage(100) },
-    ],
-    () => price,
-    NOW,
-  );
-  expect(r.spend).toHaveLength(14);
-  expect(r.spend.at(-1)).toEqual({ day: "2026-10-31", dollars: 4 });
-  expect(r.spend.find((d) => d.day === "2026-10-28")?.dollars).toBe(5);
-  expect(r.spend.reduce((s, d) => s + d.dollars, 0)).toBe(9);
-  expect(r.active).toEqual(["a", "b"]);
 });
 
 test("homeData reads projects and states from Lineclear's files", () => {
@@ -106,8 +87,6 @@ test("homeData reads projects and states from Lineclear's files", () => {
     ["First", "done"],
   ]);
   expect(d.projects[1]?.tasks).toMatchObject([{ title: "Waits", state: "need", text: "Merge it?" }]);
-  expect(d.usage).toEqual([]);
-  expect(d.spend).toHaveLength(14);
 });
 
 test("a task whose turn ended with no question is not in Needs you", () => {

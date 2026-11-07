@@ -43,16 +43,11 @@ stays. `ui/test/errors.pw.ts` tests each.
 Home is at `/`, one page, built only from the parts below. Both read the
 server's data, again every 1.5 seconds, so a change shows within 3 s and whenever the page shows again, with no AI:
 
-- `GET /api/home`: each project's tasks from Lineclear's files, its progress from its roadmap and git, and spend
-  from pi's session files (rules below), and each account's limits from `limits.json`, which pi's extension writes.
-  Projects are read at most once a second, spend once a minute.
+- `GET /api/home`: each project's tasks from Lineclear's files, and its progress from its roadmap and git.
+  Projects are read at most once a second.
   - A task's state is its Lineclear state, and "waits for you" when its last card asks for you. A project's main is
     broken when Lineclear marks it red: only then is anything red.
   - Progress is roadmap steps merged on main when the project has `docs/ROADMAP.md`, else merged tasks.
-  - Spend is the equivalent dollars of pi's session files per day. Usage is how much of each
-    account's session and week limit is used, with when each resets, as its provider last reported it. pi's Lineclear
-    extension keeps that in `<config>/limits.json`, from the rate limit headers of Claude subscriptions; `lineclear run` asks Codex and OpenCode Go for theirs, with pi's stored login, at most every five minutes. An account
-    marked full is at 100% until its reset. One whose provider reports no limit says so.
 - `GET /api/inbox`: the open Inbox items, newest first. `POST /api/inbox/<n>` with `{"choice": "..."}` answers one,
   as `lineclear inbox answer` does, with `"note"` for a plan's reason to reject. It takes only JSON from the
   server's own pages.

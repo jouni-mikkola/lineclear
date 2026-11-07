@@ -24,8 +24,6 @@ export type Settings = {
   models: Record<Role, string[]>;
   /** Review rounds a worker may use before the step asks the owner. 2 if unset. */
   reviewRounds?: number;
-  /** `spend` (default) holds no step for pace, only for a full account; `even` holds off-critical steps when every account is ahead of its weekly pace. */
-  pace?: "spend" | "even";
   /** Other machines (SSH hosts) that may run this project's steps when this one has no room. */
   machines?: string[];
   /** False keeps the project off this machine: it starts only on its `machines`. True if unset. */
