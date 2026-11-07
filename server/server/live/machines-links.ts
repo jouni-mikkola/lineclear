@@ -1,5 +1,5 @@
-import { WorkerHealth } from './recovery.ts'
-import { mkdirSync, openSync, rmSync } from 'node:fs'
+import { LinkBackoff } from './recovery.ts'
+import { mkdirSync, openSync, rmSync, watch } from 'node:fs'
 import { join } from 'node:path'
 import type { Chat } from '../../shared/types.ts'
 import { HOME, writeJson } from '../store.ts'
@@ -19,13 +19,14 @@ export class MachinesLinks extends LinkPoll {
     super()
   }
 
-  protected timers: ReturnType<typeof setInterval>[] = []
+  protected timers: NodeJS.Timeout[] = []
 
   /** this server stops: the workers go on (the next start takes them back), and what each machine showed is kept */
   stop() {
     this.stopped = true
     this.timers.forEach(clearInterval)
     for (const l of this.links.values()) {
+      clearTimeout(l.retryTimer)
       l.ws?.close()
       this.keep(l, true)
     }
@@ -69,7 +70,7 @@ export class MachinesLinks extends LinkPoll {
       state: 'Connecting…',
       lacks: [],
       connecting: true,
-      health: new WorkerHealth(),
+      health: new LinkBackoff(),
     }
     this.links.set(m.label, l)
     setTimeout(() => {
@@ -138,6 +139,7 @@ export class MachinesLinks extends LinkPoll {
           this.pendingResume.delete(label)
           clearTimeout(this.keepTimers.get(label))
           this.keepTimers.delete(label)
+          clearTimeout(l.retryTimer)
           l.ws?.close()
           const worker = l.worker ?? running(workerRecord(label).pid)
           worker?.kill()
@@ -254,14 +256,14 @@ export class MachinesLinks extends LinkPoll {
       stderr: log,
     })
     this.own(l, w)
-    // its address, once it serves
-    const look = setInterval(() => {
+    // its address, once it serves: server.json appears in its folder
+    const watcher = watch(home, () => {
       const port = workerRecord(l.saved.label).port
       if (!port || l.worker !== w) return
-      clearInterval(look)
+      watcher.close()
       l.rec.url = `http://127.0.0.1:${port}`
       void this.poll(l)
-    }, 300)
-    setTimeout(() => clearInterval(look), 60_000)
+    })
+    void w.exited.then(() => watcher.close())
   }
 }

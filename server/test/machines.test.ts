@@ -223,7 +223,6 @@ describe('a restart of the main server (an update)', () => {
     )
     try {
       const l = m.list().find((x) => x.rec.machine === 'far')!
-      await (m as unknown as { pollAll(): Promise<void> }).pollAll()
       expect(l.worker).toBeUndefined()
       expect(l.reachable).toBe(false)
       expect(l.rec.url).toBe('')

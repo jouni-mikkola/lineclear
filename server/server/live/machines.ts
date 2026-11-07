@@ -25,6 +25,5 @@ export class Machines extends MachinesActions {
       void this.sync()
       this.timers.push(setInterval(() => void this.sync(), 15_000))
     }
-    this.timers.push(setInterval(() => void this.pollAll(), 5000))
   }
 }

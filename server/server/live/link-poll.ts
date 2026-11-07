@@ -5,7 +5,6 @@ import { Emitter } from '../source.ts'
 import { readJson } from '../store.ts'
 import { boxInfo } from './install.ts'
 import type { BoxInfo } from './box.ts'
-import { MERGE_DEADLINE } from './engine/engine.ts'
 import type { Kept } from './kept.ts'
 import { type Events, type Link, dirOf } from './machines-helpers.ts'
 import { running, type Worker } from './worker-process.ts'
@@ -55,86 +54,67 @@ export abstract class LinkPoll extends Emitter<Events> {
     return [...this.links.values()].flatMap((l) => (l.probe ? [boxInfo(l.saved, l.probe)] : []))
   }
 
-  protected async pollAll() {
-    await Promise.all([...this.links.values()].map((l) => this.poll(l)))
-  }
-
+  /** One look at the worker's snapshot, then the live link: it carries every change after. A failed look or a closed
+   *  link tries again later (retry), never on a clock beside an open link. */
   protected async poll(l: Link): Promise<void> {
     if (!this.active(l) || l.polling) return
-    if (!l.rec.url && !this.moved(l)) {
-      l.health.observe(false)
-      if (l.worker && !l.busy && l.health.restartDue()) void this.restartUnhealthy(l)
-      return
-    }
+    if (!l.rec.url && !this.moved(l)) return
     l.polling = true
     try {
       const r = await fetch(`${l.rec.url}/api/snapshot`, { signal: AbortSignal.timeout(4000) })
       if (!r.ok) throw new Error(String(r.status))
       const snap = (await r.json()) as Snapshot
       if (!this.active(l)) return
-      l.snap = snap
       l.rec.lastSeen = Date.now()
-      const herdrUp = !!snap.machines?.length && !snap.machines.some((m) => m.status === 'off')
-      l.health.observe(herdrUp)
-      l.state = herdrUp ? 'Ready' : "Its herdr isn't answering"
       l.connecting = false
       this.keep(l)
-      if (!herdrUp) {
-        l.reachable = false
-        l.down ??= Date.now()
+      if (!this.seen(l, snap)) {
         this.emit('snapshot')
-        return
+        return this.retry(l)
       }
-      // a worker started again: the live link is made again
-      if (!l.reachable || !l.ws) {
-        l.reachable = true
-        l.down = undefined
-        this.connect(l)
-        // what waited goes in now
-        for (const a of l.waiting.splice(0)) await this.forward(l, a).catch(() => l.waiting.push(a))
-      }
+      this.connect(l)
+      l.backoff.success()
+      await this.flush(l)
       this.emit('snapshot')
     } catch {
       if (!this.active(l)) return
-      l.health.observe(false)
-      if (this.moved(l)) return
-      if (l.reachable || l.down === undefined) {
+      if (!this.moved(l) && (l.reachable || l.down === undefined)) {
         l.reachable = false
         l.down ??= Date.now()
         this.emit('snapshot')
       }
+      this.retry(l)
     } finally {
       l.polling = false
-      if (this.active(l) && l.worker && !l.busy && l.health.restartDue()) void this.restartUnhealthy(l)
     }
   }
 
-  /** Replace only our local worker; never stop remote herdr, panes or agents. */
-  protected async restartUnhealthy(l: Link) {
-    if (!this.active(l) || l.busy || !l.worker) return
-    l.busy = true
-    l.health.restarting()
-    console.info(`lineclear: ${l.rec.machine}: link unhealthy for 3 minutes; replacing worker`)
-    const w = l.worker
-    l.ws?.close()
-    l.ws = undefined
-    l.reachable = false
-    try {
-      w.kill()
-      // Do not spawn beside a draining worker, even if it takes longer than expected.
-      const force = setTimeout(() => {
-        if (l.worker === w) w.kill('SIGKILL')
-      }, MERGE_DEADLINE + 30_000)
-      try {
-        await w.exited
-      } finally {
-        clearTimeout(force)
-      }
-      if (l.worker === w) l.worker = undefined
-    } finally {
-      l.busy = false
+  /** what a snapshot says of the worker's herdr: whether the machine is up; the state shown follows */
+  protected seen(l: Link, snap: Snapshot) {
+    l.snap = snap
+    const herdrUp = !!snap.machines?.length && !snap.machines.some((m) => m.status === 'off')
+    l.state = herdrUp ? 'Ready' : "Its herdr isn't answering"
+    if (herdrUp) {
+      l.reachable = true
+      l.down = undefined
+    } else {
+      l.reachable = false
+      l.down ??= Date.now()
     }
-    if (this.active(l)) await this.start(l)
+    return herdrUp
+  }
+
+  /** what waited for the machine goes in now */
+  protected async flush(l: Link) {
+    for (const a of l.waiting.splice(0)) await this.forward(l, a).catch(() => l.waiting.push(a))
+  }
+
+  protected retry(l: Link) {
+    if (!this.active(l) || l.retryTimer) return
+    l.retryTimer = setTimeout(() => {
+      l.retryTimer = undefined
+      void this.poll(l)
+    }, l.backoff.fail())
   }
 
   /** Its worker was started again out of this server's hands (lineclear doctor while another server ran, by hand)
@@ -148,8 +128,10 @@ export abstract class LinkPoll extends Emitter<Events> {
     if (!w) return false
     if (w !== l.worker) this.own(l, w)
     l.rec.url = url
-    // the live link is made again at the new address on its first answer
+    // the live link is made again at the new address on its next look
     l.reachable = false
+    l.ws?.close()
+    l.ws = undefined
     return true
   }
 
@@ -171,14 +153,24 @@ export abstract class LinkPoll extends Emitter<Events> {
         this.emit('chat', m.chat.key, m.chat)
       } else if (m.type === 'terminal') this.emit('terminal', m.chat, { ansi: m.ansi, cols: m.cols, rows: m.rows })
       else if (m.type === 'snapshot') {
-        l.snap = m.snapshot
+        const was = l.reachable
+        l.connecting = false
+        l.rec.lastSeen = Date.now()
+        this.seen(l, m.snapshot)
         this.keep(l)
         this.emit('snapshot')
+        if (l.reachable && !was) void this.flush(l)
       } else if (m.type === 'alert') this.emit('alert', m.alert)
       else if (m.type === 'news') this.emit('news', l.rec.machine, m.news)
     }
     ws.onclose = () => {
-      if (l.ws === ws) l.ws = undefined
+      if (l.ws !== ws) return
+      l.ws = undefined
+      if (!this.active(l)) return
+      l.reachable = false
+      l.down ??= Date.now()
+      this.emit('snapshot')
+      this.retry(l)
     }
   }
 
