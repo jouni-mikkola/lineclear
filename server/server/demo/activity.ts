@@ -2,21 +2,20 @@
 // a test run, a headless reviewer) with what each does. Times count back from when the demo started.
 import { glance, rowsOf } from '../../shared/activity.ts'
 import type { ActivityAnswer, ActivityAsk, Job, Step, TurnActivity } from '../../shared/types.ts'
-import { claudeStep, codexItem, commandSay, type Said } from '../live/readers/steps.ts'
+import { claudeStep, commandSay, type Said } from '../live/readers/steps.ts'
 
 const T0 = Date.now()
 const ago = (s: number) => T0 - s * 1000
 
-/** a step in the words the live readers give it: a Claude Code tool call, or a Codex command */
+/** a step in the words the live readers give it: a Claude Code tool call, or a shell command */
 const step = (id: string, said: Said | undefined, tool: string, at: number, took: number | null = 2, x: Partial<Step> = {}): Step => {
   const { step: kind, ...w } = said!
   return { id, kind, tool, ...w, at: ago(at), end: took === null ? undefined : ago(at - took), output: took !== null, ...x }
 }
 const claude = (id: string, tool: string, input: object, at: number, took?: number | null, x?: Partial<Step>) =>
   step(id, claudeStep(tool, input), tool, at, took, x)
-const codex = (id: string, cmd: string, at: number, took?: number | null, x?: Partial<Step>) => step(id, commandSay(cmd), 'exec_command', at, took, x)
-const read = (id: string, path: string, at: number, took?: number | null) =>
-  step(id, codexItem({ type: 'CommandExecution', command: `sed -n 1,200p ${path}`, parsed_cmd: [{ type: 'read', path }] }), 'exec_command', at, took)
+const cmd = (id: string, line: string, at: number, took?: number | null, x?: Partial<Step>) => step(id, commandSay(line), 'Bash', at, took, x)
+const read = (id: string, path: string, at: number, took?: number | null) => claude(id, 'Read', { file_path: path }, at, took)
 
 const EDIT = {
   file_path: '/w/gtm/server/webhook.ts',
@@ -68,7 +67,7 @@ const STEPS: Record<string, Step[]> = {
   ],
   // HP-202: what it did before this turn
   'hp202-t1': [
-    codex('h1', 'rg "mute" plugins/voice', 1500),
+    cmd('h1', 'rg "mute" plugins/voice', 1500),
     read('h2', 'plugins/voice/call.ts', 1495),
     read('h3', 'plugins/voice/client.tsx', 1490),
     read('h4', 'plugins/voice/server.ts', 1485),
@@ -76,18 +75,9 @@ const STEPS: Record<string, Step[]> = {
   // HP-202: the turn that runs now
   'hp202-live': [
     read('l1', 'plugins/voice/call.ts', 300),
-    codex('l2', 'rg "track.stop" plugins', 290),
+    cmd('l2', 'rg "track.stop" plugins', 290),
     read('l3', 'plugins/voice/voice.ts', 280),
-    step(
-      'l4',
-      codexItem({
-        type: 'FileChange',
-        changes: { 'plugins/voice/call.ts': { unified_diff: '@@\n-  track.stop()\n+  track.enabled = false\n+  muted = true' } },
-      }),
-      'apply_patch',
-      200,
-      1,
-    ),
+    claude('l4', 'Edit', { file_path: 'plugins/voice/call.ts', old_string: '  track.stop()', new_string: '  track.enabled = false\n  muted = true' }, 200, 1),
     {
       ...step(
         'l5',
@@ -99,14 +89,14 @@ const STEPS: Record<string, Step[]> = {
       job: 'j1',
       output: false,
     },
-    codex('l6', 'bun run test voice', 120, 1, { job: 'j2' }),
+    cmd('l6', 'bun run test voice', 120, 1, { job: 'j2' }),
     read('l7', 'test/mute.test.ts', 14, null),
   ],
   // the reviewer subagent's own steps
   j1: [
     read('r1', 'plugins/voice/call.ts', 180),
     read('r2', 'plugins/voice/voice.ts', 170),
-    codex('r3', 'rg "onended" plugins/voice', 150),
+    cmd('r3', 'rg "onended" plugins/voice', 150),
     read('r4', 'test/call.test.ts', 20, null),
   ],
 }

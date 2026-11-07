@@ -1,7 +1,7 @@
 // A tool call in plain words: what kind of step it is, what it did ("Checked the task list", "Edited app.ts") and as it
 // runs ("Checking the task list"), from its tool and input: the agent's own short description where it gave one, else
 // what the command is. The raw command, path or pattern stays one tap deeper (detail); the output stays in the log.
-import { say, testResult, words } from '../../../shared/activity.ts'
+import { say, words } from '../../../shared/activity.ts'
 import type { StepKind, StepWords } from '../../../shared/types.ts'
 
 type Json = any
@@ -302,18 +302,6 @@ function lineCounts(before: string, after: string): { added: number; removed: nu
   return { added, removed }
 }
 
-/** a unified diff's lines added and removed */
-function diffCounts(diff: string): { added: number; removed: number } {
-  let added = 0
-  let removed = 0
-  for (const l of diff.split('\n')) {
-    if (l.startsWith('+++') || l.startsWith('---')) continue
-    if (l.startsWith('+')) added++
-    else if (l.startsWith('-')) removed++
-  }
-  return { added, removed }
-}
-
 const IMAGE = /\.(png|jpe?g|gif|webp|svg|bmp)$/i
 
 /** an MCP tool's name as words: "mcp__github__get_pr" -> "get pr" */
@@ -394,64 +382,3 @@ function subagent(description: unknown): StepWords {
 
 /** the tool's name as a step keeps it: an MCP server's tool by its own name */
 export const toolName = (name: string) => /^mcp__.+?__(.+)$/.exec(name)?.[1] ?? name
-
-/** a Codex item that is over (event_msg item_completed) as a step, or none for one that is no step */
-export function codexItem(it: Json): (Said & { failed?: boolean; tool: string; result?: string }) | undefined {
-  switch (it?.type) {
-    case 'CommandExecution': {
-      const p = Array.isArray(it.parsed_cmd) && it.parsed_cmd.length === 1 ? it.parsed_cmd[0] : undefined
-      const cmd = String(Array.isArray(it.command) ? (it.command.at(-1) ?? '') : (it.command ?? ''))
-      const failed = it.status === 'failed' || (typeof it.exit_code === 'number' && it.exit_code !== 0) || undefined
-      const c = commandSay(cmd)
-      if (p?.type === 'read') {
-        const f = baseName(String(p.path ?? p.name ?? ''))
-        return { ...c, step: 'read', ...words(`Read ${f}`, f), failed, tool: 'exec_command' }
-      }
-      if ((p?.type === 'search' || p?.type === 'list_files') && c.step !== 'search')
-        return {
-          ...c,
-          step: 'search',
-          ...words(p.query ? `Search for ${quote(p.query)}` : 'Look for files', p.query ? quote(p.query) : ''),
-          failed,
-          tool: 'exec_command',
-        }
-      return { ...c, failed, tool: 'exec_command', result: c.test ? testResult(String(it.aggregated_output ?? '')) : undefined }
-    }
-    case 'FileChange': {
-      const files = Object.keys(it.changes ?? {})
-      if (!files.length) return undefined
-      const n = Object.values(it.changes ?? {}).reduce(
-        (m: { added: number; removed: number }, c: Json) => {
-          const d = typeof c?.unified_diff === 'string' ? diffCounts(c.unified_diff) : lineCounts('', String(c?.content ?? ''))
-          return { added: m.added + d.added, removed: m.removed + d.removed }
-        },
-        { added: 0, removed: 0 },
-      )
-      const f = baseName(files[0])
-      const what = files.length > 1 ? `Edit ${files.length} files: ${files.slice(0, 3).map(baseName).join(', ')}` : `Edit ${f}`
-      return { step: 'edit', ...words(what, files.length > 1 ? '' : f, { detail: files.join('\n'), ...n }), tool: 'apply_patch' }
-    }
-    case 'McpToolCall':
-      return {
-        step: 'other',
-        ...words(`Use ${toolWords(String(it.actionName ?? it.tool ?? it.server ?? 'a tool'))}`),
-        tool: short(it.actionName ?? it.tool ?? it.server, 40),
-        failed: it.status === 'failed' || undefined,
-      }
-    case 'Extension':
-      return it.kind === 'web.search'
-        ? {
-            step: 'web',
-            ...words(it.query ? `Search the web for ${quote(it.query)}` : `Read ${host(it.action?.url)}`, '', {
-              detail: String(it.query ?? it.action?.url ?? ''),
-            }),
-            tool: 'web_search',
-          }
-        : undefined
-    case 'ImageView': {
-      const f = baseName(String(it.path ?? ''))
-      return { step: 'read', ...words(`Look at ${f}`, f, { detail: String(it.path ?? '') }), tool: 'view_image' }
-    }
-  }
-  return undefined
-}
