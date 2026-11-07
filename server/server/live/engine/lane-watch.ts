@@ -84,7 +84,7 @@ export class RedMainWatch {
   private handled = new Set<string>()
 
   async look(run: MainRun | undefined, act: RedMainActions): Promise<'reverted' | 'task only' | undefined> {
-    if (!run || run.conclusion !== 'failure' || this.handled.has(run.sha)) return undefined
+    if (run?.conclusion !== 'failure' || this.handled.has(run.sha)) return undefined
     this.handled.add(run.sha)
     const reverted = await act.revert(run.sha).catch(() => false)
     await act.fixTask(run.sha, reverted)
