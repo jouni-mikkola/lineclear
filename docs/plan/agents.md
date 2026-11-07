@@ -3,7 +3,8 @@
 How an agent runs, one control plane over 3 machines, one step claim, budgets per agent, and a task end that leaves
 nothing behind. This file replaces the open steps L502, L506, L508, L510 (agents) and L580 to L583, L586, L588 to L591,
 L593 (machines). In flight and planned around: L503 (agent files), L504 (herdr link), L585 (link socket), L587 (one
-ssh), L592 (install.sh). Rank: P1 core loop, P2 simple, P3 tokens, P4 any project, P5 web (see [release.md](../release.md)).
+ssh), L592 (install.sh). L503 is already running, so its `after: L502` ends when the lead removes L502. Ids end at
+L757; L758 and L759 are free. Rank: P1 core loop, P2 simple, P3 tokens, P4 any project, P5 web (see [release.md](../release.md)).
 
 ## What is wrong today
 
@@ -98,7 +99,7 @@ Result: A task's worktree is made and removed by git alone, also when herdr is d
 
 ### L733 Agents resume after a restart
 Result: After a server restart every live task's agent runs again within 10 s from its own session, and a cut turn gets one "continue".
-- why: P1. An RPC child dies with its server and `rpcEnded` drops it (`agents-delivery.ts:275`); old L508 counted on pane exits.
+- why: P1. An RPC child dies with its server and `rpcEnded` drops it (`agents-delivery.ts:275`); old L508 counted on pane exits. The resume runs from `revive.ts` at server start through the existing start call with the record's session id, so `agents-delivery.ts` (L503's) is not touched.
 - done when: a test with 5 live RPC agents restarts the server and sees 5 spawns with `--session-id` within 10 s; an agent whose last event was `agent_settled` gets 0 prompts, one cut mid-turn gets 1; 3 failed resumes in an hour stop with a card; `server/test/revive.test.ts` pane cases are deleted.
 - locks: revive, file-server-server-live-revive-ts
 - after: none
@@ -107,7 +108,7 @@ Result: After a server restart every live task's agent runs again within 10 s fr
 ### L734 Place by free CPU and memory
 Result: A pure placement picks the machine with the most free agents by slots, CPU and memory, and never overbooks in one tick.
 - why: P1. `mostRoom` treats memory as a 1 GiB floor and reads the room once a tick (machines finding 7, old L581).
-- done when: `placement.ts` exports `place(machines, n)`; a test with 3 machines of 10, 12 and 25 slots, 8 GiB free on the first and 45 tasks places at most `floor((8 GiB - 2 GiB) / 450 MB)` = 13 on it and passes no machine's slots; ties are stable.
+- done when: `placement.ts` exports `place(machines, n)`; a test with 3 machines of 10, 12 and 25 slots, 8 GiB free on the first and 45 tasks places at most `floor((8 GiB - 2 GiB) / 450 MiB)` = 13 on it and passes no machine's slots; ties are stable.
 - locks: placement
 - after: none
 - files: server/server/live/placement.ts, server/test/placement.test.ts
@@ -237,7 +238,7 @@ Result: Every task end stops its agent, removes its worktree and branch, keeps i
 - why: P1, P2. 136 stale worktrees (9 GB), 162 branches and 3,690 sessions (2.1 GB) on one machine.
 - done when: a test ends tasks as merged, closed and failed and sees for each: 0 live child, 0 worktree, 0 local branch, a token sum on the row; a session of a task ended 8 days ago is deleted and one of 6 days kept; `lineclear doctor` (L739) prints 0s after one sweep on a fixture of today's leftovers.
 - locks: task-release, file-server-server-live-engine-retire-ts
-- after: L731, L732, L739
+- after: L731, L732, L736, L739
 - files: server/server/live/engine/retire.ts, server/server/live/engine/sweep.ts, server/test/engine-sweep.test.ts
 
 ### L751 Budgets are set per role
@@ -257,7 +258,7 @@ Result: A small repo with no package.json and no Lineclear setup gets a worktree
 - files: server/server/live/engine/git.ts, server/test/any-repo-start.test.ts
 
 ### L753 The helper goes in atomically
-Result: The helper and its host are unpacked into a version folder and switched by one symlink; the probe returns JSON.
+Result: The helper is unpacked into a version folder and switched by one symlink; the probe returns JSON.
 - why: P1. `rm -rf bin skill; tar xf` leaves a window with no `lineclear` for a starting agent (old L590).
 - done when: a test runs 50 `lineclear` calls during an update and sees 0 failures; `grep -c "match(" server/server/live/install.ts` prints 0.
 - locks: helper-install, file-server-server-live-install-ts
