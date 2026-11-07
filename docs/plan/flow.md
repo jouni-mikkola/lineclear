@@ -111,78 +111,17 @@ L798, L799, L800, L806. L807 is the 11th. L809 starts once L799 is merged.
 
 ## Steps
 
-### L790 A lane label runs the full check
-Result: A pull request labelled `lane` runs the full sharded check on its head, and main reruns nothing already checked.
-- why: today the full suite runs only after a merge, on main, and every merge spends 9 of the 20 runners GitHub gives the repo.
-- done when: `check.yml` runs the 8 full shards on `pull_request` when the PR has the label `lane` (on `labeled` and `synchronize`), and the `changed` job otherwise; a push to main whose tree a green `lane` run checked runs 1 job of 10 s or less, else the full check; `test/light-checks.test.ts` gains a case for both and still holds every job at 5 minutes.
-- locks: check-workflow, file-github-workflows-check-yml
-- after: none
-- files: .github/workflows/check.yml, test/light-checks.test.ts
+Each step is in [ROADMAP.md](../ROADMAP.md), or dropped with the step that does its job.
 
-### L791 The lane merges a checked rebase
-Result: A task merges only after GitHub's full check passed on its branch rebased on main's current tip, so a merge never turns main red.
-- why: `mergeOnGitHub` rebases only on a text conflict and merges before any check with Merge "on its own"; 31 of 50 runs on main failed today.
-- done when: the lane rebases every branch on `origin/main`, labels its PR `lane`, waits on the repo watch for the full check on that head and merges with `--match-head-commit` only while main is still the commit it rebased on; a test merges 2 branches that pass alone and break together and sees the second sent back with the failing test named and main unchanged; the `waitChecks` path is gone from `merge.ts`; over 20 merges after the step `gh run list --workflow check.yml --branch main --limit 20 --json conclusion` lists 0 `failure` (31 of 50 today). The cases of `server/test/engine-merge-b.test.ts` that merge without waiting are deleted.
-  - Owner only: set `strict_required_status_checks_policy` to true in the `main` ruleset (a change to the public repo's rules).
-- locks: merge-lane, file-server-server-live-engine-merge-ts, file-server-server-live-engine-lane-ts
-- after: L525, L790
-- files: server/server/live/engine/merge.ts, server/server/live/engine/lane.ts, server/test/engine-merge-b.test.ts
-
-### L792 The lane tests 4 at once
-Result: With many tasks ready in one repo, the lane checks up to 4 rebased branches as one candidate and finds a bad one by halves.
-- why: one full check per merge caps a repo near 60 merges an hour, and 45 agents on 10 minute tasks make about 270. It adds a part for a core job only it serves: GitHub's merge queue is not offered to this repo.
-- done when: a new `batch.ts` stacks up to 4 queued branches on main's tip and merges them in order once the candidate's check is green; a test queues 8 with 1 bad and sees 7 merged, 1 sent back with its failing test, and 6 or fewer full runs; a test with 45 simulated ready tasks keeps the lane wait at 5 minutes or less at p90; `merge.ts` and `batch.ts` stay under 600 lines.
-- locks: merge-lane, file-server-server-live-engine-merge-ts
-- after: L791
-- files: server/server/live/engine/batch.ts, server/server/live/engine/merge.ts
-
-### L793 A closed task closes its PR
-Result: Closing or discarding a task closes its pull request and deletes its branch on GitHub and here, so no duplicate PR stays open.
-- why: 59 duplicate PRs stayed open because `close` never closes the task's PR, and 162 local branches are left on one machine.
-- done when: `close` closes the task's PR with a comment and deletes its remote and local branch, once; a test closes a task with an open PR and sees it closed and both branches gone, and a task with unmerged work kept as today; a one-time sweep closes the open PRs of Done tasks, after which `gh pr list --state open` lists only PRs of open tasks.
-- locks: task-close, file-server-server-live-engine-engine-handoff-ts, file-server-server-live-engine-engine-pr-ts
-- after: none
-- files: server/server/live/engine/engine-handoff.ts, server/server/live/engine/engine-pr.ts
-
-### L794 One light review call
-Result: `lineclear review <task> --json` reviews a diff under 80 lines with 3 lines of context and short rules, in 15 k tokens or less.
-- why: the reviewer reads 73 k new input at the median for diffs that are mostly small, and the call has no output a program can read.
-- done when: `review-call.ts` picks the light form for a diff of fewer than 80 changed lines that deletes no test, and the full form otherwise; `--json` prints the findings and the input size; a test reviews a 20-line and a 300-line diff and sees an input of 15 k or less and 50 k or less; `test/review-call.test.ts` keeps its cases for the full form.
-- locks: review-call, file-src-review-call-ts
-- after: none
-- files: src/review-call.ts
-
-### L795 The lane reviews, then merges
-Result: Lineclear reviews each task once at `ready`, on the head the lane will merge, and sends must-fix findings back as one message.
-- why: today the agent reviews itself in its own session for up to 540 s a round, holding a slot, and `lineclear review` is a second way nobody calls.
-- done when: a new `review-stage.ts` runs `lineclear review <id> --json` as a child under a timeout when a task enters the lane; findings at or above Must fix go to the agent in one message and count a round; after Review rounds the Dispatcher's chat gets one card; a test sees a clean review pass to the lane and a major finding sent back once.
-- locks: merge-lane, file-server-server-live-engine-merge-ts
-- after: L791, L794
-- files: server/server/live/engine/review-stage.ts, server/server/live/engine/merge.ts
-
-### L796 The brief ends at ready
-Result: A task's brief and skill say: build, run the quick tests, `lineclear ready`; Lineclear does the PR, the review, the checks and the merge.
-- why: the skill still has the agent review itself, wait for checks and merge, three jobs the server now does.
-- done when: `SKILL.md` has no review procedure and no `lineclear checks` wait, and is 70 lines or less (114 today); the Settings lines of `prompts.ts` say the review and the merge are Lineclear's; Merge "after GitHub checks" is gone from `settings-store.ts` (`git grep -c waitChecks server/server` prints 0); the brief cases of `server/test/live-b.test.ts`, `live-c.test.ts` and `source-b.test.ts` change with them.
-- locks: brief-words, file-server-server-live-prompts-ts, file-server-server-live-settings-store-ts
-- after: L795
-- files: server/server/live/prompts.ts, server/server/live/settings-store.ts, server/skill/lineclear-agent/SKILL.md, server/skill/lineclear-agent/START.md, server/test/live-b.test.ts, server/test/live-c.test.ts, server/test/source-b.test.ts
-
-### L797 An agent stops at ready
-Result: A task waiting for review, checks or merge has no running agent; a finding starts it again from its session within 20 seconds.
-- why: an agent takes about 420 MB, and today it stays up through review and checks while it does nothing.
-- done when: `ready` ends the task's pi process and keeps its session file; a review finding or a failed check starts it with `--session` and that one message; a test with 45 tasks of which 15 wait in the lane counts 30 pi processes or fewer; a test sees the resumed agent's first tool call within 20 s.
-- locks: task-close, file-server-server-live-engine-engine-handoff-ts
-- after: L793, L795
-- files: server/server/live/engine/engine-handoff.ts, server/server/live/engine/engine-launch.ts
-
-### L798 Each role has a token budget
-Result: A task agent compacts at 80 % of its budget, is told to finish at 100 %, and stops at its cap with a card in the project chat.
-- why: no budget is enforced: a task agent reads 195 k new input at p90 and 16.7 M cache reads, and nothing stops a runaway.
-- done when: a new `pi/budget.ts` sums `message.usage` at `turn_end` and applies the table of docs/plan/flow.md per role (`LINECLEAR_BUDGET_<ROLE>` overrides); a test feeds turns past 80 %, 100 % and the cap and sees one compaction, one message and one abort; a chat role never aborts.
-- locks: pi-budget, file-pi-extension-ts, file-pi-config-ts
-- after: none
-- files: pi/budget.ts, pi/extension.ts, pi/config.ts
+- L790 A lane label runs the full check: in ROADMAP.md.
+- L791 The lane merges a checked rebase: in ROADMAP.md.
+- L792 The lane tests 4 at once: in ROADMAP.md.
+- L793 A closed task closes its PR: in ROADMAP.md.
+- L794 One light review call: in ROADMAP.md.
+- L795 The lane reviews, then merges: in ROADMAP.md.
+- L796 The brief ends at ready: in ROADMAP.md.
+- L797 An agent stops at ready: in ROADMAP.md.
+- L798 Each role has a token budget: in ROADMAP.md.
 
 ### L799 Tokens per merged step
 Result: `bun scripts/core-baseline.ts step-tokens 20` prints the tokens of each role per merged step over the last 20 merges.
@@ -200,21 +139,8 @@ Result: `bun scripts/swarm-measure.ts <swarm-base> <one-base>` prints merged ste
 - after: none
 - files: scripts/swarm-measure.ts, test/swarm-measure.test.ts
 
-### L801 The swarm arm is measured
-Result: docs/numbers.md shows 2 runs of the swarm arm: 6 steps at once on `measure/<date>-swarm`, with steps an hour and tokens per step.
-- why: v0.2 claims parallel work beats one agent; until both arms run on the same 6 steps it is a goal, not a fact. With L803 it replaces L609.
-- done when: `docs/numbers.md` has the 2 swarm rows of `swarm-measure.ts` on 6 steps with disjoint locks from one main commit, and the commit. The agent adds the tasks and waits declared (`lineclear wait`), so it spends minutes, not the arm's hours.
-- locks: swarm-measure, file-docs-numbers-md
-- after: L800, L797, L798
-- files: docs/numbers.md
-
-### L803 One agent arm and the verdict
-Result: docs/numbers.md shows 2 runs of one agent doing the same 6 steps in a row, the verdict, and a delete step for each role that does not pay.
-- why: the swarm's numbers mean nothing without the one-agent arm on the same steps and the same commit.
-- done when: `docs/numbers.md` has the 2 one-agent rows next to L801's and the pass or fail of the rule (3 times the steps an hour, at most 1.2 times the tokens per step); every role that fails has a new step in ROADMAP.md. The agent waits declared, as in L801.
-- locks: swarm-measure, file-docs-numbers-md
-- after: L801
-- files: docs/numbers.md
+- L801 The swarm arm is measured: dropped, L609 measures both arms (ROADMAP.md).
+- L803 One agent arm and the verdict: dropped, L609 measures both arms (ROADMAP.md).
 
 ### L802 The loop promotes green main
 Result: The rule loop installs the newest green main as stable at set hours, so no outside script promotes or copies an install.
@@ -265,13 +191,7 @@ Result: A small second repo with no special setup goes through 3 steps: add, bui
 - after: L806, L807, L791, L795
 - files: docs/numbers.md
 
-### L809 Usage shows tokens per step
-Result: The Usage page shows tokens per merged step by role for the last 20 merges, against each role's budget.
-- why: budgets are only kept when the owner can see them; today Usage shows spend per account, not per merged step.
-- done when: Usage draws one bar per role with its median against the budget of docs/plan/flow.md, in the graphite theme (green under, amber near, red only for over the cap), with empty, loading and error states; screenshot tests at 1440 and 390 px.
-- locks: usage-steps, file-ui-web-usage-sheet-tsx
-- after: L799
-- files: ui/web/usage-sheet.tsx, ui/test/usage-inbox.pw.ts
+- L809 Usage shows tokens per step: dropped, W118 of the web plan does it.
 
 ## Not in this plan
 

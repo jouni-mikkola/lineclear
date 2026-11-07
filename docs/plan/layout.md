@@ -168,13 +168,7 @@ Result: A new doctor check is one new file; `src/doctor.ts` only runs them.
 - after: L760, L541
 - files: src/doctor.ts, src/doctor-task-ids.ts, src/doctor/, test/doctor.test.ts
 
-### L769 One prompt file per role
-Result: Each role's prompt is its own file, so its size per role can be read and budgeted.
-- why: `prompts.ts` holds every role's text; 11 PRs changed it, 2 with a conflict.
-- done when: `server/skill/prompts/<role>.md` holds each role's text; `prompts.ts` only fills them in and is at most 60 lines; `wc -c server/skill/prompts/*.md` prints one size per role; the prompt tests pass.
-- locks: agent-prompt, file-server-server-live-prompts-ts
-- after: none
-- files: server/server/live/prompts.ts, server/skill/prompts/
+- L769 One prompt file per role: in ROADMAP.md, with the core loop, since L796 edits the prompt files it makes.
 
 ### L770 Wire types per domain
 Result: A type change touches its domain's types file, not one shared catalog.
