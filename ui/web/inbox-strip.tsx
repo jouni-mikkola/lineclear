@@ -194,6 +194,39 @@ function Ask({
   );
 }
 
+/** One ask in a list: where it comes from, its question and its answers. */
+function AskRow({
+  item: a,
+  onChoose,
+  marked,
+  error,
+}: {
+  item: InboxItem;
+  onChoose: (item: InboxItem, choice: string, note?: string) => void;
+  marked?: boolean;
+  error?: string;
+}) {
+  return (
+    <li className={`flex flex-wrap items-center gap-x-3 gap-y-1.5 ${marked ? "border-l-2 border-caution pl-2" : ""}`} data-inbox-ask={a.id}>
+      <span className="min-w-0 flex-1 basis-60">
+        <span className="block truncate text-xs text-fg3" title={a.since ? exact(a.since) : undefined}>
+          {[a.project, a.task && (a.title ? `${a.task} ${a.title}` : a.task), asker(a)].filter(Boolean).join(" · ")}
+          {a.since && ` · ${ago(Date.parse(a.since))} ago`}
+        </span>
+        <span className="block break-words text-sm text-fg">{a.question}</span>
+        {error && (
+          <span className="block break-words text-sm text-fg2" role="status">
+            {error}
+          </span>
+        )}
+      </span>
+      <span className="flex flex-wrap gap-2">
+        <Answers item={a} onChoose={onChoose} />
+      </span>
+    </li>
+  );
+}
+
 /** The rest of the asks, a row per project; a project opens to its asks. */
 function More({ items, onChoose }: { items: InboxItem[]; onChoose: (item: InboxItem, choice: string, note?: string) => void }) {
   const groups = Map.groupBy(items, (i) => i.project);
@@ -214,18 +247,7 @@ function More({ items, onChoose }: { items: InboxItem[]; onChoose: (item: InboxI
           {openProject === project && (
             <ul className="mt-1 grid max-h-96 gap-2 overflow-auto px-2 pb-2">
               {asks.map((a) => (
-                <li key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5" data-inbox-ask={a.id}>
-                  <span className="min-w-0 flex-1 basis-60">
-                    <span className="block truncate text-xs text-fg3" title={a.since ? exact(a.since) : undefined}>
-                      {a.task && (a.title ? `${a.task} ${a.title}` : a.task)} · {asker(a)}
-                      {a.since && ` · ${ago(Date.parse(a.since))} ago`}
-                    </span>
-                    <span className="block break-words text-sm text-fg">{a.question}</span>
-                  </span>
-                  <span className="flex flex-wrap gap-2">
-                    <Answers item={a} onChoose={onChoose} />
-                  </span>
-                </li>
+                <AskRow key={a.id} item={a} onChoose={onChoose} />
               ))}
             </ul>
           )}
@@ -318,6 +340,55 @@ export function AskInRow({ item, onChoose }: { item: InboxItem; onChoose: (item:
   );
 }
 
+/** Asks drawn at once in the Inbox list; the rest are a page away. */
+const WINDOW = 40;
+
+const byNewest = (a: InboxItem, b: InboxItem) => (b.since ? Date.parse(b.since) : 0) - (a.since ? Date.parse(a.since) : 0);
+
+/** Every ask, the newest first, WINDOW rows at a time. The ask an address names goes first. */
+function InboxList({
+  open,
+  ask,
+  errors,
+  onChoose,
+}: {
+  open: InboxItem[];
+  ask?: string;
+  errors: Record<string, string>;
+  onChoose: (item: InboxItem, choice: string, note?: string) => void;
+}) {
+  const [page, setPage] = useState(0);
+  const sorted = [...open].sort(byNewest);
+  const named = sorted.find((i) => i.id === ask || i.task === ask);
+  const all = named ? [named, ...sorted.filter((i) => i !== named)] : sorted;
+  const pages = Math.max(1, Math.ceil(all.length / WINDOW));
+  const at = Math.min(page, pages - 1);
+  const shown = all.slice(at * WINDOW, (at + 1) * WINDOW);
+  if (all.length === 0) return null;
+  return (
+    <>
+      <ul className="grid gap-3 rounded-lg border border-caution/50 bg-raised p-4" data-inbox-list>
+        {shown.map((a) => (
+          <AskRow key={a.id} item={a} onChoose={onChoose} marked={a === named} error={errors[a.id]} />
+        ))}
+      </ul>
+      {pages > 1 && (
+        <nav className="mt-3 flex items-center gap-3 text-sm text-fg2" aria-label="Pages of asks" data-inbox-pages>
+          <button type="button" className={`${BUTTON} disabled:opacity-40`} disabled={at === 0} onClick={() => setPage(at - 1)}>
+            Newer
+          </button>
+          <span className="tabular-nums" data-inbox-range>
+            {at * WINDOW + 1} to {at * WINDOW + shown.length} of {all.length}
+          </span>
+          <button type="button" className={`${BUTTON} disabled:opacity-40`} disabled={at === pages - 1} onClick={() => setPage(at + 1)}>
+            Older
+          </button>
+        </nav>
+      )}
+    </>
+  );
+}
+
 /** The Inbox view at `/inbox`: what waits for the owner, or a line saying nothing does. */
 export function InboxView({ sample, ask }: { sample: PageState | undefined; ask?: string }) {
   const items = useInbox(sample);
@@ -339,7 +410,8 @@ export function InboxView({ sample, ask }: { sample: PageState | undefined; ask?
           Nothing waits for you.
         </p>
       )}
-      <InboxStrip open={open} held={held} onChoose={choose} onUndo={undo} ask={ask} errors={errors} read={items.status !== "loading"} />
+      <InboxList open={open} ask={ask} errors={errors} onChoose={choose} />
+      {held && <Toast message={`Sent: ${held.choice}`} onUndo={undo} />}
     </section>
   );
 }
