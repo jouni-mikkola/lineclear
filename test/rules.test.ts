@@ -1,6 +1,6 @@
 import { freshDecisions } from "../src/decision-dedupe.ts";
 import { expect, spyOn, test } from "bun:test";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { cpus } from "node:os";
 import { join } from "node:path";
 import { readItems } from "../src/inbox.ts";
@@ -595,4 +595,32 @@ test("stepStatuses is called only where its inputs come from stepInputs", () => 
     if (/\bstepStatuses\(/.test(text) && file !== "roadmap.ts") found.push(file);
   }
   expect(found).toEqual(["task-steps.ts"]);
+});
+
+test("a step whose start is in progress is refused, then starts once the claim is gone", () => {
+  const t = setup({ steps: [step("A", "none")] });
+  const claim = join(t.config, "projects", "demo", "starting", "A");
+  mkdirSync(claim, { recursive: true });
+  t.doTick();
+  expect(t.adds()).toEqual([]);
+  expect(t.decisions().some((x) => x.step === "A" && x.reason.includes("in progress"))).toBe(true);
+  rmSync(claim, { recursive: true });
+  t.doTick();
+  expect(t.adds().length).toBe(1);
+  expect(existsSync(claim)).toBe(false);
+});
+
+test("the same step added twice gives one start and one refusal", () => {
+  const t = setup({ steps: [step("A", "none")] });
+  t.doTick();
+  expect(t.adds().length).toBe(1);
+  writeFileSync(join(t.fake, "tasks.json"), JSON.stringify([{ id: "LIN-1", title: "A Title A", status: "work" }]));
+  t.doTick();
+  expect(t.adds().length).toBe(1);
+});
+
+test("a step already on main starts no agent", () => {
+  const t = setup({ steps: [step("A", "none")], commits: ["start", "LIN-9: A Title A"] });
+  t.doTick();
+  expect(t.adds()).toEqual([]);
 });

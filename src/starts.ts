@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { herdrArgv } from "./herdr.ts";
 import { join } from "node:path";
 import { fileClash, stepHeld, stepNeeds } from "./parts.ts";
@@ -124,6 +124,26 @@ export function lockWhy(step: Step, held: Map<string, string>, reserved: Map<str
   const others = [...reserved].filter(([, owner]) => owner !== step.id).map(([lock]) => lock);
   const lock = stepNeeds(step).find((l) => others.includes(l)) ?? fileClash(step, others);
   return lock === undefined ? undefined : `lock '${lock.replace(/^[=~]/, "")}' is reserved for ${reserved.get(lock)}, skipped for locks ${AGE_TICKS} ticks`;
+}
+
+/** A claim older than this is a crashed tick's, not a start in progress. */
+const CLAIM_MS = 2 * 60_000;
+
+/**
+ * Claims the start of a step before its task is added, so two ticks (the loop and a hand run) never both pass the
+ * "no open task" read. Returns the release, or undefined when another start of the step is in progress.
+ */
+export function claimStart(dir: string, stepId: string, now: number): (() => void) | undefined {
+  const claim = join(dir, "starting", stepId);
+  mkdirSync(join(dir, "starting"), { recursive: true });
+  try {
+    mkdirSync(claim);
+  } catch {
+    if (now - statSync(claim).mtimeMs < CLAIM_MS) return undefined;
+    rmSync(claim, { recursive: true, force: true });
+    return claimStart(dir, stepId, now);
+  }
+  return () => rmSync(claim, { recursive: true, force: true });
 }
 
 /** After a tick: the steps skipped for locks count one more tick, every other step starts over. */

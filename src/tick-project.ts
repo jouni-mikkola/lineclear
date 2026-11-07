@@ -6,7 +6,7 @@ import { testOf } from "./doneproof.ts";
 import { ownerStepItem } from "./owner-steps.ts";
 import { stepHeld } from "./parts.ts";
 import { company } from "./company.ts";
-import type { Settings } from "./project.ts";
+import { projectsDir, type Settings } from "./project.ts";
 import { checkRoadmap, closedSteps, doneIds, isFrozen, resultFlag, type StepStatus, type Task } from "./roadmap.ts";
 import { statusesFrom, stepInputs } from "./task-steps.ts";
 import type { Decision, State } from "./rules.ts";
@@ -14,7 +14,7 @@ import { askMachines, type Candidate, mostRoom, type Room, roomLack } from "./sp
 import { routineWorker } from "./routine.ts";
 import { askKey, availability, climbStalls, revertLast, reviewerFor, serviceAccounts } from "./stalls.ts";
 import { THIS_MACHINE } from "./start-failures.ts";
-import { bindStarts, liveSteps, recordStart, lockWhy, reservedLocks, settleLockWaits } from "./starts.ts";
+import { bindStarts, claimStart, liveSteps, recordStart, lockWhy, reservedLocks, settleLockWaits } from "./starts.ts";
 import type { Wait } from "./waits.ts";
 import type { World } from "./world.ts";
 
@@ -336,12 +336,23 @@ function startStep(s: Starting, step: Step): boolean {
   if (dryRun) {
     note("start", `would start${where} with worker ${worker}, reviewer ${reviewer}`, step.id);
   } else {
-    const stale = whyStale(s, step);
+    const release = claimStart(join(projectsDir(env), t.name), step.id, Date.now());
+    if (!release) {
+      note("skip", "another start of this step is in progress, so it does not start twice", step.id);
+      return false;
+    }
+    let stale: string | undefined;
+    let err: string | undefined;
+    try {
+      stale = whyStale(s, step);
+      if (!stale) err = addStepTask(s, step, host, worker, reviewer);
+    } finally {
+      release();
+    }
     if (stale) {
       note("skip", stale, step.id);
       return false;
     }
-    const err = addStepTask(s, step, host, worker, reviewer);
     if (err) {
       note("skip", `task add failed: ${err}`, step.id, host ?? THIS_MACHINE);
       return false;
