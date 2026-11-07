@@ -4,7 +4,7 @@
 // repo space herdr opened only because a task asked for a worktree is closed again with the repo's last task space,
 // unless you have started using it.
 import { boxHome } from '../box.ts'
-import { existsSync } from '../mfs.ts'
+import { exists } from '../mfs.ts'
 import { herdr, HerdrError, type WorkspaceInfo, type WorktreeSpace } from '../herdr.ts'
 import * as G from './git.ts'
 import * as I from './install.ts'
@@ -78,7 +78,7 @@ export class Worktrees {
   async create(home: Home, branch: string, base: string, label: string, path?: string): Promise<Made> {
     const open = async () => {
       const at = await G.worktreeOf(home.repo, branch)
-      return at && existsSync(at) ? this.made(await this.spaces.opening(home, (from) => this.h.worktreeOpen(from, at, label)), at) : undefined
+      return at && (await exists(at)) ? this.made(await this.spaces.opening(home, (from) => this.h.worktreeOpen(from, at, label)), at) : undefined
     }
     const was = await open()
     if (was) return this.installed(home, was)
@@ -165,7 +165,7 @@ export class Worktrees {
 
   private async putAwayFrom(o: Parameters<Worktrees['putAway']>[0], where: string, space: WorkspaceInfo | undefined): Promise<PutAway> {
     if (space && (await busy(this.h, space.workspace_id, o.agentPane))) return { kept: [`${where} (something still runs in its herdr space)`], busy: true }
-    const there = !!o.wt && existsSync(o.wt)
+    const there = !!o.wt && (await exists(o.wt))
     const branch = !!o.branch && (await G.branchExists(o.repo, o.branch))
     let kept = await this.holds(o)
     // committed work main lacks is kept by its branch alone: the folder (with its installed packages) goes, so done
@@ -196,14 +196,14 @@ export class Worktrees {
   /** remove a worktree folder through herdr, else git (never forced); why it stays, or undefined once it is gone */
   private async dropFolder(repo: string, wt: string, space: WorkspaceInfo | undefined): Promise<string | undefined> {
     if (space?.worktree) await undone(this.h.worktreeRemove(space.workspace_id))
-    if (!existsSync(wt)) return undefined
+    if (!(await exists(wt))) return undefined
     const r = await G.removeWorktree(repo, wt)
     return r.ok ? undefined : (r.err || r.out).split('\n')[0] || 'git could not remove it'
   }
 
   /** what a task's place holds that main lacks, in words ("~/x (uncommitted changes)"); none: it loses nothing */
   async holds(o: { repo: string; wt?: string; branch?: string; base: string; squashes?: string[] }): Promise<string[]> {
-    const there = !!o.wt && existsSync(o.wt)
+    const there = !!o.wt && (await exists(o.wt))
     const branch = !!o.branch && (await G.branchExists(o.repo, o.branch))
     const unsaved = there && (await G.dirty(o.wt!))
     const unmerged = branch && !(await G.landed(o.repo, o.branch!, o.base, o.squashes))
@@ -242,11 +242,11 @@ export class Worktrees {
   }
 
   private async removeFrom(o: { repo: string; wt?: string; label: string }, space: WorkspaceInfo | undefined, left: string[]) {
-    if (o.wt && existsSync(o.wt)) {
+    if (o.wt && (await exists(o.wt))) {
       if (space?.worktree) await undone(this.h.worktreeRemove(space.workspace_id, true))
-      if (existsSync(o.wt)) {
+      if ((await exists(o.wt))) {
         const r = await G.removeWorktree(o.repo, o.wt, true)
-        if (!r.ok && existsSync(o.wt)) left.push(`${tilde(o.wt)} (${(r.err || r.out).split('\n')[0] || 'git could not remove it'})`)
+        if (!r.ok && (await exists(o.wt))) left.push(`${tilde(o.wt)} (${(r.err || r.out).split('\n')[0] || 'git could not remove it'})`)
       }
     }
     if (space) await undone(this.h.closeWorkspace(space.workspace_id))

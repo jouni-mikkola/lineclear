@@ -1,7 +1,7 @@
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { existsSync } from '../mfs.ts'
+import { exists } from '../mfs.ts'
 import { hidden } from '../agents.ts'
 import { placeId, type Space } from '../places.ts'
 import { prNewsLine } from '../prompts.ts'
@@ -57,7 +57,7 @@ export class EngineMerge extends EngineLand {
     for (const t of this.tasks.filter((t) => t.reported && t.pr && t.worktree && !ended(t) && !t.archived && !t.stopped)) {
       if (['working', 'blocked'].includes(this.agents.status(this.key(t)))) continue
       const p = this.places.space(t.project)
-      if (!p || !existsSync(t.worktree!)) continue
+      if (!p || !(await exists(t.worktree!))) continue
       if (!hubs.has(p.path)) hubs.set(p.path, await this.hubOrState(p))
       const g = hubs.get(p.path)
       if (!g) continue
@@ -243,7 +243,7 @@ export class EngineMerge extends EngineLand {
       if (!p || t.machine || st === 'working' || (t.cleaned && st !== 'gone')) continue
       const left =
         !t.cleaned ||
-        (!!t.worktree && existsSync(t.worktree)) ||
+        (!!t.worktree && (await exists(t.worktree))) ||
         (!!t.branch && (await G.branchExists(p.path, t.branch))) ||
         !!(await this.wt.spaceOf(t.worktree, labelOf(t), spaces))
       if (left) {

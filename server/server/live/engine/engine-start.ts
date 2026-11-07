@@ -1,5 +1,5 @@
 import { chooseModel, firstModel } from '../../../../src/models.ts'
-import { existsSync } from '../mfs.ts'
+import { exists } from '../mfs.ts'
 import { agentEnv } from '../box.ts'
 import type { Task } from '../../../shared/types.ts'
 import { machineOf, recordWork } from '../../../../src/task-work.ts'
@@ -158,7 +158,7 @@ export abstract class EngineStart extends EngineState {
     const rec = this.agents.record(key)
     const p = this.proj(t)
     const home = { repo: p.path, name: p.name, install: p.install }
-    if (!made && (!ended(t) || !!t.kept?.some((k) => k.startsWith('branch '))) && !existsSync(t.worktree!) && t.branch) {
+    if (!made && (!ended(t) || !!t.kept?.some((k) => k.startsWith('branch '))) && !(await exists(t.worktree!)) && t.branch) {
       made = await this.wtOf(t).create(home, t.branch!, t.base!, labelOf(t), t.worktree)
       t.worktree = made.path
       this.save()

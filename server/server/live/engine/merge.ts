@@ -1,4 +1,4 @@
-import { existsSync } from '../mfs.ts'
+import { exists } from '../mfs.ts'
 import { hidden } from '../agents.ts'
 import type { Space } from '../places.ts'
 import * as G from './git.ts'
@@ -204,7 +204,7 @@ export class EngineLand extends EngineHandoff {
     const p = this.proj(t)
     const wt = t.worktree
     // a folder removed under the merge (a temp dir cleaned away) would only show as a git that "can't be found"
-    const gone = [p.path, wt].find((d) => !existsSync(d))
+    const gone = (await Promise.all([p.path, wt].map(async (d) => ((await exists(d)) ? undefined : d)))).find(Boolean)
     if (gone) return { ok: false, error: `Can't merge ${t.id}: the folder ${gone} is gone.` }
     // main here first catches up with the remote's, so the branch is rebased on what main really is
     const up = await G.catchUp(p.path, t.base)

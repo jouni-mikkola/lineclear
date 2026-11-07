@@ -26,9 +26,9 @@ imports count for the borders but not for cycles, since they are gone when the c
 | `shared` | `server/shared/` | types and pure helpers the server shares | none |
 | `server` | `server/server/` | the server: the live source, agents, chats, the engine and the merge lane | `shared`, `check-line`, `registry`, `secrets`, `project-models` |
 | `registry` | `src/models.ts` | the models every installed harness lists | none |
-| `secrets` | `server/server/live/secrets.ts` | the vault, and the `secrets` and `totp` words that read it | `cli`, `shared` |
+| `secrets` | `server/server/live/secrets.ts` | the vault, and the `secrets` and `totp` words that read it | `cli`, `shared`, `check-line` |
 | `project-models` | `server/server/live/project-models.ts` | the model each role of a space starts on, read from and moved into the project's settings | `cli`, `shared` |
-| `check-line` | `server/server/live/engine/machine.ts`, `src/check-runs.ts`, `src/task-work.ts`, `src/git.ts`, `src/time.ts` | each machine's name and load limit, a branch's GitHub checks read with gh, the log of the work a task does on its machine, and the one git helper and time constants | none |
+| `check-line` | `server/server/live/engine/machine.ts`, `src/check-runs.ts`, `src/task-work.ts`, `src/git.ts`, `src/ssh.ts`, `src/time.ts` | each machine's name and load limit, a branch's GitHub checks read with gh, the log of the work a task does on its machine, and the one git helper, the one SSH command builder and time constants | none |
 | `helper` | `server/helper/` | what runs on a remote machine | `shared` |
 | `server-scripts` | `server/scripts/` | the server's test runner and store scripts | `server`, `shared`, `server-tests` |
 | `server-tests` | `server/test/` | the server's tests | `server`, `shared`, `server-scripts`, `helper`, `check-line`, `registry`, `secrets`, `project-models` |

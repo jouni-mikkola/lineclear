@@ -201,7 +201,7 @@ describe("a task's CLI, model and effort, continued", () => {
       src.settings.set('task.agent', null)
     }
   })
-  test('each CLI is started with its own flags for model and effort', () => {
+  test('each CLI is started with its own flags for model and effort', async () => {
     const rec = (kind: string, model?: string, effort?: string) => ({
       key: 'k',
       name: 'n',
@@ -214,8 +214,8 @@ describe("a task's CLI, model and effort, continued", () => {
       effort,
       access: 'full' as const,
     })
-    expect(src.agents.args(rec('pi', 'openai/gpt-5.5', 'lowest'))).toEqual(['--model', 'openai/gpt-5.5', '--thinking', 'minimal'])
-    expect(src.agents.args(rec('gemini', 'x', 'high'))).toEqual([])
+    expect(await src.agents.args(rec('pi', 'openai/gpt-5.5', 'lowest'))).toEqual(['--model', 'openai/gpt-5.5', '--thinking', 'minimal'])
+    expect(await src.agents.args(rec('gemini', 'x', 'high'))).toEqual([])
   })
 })
 

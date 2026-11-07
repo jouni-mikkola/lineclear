@@ -4,7 +4,6 @@ import { join } from 'node:path'
 import type { Chat } from '../../shared/types.ts'
 import { HOME, writeJson } from '../store.ts'
 import { boxInfo, helperVersion, installHelper, lacks, machineStatus, probe, savedMachines, type Probe, type Saved } from './install.ts'
-import { tellRunBy } from './box.ts'
 import { MERGE_DEADLINE } from './engine/engine.ts'
 import type { Kept } from './kept.ts'
 import { LinkPoll, workerRecord } from './link-poll.ts'
@@ -222,7 +221,6 @@ export class MachinesLinks extends LinkPoll {
       p.helper = await installHelper(l.saved.target, p)
       if (!this.active(l)) return null
     }
-    tellRunBy(l.saved.target)
     this.keep(l)
     return p
   }

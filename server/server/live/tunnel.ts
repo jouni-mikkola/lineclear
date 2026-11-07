@@ -3,7 +3,8 @@
 // stays on 127.0.0.1 here; SSH is the only way in.
 import { LinkBackoff } from './recovery.ts'
 import { join } from 'node:path'
-import { BOX, helperDir, q, sshArgs } from './box.ts'
+import { quote } from '../../../src/ssh.ts'
+import { BOX, helperDir, sshTo } from './box.ts'
 
 type TunnelProcess = { exited: Promise<unknown>; kill(): void }
 
@@ -57,14 +58,14 @@ export function keepTunnel(port: number) {
   const tunnel = new Tunnel(async (track, stopped) => {
     // a socket left from before stops the forward: it goes first (sshd doesn't remove it on its own); without
     // holding up the worker meanwhile
-    const rm = Bun.spawn(sshArgs(b.target, `rm -f ${q(sock)}`), { stdout: 'ignore', stderr: 'ignore', timeout: 20_000 })
+    const rm = Bun.spawn(sshTo(b.target, `rm -f ${quote(sock)}`), { stdout: 'ignore', stderr: 'ignore', timeout: 20_000 })
     track(rm)
     const code = await rm.exited
     if (code !== 0 || stopped()) return
     // some sshds (exe.dev's) make the socket as root, so the user's own agents can't open it: hand it back first.
     // Held while the socket is there: one removed under it (an overlapping worker's rm after an update) opens again
-    const keep = `[ -O ${q(sock)} ] || sudo -n chown "$(id -u):$(id -g)" ${q(sock)} 2>/dev/null; while [ -S ${q(sock)} ] && printf . 2>/dev/null; do sleep 10; done`
-    const args = sshArgs(b.target, keep, {
+    const keep = `[ -O ${quote(sock)} ] || sudo -n chown "$(id -u):$(id -g)" ${quote(sock)} 2>/dev/null; while [ -S ${quote(sock)} ] && printf . 2>/dev/null; do sleep 10; done`
+    const args = sshTo(b.target, keep, {
       extra: ['-o', 'ControlPath=none', '-o', 'ExitOnForwardFailure=yes', '-R', `${sock}:127.0.0.1:${port}`],
     })
     const p = Bun.spawn(args, { stdin: 'ignore', stdout: 'pipe', stderr: 'ignore' })

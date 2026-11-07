@@ -201,12 +201,12 @@ export class AgentsDelivery extends AgentsState {
     this.records[spec.key] = r
     this.byName.set(r.name, r.key)
     this.save()
-    task.mkdirSync(r.cwd, { recursive: true })
+    await task.mkdir(r.cwd, { recursive: true })
     const chosen = chooseModel(r.kind, r.model) ? firstModel(r.kind) : undefined
     if (chosen) r.model = chosen
     const unset = chooseModel(r.kind, r.model)
     if (unset) throw new Error(unset)
-    const args = this.args(r)
+    const args = await this.args(r)
     if (input.rpc && r.kind === 'pi' && !BOX) return this.launchRpc(r, args, chosen, first)
     const pane = place ? await place() : await paneFor(r, was)
     this.startedIn.set(r.key, pane)

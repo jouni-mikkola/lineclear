@@ -5,9 +5,11 @@
 //   skill/               Lineclear's skills, which agents there read
 import { createHash } from 'node:crypto'
 import { lstatSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { hostname } from 'node:os'
 import { join, relative } from 'node:path'
 import { ROOT } from '../root.ts'
-import { helperDir, q, sshArgs, type BoxInfo } from './box.ts'
+import { quote } from '../../../src/ssh.ts'
+import { helperDir, RUN_BY, sshTo, type BoxInfo } from './box.ts'
 import { herdrCli } from './herdr.ts'
 
 /** a machine as herdr saved it (herdr machine list --json) */
@@ -36,7 +38,7 @@ export const machineStatus = async () =>
 
 /** a command on a machine over the shared SSH connection, before a worker for it runs */
 async function onMachine(target: string, script: string, o: { stdin?: Uint8Array | string; timeoutMs?: number } = {}) {
-  const p = Bun.spawn(sshArgs(target, script), { stdin: o.stdin === undefined ? 'ignore' : Buffer.from(o.stdin), stdout: 'pipe', stderr: 'pipe' })
+  const p = Bun.spawn(sshTo(target, script), { stdin: o.stdin === undefined ? 'ignore' : Buffer.from(o.stdin), stdout: 'pipe', stderr: 'pipe' })
   const t = setTimeout(() => p.kill(), o.timeoutMs ?? 60_000)
   const [out, err, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited])
   clearTimeout(t)
@@ -173,13 +175,16 @@ function tarOf(files: [string, string][], version: string) {
 }
 
 /** put the helper there (again): the folder's old files are replaced, its hooks, inbox and prompts stay */
+/** the name this machine gives itself, written on a worker machine so its own task list and doctor can say who runs its tasks */
+const runBy = () => (process.env.LINECLEAR_MACHINE ?? hostname()).split('.')[0] ?? ''
+
 export async function installHelper(target: string, p: Probe) {
   const version = helperVersion()
   const dir = helperDir(p.home)
   const tar = tarOf(helperFiles(), version)
   const r = await onMachine(
     target,
-    `set -e; d=${q(dir)}; mkdir -p "$d"; rm -rf "$d/skill" "$d/bin"; tar xf - -C "$d"; mkdir -p "$d/hooks" "$d/inbox" "$d/prompts"`,
+    `set -e; d=${quote(dir)}; mkdir -p "$d"; rm -rf "$d/skill" "$d/bin"; tar xf - -C "$d"; mkdir -p "$d/hooks" "$d/inbox" "$d/prompts"; printf '"%s"' ${quote(runBy())} > "$HOME/.lineclear/${RUN_BY}"`,
     {
       stdin: tar,
       timeoutMs: 180_000,

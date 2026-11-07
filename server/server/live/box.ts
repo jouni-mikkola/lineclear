@@ -8,6 +8,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { existsSync, mkdirSync } from 'node:fs'
 import { homedir, hostname } from 'node:os'
 import { join } from 'node:path'
+import { quote, sshArgs } from '../../../src/ssh.ts'
 import { secretFileId } from './secret-paths.ts'
 import { DEFAULT_PORT, readJson } from '../store.ts'
 import type { Machines } from './machines.ts'
@@ -67,41 +68,16 @@ const control = () => {
   return join(dir, '%C')
 }
 
-/** single-quoted for a POSIX shell */
-export const q = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`
-
-/** ssh to a target with the shared connection; the remote command runs under /bin/sh, whatever the login shell is */
-export function sshArgs(target: string, script: string, opts: { tty?: boolean; extra?: string[] } = {}): string[] {
-  return [
-    'ssh',
-    // first: ssh keeps the first value it is given
-    ...(opts.extra ?? []),
-    '-o',
-    'BatchMode=yes',
-    '-o',
-    'ConnectTimeout=10',
-    '-o',
-    'ServerAliveInterval=15',
-    '-o',
-    'ServerAliveCountMax=4',
-    '-o',
-    'ControlMaster=auto',
-    '-o',
-    'ControlPersist=600',
-    '-o',
-    `ControlPath=${control()}`,
-    opts.tty ? '-tt' : '-T',
-    target,
-    `/bin/sh -c ${q(script)}`,
-  ]
-}
+/** ssh to a target with the shared connection (ssh.ts) */
+export const sshTo = (target: string, script: string, opts: { tty?: boolean; extra?: string[] } = {}) =>
+  sshArgs(process.env, target, script, { ...opts, control: control() })
 
 /** a command line on the box: its PATH (the helper's bin first), in cwd, with env */
 function script(b: BoxInfo, argv: string[], o: { cwd?: string; env?: Record<string, string> } = {}) {
   const env = Object.entries({ PATH: b.path, ...o.env })
-    .map(([k, v]) => `${k}=${q(v)}`)
+    .map(([k, v]) => `${k}=${quote(v)}`)
     .join(' ')
-  return `${o.cwd ? `cd ${q(o.cwd)} || exit 1; ` : ''}export ${env}; exec ${argv.map(q).join(' ')}`
+  return `${o.cwd ? `cd ${quote(o.cwd)} || exit 1; ` : ''}export ${env}; exec ${argv.map(quote).join(' ')}`
 }
 
 export interface Ran {
@@ -110,101 +86,37 @@ export interface Ran {
   err: string
 }
 
-/** git reads that change nothing: the tick's many askers share one ssh call to the box for them */
-const GIT_READS = new Set([
-  'rev-parse',
-  'symbolic-ref',
-  'status',
-  'log',
-  'diff',
-  'show-ref',
-  'cat-file',
-  'merge-base',
-  'rev-list',
-  'for-each-ref',
-  'ls-files',
-  'ls-tree',
-  'show',
-  'merge-tree',
-])
-export const GIT_READ_SHARE_MS = 2000
-const GIT_READ_FORMS: Record<string, (args: string[]) => boolean> = {
-  worktree: (a) => a[0] === 'list',
-  remote: (a) => a[0] === 'get-url',
-  config: (a) => a[0]?.startsWith('--get') === true || a[0] === '--name-only',
-  branch: (a) => a[0] === '--show-current',
-}
-export const isGitRead = (cmd: string[]) => cmd[0] === 'git' && (GIT_READS.has(cmd[1] ?? '') || (GIT_READ_FORMS[cmd[1] ?? '']?.(cmd.slice(2)) ?? false))
-
-const shared = new Map<string, { gen: number; at: number; ran: Promise<Ran> }>()
-/** counts every other command's start and end: a shared read is only good while this has not moved since it began */
-let writes = 0
-
-/** A read many callers ask for at once costs one ssh call per `shareMs`: the same command and folder get the same answer. */
-function runShared(argv: string[], o: RunOpts, shareMs: number): Promise<Ran> {
-  const key = JSON.stringify([argv, o.cwd, o.env, o.timeoutMs])
-  const now = Date.now()
-  const hit = shared.get(key)
-  if (hit && hit.gen === writes && now - hit.at < shareMs) return hit.ran
-  for (const [k, v] of shared) if (now - v.at >= shareMs) shared.delete(k)
-  const entry = { gen: writes, at: now, ran: runNow(argv, o) }
-  shared.set(key, entry)
-  return entry.ran
-}
-
 export interface RunOpts {
   cwd?: string
   env?: Record<string, string>
   stdin?: string | Uint8Array
   timeoutMs?: number
-  /** a read-only command whose answer may be shared for this many ms (only on a box, where each call is an ssh round trip) */
-  shareMs?: number
 }
 
 /** run a command on the box (or here, when there is no box) */
 export function run(argv: string[], o: RunOpts = {}): Promise<Ran> {
-  if (remote(box()) && o.shareMs && o.stdin === undefined) return runShared(argv, o, o.shareMs)
-  // a git command that may write changes what a shared read sees, when it starts and when it ends
-  if (argv[0] !== 'git' || isGitRead(argv)) return runNow(argv, o)
-  writes++
-  return runNow(argv, o).finally(() => writes++)
-}
-
-async function runNow(argv: string[], o: RunOpts): Promise<Ran> {
   const b = box()
   const ssh = remote(b) ? b : null
-  const cmd = ssh ? sshArgs(ssh.target, script(ssh, argv, o)) : argv
+  return spawnRan(ssh ? sshTo(ssh.target, script(ssh, argv, o)) : argv, { ...o, local: !ssh })
+}
+
+/** a command line run to its end: its output, or code 124 when `timeoutMs` passed first */
+async function spawnRan(
+  cmd: string[],
+  o: { cwd?: string; env?: Record<string, string>; stdin?: string | Uint8Array; timeoutMs?: number; local?: boolean },
+): Promise<Ran> {
   const p = Bun.spawn(cmd, {
-    cwd: ssh ? undefined : o.cwd,
+    cwd: o.local ? o.cwd : undefined,
     stdin: o.stdin === undefined ? 'ignore' : Buffer.from(o.stdin),
     stdout: 'pipe',
     stderr: 'pipe',
-    env: ssh ? process.env : { ...process.env, ...o.env },
+    env: o.local ? { ...process.env, ...o.env } : process.env,
   })
   let timedOut = false
   const t = o.timeoutMs ? setTimeout(() => ((timedOut = true), p.kill()), o.timeoutMs) : null
   const [out, err, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited])
   if (t) clearTimeout(t)
   return { code: timedOut ? 124 : code, out, err: timedOut ? `${err}\ntimed out` : err }
-}
-
-/** the same, waiting for it: only for the few reads that code expects at once (a file's text, whether it is there) */
-export function runSync(
-  argv: string[],
-  o: { cwd?: string; env?: Record<string, string>; stdin?: string | Uint8Array; timeoutMs?: number } = {},
-): { code: number; out: Buffer; err: string } {
-  const b = box()
-  const ssh = remote(b) ? b : null
-  const cmd = ssh ? sshArgs(ssh.target, script(ssh, argv, o)) : argv
-  const r = Bun.spawnSync(cmd, {
-    cwd: ssh ? undefined : o.cwd,
-    stdin: o.stdin === undefined ? 'ignore' : Buffer.from(o.stdin),
-    stdout: 'pipe',
-    stderr: 'pipe',
-    timeout: o.timeoutMs ?? 30_000,
-    env: ssh ? process.env : { ...process.env, ...o.env },
-  })
-  return { code: r.exitCode ?? 1, out: r.stdout ?? Buffer.alloc(0), err: r.stderr?.toString() ?? '' }
 }
 
 /** the stable build's bin: an agent of any project, the Lineclear repo's included, runs this `lineclear`, never its own checkout's */
@@ -238,7 +150,7 @@ export function agentEnv(chat: string, root: string, data = process.env.LINECLEA
 // says who runs its tasks when its own list is empty.
 
 /** the file in a worker machine's data folder naming the machine that runs its tasks (JSON string) */
-const RUN_BY = 'run-by'
+export const RUN_BY = 'run-by'
 
 /** "desktop:OMA-91" or "OMA-91@desktop" names a task on one machine; a bare id names none. This machine's own name drops out. */
 export function machineRef(ref: string): { machine?: string; id: string } {
@@ -286,10 +198,4 @@ export async function runOn(peers: Machines, l: NonNullable<ReturnType<Machines[
 export function noTasks(): string {
   const by = readJson<string>(RUN_BY, '')
   return by ? `No tasks here: this machine's tasks are run by ${by}. Run "lineclear task list" there.` : 'No tasks.'
-}
-
-/** tells a machine that this one runs its tasks, so its own task list and doctor can say so */
-export function tellRunBy(target: string): void {
-  const me = (process.env.LINECLEAR_MACHINE ?? hostname()).split('.')[0]
-  Bun.spawn(sshArgs(target, `printf '"%s"' ${q(me ?? '')} > "$HOME/.lineclear/${RUN_BY}"`), { stdout: 'ignore', stderr: 'ignore' })
 }

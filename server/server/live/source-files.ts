@@ -20,11 +20,11 @@ export class LiveSourceFiles extends LiveSourceViews {
     }
     // on the machine of the agent it is for: there it reads it
     const dir = join(boxDir(), 'inbox', chatDir(chat))
-    task.mkdirSync(dir, { recursive: true })
+    await task.mkdir(dir, { recursive: true })
     const safe = name.replace(/[^a-zA-Z0-9_. -]+/g, '_').slice(0, 120) || 'file'
     // its own path even next to a file of the same name: a reply names the file by it
     const f = join(dir, `${Date.now().toString(36)}${randomUUID().slice(0, 4)}-${safe}`)
-    task.writeFileSync(f, data)
+    await task.writeFile(f, data)
     return f
   }
 
@@ -52,7 +52,7 @@ export class LiveSourceFiles extends LiveSourceViews {
       }
       const ok = sent ? real.startsWith(inbox + sep) || old() : dirname(real) === join(inbox, chatDir(chat))
       if (!ok || !task.statSync(real).isFile()) return null
-      return BOX ? new Blob([new Uint8Array(task.readFileSync(real))], { type: fileType(real).type }) : Bun.file(real)
+      return BOX ? new Blob([new Uint8Array(await task.readFile(real))], { type: fileType(real).type }) : Bun.file(real)
     } catch {
       return null
     }
