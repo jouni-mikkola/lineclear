@@ -258,6 +258,9 @@ export function chooseModel(kind: string, model?: string): string | undefined {
   return `No model is set for ${kind}. Choose one of: ${c.models.map((m) => m.id).join(", ")}.`;
 }
 
+/** the model a start takes when none is set: the first one the CLI lists, nothing when it can't list any */
+export const firstModel = (kind: string): string | undefined => modelsOf(kind)?.models[0]?.id;
+
 /** for tests: how a fresh server reads the harnesses, before any read happened */
 export function setRegistryReader(read: () => ModelEntry[]) {
   readEntries = read;

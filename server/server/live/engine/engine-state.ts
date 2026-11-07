@@ -7,6 +7,7 @@ import { Emitter } from '../../source.ts'
 import { machineOf, recordWork } from '../../../../src/task-work.ts'
 import { readJson, writeJson } from '../../store.ts'
 import { ROOT } from '../../root.ts'
+import { chooseModel, firstModel } from '../../../../src/models.ts'
 import { hidden, type Agents, type Spec } from '../agents.ts'
 import type { Chats } from '../chats.ts'
 import { HOST, type Places, type Space } from '../places.ts'
@@ -443,6 +444,14 @@ export abstract class EngineState extends Emitter<Events> {
       env,
       first,
       pane: () => this.wtOf(t).agentPane({ home, wt: t.worktree!, label: labelOf(t), tab: 'Agent', env, made }),
+    }
+    // a CLI that lists its models won't start without one: the first it lists is taken, and said in the facts
+    const chosen = chooseModel(spec.kind, spec.model ?? rec?.model) ? firstModel(spec.kind) : undefined
+    if (chosen) {
+      spec.model = chosen
+      const note = `No default model was set for ${spec.kind}, so ${chosen} was chosen.`
+      if (!t.facts?.includes(note)) t.facts = [t.facts, note].filter(Boolean).join(' · ')
+      this.save()
     }
     // a start, not a message to a running agent that launch only heals
     if (!rec || restart || this.agents.status(key) === 'gone') recordWork(t.id, 'agent', undefined, t.machine ?? machineOf())

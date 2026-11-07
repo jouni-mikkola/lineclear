@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { existsSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { setRegistry } from '../../src/models.ts'
 import { sh, repo, world, until, started, settingsBlock, writeJson, fakeHerdr } from './engine-world.ts'
 
 describe('a task is its brief and one agent', () => {
@@ -24,6 +25,21 @@ describe('a task is its brief and one agent', () => {
     expect(s.system).toContain(`task ${t.id}`)
     expect(w.engine.statusOf(t)).toBe('work')
     expect(w.news.some((n) => n.includes('was added'))).toBe(true)
+  })
+
+  test('with no default model set, the first model pi lists is chosen and noted in the facts', async () => {
+    setRegistry([
+      { harness: 'pi', provider: 'fakeco', name: 'zeta-1' },
+      { harness: 'pi', provider: 'fakeco', name: 'zeta-2' },
+    ])
+    try {
+      const w = world()
+      const { t } = await started(w, repo(), 'first-model')
+      expect(w.started[0].model).toBe('fakeco/zeta-1')
+      expect(t.facts).toContain('No default model was set for pi, so fakeco/zeta-1 was chosen.')
+    } finally {
+      setRegistry([])
+    }
   })
 
   test('private rules reach launches, stay out of briefs/git, and refresh only on restart', async () => {
