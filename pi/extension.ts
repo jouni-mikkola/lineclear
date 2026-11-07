@@ -1,9 +1,7 @@
-// Lineclear's pi extension. It keeps an agent inside its task: no push, and no secret or login file that is not its own.
-// It also notes how full each account's limits are, for Home's Usage card, and gives
+// Lineclear's pi extension. It notes how full each account's limits are, for Home's Usage card, and gives
 // Lineclear's agents the kit (kit/): its rules in the system prompt and its skills, so no agent needs personal files.
-import { homedir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
-import { execFile, execFileSync } from "node:child_process";
+import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { existsSync, mkdirSync, readFileSync, realpathSync } from "node:fs";
 import { writeAtomic } from "./atomic.ts";
@@ -11,71 +9,6 @@ import { configDir, readJson } from "./config.ts";
 import { quietNudge } from "./nudge.ts";
 
 type Env = Record<string, string | undefined>;
-
-const PUSH = /(^|[\s;&|(`])git(\s+(-[Cc]\s+\S+|--[\w-]+(=\S+)?|-[\w]+))*\s+push(\s|$|[;&|)`])/;
-const word = (name: string) => new RegExp(`(?<![A-Za-z0-9_])${name}(?![A-Za-z0-9_])`);
-
-/** Login files an agent never needs, as patterns on a command or a path. */
-const LOGIN_FILES: [RegExp, string][] = [
-  [/(^|[\s/'"=:~])\.ssh(\/|\s|$|['"])/, "~/.ssh holds your SSH keys"],
-  [/\.git-credentials/, "git's saved logins are yours alone"],
-  [/\.config\/gh(\/|\s|$|['"])/, "gh's login is yours alone"],
-  [/\.config\/git\/credentials/, "git's saved logins are yours alone"],
-];
-
-type Deny = { names: string[] };
-
-/** What a task in this folder may not see, asked of the lineclear command so there is one source of truth. */
-function deny(cwd: string, env: Env): Deny {
-  try {
-    const text = execFileSync(env.LINECLEAR_BIN ?? "lineclear", ["secrets", "deny"], {
-      cwd,
-      env: env as NodeJS.ProcessEnv,
-      stdio: ["ignore", "pipe", "ignore"],
-    }).toString();
-    return JSON.parse(text) as Deny;
-  } catch {
-    // no lineclear to ask: the rules that need no list (push, login files, owner.env by name) still hold
-    return { names: [] };
-  }
-}
-
-// Loose on purpose: a quote, a path or a wrapper (sh -c, bin/lineclear, bun src/cli.ts) must not get past them.
-const INBOX_ANSWER = /\binbox\s+(answer|undo)\b|\binbox\/\d+(\.json)?\b/;
-const MERGE = /\blineclear\s+merge\b|\bgit\b[^;&|\n]*\s(merge|pull)\b|\bgh\s+pr\s+merge\b/;
-
-/** True in the Dispatcher: its role is set, or it runs in its folder (<config>/dispatcher). */
-export function inDispatcher(cwd: string, env: Env): boolean {
-  if (env.LINECLEAR_ROLE === "dispatcher") return true;
-  const dir = join(configDir(env), "dispatcher");
-  return cwd === dir || cwd.startsWith(`${dir}/`);
-}
-
-/** Why a command is refused, as one line, or undefined when it may run. */
-export function refusal(command: string, cwd: string, env: Env = process.env): string | undefined {
-  if (INBOX_ANSWER.test(command)) return "Refused: no agent answers the Inbox or undoes a plan. Only the owner does.";
-  if (inDispatcher(cwd, env)) {
-    if (MERGE.test(command)) return "Refused: the Dispatcher never merges. A project's task merges itself, or the owner approves in the Inbox.";
-  }
-  if (PUSH.test(command)) return "Refused: git push. Agents never push, ask the server to merge (lineclear merge <task>).";
-  const bare = command.replace(/['"\\]/g, "");
-  if (/owner\.e|secrets\.env|vault[.*?[]|LINECLEAR_CONFIG/.test(bare))
-    return "Refused: owner.env, the vault and the projects' secrets.env files are not for an agent. It gets its own through 'eval \"$(lineclear secrets env)\"'.";
-  if (/lineclear\s+secrets\s+(set|list|deny)\b/.test(command))
-    return "Refused: an agent may only run 'lineclear secrets env'. Setting and listing secrets is yours.";
-  // a restored copy holds the vault and the owner-only secrets, in a folder no other refusal knows
-  if (/\bbackup\s+restore\b/.test(bare)) return "Refused: restoring a backup is yours: it holds every secret.";
-  for (const [pattern, why] of LOGIN_FILES) if (pattern.test(command)) return `Refused: ${why}, and no agent needs it.`;
-  const hit = deny(cwd, env).names.find((n) => word(n).test(command));
-  if (hit !== undefined) return `Refused: ${hit} is a secret this task may not see (owner-only or another project's).`;
-  return undefined;
-}
-
-/** The same rule for a file an agent reads or writes. */
-export function pathRefusal(path: string, cwd: string, env: Env = process.env): string | undefined {
-  const full = path.startsWith("~") ? join(env.HOME ?? homedir(), path.slice(1)) : path;
-  return refusal(`cat ${full}`, cwd, env);
-}
 
 /** How full one limit window is: used in percent and when it starts again (ISO time). */
 export type Window = { percent: number; resetAt?: string };
@@ -235,15 +168,6 @@ export function beatDuringCalls(
 export default async function lineclearExtension(pi: Pi): Promise<void> {
   nudgeQuietTurns(pi);
   beatDuringCalls(pi);
-  pi.on("tool_call", (event, ctx) => {
-    const cwd: string = ctx?.cwd ?? process.cwd();
-    const input = event.input ?? {};
-    let why: string | undefined;
-    if (event.toolName === "bash" && typeof input.command === "string") why = refusal(input.command, cwd);
-    else if (typeof input.path === "string") why = pathRefusal(input.path, cwd);
-    if (why !== undefined) return { block: true, reason: why };
-    return undefined;
-  });
   pi.on("after_provider_response", (event, ctx) => {
     const account = ctx?.model?.provider;
     if (typeof account !== "string" || !event?.headers) return;

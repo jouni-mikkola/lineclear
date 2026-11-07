@@ -9,7 +9,6 @@ import { planMain } from "../src/plan.ts";
 import { status } from "../src/status.ts";
 import { STATUS_MAX_CHARS } from "../src/status.ts";
 import { writeWait } from "../src/waits.ts";
-import { refusal } from "../pi/extension.ts";
 
 const temps: string[] = [];
 afterAll(() => temps.forEach((d) => rmSync(d, { recursive: true, force: true })));
@@ -108,36 +107,6 @@ test("an approved move waits when the project is not on main or its roadmap is e
   expect(r.code).toBe(1);
   expect(r.text).toContain("uncommitted");
   expect(readItems(t.env)[0]!.answer).toBeUndefined();
-});
-
-test("the extension refuses an inbox answer from every agent, and any merge in the Dispatcher", () => {
-  const t = setup();
-  const home = dispatcherDir(t.env);
-  const r = (c: string, cwd = home) => refusal(c, cwd, t.env);
-  expect(r("lineclear inbox answer 3 Approve")).toContain("answers the Inbox");
-  expect(r("cd x && lineclear inbox answer 3 Reject --note no")).toContain("answers the Inbox");
-  expect(r("lineclear merge LIN-5")).toContain("never merges");
-  expect(r("git merge main")).toContain("never merges");
-  expect(r("git -C /x merge main")).toContain("never merges");
-  expect(r("gh pr merge 4")).toContain("never merges");
-  for (const c of [
-    "sh -c 'lineclear inbox answer 1 Approve'",
-    "bin/lineclear inbox answer 1 Approve",
-    "bun src/cli.ts inbox answer 1 Approve",
-    '"lineclear" inbox answer 1 Approve',
-    "git --no-pager merge main",
-    "git pull",
-    "echo Approve > ~/.config/lineclear/inbox/1.json",
-  ])
-    expect(r(c)).toBeDefined();
-  expect(r("lineclear inbox")).toBeUndefined();
-  expect(r("lineclear status")).toBeUndefined();
-  expect(r("lineclear move demo B --after A")).toBeUndefined();
-  // a task's agent is refused too
-  expect(refusal("lineclear inbox answer 3 Approve", t.dir, t.env)).toContain("no agent answers the Inbox");
-  expect(refusal("bin/lineclear inbox answer 3 Approve", t.dir, { ...t.env, LINECLEAR_ROLE: "worker" })).toContain("no agent answers the Inbox");
-  expect(refusal("lineclear merge LIN-5", t.dir, t.env)).toBeUndefined();
-  expect(refusal("lineclear merge LIN-5", t.dir, { ...t.env, LINECLEAR_ROLE: "dispatcher" })).toContain("never merges");
 });
 
 test("setup makes a regular-mode space with pi, and plans go to the project's space, so no task event reaches it", () => {

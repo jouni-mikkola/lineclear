@@ -2,7 +2,6 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { main } from "../src/cli.ts";
-import lineclearExtension, { pathRefusal, refusal } from "../pi/extension.ts";
 import { secrets, totp } from "../src/secrets.ts";
 import { sh, tmp } from "./helpers.ts";
 
@@ -173,60 +172,6 @@ test("the cli routes secrets", async () => {
   expect(await main(["secrets"], (l) => out.push(l))).toBe(2);
 });
 
-test("an agent in alpha: owner-only and other projects' names and files are refused, own ones are not", () => {
-  const r = (c: string) => refusal(c, alphaTask, env);
-  expect(r("echo $OWNER_LOGIN")).toContain("OWNER_LOGIN");
-  expect(r("echo $BETA_TOKEN")).toContain("BETA_TOKEN");
-  expect(r("echo $ALPHA_TOKEN")).toBeUndefined();
-  expect(r("echo $SHARED")).toBeUndefined(); // own name, even if owner.env has it too
-  expect(r("cat ~/.config/lineclear/owner.env")).toContain("owner.env");
-  expect(r(`cat ${root}/config/projects/beta/secrets.env`)).toContain("secrets.env");
-  expect(r("cd ~/.config/lineclear/projects/beta && cat secrets.env")).toContain("secrets.env");
-  expect(r("cat ~/.config/lineclear/owner.e*")).toContain("owner.env");
-  expect(r("jq . $HOME/.lineclear/vault.json")).toContain("vault");
-  expect(pathRefusal("~/.lineclear/vault.json", alphaTask, env)).toContain("vault");
-  expect(r("lineclear backup restore /tmp/r")).toContain("every secret");
-  expect(r("lineclear backup status")).toBeUndefined();
-  expect(r("lineclear backup 'restore' /tmp/r")).toContain("every secret");
-  expect(r("cat ~/.lineclear/vault*")).toContain("vault");
-  expect(r("cat ~/.lineclear/va'ult'.json")).toContain("vault");
-  expect(r("lineclear secrets list beta")).toContain("secrets env");
-  expect(r('eval "$(lineclear secrets env)"')).toBeUndefined();
-  expect(r("ls ~/.ssh")).toContain(".ssh");
-  expect(r("cat ~/.git-credentials")).toContain("git");
-  expect(r("cat ~/.config/gh/hosts.yml")).toContain("gh");
-  expect(r("echo BETA_TOKENS_ARE_NOT_A_NAME")).toBeUndefined();
-}); // each refusal asks the lineclear command, 15 processes: the check's own timeout, which scales with load, applies
-
-test("git push is refused in each form, other git and the project's work are not", () => {
-  const r = (c: string) => refusal(c, alphaTask, env);
-  for (const c of ["git push", "git push origin main", "cd x && git push -f", "git -C /x push", "git -c a=b push", "git --no-pager push", "true; git push"])
-    expect(r(c)).toContain("git push");
-  for (const c of ["git status", "git commit -m 'push it'", "git pull", "echo git pushed", "bun run check", "pi -p 'review this'"])
-    expect(r(c)).toBeUndefined();
-});
-
-test("the extension blocks through pi's tool_call event and lets a check and pi -p run", async () => {
-  const handlers: ((e: any, c: any) => any)[] = [];
-  await lineclearExtension({ on: (n, h) => void (n === "tool_call" && handlers.push(h)) });
-  const handler = handlers[0]!; // its own handler
-  const bash = (command: string) => handler({ toolName: "bash", input: { command } }, { cwd: alphaTask });
-  const old = { ...process.env };
-  Object.assign(process.env, env);
-  try {
-    expect(bash("git push").block).toBe(true);
-    expect(bash("echo $OWNER_LOGIN").reason).toContain("OWNER_LOGIN");
-    expect(bash("bun run check")).toBeUndefined();
-    expect(bash("pi -p 'review the diff'")).toBeUndefined();
-    expect(handler({ toolName: "read", input: { path: join(root, "config", "owner.env") } }, { cwd: alphaTask }).block).toBe(true);
-    expect(handler({ toolName: "read", input: { path: "src/cli.ts" } }, { cwd: alphaTask })).toBeUndefined();
-  } finally {
-    for (const k of Object.keys(env)) if (!(k in old)) delete process.env[k];
-    Object.assign(process.env, old);
-  }
-  expect(existsSync(join(root, "config", "owner.env"))).toBe(true);
-});
-
 test("as an agent in a task: its shell has no owner-only or other project name, its own load, check and pi -p run", () => {
   const bin = join(import.meta.dir, "..", "bin", "lineclear");
   const stubs = join(root, "stubs");
@@ -245,7 +190,6 @@ test("as an agent in a task: its shell has no owner-only or other project name, 
   for (const gone of ["OWNER_LOGIN", "BETA_TOKEN", "o-secret", "b-secret"]) expect(r.out).not.toContain(gone);
   expect(r.out).toContain("check command runs");
   expect(r.out).toContain("pi-ran -p");
-  expect(refusal(script.replace(bin, "lineclear"), alphaTask, env)).toBeUndefined();
 });
 
 test("adopt moves an old env tree into the vault: common to Everywhere, machine to this machine, a repo's file to its project, and prints no value", async () => {
