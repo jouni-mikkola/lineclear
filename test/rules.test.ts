@@ -87,6 +87,11 @@ test("a step whose task appeared since the tick read its list is not started aga
 
 test("the same step added twice gives one start and one refusal", () => {
   const t = setup({ steps: [step("A", "none")] });
+  t.doTick();
+  writeFileSync(join(t.fake, "tasks.json"), JSON.stringify([{ id: "LIN-1", title: "A Title A", status: "work" }]));
+  const second = t.doTick();
+  expect(t.adds().length).toBe(1);
+  expect(second.some((x) => x.kind === "start")).toBe(false);
   const lock = join(t.config, "projects", "demo", "tick.lock");
   writeFileSync(lock, String(process.pid));
   const refused = t.doTick();
@@ -104,6 +109,7 @@ test("a step closed with nothing to merge since the tick read its list is not st
   writeFileSync(join(t.config, "projects", "demo", "state.json"), JSON.stringify({ taskSteps: { "LIN-9": "A" } }));
   staleTick(t, { tasks: () => [closed] });
   expect(t.adds()).toEqual([]);
+  expect(t.decisions().some((x) => x.step === "A" && x.reason.includes("closed with nothing to merge"))).toBe(true);
 });
 
 test("a step merged on origin/main since the tick read it is not started", () => {
