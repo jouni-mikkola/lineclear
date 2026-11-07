@@ -103,11 +103,13 @@ export function Home({
             )}
           </Part>
         </section>
-        <section aria-label="Working tasks" className="min-h-64 flex-1 lg:min-h-0">
-          <Part state={!d ? "loading" : rows.length ? "filled" : "empty"} label="Working tasks" empty={{ text: "Nothing is at work." }} rows={3}>
-            <TaskTable rows={rows} sample={sample} browsers={browsers} onChoose={choose} />
-          </Part>
-        </section>
+        {(!first || started) && (
+          <section aria-label="Working tasks" className="min-h-64 flex-1 lg:min-h-0">
+            <Part state={!d ? "loading" : rows.length ? "filled" : "empty"} label="Working tasks" empty={{ text: "Nothing is at work." }} rows={3}>
+              <TaskTable rows={rows} sample={sample} browsers={browsers} onChoose={choose} />
+            </Part>
+          </section>
+        )}
       </div>
       <aside
         ref={column}

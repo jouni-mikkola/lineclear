@@ -2,7 +2,6 @@
 // acts, the targets on a phone, the one table part and the one format for counts and money.
 import { expect, type Page, test } from "@playwright/test";
 import { PAGE_STATES } from "./bar.ts";
-import { startEmpty } from "./fixture.ts";
 
 const VIEWS = ["/", "/settings", "/web-shop/roadmap"];
 /** The type scale: 12 and 14 for text, 16 for body, 18 a card or section title, 22 a detail, 32 a view title on a phone, 48 the answer. */
@@ -70,28 +69,4 @@ test("at 768 px every target is at least 48 by 48 px, on every view", async ({ p
   test.skip(viewport!.width !== 1440, "run once; it sets its own width");
   await page.setViewportSize({ width: 768, height: 1024 });
   await everyTargetIs48(page);
-});
-
-test("the first-project card with no repos keeps its repo row, with an add-repo target of 48 px", async ({ page, viewport }) => {
-  test.skip(viewport!.width !== 1440, "the live empty config is started once");
-  startEmpty();
-  await page.waitForTimeout(1100);
-  let release = () => {};
-  const held = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  await page.route("**/api/repos", async (r) => {
-    await held;
-    await r.continue();
-  });
-  await page.goto("/");
-  await page.evaluate(() => document.fonts.ready);
-  const loadingHeight = (await page.locator("[data-add-project] > .min-h-12").boundingBox())!.height;
-  release();
-  const none = page.locator("[data-add-project] > .min-h-12");
-  await expect(page.locator("[data-add-project] label", { hasText: "The folder of a repo" })).toBeVisible();
-  expect((await none.boundingBox())!.height).toBe(loadingHeight);
-  const add = (await page.locator("[data-add-project] label", { hasText: "The folder of a repo" }).boundingBox())!;
-  expect(add.height).toBeGreaterThanOrEqual(47.5);
-  expect(add.width).toBeGreaterThanOrEqual(47.5);
 });

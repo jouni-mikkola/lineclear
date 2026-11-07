@@ -32,6 +32,9 @@ export interface NewProject {
 /** What Start did: the reason it failed, or whether a first roadmap is being written. */
 export type Started = { error: string } | { planning: boolean };
 
+/** The repos offered under the field: the rest are typed. */
+const SUGGESTED = 3;
+
 const started = (name: string, planning: boolean) =>
   planning ? `Started ${name}. Lineclear is writing its first roadmap; the first step starts by itself.` : `Started ${name}. Its first step starts by itself.`;
 
@@ -63,7 +66,7 @@ export function AddProject({
   onDetect,
   onSave,
 }: {
-  /** Undefined while the repos are looked up: their row keeps its room, so the card below does not move. */
+  /** Undefined while the repos are looked up: the suggestions appear when they arrive. */
   repos: Repo[] | undefined;
   onDetect: (repo: string) => Promise<Detection | { error: string }>;
   onSave: (p: NewProject) => Promise<Started>;
@@ -126,31 +129,9 @@ export function AddProject({
       }}
     >
       <h2 className="text-base font-medium text-fg">Which repo should Lineclear work on?</h2>
-      {!repos?.length && (
-        <div className="mt-3 min-h-12">
-          {repos && (
-            <label className="flex min-h-12 items-center text-sm text-fg2" htmlFor="add-project-repo">
-              The folder of a repo
-            </label>
-          )}
-        </div>
-      )}
-      {!!repos?.length && (
-        <>
-          <ul className="mt-3 flex flex-wrap gap-2" data-repos>
-            {repos.map((r) => (
-              <li key={r.repo} className="min-w-0">
-                <Button quiet onClick={() => void look(r.repo)} data-testid={`repo-${r.name}`}>
-                  {r.name}
-                </Button>
-              </li>
-            ))}
-          </ul>
-          <label className="mt-4 block text-sm text-fg2" htmlFor="add-project-repo">
-            Or the folder of another repo
-          </label>
-        </>
-      )}
+      <label className="mt-3 block text-sm text-fg2" htmlFor="add-project-repo">
+        The folder of a repo
+      </label>
       <div className="mt-2 flex flex-wrap gap-2">
         <Input
           id="add-project-repo"
@@ -170,6 +151,17 @@ export function AddProject({
           </Button>
         )}
       </div>
+      {!found && !!repos?.length && (
+        <ul className="mt-3 flex flex-wrap gap-2" data-repos>
+          {repos.slice(0, SUGGESTED).map((r) => (
+            <li key={r.repo} className="min-w-0">
+              <Button quiet onClick={() => void look(r.repo)} data-testid={`repo-${r.name}`}>
+                {r.name}
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
       {found && (
         <div ref={details} className="mt-4" data-detected>
           <dl className="space-y-2">
