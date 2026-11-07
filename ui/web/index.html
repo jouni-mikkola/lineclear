@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content" />
+    <link rel="icon" href="/brand/favicon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icon-180.png" />
+    <meta name="theme-color" content="#0b0b0c" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>Lineclear</title>
+  </head>
+  <body>
+    <!-- what shows before the script runs: the header with the logo, where the views draw it -->
+    <div id="root"><div class="min-h-dvh lg:pl-(--lc-rail-w)"><header class="flex h-[72px] items-start px-5 pt-6 md:px-10 md:pt-8 lg:hidden"><div class="flex h-9 items-center"><!--wordmark--></div></header><main class="h-16 lg:h-0"></main></div></div>
+    <!-- Home's answer is asked for while the scripts load; data.ts takes the request once -->
+    <script>
+      if (location.pathname === "/" && !location.search) window.__early = fetch("/api/home", { headers: { accept: "application/json" } });
+    </script>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

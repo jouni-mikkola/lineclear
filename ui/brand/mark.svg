@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>Lineclear</title>
+  <!-- Signal head with its bezel, the lit lamp, and the post that turns onto the line. -->
+  <path fill="#ece9e4" fill-rule="evenodd" d="M5 22a17 17 0 1 0 34 0a17 17 0 1 0 -34 0ZM12 22a10 10 0 1 0 20 0a10 10 0 1 0 -20 0Z"/>
+  <circle cx="22" cy="22" r="6.5" fill="#d97757"/>
+  <path d="M22 38V55H57" stroke="#ece9e4" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
