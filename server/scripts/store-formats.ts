@@ -8,7 +8,17 @@ import { join } from 'node:path'
 type Values = Record<string, string>
 
 /** The files the server keeps its settings, spaces and tasks in; the database with its journals. */
-const FILES = ['settings.json', 'tasks.json', 'spaces.json', 'store.sqlite', 'store.sqlite-wal', 'store.sqlite-shm', 'task-ids.sqlite', 'task-ids.sqlite-wal', 'task-ids.sqlite-shm']
+const FILES = [
+  'settings.json',
+  'tasks.json',
+  'spaces.json',
+  'store.sqlite',
+  'store.sqlite-wal',
+  'store.sqlite-shm',
+  'task-ids.sqlite',
+  'task-ids.sqlite-wal',
+  'task-ids.sqlite-shm',
+]
 
 const args = process.argv.slice(2).filter((a) => a !== 'read') // `read` is the old verb: a promotion by an older build may still say it
 const dir = args.find((a) => a !== '--older') ?? process.exit(console.error('usage: store-formats.ts <dir> [--older]') ?? 2)
