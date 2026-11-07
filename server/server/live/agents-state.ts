@@ -6,7 +6,7 @@ import { ColdAgents } from './engine/cold.ts'
 import { addLog } from './log-list.ts'
 import type { AgentHerdr, TermScreen } from '../../shared/types.ts'
 import { herdr, type Subscription, type AgentInfo, type AgentStatus } from './herdr.ts'
-import { findCodexLog, findPiLog } from './readers/find.ts'
+import { findPiLog } from './readers/find.ts'
 import { PasteWatch } from './paste-watch.ts'
 import { TerminalClock } from './terminal-clock.ts'
 import { machineNews } from './quiet.ts'
@@ -249,7 +249,7 @@ export class AgentsState extends Emitter<Events> {
     const r = this.records[key]
     if (!r) return
     const since = r.started - 5000
-    const f = r.kind === 'codex' ? findCodexLog(r.cwd, since) : r.kind === 'pi' ? findPiLog(r.cwd, since) : undefined
+    const f = r.kind === 'pi' ? findPiLog(r.cwd, since) : undefined
     if (f && addLog(r, f)) {
       this.save()
       this.emit('logs', key)

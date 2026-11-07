@@ -7,7 +7,7 @@ export function sessionRuntime(events: LogEvent[], file: string | undefined, sta
   for (const e of events) {
     if (e.kind === 'session' && e.file === file) state = undefined
     if (e.kind !== 'runtime' || e.file !== file || e.at < started) continue
-    // Codex turn_context is a full snapshot: an unset effort must clear the previous turn's override.
+    // a new model drops the previous model's settings: an unset effort must not carry over
     if (e.runtime.model && state?.model && e.runtime.model !== state.model) state = undefined
     state = e.replace ? e.runtime : { ...state, ...e.runtime }
   }

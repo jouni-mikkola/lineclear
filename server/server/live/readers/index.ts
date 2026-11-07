@@ -1,16 +1,11 @@
-// Picks the reader for a CLI, and tails a log file: each read() returns the events of the lines written since the
-// last one.
+// Picks the reader for a CLI, and tails a log file: each read() returns the events of the lines written since the last.
 import { closeSync, openSync, readSync, statSync } from 'node:fs'
 import { PiReader } from './pi.ts'
-import { LOG_FINDERS } from './find.ts'
 import type { LogEvent, Reader } from './types.ts'
 
-const READERS: Record<string, () => Reader> = {
-  pi: () => new PiReader(),
-}
+const READERS: Record<string, () => Reader> = { pi: () => new PiReader() }
 
-/** Kinds with both runtime log discovery and a transcript reader. */
-export const CHAT_KINDS = Object.keys(READERS).filter((kind) => !!LOG_FINDERS[kind])
+export const CHAT_KINDS = Object.keys(READERS)
 
 export function chatProblem(kind: string): string | undefined {
   if (!CHAT_KINDS.includes(kind)) return `${kind} does not support Lineclear chat: no chat log reader is available. Choose ${CHAT_KINDS.join(', ')}.`
@@ -118,6 +113,5 @@ export class LogTail {
     this.pos = 0
     this.carry = []
     this.ino = ino
-    this.reader.reset?.(this.file)
   }
 }

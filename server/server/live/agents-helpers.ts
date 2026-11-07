@@ -11,7 +11,7 @@ export interface AgentRecord {
   key: string
   /** herdr agent name */
   name: string
-  /** herdr agent kind: claude, codex, pi */
+  /** herdr agent kind: pi */
   kind: string
   cwd: string
   /** herdr workspace label it lives in */

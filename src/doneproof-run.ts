@@ -86,7 +86,7 @@ function readVerdicts(text: string, items: string[], answerTokens: number): Item
   return items.map((item, i) => lines.get(i) ?? { item, ok: false, proof: "the checker did not judge this item" });
 }
 
-/** The checker's models: codex (OpenAI) first, else the reviewer list in its order. */
+/** The checker's models: OpenAI first, else the reviewer list in its order. */
 export function checkerModels(reviewers: string[], usable: (m: string) => boolean = () => true): string[] {
   const ok = reviewers.filter(usable);
   return [...ok.filter((m) => company(m) === "openai"), ...ok.filter((m) => company(m) !== "openai")];
@@ -108,7 +108,7 @@ export interface ProveInput {
 /**
  * Reads the step's `done when` items against the merged tree and records each as true or false with its proof. An item
  * that is an action outside the repo is proven by a command the checker runs, never by reading text; the rest goes to a
- * model (codex first, else a fresh session of another). Returns the record, or why none was made (nothing is recorded then).
+ * model (an OpenAI model first, else a fresh session of another). Returns the record, or why none was made (nothing is recorded then).
  */
 export function proveStep(i: ProveInput): StepProof | string {
   const run = i.run ?? spawn;

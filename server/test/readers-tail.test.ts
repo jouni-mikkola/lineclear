@@ -3,10 +3,10 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { appendFileSync, mkdirSync, mkdtempSync, renameSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { findCodexLog, findPiLog, piSessionDir } from '../server/live/readers/find.ts'
+import { findPiLog, piSessionDir } from '../server/live/readers/find.ts'
 import { LogTail, readerFor } from '../server/live/readers/index.ts'
 import type { LogEvent } from '../server/live/readers/types.ts'
-import { parse, brief, cxmsg, sessionMeta, pimsg, T } from './readers-fixture.ts'
+import { parse, brief, pimsg } from './readers-fixture.ts'
 
 let dir = ''
 beforeAll(() => {
@@ -87,23 +87,6 @@ describe('finding logs', () => {
     writeFileSync(f, text)
     utimesSync(f, mtimeMs / 1000, mtimeMs / 1000)
   }
-
-  test("codex: today's rollout whose session_meta has the cwd, not a subagent's", () => {
-    process.env.CODEX_HOME = join(dir, 'codex')
-    const d = new Date()
-    const day = join(dir, 'codex', 'sessions', String(d.getFullYear()), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0'))
-    const now = Date.now()
-    touch(join(day, 'rollout-a.jsonl'), jl(sessionMeta('/work/app')) + jl(cxmsg('m', 'user', [])), now - 5000)
-    touch(join(day, 'rollout-b.jsonl'), jl(sessionMeta('/work/other')), now - 1000)
-    touch(
-      join(day, 'rollout-c.jsonl'),
-      jl(sessionMeta('/work/app', { source: { subagent: { thread_spawn: { parent_thread_id: T } } }, thread_source: 'subagent' })),
-      now - 500,
-    )
-    expect(findCodexLog('/work/app')).toBe(join(day, 'rollout-a.jsonl'))
-    expect(findCodexLog('/work/app/')).toBe(join(day, 'rollout-a.jsonl'))
-    expect(findCodexLog('/work/app', now)).toBeUndefined()
-  })
 
   test('pi: session folder from the cwd', () => {
     process.env.PI_CODING_AGENT_DIR = join(dir, 'pi')

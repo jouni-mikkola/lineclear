@@ -2,11 +2,10 @@ import { chatProblem } from './readers/index.ts'
 import { randomUUID } from 'node:crypto'
 import { dirname } from 'node:path'
 import { herdr, paneEvents, type AgentInfo, type AgentStatus, type HerdrEvent } from './herdr.ts'
-import { findLog, logKind } from './readers/find.ts'
+import { findPiLog } from './readers/find.ts'
 import { chooseModel, effortFor, firstModel, modelArg } from '../../../src/models.ts'
 import * as task from './mfs.ts'
-import { agentEnv, BOX } from './box.ts'
-import { ROOT } from '../root.ts'
+import { BOX } from './box.ts'
 import { type AgentRecord, type Spec, holdFrom, ownOldPane, promptPath, hidden } from './agents-helpers.ts'
 import { addLog } from './log-list.ts'
 import { AgentsState } from './agents-state.ts'
@@ -46,7 +45,7 @@ export class AgentsDelivery extends AgentsState {
 
   start() {
     this.refresh()
-    // upkeep of what herdr does not push: files of codex runs, stranded sends, background expiry.
+    // upkeep of what herdr does not push: stranded sends, background expiry.
     // It never asks herdr for anything.
     this.timer = setInterval(() => {
       // the subscription is open while herdr is reachable: that is its contact
@@ -199,14 +198,14 @@ export class AgentsDelivery extends AgentsState {
     const r = this.records[key]
     if (!r) return
     const look = () => {
-      const f = findLog(r.kind, r.cwd, since - 1000)
+      const f = r.kind === 'pi' ? findPiLog(r.cwd, since - 1000) : undefined
       if (!f || !addLog(r, f)) return
-      // pi resumes by the id in its name; Codex by its last log
-      if (r.kind !== 'codex') r.sessionId = f.match(/([0-9a-f-]{36})\.jsonl$/)?.[1] ?? r.sessionId
+      // pi resumes by the id in its name
+      r.sessionId = f.match(/([0-9a-f-]{36})\.jsonl$/)?.[1] ?? r.sessionId
       this.save()
       this.emit('logs', key)
     }
-    // a menu it opened (Codex's /new asks where) may be answered a while later
+    // a menu it opened may be answered a while later
     for (const ms of [1500, 5000, 15000, 60000, 180000]) setTimeout(look, ms)
   }
 
@@ -280,7 +279,7 @@ export class AgentsDelivery extends AgentsState {
     r.launch = randomUUID()
     if (fresh) this.outbox = this.outbox.filter((item) => item.key !== spec.key || item.cid || !item.text.startsWith('<lineclear>'))
     r.started = Date.now()
-    if (!resume) r.sessionId = r.kind === 'codex' ? undefined : randomUUID()
+    if (!resume) r.sessionId = randomUUID()
     this.records[spec.key] = r
     this.byName.set(r.name, r.key)
     this.save()
@@ -294,7 +293,7 @@ export class AgentsDelivery extends AgentsState {
     if (unset) throw new Error(unset)
     const pane = place ? await place() : await this.paneFor(r, was)
     this.startedIn.set(r.key, pane)
-    const args = this.args(r, !!resume)
+    const args = this.args(r)
     this.save()
     // a new pane needs a moment before its shell is at the prompt
     for (let i = 0; ; i++) {
@@ -341,7 +340,7 @@ export class AgentsDelivery extends AgentsState {
     return this.live.get(r.name) ?? null
   }
 
-  args(r: AgentRecord, resume: boolean): string[] {
+  args(r: AgentRecord): string[] {
     const a: string[] = []
     // a model is kept by its id, or by its name when picked in the chat's menu (Model Top 5.5); an effort its model lacks
     // goes in as the nearest it has
@@ -352,24 +351,6 @@ export class AgentsDelivery extends AgentsState {
       if (r.system) a.push('--append-system-prompt', this.promptFile(r))
       if (model) a.push('--model', model)
       if (effort) a.push('--thinking', effort)
-    } else if (r.kind === 'codex') {
-      // Codex tools have their own environment policy. Set the owner explicitly even on resume;
-      // do not depend on the pane's login shell or its stale inherited environment.
-      const env = { ...r.env, ...agentEnv(r.key, ROOT) }
-      a.push(
-        '-c',
-        `shell_environment_policy.set={${Object.entries(env)
-          .map(([k, v]) => `${JSON.stringify(k)}=${JSON.stringify(v)}`)
-          .join(',')}}`,
-      )
-      // its own last log: a task it took over keeps the logs of the agent before it too
-      const id = resume
-        ? r.logs.findLast((f) => (logKind(f) ?? 'codex') === 'codex')?.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/)?.[1]
-        : undefined
-      if (id) a.unshift('resume', id)
-      if (r.access !== 'ask') a.push('--dangerously-bypass-approvals-and-sandbox')
-      if (model) a.push('-m', model)
-      if (effort) a.push('-c', `model_reasoning_effort="${effort}"`)
     }
     return a
   }

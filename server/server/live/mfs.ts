@@ -43,18 +43,6 @@ export function mkdirSync(p: string, o?: { recursive?: boolean; mode?: number })
   if (r.code && !o?.recursive) fail(p, r.err)
 }
 
-export function rmSync(p: string, o?: { recursive?: boolean; force?: boolean }) {
-  if (local(p)) return fs.rmSync(p, o)
-  const r = sh(`rm ${o?.recursive ? '-r ' : ''}${o?.force ? '-f ' : ''}${q(p)}`)
-  if (r.code && !o?.force) fail(p, r.err)
-}
-
-export function renameSync(from: string, to: string) {
-  if (local(from) && local(to)) return fs.renameSync(from, to)
-  const r = sh(`mv -f ${q(from)} ${q(to)}`)
-  if (r.code) fail(from, r.err)
-}
-
 export function readdirSync(p: string): string[] {
   if (local(p)) return fs.readdirSync(p)
   const r = sh(`cd ${q(p)} && ls -A1`)

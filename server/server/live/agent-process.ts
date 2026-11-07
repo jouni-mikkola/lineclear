@@ -5,6 +5,6 @@ export function isAgentProcess(kind: string, argv: string[] = []) {
   if (!/^(node|bun)(?:\.exe)?$/.test(name(argv[0] ?? ''))) return false
   const entry = argv[1] ?? ''
   if (name(entry) === kind || name(entry) === `${kind}.js`) return true
-  const packages: Record<string, string> = { pi: '/pi-coding-agent/', claude: '/claude-code/', codex: '/@openai/codex/' }
+  const packages: Record<string, string> = { pi: '/pi-coding-agent/' }
   return !!packages[kind] && entry.includes(packages[kind]) && /\.(?:m?js|cjs)$/.test(entry)
 }

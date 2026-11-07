@@ -103,7 +103,7 @@ const FOUND = {
       name: "pi",
       accounts: [
         { account: "anthropic", models: ["vendor-a/model-top", "vendor-a/model-mid"] },
-        { account: "openai-codex", models: ["vendor-b/model-review", "vendor-b/model-lite"] },
+        { account: "vendor-b", models: ["vendor-b/model-review", "vendor-b/model-lite"] },
       ],
     },
   ],

@@ -56,8 +56,7 @@ export async function workedTask(name: string) {
 }
 
 test('native and npm agent CLI process identities', () => {
-  expect(isAgentProcess('codex', ['/opt/bin/codex', '--resume'])).toBe(true)
+  expect(isAgentProcess('pi', ['/opt/bin/pi', '--resume'])).toBe(true)
   expect(isAgentProcess('pi', ['/usr/bin/node', '/opt/node_modules/@mariozechner/pi-coding-agent/dist/cli.js'])).toBe(true)
-  expect(isAgentProcess('claude', ['/usr/bin/node', '/opt/node_modules/@anthropic-ai/claude-code/cli.js'])).toBe(true)
   expect(isAgentProcess('pi', ['/usr/bin/node', '/some/app.js', 'pi'])).toBe(false)
 })

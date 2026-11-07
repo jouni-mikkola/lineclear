@@ -47,8 +47,8 @@ How to do the work inside a task is its agent's judgment, not yours.
 1. **Add a task**: `lineclear task add "<title>" --brief "<brief>"`. The title fits 32 characters. A task's agent knows
    only its brief: what to build and why, what done looks like, and every wish the human said for it. Lineclear ends
    it with its Settings block, the defaults in `lineclear show`; write only what the human wants different. For one
-   task, change a line with `--set` (`--set review.rounds=1 --set merge="ask me first"`, `--set agent=codex`,
-   `--set reviewer=claude`): the block then says the coordinator set it. Plain words in the brief win over the block
+   task, change a line with `--set` (`--set review.rounds=1 --set merge="ask me first"`, `--set agent=pi`,
+   `--set reviewer=pi`): the block then says the coordinator set it. Plain words in the brief win over the block
    too. A review is only words in the brief; its agent decides how to do it.
 2. **Hold or queue it**: `--later` has its agent wait for a go (`lineclear task tell <id> "<go>"`). `--after SHE-12`
    queues it until those are all done; Lineclear then sends the go. `lineclear task queue <id> --after …|none` changes

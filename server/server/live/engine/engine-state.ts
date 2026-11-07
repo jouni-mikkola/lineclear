@@ -1,6 +1,5 @@
 import { answersTo, renameLater, type TaskIds } from '../task-ids.ts'
 import { chooseModel, firstModel } from '../../../../src/models.ts'
-import { trustWorktree } from '../trust.ts'
 import { existsSync } from '../mfs.ts'
 import { agentEnv, onMachine, type BoxInfo } from '../box.ts'
 import type { Task, TaskStatus } from '../../../shared/types.ts'
@@ -433,7 +432,6 @@ export abstract class EngineState extends Emitter<Events> {
     const env = this.env(key)
     // a task from before tasks kept their own CLI starts on Settings'
     const h = t.agent ?? this.settings.harness('task', this.nameOf(t))
-    trustWorktree(t.worktree!, as?.kind ?? rec?.kind ?? h.kind, env)
     const model = !as && !rec ? this.defaultModel(t, h) : undefined
     const spec: Spec = {
       access: 'full',

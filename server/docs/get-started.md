@@ -3,7 +3,7 @@
 Install Lineclear on the machine that runs herdr, share it on your tailnet, and open it on your phone, tablet or desktop.
 
 Lineclear stands alone: it talks to herdr and needs nothing else of yours. Agents keep running in herdr terminals; any
-CLI herdr can start works (chats are read for Claude Code, Codex and pi).
+CLI herdr can start works (chats are read for pi).
 
 ## Install
 

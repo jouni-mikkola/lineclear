@@ -22,7 +22,7 @@
   for provisioning and the upgrade steps for already-running agents.
 
 - Interactive task, coordinator and backup chat choices require both runtime log discovery and a chat reader.
-  Settings and Restart offer Claude Code, Codex and pi; other herdr CLIs are refused before a chat launch because
+  Settings and Restart offer pi; other herdr CLIs are refused before a chat launch because
   their replies cannot be shown. Existing saved choices are kept, but an unsupported choice must be changed before
   launching again. Headless reviewer choices are separate; this does not add or prove support for other reviewers.
 

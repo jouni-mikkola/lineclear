@@ -5,11 +5,9 @@ import { HOME, readJson, writeJson } from '../store.ts'
 import { stripHidden, type Agents, type OutItem } from './agents.ts'
 import { agentLines } from './chatlines.ts'
 import { herdr } from './herdr.ts'
-import { logKind } from './readers/find.ts'
 import { LogTail, readerFor } from './readers/index.ts'
 import type { LogEvent } from './readers/types.ts'
-import { replyOnScreen } from './streaming.ts'
-import { yours, turnOf, replying, type Shown, type Posted, type ChatLog, safe, type ScreenMenu, parseMenu, sawReply, PIECE } from './chats-helpers.ts'
+import { yours, turnOf, replying, type Posted, type ChatLog, safe, type ScreenMenu, parseMenu, PIECE } from './chats-helpers.ts'
 
 export class ChatsLogs {
   constructor(
@@ -29,7 +27,6 @@ export class ChatsLogs {
   protected logs = new Map<string, ChatLog>()
   protected menus = new Map<string, ScreenMenu>()
   protected menuAt = new Map<string, number>()
-  protected shown = new Map<string, Shown>()
 
   /* ---------- Lineclear's own log per chat ---------- */
 
@@ -48,7 +45,7 @@ export class ChatsLogs {
 
   /** a deleted task's chat: its log goes, and all that was read of it */
   forget(key: string) {
-    for (const m of [this.tails, this.events, this.where, this.reading, this.logs, this.menus, this.menuAt, this.shown]) m.delete(key)
+    for (const m of [this.tails, this.events, this.where, this.reading, this.logs, this.menus, this.menuAt]) m.delete(key)
     rmSync(join(HOME, 'chatlog', `${safe(key)}.json`), { force: true })
   }
 
@@ -118,8 +115,7 @@ export class ChatsLogs {
       if (!existsSync(f)) continue
       let t = this.tails.get(f)
       if (!t) {
-        // each by its own CLI's reader: a backup agent's logs follow the first one's
-        const reader = readerFor(logKind(f) ?? r.kind)
+        const reader = readerFor(r.kind)
         if (!reader) continue
         t = new LogTail(f, reader)
         this.tails.set(f, t)
@@ -185,28 +181,6 @@ export class ChatsLogs {
     const reply = e && { at: e.at, text: e.kind === 'agent' ? agentLines(stripHidden(e.text)).text : undefined }
     const posted = p && { at: p.at, text: p.card?.text ?? p.text ?? p.question?.title, card: !!p.card }
     return !reply || (posted && posted.at > reply.at) ? posted : reply
-  }
-
-  /** in a turn the agent started itself, has its reply begun on its screen, not as a hidden <no-reply> (or older [[...]])? Read about
-   *  once a second, until it has; true when that changes what the chat shows */
-  async readReply(key: string): Promise<boolean> {
-    const r = this.agents.record(key)
-    const turn = turnOf(this.events.get(key) ?? [], this.agents.sentLately(key))
-    if (!r || this.agents.status(key) !== 'working' || turn.kind !== 'own') {
-      const had = this.shown.get(key)?.on ?? false
-      this.shown.delete(key)
-      return had
-    }
-    const was = this.shown.get(key)
-    const s: Shown = was && was.turn === turn.id ? was : { turn: turn.id!, on: false, at: 0 }
-    this.shown.set(key, s)
-    // a little under the poll's second, so a late tick never skips a read
-    if (s.on || Date.now() - s.at < 900) return false
-    s.at = Date.now()
-    const info = this.agents.info(key)
-    if (!info) return false
-    Object.assign(s, sawReply(s, replyOnScreen(r.kind, await herdr.visible(info.pane_id).catch(() => ''))))
-    return s.on
   }
 
   /** a blocked agent's terminal menu, read from its screen (refreshed at most every 2s) */
@@ -306,11 +280,10 @@ export class ChatsLogs {
 
   protected replying(key: string, ev: LogEvent[]) {
     const turn = turnOf(ev, this.agents.sentLately(key))
-    const s = this.shown.get(key)
-    return replying(turn, !!s?.on && s.turn === turn.id, ev)
+    return replying(turn, ev)
   }
 
-  /** Codex and pi change model and effort only through their own pickers: their menu only adds files */
+  /** pi changes model and effort only through its own picker: its menu only adds files */
   protected controls(): ChatControls {
     return { models: [], model: 0, efforts: [], effort: 0 }
   }

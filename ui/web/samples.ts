@@ -298,7 +298,7 @@ export function inbox(state: PageState): InboxItem[] {
         since: fromNow(-50),
         question: `Approve the plan for ${LONG}?`,
         choices: ["Approve", "Reject"],
-        stepChecks: [{ step: "L1234", model: "openai-codex/a-model-with-a-very-long-name-for-the-bar", said: `${LONG}. ${LONG}.` }],
+        stepChecks: [{ step: "L1234", model: "vendor-b/a-model-with-a-very-long-name-for-the-bar", said: `${LONG}. ${LONG}.` }],
       },
       ...base,
     ];

@@ -162,7 +162,6 @@ describe('projects', () => {
 describe('interactive chat capabilities', () => {
   test('Settings offers runtime-readable kinds and rejects unsupported selections without changing defaults', async () => {
     const { CHAT_KINDS, readerFor } = await import('../server/live/readers/index.ts')
-    const { LOG_FINDERS } = await import('../server/live/readers/find.ts')
     const { KIND, REVIEWERS } = await import('../server/live/settings.ts')
     const settings = new Settings({ everywhere: {}, machine: {}, spaces: {} })
     const legacy = new Settings({ everywhere: { 'task.agent': 'Antigravity' }, machine: {}, spaces: {} })
@@ -178,7 +177,6 @@ describe('interactive chat capabilities', () => {
     }
     for (const kind of CHAT_KINDS) {
       expect(readerFor(kind)).toBeDefined()
-      expect(LOG_FINDERS[kind]).toBeFunction()
     }
     expect(settings.set('task.fallback', 'off').ok).toBe(true)
     expect(REVIEWERS).toEqual(['pi'])

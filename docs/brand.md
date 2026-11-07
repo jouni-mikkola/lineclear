@@ -78,7 +78,7 @@ Lines, word for word:
 - "You talk to one contact. It knows which project each request belongs to, hands the work to AI workers and
   reviewers, and shows you everything live. You only make the decisions."
 - "Not tied to one AI company."
-- "Claude, Codex, Gemini and others, side by side. When one subscription runs out, the next one takes over."
+- "Claude, OpenAI, Gemini and others, side by side. When one subscription runs out, the next one takes over."
 - "Model-agnostic: you choose the models for each role in Settings."
 - "Plain code decides what starts next, so no AI runs while nothing happens."
 - "Each worker gets only its step, not the whole history."

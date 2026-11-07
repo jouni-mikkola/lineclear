@@ -35,11 +35,9 @@ export class LiveSourceSpaces extends LiveSourceViews {
 
   protected async pollChats() {
     for (const k of new Set([...this.watched, ...Object.keys(this.agents.records).filter((k) => !['gone', 'working'].includes(this.agents.status(k)))])) {
-      // pull first: the reply's read goes by the turn the log shows now
       const pulled = this.chats.pull(k)
       const menu = await this.chats.readMenu(k).catch(() => false)
-      const reply = await this.chats.readReply(k).catch(() => false)
-      if (pulled || menu || reply) this.emit('chat', k)
+      if (pulled || menu) this.emit('chat', k)
     }
   }
 

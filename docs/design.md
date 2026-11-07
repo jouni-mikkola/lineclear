@@ -446,7 +446,7 @@ the Inbox count.
 
 ## What done means
 
-A step is `done` only when its proof holds. At merge the independent checker (`src/stepcheck.ts`, codex first, else a
+A step is `done` only when its proof holds. At merge the independent checker (`src/stepcheck.ts`, an OpenAI model first, else a
 fresh session of another model) reads each `done when` item against the merged tree and records it true or false, with
 its proof, in the project's `plan-checks/` (`src/doneproof.ts`). An item that is an action outside the repo (a tag, a
 GitHub release) is proven by a command the checker runs (`git ls-remote --tags origin`, `gh release view`), never by
