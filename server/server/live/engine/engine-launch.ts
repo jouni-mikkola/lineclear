@@ -246,8 +246,9 @@ export class EngineLaunch extends EngineStalls {
 
   /** the go, now if this machine has room, else once it has */
   protected goWhenRoom(t: TaskRec, text: string, why: string, plain = false) {
-    const r = this.room()
+    const r = this.roomFor(t)
     if (r.why) return this.hold(t, r.why, { text, why, plain })
+    if (!t.worktree) t.machine = r.machine
     this.go(t, text, why, plain)
   }
 
@@ -261,16 +262,18 @@ export class EngineLaunch extends EngineStalls {
     try {
       const byLoad = this.settings.machine().startLoad !== null
       for (const t of this.heldTasks()) {
-        const r = this.room()
+        const r = this.roomFor(t)
         if (r.why) {
-          // each one waits for the same reason: its line says the one that holds them now
-          const stale = this.heldTasks().filter((x) => x.held!.why !== r.why)
-          for (const x of stale) x.held!.why = r.why
-          if (stale.length) this.save()
-          return
+          // its line says the reason that holds it now
+          if (t.held!.why !== r.why) {
+            t.held!.why = r.why
+            this.save()
+          }
+          continue
         }
         if (byLoad && now - this.lastStart < START_GAP) return
         this.lastStart = now
+        if (!t.worktree) t.machine = r.machine
         const why = t.held!.why === 'slots' ? 'a slot is free' : 'the machine has room'
         if (t.held!.go) this.go(t, t.held!.go, `${t.held!.goWhy ?? why} · ${why}`, t.held!.plain)
         else {
@@ -353,7 +356,8 @@ export class EngineLaunch extends EngineStalls {
     }
     if (after.length) t.after = after
     // one that starts work now waits for room; one for later only reads its brief, so it starts at once
-    const room = after.length || o.later ? {} : this.room()
+    const room: { why?: 'slots' | 'machine'; machine?: string } = after.length || o.later ? {} : this.roomFor(t)
+    if (!room.why && !after.length && !o.later) t.machine = room.machine
     this.data.tasks.push(t)
     if (room.why) {
       t.told = 'queued'

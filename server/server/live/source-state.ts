@@ -62,6 +62,8 @@ export class LiveSourceState extends Emitter<SourceEvents> {
     undefined,
     { read: () => readJson('health.json', {}), write: (w) => writeJson('health.json', w) },
   )
+  /** what the last look at each other machine found (source-views.ts readBoxes) */
+  protected boxes = new Map<string, { read?: { busy?: 'cpu' | 'memory'; herdr: boolean }; at: number; reading: boolean }>()
   /** when each chat last had something new, and how far you have read each (on the main machine) */
   unread = new Unread()
   /** when this server started: only what comes after it buzzes as a new message */
@@ -292,7 +294,7 @@ export class LiveSourceState extends Emitter<SourceEvents> {
   protected workingLine() {
     const max = this.settings.machine().max
     const held = this.engine.heldTasks().length
-    return `${this.engine.working()}${max === null ? '' : ` of ${max}`} working${held ? `, ${held} held` : ''}`
+    return `${this.engine.workingOn()}${max === null ? '' : ` of ${max}`} working${held ? `, ${held} held` : ''}`
   }
 
   /** this machine's numbers for the screen */
@@ -303,7 +305,7 @@ export class LiveSourceState extends Emitter<SourceEvents> {
     return {
       meters: meters(s, this.settings.machine(), this.health.told()),
       herdr: this.agents.reachable,
-      working: this.engine.working(),
+      working: this.engine.workingOn(),
       max: this.settings.machine().max ?? undefined,
       held: held.length,
       heldWhy: held[0] && this.engine.subOf(held[0]),
