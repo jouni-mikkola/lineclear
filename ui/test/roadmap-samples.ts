@@ -2,7 +2,7 @@ import type { RoadmapData, RoadmapStep } from "../../src/roadmap-view.ts";
 import { whereTo } from "../../src/progress.ts";
 import { roadmapLine } from "../../src/roadmap-line.ts";
 import type { StepRecord } from "../../src/step-page.ts";
-import type { PageState } from "./samples.ts";
+import type { PageState } from "../web/states.ts";
 
 // Sample roadmaps for each state of the Roadmap view (`?state=`), the same on every machine.
 

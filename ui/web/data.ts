@@ -4,27 +4,13 @@ import { useEffect, useState } from "react";
 import type { AccountUse, MonthSpend, Browser, Detection, InboxItem, Move, NewProject, Project, Repo, Started, Task } from "../kit/index.ts";
 import type { RoadmapData } from "../../src/roadmap-view.ts";
 import type { StepRecord } from "../../src/step-page.ts";
-import { browserSamples } from "./browser-samples.ts";
 import type { AppliedChange, PlanCard } from "../../src/web.ts";
 import { ApiError, forget, startRead } from "./health.ts";
 import { noteRevision, useStreamed, watch } from "./live.ts";
-import { emptyRoadmap, roadmapSample, stepSample } from "./roadmap-samples.ts";
-import { lazySamples } from "./lazy-samples.ts";
+import { samples } from "./lazy-samples.ts";
 import { emptySettings } from "./settings-empty.ts";
 import type { SettingsData } from "./settings-empty.ts";
-import { CHAT_STATES, detected, inbox, moves, type PageState, projects, sampleRepos, spend, STATES, usage } from "./samples.ts";
-
-const SAMPLE_MONTH: MonthSpend = {
-  month: "2026-01",
-  paid: [{ amount: 120, currency: "USD" }],
-  paidUnknown: true,
-  apiEquivalent: 612.4,
-  accounts: [
-    { account: "anthropic", kind: "subscription", paid: { amount: 100, currency: "USD" }, apiEquivalent: 540.1 },
-    { account: "openai", kind: "subscription", apiEquivalent: 52.3 },
-    { account: "openrouter", kind: "key", paid: { amount: 20, currency: "USD" }, apiEquivalent: 20 },
-  ],
-};
+import { CHAT_STATES, type PageState, STATES } from "./states.ts";
 
 // What the views read: the server's `/api/home`, `/api/inbox`, `/api/roadmap/<project>` and `/api/browsers`, read again every few seconds and when the page
 // shows again. `?state=` draws a sample state instead, so each state can be seen and tested.
@@ -51,6 +37,17 @@ export interface HomeData {
 
 /** `offline` is when the server last answered, while a later read fails. */
 export type Load<T> = { status: "loading" } | { status: "error"; error: string; retry: () => void } | { status: "ok"; data: T; offline?: number };
+
+const emptyRoadmap = (project: string): RoadmapData => ({
+  project,
+  phases: [],
+  steps: [],
+  done: 0,
+  total: 0,
+  line: { done: 0, work: 0, waiting: 0, left: 0, total: 0, text: "All 0 steps are done." },
+  history: [],
+  rounds: 2,
+});
 
 export const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchInterval: 1500, staleTime: 0, networkMode: "always" } } });
 
@@ -146,13 +143,10 @@ export const useHome = (state: PageState | undefined) =>
     "home",
     "/api/home",
     state,
-    (s) => ({
-      projects: projects(s),
-      spend,
-      usage: usage(s),
-      month: SAMPLE_MONTH,
-      moves,
-    }),
+    (s) => {
+      const p = samples().page;
+      return { projects: p.projects(s), spend: p.spend, usage: p.usage(s), month: p.SAMPLE_MONTH, moves: p.moves };
+    },
     { projects: [], spend: [], usage: [] },
     true,
     (d) => hasLists("projects")(d) && (d as HomeData).projects.every((p) => typeof p?.name === "string" && Array.isArray(p.tasks)),
@@ -164,7 +158,7 @@ export const useRoadmap = (project: string, state: PageState | undefined, on: bo
     ["roadmap", project],
     `/api/roadmap/${encodeURIComponent(project)}`,
     state,
-    (s) => roadmapSample(s, project),
+    (s) => samples().roadmap.roadmapSample(s, project),
     emptyRoadmap(project),
     on,
     hasLists("phases", "steps"),
@@ -176,7 +170,7 @@ export const useStepRecord = (project: string, step: string | undefined, state: 
     ["step", project, step ?? ""],
     `/api/roadmap/${encodeURIComponent(project)}/step/${encodeURIComponent(step ?? "")}`,
     state,
-    (s) => stepSample(roadmapSample(s, project), step ?? ""),
+    (s) => samples().roadmap.stepSample(samples().roadmap.roadmapSample(s, project), step ?? ""),
     { step: step ?? "", checklist: [], waits: [], read: [] },
     step !== undefined,
     (d) => hasLists("checklist", "waits", "read")(d),
@@ -184,21 +178,23 @@ export const useStepRecord = (project: string, step: string | undefined, state: 
 
 /** The agents' open browsers, read every 1.5 s so a finished task's browser leaves within 3 s. Only their own view asks the server for a fresh list: reading it costs a process. */
 export const useBrowsers = (state: PageState | undefined, live: boolean) =>
-  useLoad<Browser[]>("browsers", live ? "/api/browsers?live" : "/api/browsers", state, () => browserSamples(state as PageState), [], true, isList, 1500);
+  useLoad<Browser[]>(
+    "browsers",
+    live ? "/api/browsers?live" : "/api/browsers",
+    state,
+    () => samples().browser.browserSamples(state as PageState),
+    [],
+    true,
+    isList,
+    1500,
+  );
 
-const SAMPLE_DETAIL: TaskDetail = {
-  log: ["Read the cart code.", "Wrote the retry test first.", "Tests pass; running the check."],
-  diff: " src/cart.ts | 14 ++++++++------\n test/cart.test.ts | 22 ++++++++++++++++++++++\n 2 files changed, 30 insertions(+), 6 deletions(-)",
-  check: { ok: true, command: "bun run check", seconds: 96, at: Date.UTC(2026, 9, 31, 11, 40), failed: [] },
-  review: ["minor: name the helper for what it returns."],
-  cost: 1.84,
-};
 export const useTaskDetail = (id: string, state: PageState | undefined) =>
   useLoad<TaskDetail>(
     ["task", id],
     `/api/task/${encodeURIComponent(id)}`,
     state,
-    () => SAMPLE_DETAIL,
+    () => samples().page.SAMPLE_DETAIL,
     { log: [], diff: "", review: [] },
     true,
     (d) => typeof d === "object" && d !== null && Array.isArray((d as TaskDetail).log),
@@ -210,13 +206,14 @@ export const drive = (session: string, what: "take" | "input", body: unknown) =>
 
 /** The plans started with `lineclear plan`, read only while a view shows one. */
 export const usePlans = (state: PageState | undefined, on: boolean) =>
-  useLoad<PlanCard[]>("plans", "/api/plans", state, () => lazySamples?.chat.planSamples("request") ?? [], [], on, isList);
+  useLoad<PlanCard[]>("plans", "/api/plans", state, () => samples().chat.planSamples("request"), [], on, isList);
 
 /** The changes that applied by themselves in a project, with their undo. A sample page has none. */
 export const useApplied = (project: string, state: PageState | undefined) =>
   useLoad<AppliedChange[]>(["applied", project], `/api/applied/${encodeURIComponent(project)}`, state, () => [], [], true, isList);
 
-export const useInbox = (state: PageState | undefined) => useLoad<InboxItem[]>("inbox", "/api/inbox", state, () => inbox(state as PageState), [], true, isList);
+export const useInbox = (state: PageState | undefined) =>
+  useLoad<InboxItem[]>("inbox", "/api/inbox", state, () => samples().page.inbox(state as PageState), [], true, isList);
 
 /**
  * Answers an Inbox item. It leaves the list at once; when the answer fails it comes back with the reason.
@@ -249,7 +246,7 @@ export const useSettings = (state: PageState | undefined, on: boolean) =>
     "settings",
     "/api/settings",
     state,
-    () => lazySamples?.settings.settingsSample(state as PageState) ?? emptySettings,
+    () => samples().settings.settingsSample(state as PageState),
     emptySettings,
     on,
     hasLists("projects"),
@@ -280,14 +277,14 @@ export async function send(path: string, body: unknown): Promise<string | undefi
 
 /** What `lineclear project add` finds in a folder. On a sample page, the same sample for every folder. */
 export async function detect(repo: string, sample: boolean): Promise<Detection | { error: string }> {
-  if (sample) return detected(repo);
+  if (sample) return samples().page.detected(repo);
   const r = await call<Detection>(`/api/detect?repo=${encodeURIComponent(repo)}`);
   return r.ok ? r.data : { error: r.error };
 }
 
 /** The git repos in the home's usual folders that are no project yet. On a sample page, two samples. */
 export async function findRepos(sample: boolean): Promise<Repo[]> {
-  if (sample) return sampleRepos;
+  if (sample) return samples().page.sampleRepos;
   const r = await call<{ repos?: Repo[] }>("/api/repos");
   return r.ok ? (r.data.repos ?? []) : [];
 }

@@ -1,32 +1,30 @@
-import type { AccountUse, Detection, InboxItem, Project, Task, TaskState } from "../kit/index.ts";
+import type { TaskDetail } from "../../src/task-detail.ts";
+import type { AccountUse, MonthSpend, Detection, InboxItem, Project, Task, TaskState } from "../kit/index.ts";
 import { realInbox, realProjects, realUsage } from "./real-samples.ts";
+import type { PageState } from "../web/states.ts";
 
 // Sample data for each state of a page (`?state=`): the design page and the views draw it, so their pictures stay
 // the same on every machine.
 
-export const STATES = [
-  "filled",
-  "empty",
-  "loading",
-  "error",
-  "long",
-  "many",
-  "idle",
-  "clear",
-  "offline",
-  "thirty",
-  "one",
-  "title",
-  "tasks200",
-  "real",
-] as const;
-export type PageState = (typeof STATES)[number];
+export const SAMPLE_MONTH: MonthSpend = {
+  month: "2026-01",
+  paid: [{ amount: 120, currency: "USD" }],
+  paidUnknown: true,
+  apiEquivalent: 612.4,
+  accounts: [
+    { account: "anthropic", kind: "subscription", paid: { amount: 100, currency: "USD" }, apiEquivalent: 540.1 },
+    { account: "openai", kind: "subscription", apiEquivalent: 52.3 },
+    { account: "openrouter", kind: "key", paid: { amount: 20, currency: "USD" }, apiEquivalent: 20 },
+  ],
+};
 
-/** The Chat view has states more than the others: sending, streaming, offline, none, request (a sentence to a plan to approve) and task. */
-export const CHAT_STATES = [...STATES, "sending", "streaming", "offline", "none", "request", "task"] as const;
-export type ChatState = (typeof CHAT_STATES)[number];
-
-export const QUESTIONS = ["What waits for me?", "How far is web-shop?", "Move Gift cards after Search that forgives typos"];
+export const SAMPLE_DETAIL: TaskDetail = {
+  log: ["Read the cart code.", "Wrote the retry test first.", "Tests pass; running the check."],
+  diff: " src/cart.ts | 14 ++++++++------\n test/cart.test.ts | 22 ++++++++++++++++++++++\n 2 files changed, 30 insertions(+), 6 deletions(-)",
+  check: { ok: true, command: "bun run check", seconds: 96, at: Date.UTC(2026, 9, 31, 11, 40), failed: [] },
+  review: ["minor: name the helper for what it returns."],
+  cost: 1.84,
+};
 
 const LONG = "Move the whole settings page onto the new form parts and keep every saved value, including the ones from before the rename";
 const LONG_NAME = "a-project-with-a-very-long-repository-name-that-goes-on-and-on";

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { hostOf, splitSessions, whereOf } from "../ui/kit/browsers.tsx";
-import { browserSamples } from "../ui/web/browser-samples.ts";
+import { browserSamples } from "../ui/test/browser-samples.ts";
 
 test("the sample sessions split into task browsers and Other sessions, and the two add up to all of them", () => {
   const all = browserSamples("filled");

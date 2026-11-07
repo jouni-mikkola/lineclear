@@ -2,9 +2,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Button, PageTitle, Part, type PartState } from "../kit/index.ts";
 import type { SetupView } from "../../src/setup.ts";
-import type { PageState } from "./samples.ts";
+import type { PageState } from "./states.ts";
 import { hasLists, sampleState, send, useLoad } from "./data.ts";
-import { setupSample } from "./settings-samples.ts";
+import { samples } from "./lazy-samples.ts";
 
 // The first run in the web: the harnesses and accounts found, and one model per role with none chosen for you. Settings
 // shows the same panel and edits the choice afterwards. It saves where `lineclear setup` does.
@@ -20,7 +20,8 @@ type RoleId = (typeof ROLES)[number]["id"];
 const NONE: SetupView = { harnesses: [], chosen: {} };
 
 /** The harnesses and accounts found and the models chosen per role. Read once a minute: finding them runs the harnesses. */
-export const useSetup = (state: PageState | undefined) => useLoad("setup", "/api/setup", state, setupSample, NONE, true, hasLists("harnesses"), 60_000);
+export const useSetup = (state: PageState | undefined) =>
+  useLoad("setup", "/api/setup", state, (s) => samples().settings.setupSample(s), NONE, true, hasLists("harnesses"), 60_000);
 
 type Said = { text: string; failed?: boolean };
 

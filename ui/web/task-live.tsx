@@ -3,7 +3,7 @@ import type { TerminalView } from "../../src/task-live.ts";
 import { Part, type PartState } from "../kit/index.ts";
 import { TerminalInput, TerminalScreen } from "../kit/terminal.tsx";
 import { post, sampleState } from "./data.ts";
-import type { PageState } from "./samples.ts";
+import type { PageState } from "./states.ts";
 
 // A task's terminal, the tab next to its chat. It comes from the server's `/api/task/<id>/terminal/events` as the
 // screen changes. `?state=` draws sample states instead.

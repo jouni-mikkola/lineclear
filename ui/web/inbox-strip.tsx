@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useAnswer, useInbox } from "./data.ts";
-import type { PageState } from "./samples.ts";
+import type { PageState } from "./states.ts";
 import { ago, Button, exact, InboxChecks, type InboxItem, ReasonForm, reveal, SignalPic, Toast } from "../kit/index.ts";
 
 // The strip at the top of Home: the first ask that waits for the owner, who asks, in which project and step, its

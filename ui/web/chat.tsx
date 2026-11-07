@@ -5,8 +5,8 @@ import type { PlanCard } from "../../src/web.ts";
 import { MAX_FILE_BYTES, MAX_FILES } from "../../src/chat-limits.ts";
 import { type Attached, sizeText } from "../kit/index.ts";
 import { get, isList, post } from "./data.ts";
-import { lazySamples } from "./lazy-samples.ts";
-import { CHAT_STATES, type ChatState } from "./samples.ts";
+import { samples } from "./lazy-samples.ts";
+import { CHAT_STATES, type ChatState } from "./states.ts";
 
 // The Chat view at `/chat`: you talk to the Dispatcher, with words, pictures and files. The chat comes from the
 // server's `/api/chat/events` as it changes, so the Dispatcher's answers show as it writes them. `?state=` draws a
@@ -81,8 +81,7 @@ function useAttach(sample: ChatState | undefined, api: string, attached: Attache
 function usePlanCards(sample: ChatState | undefined, on: boolean, api: string) {
   const client = useQueryClient();
   const plansQuery = useQuery({ queryKey: ["plans"], queryFn: () => get<PlanCard[]>("/api/plans", isList), enabled: !sample && on && api === "/api/chat" });
-  const plans =
-    api !== "/api/chat" ? [] : (sample ? (lazySamples?.chat.planSamples(sample) ?? []) : (plansQuery.data ?? [])).filter((p) => p.by === "dispatcher");
+  const plans = api !== "/api/chat" ? [] : (sample ? samples().chat.planSamples(sample) : (plansQuery.data ?? [])).filter((p) => p.by === "dispatcher");
   const [planErrors, setPlanErrors] = useState<Record<string, string>>({});
   const answerPlan = useCallback(
     async (p: PlanCard, choice: string, note?: string) => {
@@ -100,9 +99,9 @@ function usePlanCards(sample: ChatState | undefined, on: boolean, api: string) {
 
 /** The Dispatcher's chat, live, with what you sent and attached on its way. */
 export function useChat(sample: ChatState | undefined, on: boolean, api = "/api/chat") {
-  const [view, setView] = useState<ChatView | undefined>(() => (sample ? lazySamples?.chat.chatSample(sample) : undefined));
-  const [pending, setPending] = useState<Pending[]>(() => (sample ? (lazySamples?.chat.chatSamplePending(sample) ?? []) : []));
-  const [attached, setAttached] = useState<Attached[]>(() => (sample ? (lazySamples?.chat.chatSampleAttached(sample) ?? []) : []));
+  const [view, setView] = useState<ChatView | undefined>(() => (sample ? samples().chat.chatSample(sample) : undefined));
+  const [pending, setPending] = useState<Pending[]>(() => (sample ? samples().chat.chatSamplePending(sample) : []));
+  const [attached, setAttached] = useState<Attached[]>(() => (sample ? samples().chat.chatSampleAttached(sample) : []));
   const [online, setOnline] = useState(() => (sample ? sample !== "offline" : navigator.onLine));
   // the server could not be read since it last answered
   const [lost, setLost] = useState(false);

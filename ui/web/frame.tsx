@@ -14,7 +14,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { play } from "../kit/motion.ts";
 import { SAMPLE_OFFLINE } from "./data.ts";
 import { useTrouble } from "./health.ts";
-import type { PageState } from "./samples.ts";
+import type { PageState } from "./states.ts";
 import { useInbox } from "./data.ts";
 import { InboxView } from "./inbox-strip.tsx";
 import { PATHS, placeOf, roadmapPath, type View, viewOf } from "./routes.ts";

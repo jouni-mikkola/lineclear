@@ -5,7 +5,7 @@ import type { Row } from "./home-rows.ts";
 import { AskInRow } from "./inbox-strip.tsx";
 
 type Choose = (item: InboxItem, choice: string, note?: string) => void;
-import { samplePictureOf } from "./browser-samples.ts";
+import { samples } from "./lazy-samples.ts";
 
 // Home's table of working tasks: one row each, the row opens in place with the log tail, the diff stat, the check,
 // the review's findings and the task's browser.
@@ -140,7 +140,7 @@ function Details({ row, sample, browsers, onChoose }: { row: Row; sample: boolea
         section(
           "Browser",
           <LivePicture
-            src={sample ? samplePictureOf(browser) : `/api/browsers/${encodeURIComponent(browser.session)}/picture`}
+            src={sample ? samples().browser.samplePictureOf(browser) : `/api/browsers/${encodeURIComponent(browser.session)}/picture`}
             every={2000}
             alt={`What ${row.step || row.title} shows now`}
             host={browser.page?.url}
