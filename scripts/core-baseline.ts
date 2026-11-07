@@ -10,7 +10,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 type Task = {
   id: string;
@@ -199,20 +199,28 @@ async function snapshot(url: string, n: number): Promise<void> {
 }
 
 function chatTokens(n: number): void {
-  const dirOf = (cwd: string) => join(SESSIONS, `--${cwd.slice(1).replaceAll("/", "-")}--`);
-  const roles: [string, string][] = [
-    ["coordinator", dirOf(join(homedir(), ".herdr-projects/data/coordinator-default-chat"))],
-    ["Dispatcher", dirOf(join(homedir(), ".config/lineclear/dispatcher"))],
+  const dirOf = (cwd: string) => join(SESSIONS, `--${cwd.slice(1).replaceAll("/", "-").replaceAll("_", "-")}--`);
+  const spacesFile = join(BOARD, "spaces.json");
+  const spaces: { path?: string }[] = existsSync(spacesFile) ? JSON.parse(readFileSync(spacesFile, "utf8")) : [];
+  // a coordinator runs in its project's folder, the home one in the home folder
+  const coordinatorDirs = [homedir(), ...spaces.map((s) => s.path ?? "")].filter(Boolean).map(dirOf);
+  const roles: [string, string[]][] = [
+    ["coordinator", coordinatorDirs],
+    ["Dispatcher", [dirOf(join(homedir(), ".config/lineclear/dispatcher"))]],
   ];
-  for (const [role, dir] of roles) {
-    if (!existsSync(dir)) continue;
-    const files = readdirSync(dir)
-      .filter((f) => f.endsWith(".jsonl"))
-      .sort()
+  for (const [role, dirs] of roles) {
+    const files = dirs
+      .filter((d) => existsSync(d))
+      .flatMap((d) =>
+        readdirSync(d)
+          .filter((f) => f.endsWith(".jsonl"))
+          .map((f) => join(d, f)),
+      )
+      .sort((a, b) => basename(a).localeCompare(basename(b)))
       .slice(-n);
     const per = files.map((f) => {
       const u: Usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
-      for (const raw of readFileSync(join(dir, f), "utf8").split("\n")) {
+      for (const raw of readFileSync(f, "utf8").split("\n")) {
         if (!raw) continue;
         const m = (JSON.parse(raw) as { message?: { role: string; usage?: Usage } }).message;
         if (m?.role !== "assistant") continue;
