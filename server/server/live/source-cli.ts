@@ -58,8 +58,8 @@ export class LiveSourceCli extends LiveSourceSubcommands {
       // a machine's room as the adapter reads it, with its tasks at work and its slots from the one store
       room: async () => {
         if (a1 && !this.engine.machines.has(a1) && !this.peers?.knows(a1)) throw new Error(`No machine called ${a1}.`)
-        const read = await room(a1)
-        if (!read) throw new Error(`${a1 ?? NAME} cannot be reached through herdr.`)
+        const read = a1 ? this.peers?.byName(a1)?.snap?.machines.find((m) => m.machine === a1)?.room : room()
+        if (!read) throw new Error(`${a1 ?? NAME} has not reported its room.`)
         return JSON.stringify({ host: a1 ?? NAME, ...read, working: this.engine.workingOn(a1), max: this.settings.machine().max }, null, 2)
       },
       // project, from before spaces, is space

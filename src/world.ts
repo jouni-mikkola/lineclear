@@ -6,6 +6,7 @@ import { sessionFolderPath } from "./harness-pi.ts";
 import { gitLimited as git } from "./git.ts";
 import { mainRefs, revertOnMain } from "./main-branch.ts";
 import { lineclearDir } from "./measure.ts";
+import { lineclearServer, readSnapshot } from "./lineclear-client.ts";
 import { harnesses, readRegistry } from "./models.ts";
 import { serverBin } from "./paths.ts";
 import type { Settings } from "./project.ts";
@@ -242,17 +243,37 @@ function offeredModels(env: NodeJS.ProcessEnv): World["offered"] {
   };
 }
 
+/**
+ * The server's snapshot, read in the background once a tick: a tick is synchronous, so it uses the one the last tick
+ * asked for, and a machine's room costs no process and no herdr call.
+ */
+function snapshotKeeper(env: Record<string, string | undefined>) {
+  let latest: unknown;
+  return {
+    refresh() {
+      const base = lineclearServer(env);
+      if (base) void readSnapshot(base).then((snap) => (latest = snap ?? latest));
+    },
+    latest: () => latest,
+  };
+}
+
 export function realWorld(env = process.env): World {
   const io = readers(run);
+  const snapshot = snapshotKeeper(env);
+  snapshot.refresh();
   const refsOf = (repo: string) => io.memo(`main-refs:${repo}`, () => mainRefs(repo)); // up to five gits to find
   const tasksFile = join(lineclearDir(env), "tasks.json");
   const sessionsOf = (worktree: string) => sessionFolderPath(worktree, env);
   return {
     now: () => new Date(),
-    newTick: io.newTick,
+    newTick() {
+      io.newTick();
+      snapshot.refresh();
+    },
     offered: offeredModels(env),
     load: () => loadavg()[0] ?? 0,
-    room: (host, space) => readRoom(host, space, env),
+    room: (host, space) => readRoom(host, space, snapshot.latest(), env),
     ...gitWorld(refsOf),
     ...claimWorld(
       run,

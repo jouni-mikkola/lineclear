@@ -97,6 +97,14 @@ interface MachineHealth {
   at: string
 }
 
+/** what a machine has room for: its 1-minute load, its cores, and its free and total memory in kB */
+export interface Room {
+  load: number
+  cores: number
+  freeKb: number
+  totalKb: number
+}
+
 export interface Machine {
   /** m:<its key>: what its spaces' order and its fold are kept under */
   id: string
@@ -113,6 +121,10 @@ export interface Machine {
   /** how it is doing, sampled every 30 seconds */
   health?: MachineHealth
   herdrDown?: string
+  /** its load, cores and memory, read by its own worker for its snapshot */
+  room?: Room
+  /** the tasks at work on it and the slots Settings give (none: no limit); the main machine's snapshot fills it for every machine */
+  slots?: { working: number; max: number | null }
 }
 
 /** The most characters a task's title may have: with its id it fits one line of the tasks list on a 390 px phone. */

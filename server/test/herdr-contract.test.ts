@@ -7,7 +7,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { HERDR_TESTED, herdr, herdrCli, paneEvents, rpc, Subscription, type HerdrEvent } from '../server/live/herdr.ts'
-import { forwardArgs, herdrOn, room } from '../server/live/herdr-forward.ts'
+import { forwardArgs, herdrOn } from '../server/live/herdr-forward.ts'
 import { until } from './until.ts'
 
 const bin = Bun.which('herdr') ?? ''
@@ -316,7 +316,7 @@ describe.skipIf(!saved)('herdr contract: the forwarding to a saved machine', () 
     if (first) expect(Array.isArray(await there.panes(first))).toBe(true)
   }, 60_000)
 
-  test('a tab runs a line there, is read back and closed, and the room is read from it', async () => {
+  test('a tab runs a line there, is read back and closed', async () => {
     const there = on()
     const first = (await there.workspaces())[0]?.workspace_id
     expect(first, 'the saved machine has no workspace to open a tab in').toBeDefined()
@@ -333,6 +333,5 @@ describe.skipIf(!saved)('herdr contract: the forwarding to a saved machine', () 
     } finally {
       await there.closePane(tab.root_pane.pane_id).catch(() => undefined)
     }
-    expect(await room(saved?.label)).toMatchObject({ load: expect.any(Number), cores: expect.any(Number), freeKb: expect.any(Number) })
   }, 120_000)
 })

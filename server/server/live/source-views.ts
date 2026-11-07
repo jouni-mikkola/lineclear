@@ -9,7 +9,6 @@ import { ended } from './engine/engine.ts'
 import { BOX } from './box.ts'
 import { HOST, NAME, placeId } from './places.ts'
 import { restartHint, type Harness } from './restart.ts'
-import { room } from './herdr-forward.ts'
 import { repositorySection } from './settings.ts'
 import { secretPages } from './secrets.ts'
 import { LiveSourceState } from './source-state.ts'
@@ -28,27 +27,15 @@ export class LiveSourceViews extends LiveSourceState {
     if (this.health.last?.at !== at) this.emit('snapshot')
   }
 
-  /** the load of each machine tasks run on besides this one, read at most once a minute; held tasks look again when it is in */
+  /** the load of each machine tasks run on besides this one, from the room its worker put in its snapshot */
   protected readBoxes(now: number) {
-    // only while a task waits for room: each look opens a tab on that machine
     if (!this.engine.heldTasks().length) return
     const { startLoad, startMemory } = this.settings.machine()
     for (const label of this.engine.machines.keys()) {
-      const had = this.boxes.get(label)
-      if (had?.reading || (had && now - had.at < 60_000)) continue
-      const box = { read: had?.read, at: now, reading: true }
-      this.boxes.set(label, box)
-      void room(label)
-        .then((r) => {
-          const used = r?.totalKb ? ((r.totalKb - r.freeKb) / r.totalKb) * 100 : 0
-          const busy = r && startLoad !== null && r.load > startLoad * r.cores ? 'cpu' : r && startMemory !== null && used > startMemory ? 'memory' : undefined
-          box.read = { herdr: !!r, busy }
-        })
-        .catch(() => undefined)
-        .finally(() => {
-          box.reading = false
-          this.engine.release()
-        })
+      const r = this.peers?.byName(label)?.snap?.machines.find((m) => m.machine === label)?.room
+      const used = r?.totalKb ? ((r.totalKb - r.freeKb) / r.totalKb) * 100 : 0
+      const busy = r && startLoad !== null && r.load > startLoad * r.cores ? 'cpu' : r && startMemory !== null && used > startMemory ? 'memory' : undefined
+      this.boxes.set(label, { read: { herdr: !!r, busy }, at: now, reading: false })
     }
   }
 
@@ -119,6 +106,8 @@ export class LiveSourceViews extends LiveSourceState {
 
   snapshot(): Snapshot {
     const { places, machines } = this.listed()
+    const { max } = this.settings.machine()
+    for (const m of machines) m.slots = { working: this.engine.workingOn(m.machine === HOST ? undefined : m.machine), max }
     const peers = this.peers?.list() ?? []
     const asks = this.asks()
     for (const l of peers) Object.assign(asks, l.snap?.asks ?? {})

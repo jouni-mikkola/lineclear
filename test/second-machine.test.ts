@@ -67,11 +67,7 @@ function setup(o: Opts) {
 const [cmd, sub, ...rest] = process.argv.slice(2);
 const read = (f) => JSON.parse(fs.readFileSync(f, "utf8"));
 const remote = read("${home}/tasks.json");
-if (cmd === "room") {
-  if (fs.existsSync("${home}/down")) { console.error("herdr could not reach farbox for workspace.list"); process.exit(1); }
-  const working = remote.filter((t) => t.status === "work").length;
-  console.log(JSON.stringify({ host: "farbox", load: 1, cores: 4, freeKb: ${o.freeKb ?? 8_000_000}, working, max: Number(fs.readFileSync("${home}/max", "utf8")) }));
-} else if (cmd === "task" && sub === "list") {
+if (cmd === "task" && sub === "list") {
   console.log(JSON.stringify([...read("${fake}/tasks.json"), ...remote.map((t) => ({ ...t, machine: "farbox" }))]));
 } else if (cmd === "task" && sub === "add") {
   const line = [cmd, sub, ...rest].join(" ");
@@ -118,7 +114,21 @@ else if (cmd === "show") console.log("machine.maxTasks       ${o.localMax ?? 0} 
     XDG_CACHE_HOME: join(dir, "cache"),
   };
   const doTick = (dryRun = false, world: Partial<World> = {}) =>
-    tick({ ...realWorld(vars), room: (host, space) => readRoom(host, space, vars), load: () => 0, ...world }, dryRun, vars);
+    tick({ ...realWorld(vars), room: (host, space) => readRoom(host, space, snapshot(), vars), load: () => 0, ...world }, dryRun, vars);
+  // What the main server's snapshot says of farbox: its worker's room and the slots the one store counts (no row when the worker is silent).
+  const snapshot = () => {
+    if (existsSync(join(home, "down"))) return { machines: [] };
+    const working = (JSON.parse(read(join(home, "tasks.json"))) as { status: string }[]).filter((t) => t.status === "work").length;
+    return {
+      machines: [
+        {
+          machine: "farbox",
+          room: { load: 1, cores: 4, freeKb: o.freeKb ?? 8_000_000, totalKb: 16_000_000 },
+          slots: { working, max: Number(read(join(home, "max"))) },
+        },
+      ],
+    };
+  };
   const read = (f: string) => (existsSync(f) ? readFileSync(f, "utf8") : "");
   const down = () => {
     writeFileSync(join(home, "down"), "");

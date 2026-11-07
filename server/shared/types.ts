@@ -3,6 +3,7 @@ export type {
   HealthLevel,
   HealthMeter,
   Machine,
+  Room,
   Report,
   TaskStatus,
   AgentHerdr,
