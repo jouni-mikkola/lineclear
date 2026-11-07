@@ -20,7 +20,7 @@ function project(scripts: Record<string, string> = { check: "bun test", "types:f
   mkdirSync(join(config, "projects", "app"), { recursive: true });
   writeFileSync(
     join(config, "projects", "app", "settings.json"),
-    JSON.stringify({ repo, space: "app", check: "bun run check", models: { worker: [], reviewer: [], planner: [] } }),
+    JSON.stringify({ repo, space: "app", check: "bun run check", models: { worker: [], reviewer: [] } }),
   );
   const env = { ...process.env, LINECLEAR_CONFIG: config };
   const settings = () => readSettings("app", env) as Settings;

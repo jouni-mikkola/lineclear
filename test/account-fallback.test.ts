@@ -32,7 +32,7 @@ function setup() {
   mkdirSync(join(config, "projects/p"), { recursive: true });
   writeFileSync(
     join(config, "projects/p/settings.json"),
-    JSON.stringify({ repo, models: { worker: ["claude-bridge-b/s", "claude-bridge/s"], reviewer: ["x/r"], planner: [] } }),
+    JSON.stringify({ repo, models: { worker: ["claude-bridge-b/s", "claude-bridge/s"], reviewer: ["x/r"] } }),
   );
   return { repo, env: { LINECLEAR_CONFIG: config } };
 }

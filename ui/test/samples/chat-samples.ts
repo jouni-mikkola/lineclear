@@ -126,7 +126,7 @@ function request(): ChatMessage[] {
     {
       id: "r4",
       who: "dispatcher",
-      text: "The planner writes the steps for **budget-app** now (task BUD-12). They come to you as one approval, here and in the Inbox.\n\nSee them live: [budget-app roadmap](/budget-app/roadmap/track?plan=BUD-12)",
+      text: "I write the steps for **budget-app** now (plan BUD-12). They come to you as one approval, here and in the Inbox.\n\nSee them live: [budget-app roadmap](/budget-app/roadmap/track?plan=BUD-12)",
       at: AT + 30_000,
     },
   ];

@@ -179,7 +179,7 @@ export async function saveProject(body: NewProject, env: Env): Promise<{ name: s
   const said: string[] = [];
   const list = models.join(",");
   const code = await addProject(
-    [repo, "--name", name, "--space", space, "--check", text(body.check), "--worker", list, "--reviewer", list, "--planner", list],
+    [repo, "--name", name, "--space", space, "--check", text(body.check), "--worker", list, "--reviewer", list],
     null,
     (l) => said.push(l),
     env as NodeJS.ProcessEnv,
@@ -188,7 +188,7 @@ export async function saveProject(body: NewProject, env: Env): Promise<{ name: s
     const why = said.join(" ");
     return { error: sentence(why), status: why.includes("already exists") ? 409 : 400 };
   }
-  // own processes, as the commands: the planner leans on the loop, whose web pages call this
+  // own processes, as the commands: the Dispatcher leans on the loop, whose web pages call this
   const lineclear = (...args: string[]) =>
     Bun.spawnSync([process.execPath, join(import.meta.dir, "..", "bin", "lineclear"), ...args], { env: env as NodeJS.ProcessEnv, stdin: "ignore" });
   // the chat's Dispatcher comes with the first project; setting it up again changes nothing

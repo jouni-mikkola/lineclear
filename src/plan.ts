@@ -7,9 +7,9 @@ import { applyPlan } from "./plan-apply.ts";
 import { addItem, isOpen, readItems } from "./inbox.ts";
 import { readSettings } from "./project.ts";
 import { looseNote, resolveProject } from "./resolve.ts";
-import { liveLink, recordRequest } from "./requests.ts";
+import { liveLink, readRequests, recordRequest } from "./requests.ts";
 import { planBrief } from "./plan-brief.ts";
-import { checkRoadmap, fitTitle, TITLE_MAX } from "./roadmap.ts";
+import { checkRoadmap } from "./roadmap.ts";
 import { checkSteps, NOGO_ROUNDS, type StepCheck, type StepCheckInput, type StepVerdict } from "./stepcheck.ts";
 import { decisionsPath } from "../pi/config.ts";
 import type { Decision } from "./rules.ts";
@@ -29,7 +29,7 @@ function serverIsDown(env: NodeJS.ProcessEnv): boolean {
 }
 
 const lineclear = serverBin;
-/** `lineclear plan <project> "<goal>"` starts a planning task. `lineclear plan submit` sends its roadmap change to the Inbox. */
+/** `lineclear plan <project> "<goal>"` hands the goal to the Dispatcher, which writes the steps. No task starts. `lineclear plan submit` sends its roadmap change to the Inbox. */
 export function planMain(raw: string[], out: (l: string) => void, baseEnv = process.env, cwd = process.cwd(), now: () => Date = () => new Date()): number {
   // the flag first, then the environment, then the data folder's record: the server's own command reads the last two
   const at = raw.indexOf("--url");
@@ -45,47 +45,14 @@ export function planMain(raw: string[], out: (l: string) => void, baseEnv = proc
   const name = project.name;
   const settings = readSettings(name, env);
   if (typeof settings === "string") return (out(`lineclear plan: ${settings}`), 1);
-  const planner = settings.models.planner[0];
-  // a goal that opens with a short name ("A first roadmap: ...") is titled by it rather than cut mid-word
-  const head = /^([^.:]+)[.:]\s/.exec(goal.trim())?.[1];
-  const title = fitTitle(head && head.length + 6 <= TITLE_MAX ? `Plan: ${head}` : `Plan: ${goal.trim()}`);
-  const p = Bun.spawnSync(
-    [
-      lineclear(env),
-      "task",
-      "add",
-      title,
-      "--brief",
-      planBrief(name, goal.trim(), settings.repo),
-      "--space",
-      settings.space,
-      "--agent",
-      "pi",
-      ...(planner ? ["--model", planner] : []),
-      // The plan is checked by rules and a readiness check, and `lineclear plan submit` merges it when both say go.
-      // A project that asks before plans gets the owner's yes in the Inbox first.
-      "--set",
-      "review=off",
-      "--set",
-      "merge=ask me first",
-    ],
-    { stdin: "ignore", env },
-  );
-  if (p.exitCode === 2 && p.stderr.toString().startsWith("Cannot reach the lineclear command")) return (out(NO_SERVER), 1);
-  if (p.exitCode !== 0) return (out(`lineclear plan: task add failed: ${(p.stderr.toString() || p.stdout.toString()).trim()}`), 1);
-  const task = /\bAdded ([A-Z][A-Z0-9]*-\d+)\b/.exec(p.stdout.toString())?.[1];
-  if (task === undefined) {
-    out(`planning task started for ${name}; its roadmap change will come to the Inbox.${looseNote([[rawName, name]])}`);
-    return 0;
-  }
+  const id = `PLAN-${readRequests(env).length + 1}`;
   const dir = dispatcherDir(env);
   const by = env.LINECLEAR_ROLE === "dispatcher" || cwd === dir || cwd.startsWith(`${dir}/`) ? "dispatcher" : "cli";
-  recordRequest({ task, project: name, goal: goal.trim(), since: now().toISOString(), by }, env);
-  out(
-    `planning task ${task} started for ${name}; ${plansAreAuto(name, env) ? "its steps apply by themselves once the checks pass; you can undo them." : "its steps come to the owner as one approval, in the chat and the Inbox."}${looseNote([[rawName, name]])}`,
-  );
-  out(`live: ${liveLink(name, task)}`);
-  out(`where it stands: lineclear status --plan ${task}`);
+  recordRequest({ task: id, project: name, goal: goal.trim(), since: now().toISOString(), by }, env);
+  // The Dispatcher writes the steps itself: the brief goes back to its chat as this command's answer, and no task starts.
+  out(planBrief(name, goal.trim(), settings.repo, id));
+  out(`live: ${liveLink(name, id)}`);
+  out(`where it stands: lineclear status --plan ${id}${looseNote([[rawName, name]])}`);
   return 0;
 }
 
@@ -110,7 +77,7 @@ function submit(out: (l: string) => void, env: NodeJS.ProcessEnv, cwd: string, n
   if (missing.length > 0) {
     logDecision(task, project, `plan sent back, a step is not whole: ${missing.join(" | ")}`, env, now);
     return fail(
-      `the plan goes back to the planner, each new or changed step must be whole. Fix these, commit and run 'lineclear plan submit' again:\n${missing.join("\n")}`,
+      `the plan goes back to the Dispatcher, each new or changed step must be whole. Fix these, commit and run 'lineclear plan submit' again:\n${missing.join("\n")}`,
     );
   }
   const errors = checkRoadmap(text).errors;
@@ -125,9 +92,8 @@ function submit(out: (l: string) => void, env: NodeJS.ProcessEnv, cwd: string, n
   if (round > 2) return fail("the plan was already sent back once; this task ends");
   const settings = project ? readSettings(project, env) : undefined;
   const before = was.ok ? was.out : "";
-  const planner = typeof settings === "object" ? settings.models.planner[0] : undefined;
   const reviewers = typeof settings === "object" ? settings.models.reviewer : [];
-  const read = stepCheckOf(settings, { task, root, before, after: text, planner, reviewers, env });
+  const read = stepCheckOf(settings, { task, root, before, after: text, reviewers, env });
   if (read.kind === "refused") {
     // a plan held as Ready to merge is watched by no stall check, so the failure is recorded as a stall of its own
     logStall(task, project, `the fresh-model step check cannot run: ${read.why}`, env, now);
@@ -136,7 +102,7 @@ function submit(out: (l: string) => void, env: NodeJS.ProcessEnv, cwd: string, n
   if (read.kind === "no-go") {
     logDecision(task, project, `plan sent back, a fresh reader says no-go: ${read.lines.join(" | ")}`, env, now);
     return fail(
-      `the plan goes back to the planner, a fresh reader found a step unclear. Fix these, commit and run 'lineclear plan submit' again:\n${read.lines.join("\n")}`,
+      `the plan goes back to the Dispatcher, a fresh reader found a step unclear. Fix these, commit and run 'lineclear plan submit' again:\n${read.lines.join("\n")}`,
     );
   }
   if (read.kind === "ended") return endPlan(task, project, read, out, env, now);

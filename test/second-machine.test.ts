@@ -99,7 +99,7 @@ else if (cmd === "show") console.log("machine.maxTasks       ${o.localMax ?? 0} 
       check: "bun run check",
       machines: ["farbox"],
       ...o.settings,
-      models: { worker: ["anthropic/claude-sonnet-5-5"], reviewer: ["anthropic/claude-opus-5-5"], planner: ["anthropic/claude-opus-5-5"] },
+      models: { worker: ["anthropic/claude-sonnet-5-5"], reviewer: ["anthropic/claude-opus-5-5"] },
     }),
   );
   // No GIT_* variable of the run around the test (a hook's GIT_DIR, a global config) reaches the clone on the fake machine.

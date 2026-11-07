@@ -126,7 +126,7 @@ export function readinessPrompt(diff: string, repo?: string): string {
 export function readiness(diff: string, project: string | undefined, env = process.env): { go: boolean; why: string } {
   const s = project ? readSettings(project, env) : undefined;
   const prompt = readinessPrompt(diff, typeof s === "object" ? s.repo : undefined);
-  const model = typeof s === "object" ? (s.models.reviewer[0] ?? s.models.planner[0]) : undefined;
+  const model = typeof s === "object" ? s.models.reviewer[0] : undefined;
   const p = askModel(prompt, model, env.LINECLEAR_READINESS, "LINECLEAR_READINESS_MODEL", env);
   const text = p.stdout.toString().trim();
   if (p.exitCode !== 0 || !text)

@@ -35,7 +35,7 @@ beforeEach(async () => {
     mkdirSync(join(root, "config", "projects", name), { recursive: true });
     writeFileSync(
       join(root, "config", "projects", name, "settings.json"),
-      JSON.stringify({ repo: r, space: `${name}-space`, check: "true", models: { worker: ["a"], reviewer: ["b"], planner: ["c"] } }),
+      JSON.stringify({ repo: r, space: `${name}-space`, check: "true", models: { worker: ["a"], reviewer: ["b"] } }),
     );
   }
   alphaTask = join(root, "alpha-task");

@@ -103,7 +103,6 @@ esac`,
       models: {
         worker: o.worker ?? ["anthropic/claude-sonnet-5-5"],
         reviewer: o.reviewer ?? ["anthropic/claude-opus-5-5", "openai-codex/gpt-6.1-sol"],
-        planner: ["anthropic/claude-opus-5-5"],
       },
     }),
   );

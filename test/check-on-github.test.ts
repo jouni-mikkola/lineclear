@@ -41,11 +41,7 @@ beforeEach(async () => {
   const saved = { ...process.env };
   Object.assign(process.env, vars);
   try {
-    await main(
-      ["project", "add", repo, "--name", "demo", "--worker", "a", "--reviewer", "b", "--planner", "c", "--check", `touch ${ran()}`, "--heavy", "true"],
-      () => {},
-      null,
-    );
+    await main(["project", "add", repo, "--name", "demo", "--worker", "a", "--reviewer", "b", "--check", `touch ${ran()}`, "--heavy", "true"], () => {}, null);
   } finally {
     for (const k of Object.keys(vars)) if (saved[k] === undefined) delete process.env[k];
     Object.assign(process.env, saved);

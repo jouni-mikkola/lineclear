@@ -23,11 +23,7 @@ beforeEach(async () => {
   const saved = { ...process.env };
   Object.assign(process.env, vars);
   try {
-    await main(
-      ["project", "add", repo, "--name", "demo", "--worker", "a", "--reviewer", "b", "--planner", "c", "--check", "true", "--heavy", "true"],
-      () => {},
-      null,
-    );
+    await main(["project", "add", repo, "--name", "demo", "--worker", "a", "--reviewer", "b", "--check", "true", "--heavy", "true"], () => {}, null);
   } finally {
     // later test files of this process must not see this test's folders
     for (const k of Object.keys(vars)) if (saved[k] === undefined) delete process.env[k];

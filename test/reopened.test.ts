@@ -33,7 +33,7 @@ function setup(commitsSince: number, text = roadmap(true)) {
   const dir = scratchDir("reopened");
   const config = join(dir, "config");
   mkdirSync(join(config, "projects", "demo"), { recursive: true });
-  const models = { worker: ["anthropic/claude-sonnet-5-5"], reviewer: ["anthropic/claude-opus-5-5"], planner: ["anthropic/claude-opus-5-5"] };
+  const models = { worker: ["anthropic/claude-sonnet-5-5"], reviewer: ["anthropic/claude-opus-5-5"] };
   writeFileSync(join(config, "projects", "demo", "settings.json"), JSON.stringify({ repo: dir, space: "demo", check: "true", models }));
   writeFileSync(join(config, "machine.json"), JSON.stringify({ loadLimit: 1e6 }));
   const tmp = join(dir, "tmp");

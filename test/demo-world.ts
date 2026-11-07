@@ -9,8 +9,7 @@ const ROADMAP = "# Roadmap\n\n## Phase 0\n\n### A Alpha\n- why: because\n- done 
 export function demoConfig(dir: string, o: { worker?: string[]; reviewer?: string[]; loadPerCore: number }): string {
   const config = join(dir, "config");
   mkdirSync(join(config, "projects", "demo"), { recursive: true });
-  const planner = ["anthropic/claude-opus-5-5"];
-  const models = { worker: o.worker ?? ["anthropic/claude-sonnet-5-5"], reviewer: o.reviewer ?? planner, planner };
+  const models = { worker: o.worker ?? ["anthropic/claude-sonnet-5-5"], reviewer: o.reviewer ?? ["anthropic/claude-opus-5-5"] };
   writeFileSync(join(config, "projects", "demo", "settings.json"), JSON.stringify({ repo: dir, space: "demo", check: "true", models }));
   writeFileSync(join(config, "machine.json"), JSON.stringify({ loadPerCore: o.loadPerCore }));
   return config;

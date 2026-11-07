@@ -22,7 +22,7 @@ export function demoEnv(dir: string): NodeJS.ProcessEnv {
   const at = (...p: string[]) => join(dir, ...p);
   mkdirSync(at("config", "projects", "demo"), { recursive: true });
   mkdirSync(at("tmp"));
-  const models = { worker: ["anthropic/claude-sonnet-5-5"], reviewer: ["anthropic/claude-opus-5-5"], planner: ["anthropic/claude-opus-5-5"] };
+  const models = { worker: ["anthropic/claude-sonnet-5-5"], reviewer: ["anthropic/claude-opus-5-5"] };
   writeFileSync(at("config", "projects", "demo", "settings.json"), JSON.stringify({ repo: dir, space: "demo", check: "true", models }));
   writeFileSync(at("config", "machine.json"), JSON.stringify({ loadLimit: 1e6 }));
   return {

@@ -12,7 +12,6 @@ import { samples } from "./sample-loader.ts";
 const ROLES = [
   { id: "worker", label: "Worker" },
   { id: "reviewer", label: "Reviewer" },
-  { id: "planner", label: "Planner" },
   { id: "stepChecker", label: "Step checker" },
 ] as const;
 type RoleId = (typeof ROLES)[number]["id"];

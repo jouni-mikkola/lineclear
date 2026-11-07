@@ -61,7 +61,7 @@ export function AppliedStrip({ project }: { project: string }) {
 /** The steps of one request (`?plan=<task>`): what you asked for, where it stands, and each of its steps live. */
 export function PlanStrip({ plan, byId }: { plan: PlanCard; byId: Map<string, RoadmapStep> }) {
   const said: Record<PlanCard["state"], string> = {
-    planning: "The planner writes the steps.",
+    planning: "The Dispatcher writes the steps.",
     approve: "The steps wait for your approval in the Inbox.",
     approved: "Approved. Each step starts when the steps before it are merged.",
     rejected: "Rejected. The roadmap stays as it was.",

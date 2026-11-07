@@ -81,7 +81,7 @@ export function writeTasks(tasks: FixtureTask[], o: { need?: string[]; red?: str
       repo: path(name),
       space: name,
       check: "true",
-      models: { worker: [], reviewer: [], planner: [] },
+      models: { worker: [], reviewer: [] },
     });
   write(join(FIXTURE, "lineclear", "tasks.json"), {
     tasks: tasks.map((t, i) => ({ ...t, updated: i + 1, ...(t.merged ? { doneAt: i + 1 } : {}) })),
@@ -245,7 +245,7 @@ function writeRoadmapProject(
     repo,
     space: project,
     check: "true",
-    models: { worker: [], reviewer: [], planner: [] },
+    models: { worker: [], reviewer: [] },
   });
   writeSpaceTasks(project, tasks);
   recordSteps(project, tasks);
@@ -397,7 +397,7 @@ export const ROADMAP_LIVE: Partial<Record<Motion, { change: () => void; after: s
 
 // Settings: a project's settings.
 
-const SHOP_MODELS = { worker: ["vendor-a/model-mid", "vendor-b/model-code"], reviewer: ["vendor-b/model-code"], planner: ["vendor-a/model-top"] };
+const SHOP_MODELS = { worker: ["vendor-a/model-mid", "vendor-b/model-code"], reviewer: ["vendor-b/model-code"] };
 
 export const shopSettings = () => JSON.parse(readFileSync(join(FIXTURE, "config", "projects", "web-shop", "settings.json"), "utf8"));
 

@@ -109,7 +109,7 @@ function world(cards: Card[], secrets = "", postedAt = 1000) {
   mkdirSync(join(shep, "chatlog"), { recursive: true });
   writeFileSync(
     join(config, "projects", "demo", "settings.json"),
-    JSON.stringify({ repo: dir, space: "Demo", check: "true", models: { worker: [], reviewer: [], planner: [] } }),
+    JSON.stringify({ repo: dir, space: "Demo", check: "true", models: { worker: [], reviewer: [] } }),
   );
   if (secrets) {
     mkdirSync(join(dir, "main"), { recursive: true });

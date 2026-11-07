@@ -98,5 +98,5 @@ function staleBranch(item: Item, env: NodeJS.ProcessEnv): string | undefined {
   const n = /-(\d+)$/.exec(item.task)?.[1];
   if (!item.head || typeof repo !== "object" || !n) return undefined;
   const now = gitText(repo.repo, "for-each-ref", "--format=%(objectname)", `refs/heads/work/${n}-*`) ?? "";
-  return now === item.head ? undefined : "lineclear inbox: the branch changed after the plan was sent, ask the planner to run 'lineclear plan submit' again";
+  return now === item.head ? undefined : "lineclear inbox: the branch changed after the plan was sent, ask the Dispatcher to run 'lineclear plan submit' again";
 }

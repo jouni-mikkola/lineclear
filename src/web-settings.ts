@@ -53,7 +53,7 @@ export function settingsList(env: Env): ProjectSettings[] {
   for (const name of listProjectNames(env as NodeJS.ProcessEnv)) {
     const s = readSettings(name, env as NodeJS.ProcessEnv);
     if (typeof s === "string") continue;
-    const models = { worker: s.models?.worker ?? [], reviewer: s.models?.reviewer ?? [], planner: s.models?.planner ?? [] };
+    const models = { worker: s.models?.worker ?? [], reviewer: s.models?.reviewer ?? [] };
     out.push({
       name,
       repo: s.repo,

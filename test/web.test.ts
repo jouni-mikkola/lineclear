@@ -322,7 +322,7 @@ test("/api/settings gives each project with its secret names, never their values
   mkdirSync(proj, { recursive: true });
   writeFileSync(
     join(proj, "settings.json"),
-    JSON.stringify({ repo: "/r", space: "web-shop", check: "true", models: { worker: ["a/x", "a/y"], reviewer: ["b/z"], planner: ["c/w"] } }),
+    JSON.stringify({ repo: "/r", space: "web-shop", check: "true", models: { worker: ["a/x", "a/y"], reviewer: ["b/z"] } }),
   );
   mkdirSync(join(dir, "data"), { recursive: true });
   writeFileSync(join(dir, "data", "vault.json"), JSON.stringify({ all: { API_TOKEN: { value: "s3cret", at: 1 } } }));
@@ -336,7 +336,7 @@ test("/api/settings gives each project with its secret names, never their values
       name: "web-shop",
       repo: "/r",
       check: "true",
-      models: { worker: ["a/x", "a/y"], reviewer: ["b/z"], planner: ["c/w"] },
+      models: { worker: ["a/x", "a/y"], reviewer: ["b/z"] },
       secrets: ["API_TOKEN"],
       askBefore: { plans: false, releases: true, spending: true },
     },
@@ -389,7 +389,7 @@ test("the add form's API detects a folder and saves a project where the CLI does
   expect((await post(full)).status).toBe(201);
   expect((await post(full)).status).toBe(409);
   const saved = JSON.parse(readFileSync(join(config, "projects", "new-repo", "settings.json"), "utf8"));
-  expect(saved).toMatchObject({ repo, space: "new-space", check: "bun run check", models: { worker: ["a/b"], reviewer: ["a/b"], planner: ["a/b"] } });
+  expect(saved).toMatchObject({ repo, space: "new-space", check: "bun run check", models: { worker: ["a/b"], reviewer: ["a/b"] } });
   const noOrigin = await api(new Request("http://127.0.0.1/api/projects", { method: "POST", headers: { "content-type": "text/plain" }, body: "{}" }));
   expect(noOrigin.status).toBe(403);
 });

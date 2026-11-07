@@ -41,7 +41,7 @@ function world() {
     mkdirSync(join(config, "projects", name), { recursive: true });
     writeFileSync(
       join(config, "projects", name, "settings.json"),
-      JSON.stringify({ repo, space: name, check: "true", askBefore: { plans: true }, models: { worker: [], reviewer: [], planner: [] } }),
+      JSON.stringify({ repo, space: name, check: "true", askBefore: { plans: true }, models: { worker: [], reviewer: [] } }),
     );
   }
   const bin = join(dir, "lineclear");
@@ -70,7 +70,7 @@ function dispatcher(env: NodeJS.ProcessEnv) {
   const plan = (project: string, goal: string) => {
     const said = run((o) => planMain([project, goal], o, env));
     const live = said.find((l) => l.startsWith("live: "))!.slice(6);
-    return `I picked **${project}**. The planner writes the steps; they come back to you as one approval.\n\n[See the steps live](${live})`;
+    return `I picked **${project}**. I write the steps; they come back to you as one approval.\n\n[See the steps live](${live})`;
   };
   let asked = "";
   return (text: string, answer?: boolean) => {
@@ -179,7 +179,7 @@ test("a clear pick plans in that project; the plan comes back as one approval in
     const answer = await c.ask("Add CSV export to the budget app", 2);
     expect(answer.text).toContain("I picked **budget-app**");
     expect(answer.text).toContain("[See the steps live](/budget-app/roadmap/track?plan=PLAN-1)");
-    expect(readFileSync(w.log, "utf8")).toContain("task add Plan: Add CSV export to the --brief Plan for the project budget-app.");
+    expect(readFileSync(w.log, "utf8")).not.toContain("task add");
     expect(readRequests(w.env)).toMatchObject([{ task: "PLAN-1", project: "budget-app", goal: "Add CSV export to the budget app", by: "dispatcher" }]);
     expect((await c.get("/api/plans"))[0]).toMatchObject({ task: "PLAN-1", state: "planning", steps: [], live: "/budget-app/roadmap/track?plan=PLAN-1" });
 

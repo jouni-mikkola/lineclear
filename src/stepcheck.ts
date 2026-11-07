@@ -169,7 +169,7 @@ export interface StepCheckInput {
   root: string;
   before: string;
   after: string;
-  planner: string | undefined;
+  planner?: string;
   reviewers: string[];
   env: NodeJS.ProcessEnv;
 }

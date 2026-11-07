@@ -33,7 +33,7 @@ test("the web chat gets answers to status, plan and move from the Dispatcher", a
   mkdirSync(join(config, "projects", "demo"), { recursive: true });
   writeFileSync(
     join(config, "projects", "demo", "settings.json"),
-    JSON.stringify({ repo, space: "demo", check: "true", askBefore: { plans: true }, models: { worker: [], reviewer: [], planner: [] } }),
+    JSON.stringify({ repo, space: "demo", check: "true", askBefore: { plans: true }, models: { worker: [], reviewer: [] } }),
   );
   const env = { ...process.env, LINECLEAR_CONFIG: config, LINECLEAR_SERVER_BIN: bin };
 
@@ -63,8 +63,8 @@ test("the web chat gets answers to status, plan and move from the Dispatcher", a
 
     expect(await ask("status of demo", 2)).toContain("D-1 waits for you: Pick A or B");
 
-    expect(await ask("plan a login step", 4)).toContain("planning task started for demo");
-    expect(readFileSync(log, "utf8")).toContain("task add Plan: Add a login step");
+    expect(await ask("plan a login step", 4)).toContain("Plan PLAN-1 for the project demo");
+    expect(readFileSync(log, "utf8")).not.toContain("task add");
 
     const before = readFileSync(join(repo, "docs", "ROADMAP.md"), "utf8");
     expect(await ask("move B after A", 6)).toContain("Nothing changes until the owner approves");

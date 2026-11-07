@@ -4,11 +4,11 @@ import { writeAtomic } from "../pi/atomic.ts";
 import { configDir } from "../pi/config.ts";
 import { ENDLESS, scriptRunner } from "./project-detect.ts";
 
-export const roles = ["worker", "reviewer", "planner"] as const;
+export const roles = ["worker", "reviewer"] as const;
 export type Role = (typeof roles)[number];
 
 /** The roles the owner chooses a model for on first run, one model each and none by default. */
-export const setupRoles = ["worker", "reviewer", "planner", "stepChecker"] as const;
+export const setupRoles = ["worker", "reviewer", "stepChecker"] as const;
 export type SetupRole = (typeof setupRoles)[number];
 export type Setup = Partial<Record<SetupRole, string>>;
 
