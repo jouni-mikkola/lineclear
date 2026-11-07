@@ -271,6 +271,25 @@ export class EngineLand extends EngineHandoff {
   }
 
   /**
+   * A red main stops the merges: one waits for a green run, so a burst of failures stays one. A fix (its task is made by
+   * main-green, or its title starts with Fix) goes in, as only it can turn main green. False when Lineclear is stopping.
+   */
+  protected async holdWhileRed(t: TaskRec, g: G.GitHub, cwd: string): Promise<boolean> {
+    if (t.by === 'main-green' || /^fix\b/i.test(t.title)) return true
+    const red = async () => {
+      const runs = await GH.branchRuns(g, cwd, t.base!)
+      return runs?.find((r) => r.state !== 'pending')?.state === 'fail'
+    }
+    while (!this.closing && (await red())) {
+      t.mergeStopped = `Held: ${t.base} is red on GitHub, the merge goes on once a run is green.`
+      await Bun.sleep(this.redWait)
+    }
+    return !this.closing
+  }
+
+  protected redWait = CHECKS_EVERY
+
+  /**
    * Through the pull request, as herdr-projects lands one: the branch pushed as it is, rebased on GitHub's main only
    * when it conflicts with it (its pull request opened if the agent didn't), GitHub's checks passed at exactly that
    * commit, then squash-merged on GitHub only while its head is still that commit, its branch there deleted, and main here brought up to GitHub's (which
@@ -319,6 +338,8 @@ export class EngineLand extends EngineHandoff {
         `it was in ${t.base} already${pr ? (closed ? `; closed PR #${pr.number}` : `; could not close PR #${pr.number}: close it on GitHub`) : ''}`,
       )
     }
+    if (!(await this.holdWhileRed(t, g, p.path)))
+      return { ok: false, error: `Lineclear is restarting: nothing was merged. Run lineclear merge ${t.id} again in a minute.` }
     const head = (await G.git(wt, 'rev-parse', 'HEAD')).out
     const pushing = !pr || pr.headRefOid !== head
     if (pushing) {
