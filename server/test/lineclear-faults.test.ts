@@ -1,6 +1,6 @@
 // Faults seen in herdr-projects 2.0 (ebb17d5) that the fork fixes, each with a test that fails on the base's behaviour. The
 // Each is named for the fault it plants.
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, spyOn, test } from 'bun:test'
 import { repo, started, world } from './engine-world.ts'
 
 describe('(d) Ready with no review and no merge', () => {
@@ -77,4 +77,3 @@ describe("(g) a turn ends by pi's word", () => {
     expect(w.cards.slice(before).some((c) => c.status === 'need')).toBe(true)
   })
 })
-
