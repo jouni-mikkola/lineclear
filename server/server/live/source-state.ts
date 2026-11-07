@@ -14,6 +14,7 @@ import { agentEnv, BOX } from './box.ts'
 import { NAME, placeId, Places } from './places.ts'
 import { privatePrompt, coordinatorPrompt } from './prompts.ts'
 import type { Harness } from './restart.ts'
+import { ChatIdle } from './chat-idle.ts'
 import { Revivals } from './revive.ts'
 import { Settings, type Level } from './settings.ts'
 import { Vault } from './secrets.ts'
@@ -62,6 +63,8 @@ export class LiveSourceState extends Emitter<SourceEvents> {
   /** agents that stopped or run on outdated files, started again by Lineclear (revive.ts) */
   revivals = new Revivals()
   protected reviving = new Set<string>()
+  /** how long each agent has been idle: past the limit its pane closes (chat-idle.ts) */
+  idle = new ChatIdle()
   devices: () => string[] = () => []
   /** the main machine runs every other machine saved in herdr, each from a worker of its own (machines.ts); a worker
    *  is one of those (box.ts) */
