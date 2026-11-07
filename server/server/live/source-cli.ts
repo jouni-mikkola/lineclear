@@ -40,29 +40,30 @@ export class LiveSourceCli extends LiveSourceSubcommands {
   protected async command(p: Parsed, ctx: { chat?: string; cwd?: string; stdin?: string; proof?: string }): Promise<string> {
     const [a0, a1, ...rest] = p.words
     if (!a0 || a0 === 'help' || p.flags.has('help')) return HELP
-    switch (a0) {
-      case 'alive': {
+    // the words that go by another name
+    const alias: Record<string, string> = { project: 'space', done: 'ready', checks: 'pr', unset: 'set' }
+    const words: Record<string, () => string | Promise<string>> = {
+      alive: async () => {
         if (!a1) throw new Error('lineclear alive <task>')
         if (ctx.chat?.includes('/') && ctx.chat.split('/')[0].toUpperCase() !== a1.toUpperCase()) throw new Error('An agent beats only for its own task.')
         this.engine.alive(a1)
         return 'ok'
-      }
-      case 'status': {
+      },
+      status: async () => {
         if (a1) return this.reportCommand(a1, rest, p, ctx)
         const kept = this.engine.keptLeftovers()
         const line = `Lineclear on ${NAME}: ${this.places.shown().length} spaces, ${this.engine.tasks.filter((t) => !ended(t) && !t.archived).length} open tasks; herdr ${this.agents.reachable ? 'answers' : 'does not answer'}.`
         return kept.length ? `${line}\nDone tasks that kept work (remove it by hand once you're sure):\n${kept.map((k) => `  ${k}`).join('\n')}` : line
-      }
+      },
       // a machine's room as the adapter reads it, with its tasks at work and its slots from the one store
-      case 'room': {
+      room: async () => {
         if (a1 && !this.engine.machines.has(a1) && !this.peers?.knows(a1)) throw new Error(`No machine called ${a1}.`)
         const read = await room(a1)
         if (!read) throw new Error(`${a1 ?? NAME} cannot be reached through herdr.`)
         return JSON.stringify({ host: a1 ?? NAME, ...read, working: this.engine.workingOn(a1), max: this.settings.machine().max }, null, 2)
-      }
+      },
       // project, from before spaces, is space
-      case 'project':
-      case 'space': {
+      space: async () => {
         if (a1 === 'add') {
           const path = rest[0] ?? ctx.cwd
           if (!path) throw new Error('lineclear space add <path> [--name NAME]')
@@ -99,8 +100,8 @@ export class LiveSourceCli extends LiveSourceSubcommands {
           return `Removed ${shown} from Lineclear; ${pr.path} and its code stay on disk. lineclear space add ${pr.path} --name ${shown} brings it back with its open tasks and chat.`
         }
         throw new Error('lineclear space add|list|rename|remove')
-      }
-      case 'task': {
+      },
+      task: async () => {
         // a task the list shows "(on desktop)" is run by that machine's worker: its show, tell, close, merge and delete go there
         const ref = machineRef(rest[0] ?? '')
         // "machine-b:OMA-91" may be an old id a rename kept: that machine's task is then called by its new id
@@ -116,12 +117,9 @@ export class LiveSourceCli extends LiveSourceSubcommands {
         return other
           ? `${out}\n(${this.engine.task(rest[0])!.id} is also a task on ${other.rec.machine}: say ${other.rec.machine}:${rest[0]} for that one.)`
           : out
-      }
-      case 'restart':
-        return this.restartCommand(a1, p, ctx)
-      // done is ready's old name, still taken
-      case 'ready':
-      case 'done': {
+      },
+      restart: () => this.restartCommand(a1, p, ctx),
+      ready: async () => {
         // a task's agent may leave the id out: it reports its own task
         const id = a1 ?? (ctx.chat?.includes('/') ? ctx.chat.split('/')[0] : undefined)
         if (!id) throw new Error(`lineclear ${a0} <id> --summary "<what changed>". ${readSection('lineclear-agent', 'Procedure')}`)
@@ -135,19 +133,17 @@ export class LiveSourceCli extends LiveSourceSubcommands {
         if (ctx.chat === `${t.id}/Agent` && this.engine.landAtReady(t.id))
           return `Noted: ${t.id} shows as Ready. Lineclear merges it once this turn ends and starts you again only if the check fails: end your turn now and do nothing more.`
         return `Noted: ${t.id} shows as Ready to merge (not merged yet). Merge only when your brief or the human says so (lineclear merge ${t.id}).`
-      }
-      case 'todo': {
+      },
+      todo: async () => {
         const t = this.engine.task(a1 ?? '')
         if (!t) throw new Error(`No task ${a1 ?? ''}; lineclear todo <id>`)
         if (ctx.chat?.includes('/') && ctx.chat.split('/')[0].toUpperCase() !== t.id.toUpperCase())
           throw new Error(`A task's agent says only its own task waits, not ${t.id}. ${readSection('lineclear-agent', 'Procedure')}`)
         this.engine.todo(t.id)
         return `Noted: ${t.id} shows as To do until it gets a go. Reply in one line that you have the brief, then end your turn.`
-      }
-      case 'merge':
-        return this.mergeCommand(a1, ctx)
-      case 'pr':
-      case 'checks': {
+      },
+      merge: () => this.mergeCommand(a1, ctx),
+      pr: async () => {
         const t = this.engine.task(a1 ?? '')
         if (!t) throw new Error(`no task ${a1 ?? ''}; lineclear ${a0} <id>`)
         if (ctx.chat?.includes('/') && ctx.chat.split('/')[0].toUpperCase() !== t.id.toUpperCase())
@@ -155,14 +151,14 @@ export class LiveSourceCli extends LiveSourceSubcommands {
         const r = a0 === 'pr' ? await this.engine.openPr(t.id) : await this.engine.checks(t.id)
         if (!r.ok) throw new Error(r.text)
         return r.text
-      }
-      case 'plan': {
+      },
+      plan: async () => {
         const steps = p.opts.step ?? []
         if (!steps.length) throw new Error('lineclear plan <id> --step "..." --step "..."')
         await this.engine.plan(a1, steps)
         return 'Plan posted. Stop now and wait: the yes, or a note, arrives as a message.'
-      }
-      case 'ask': {
+      },
+      ask: async () => {
         if (!ctx.chat) throw new Error('lineclear card works from an agent Lineclear started')
         const title = a1
         const labels = p.opts.choice ?? []
@@ -186,8 +182,8 @@ export class LiveSourceCli extends LiveSourceSubcommands {
         this.emit('chat', ctx.chat)
         this.emit('snapshot')
         return 'Asked. End your turn now; the answer arrives as an [… answered …] line.'
-      }
-      case 'alert': {
+      },
+      alert: async () => {
         if (!a1) throw new Error('lineclear alert "<title>" --body "<why>"')
         const t = one(p, 'task') ? this.engine.task(one(p, 'task')!) : undefined
         // another machine's task (the main machine's home space keeps every machine's overview): it opens on that task,
@@ -218,8 +214,8 @@ export class LiveSourceCli extends LiveSourceSubcommands {
             ...(ctx.chat?.includes('/') ? { task: true as const } : {}),
           })
         return 'Alert sent.'
-      }
-      case 'show': {
+      },
+      show: async () => {
         // the defaults where it runs: its space's (a space's coordinator, one of its tasks, --space, or a folder in it),
         // else this machine's
         const pr = this.placeOfCommand(p, ctx)?.name
@@ -236,9 +232,8 @@ export class LiveSourceCli extends LiveSourceSubcommands {
         })
         const repo = pr ? this.places.byName(pr) : undefined
         return `${head}${repo ? `\nBase branch: ${repo.base} (new tasks; per-task override: --base <branch>)` : ''}\n${this.settings.lines(pr, NAME, lists)}${now}\n\nEvery new task's brief${pr ? ` in ${pr}` : ''} ends with:\n${block}\n\nFor one task, set any of these with task add: --set review.rounds=1 --set merge="ask me first" (--set agent=codex, model, effort, reviewer, reviewer.model, reviewer.effort too), or say so in its brief, which wins.`
-      }
-      case 'set':
-      case 'unset': {
+      },
+      set: async () => {
         const value = a0 === 'unset' ? null : rest.join(' ')
         if (!a1 || (a0 === 'set' && !value && !(a1.endsWith('.instructions') && rest.length)))
           throw new Error(`lineclear ${a0} <key>${a0 === 'set' ? ' <value>' : ''}`)
@@ -274,15 +269,16 @@ export class LiveSourceCli extends LiveSourceSubcommands {
         const where = pr ? `${named}'s` : level === 'machine' ? `${NAME}'s` : "Everywhere's"
         const now = this.settings.get(a1, pr)
         return `${a0 === 'unset' ? `${a1}: ${where} own is unset; it is ${now} now.` : `${a1} = ${now} (${where})`}${a1.endsWith('.instructions') ? '\nUsed at the next start or restart; running agents are unchanged. Reviewer changes need a new or restarted task agent.' : ''}`
-      }
-      case 'doctor': {
+      },
+      doctor: async () => {
         if (BOX) throw new Error(`lineclear doctor checks every machine from the main one: run it there (${HOST} is run from it over SSH).`)
         const own = `${NAME} (this machine, the main one): herdr ${this.agents.reachable ? 'answers' : 'does not answer'}`
         return [own, ...this.pushWarnings().map((warning) => `Alerts: ${warning}`), ...((await this.peers?.doctor()) ?? [])].join('\n')
-      }
-      case 'secret':
-        return this.secretCommand(a1, rest, p, ctx)
+      },
+      secret: () => this.secretCommand(a1, rest, p, ctx),
     }
-    throw new Error(`No command ${a0}; lineclear help lists them`)
+    const name = alias[a0] ?? a0
+    if (!Object.hasOwn(words, name)) throw new Error(`No command ${a0}; lineclear help lists them`)
+    return words[name]()
   }
 }
