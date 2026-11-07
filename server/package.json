@@ -1,0 +1,23 @@
+{
+  "name": "lineclear",
+  "version": "2.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "Run many coding agents across machines from a phone, tablet or desktop.",
+  "scripts": {
+    "start": "bun server/main.ts",
+    "typecheck": "tsc --noEmit",
+    "typecheck:changed": "tsc --noEmit --incremental --tsBuildInfoFile node_modules/.cache/tsc-changed.tsbuildinfo",
+    "test": "bun scripts/test.ts",
+    "check": "bun run typecheck && bun scripts/test.ts"
+  },
+  "dependencies": {
+    "web-push": "3.6.7"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.4",
+    "@types/web-push": "3.6.4",
+    "typescript": "5.9.3"
+  }
+}
