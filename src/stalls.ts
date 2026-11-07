@@ -280,6 +280,51 @@ function markFullAccounts(p: Pass): void {
   }
 }
 
+const NUDGE = "The board saw no sign of life from you. Carry on with your task, and report with lineclear status when you have something to say.";
+const RESTART = "You were restarted because nothing changed after a nudge. Carry on with your task from where it stands.";
+
+/**
+ * The stall ladder. The server alone judges which task is quiet or late and posts one "may be stuck" card for it;
+ * each new card for a running task is one rung: a nudge, then a restart, then the Inbox. No limit is read here.
+ */
+export function climbStalls(a: Args): void {
+  const { settings, world, state, dryRun, note, env } = a;
+  const running = new Set(a.tasks.filter((t) => t.status === "work").map((t) => t.id));
+  for (const id of Object.keys(state.ladder)) if (!running.has(id)) delete state.ladder[id];
+  for (const card of world.stallCards(settings.space, settings.repo)) {
+    const id = card.task;
+    const entry = state.ladder[id] ?? { rung: 0, seen: [] };
+    if (entry.seen.includes(card.id) || card.at < (state.stallSince ?? 0) || !running.has(id)) continue;
+    const rung = entry.rung + 1;
+    const what = card.late ? "past its time left" : "no sign of life";
+    if (dryRun) {
+      note("stall", `rung ${Math.min(rung, 3)}: would ${rung === 1 ? "nudge" : rung === 2 ? "restart" : "ask you about"} ${id}: ${what}`, id);
+      continue;
+    }
+    state.ladder[id] = { rung, seen: [...entry.seen, card.id] };
+    if (rung === 1) {
+      const err = world.tellTask(id, NUDGE, "resume");
+      note("stall", err ? `rung 1: could not nudge ${id}: ${err}` : `rung 1: nudged ${id}: ${what}`, id);
+    } else if (rung === 2) {
+      const err = world.stopTask(id) ?? world.tellTask(id, RESTART, "resume");
+      note("stall", err ? `rung 2: could not restart ${id}: ${err}` : `rung 2: restarted ${id}: ${what}`, id);
+    } else if (rung === 3) {
+      addItem(
+        {
+          kind: "stuck",
+          task: id,
+          project: a.project,
+          question: `${id} is stuck (${what}) after a nudge and a restart.`,
+          choices: ["Ok"],
+          since: world.now().toISOString(),
+        },
+        env,
+      );
+      note("stall", `rung 3: asked you about ${id} in the Inbox: ${what}`, id);
+    }
+  }
+}
+
 /** Marks the accounts that ran out and brings back those whose reset passed. Nobody is told: it shows on Usage. */
 export function serviceAccounts(a: Args): void {
   const { settings, world, state } = a;
