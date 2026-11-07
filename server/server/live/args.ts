@@ -54,8 +54,6 @@ Spaces (a folder on a machine with a name and its own coordinator; each machine 
                                                  ids stay)
   lineclear space remove <name>                  Lineclear forgets it (its folder stays); not while its tasks work,
                                                  never the home space
-  lineclear answer <card id> "<answer>" --space NAME
-                                                 answer a choice card of the space's coordinator chat in words
 
 Tasks (coordinators add them, only when the human asks)
   lineclear room [MACHINE]    a machine's load, cores, free memory, tasks at work and slots, as JSON
@@ -75,7 +73,7 @@ Tasks (coordinators add them, only when the human asks)
                                                  is a message to it that says so (task tell).
                                                  --agent, --model and --effort pick the CLI (claude, pi, …),
                                                  model and effort for this task instead of Settings': only what
-                                                 that CLI and model take (lineclear models), or default.
+                                                 that CLI and model take, or default.
                                                  --reviewer, --reviewer-model and --reviewer-effort pick who reviews
                                                  its change (claude, pi), named in its brief's Review line.
                                                  --after queues it: its agent reads the brief and waits, and Lineclear
@@ -121,7 +119,7 @@ Tasks (coordinators add them, only when the human asks)
   lineclear restart <space|id> [--agent CLI] [--model ID] [--effort LEVEL] [--save]
                                                  only when the human asks: start a space's coordinator or a task's
                                                  agent again on Settings' CLI, model and effort for its role (or
-                                                 these: what lineclear models lists, or default); --save makes them
+                                                 these, or default); --save makes them
                                                  the space's Settings too. A working agent is interrupted first. The
                                                  same CLI resumes its session; another takes over with the chat so
                                                  far (a task's: its brief, commits and changes too). Its worktree,
@@ -190,7 +188,6 @@ Settings and automations
                                                  limits and numbers now, alerts)
                                                  as they are where it runs (its space, else this machine),
                                                  each with where it comes from, and the lines every brief ends with
-  lineclear models [CLI]                         each CLI's models and the effort levels each takes, as the CLI says
   lineclear set <key> <value> [--machine | --space NAME]
   lineclear unset <key> [--machine | --space NAME]
                                                  defaults are set Everywhere (none), for this machine (--machine)

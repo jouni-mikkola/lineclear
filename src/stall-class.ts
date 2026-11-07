@@ -6,15 +6,9 @@ import { MIN } from "./time.ts";
 
 // Every way a task or a ready step stops moving has a class. A detector in plain code sees it, the stall is recorded
 // in decisions.jsonl once it passes its class's limit, its remedy is recorded with the minutes from the stall, and
-// its end with the minutes it cost. `lineclear stalls` sums them by class.
+// its end with the minutes it cost.
 
 /** Every decision of the rule loop, one JSON line each. */
-
-/** The summary of the last `hours`: a stall that began before the window counts its minutes inside it. */
-function stallSummary(file: string, now: Date, hours = 24): StallSummary {
-  const since = new Date(now.getTime() - hours * 3_600_000);
-  return summarize(readDecisionsSince(file, since.getTime() - 86_400_000), since, now);
-}
 
 const STALL_CLASSES = [
   "signed-out",
@@ -219,24 +213,6 @@ function ladderActed(stalls: Record<string, StallEntry>, r: { k: string; reason:
   seen.set(r.k, { key, class: c, evidence: r.reason });
 }
 
-// ---- the summary ----
-
-interface ClassSum {
-  stalls: number;
-  /** Minutes the stalls cost: ended ones in full, open ones until now. */
-  minutes: number;
-  /** Median minutes from a stall to its remedy, or null when none ran. */
-  toRemedy: number | null;
-}
-
-export interface StallSummary {
-  since: string;
-  until: string;
-  stalls: number;
-  minutes: number;
-  classes: Partial<Record<StallClass, ClassSum>>;
-}
-
 /** Decisions from `since`, read from the end of the file so a long one costs little. When `since` is older than the
  *  file's first line, the months rotateDecisions moved to archive/ are read too. */
 export function readDecisionsSince(file: string, since: number): Decision[] {
@@ -307,60 +283,6 @@ export function rotateDecisions(file: string, now: Date): number {
   return i;
 }
 
-/** The middle of `xs`, null for none. */
-const median = (xs: number[]) => {
-  if (xs.length === 0) return null;
-  const s = [...xs].sort((a, b) => a - b);
-  const m = Math.floor(s.length / 2);
-  const at = (i: number) => s[i] ?? 0;
-  return s.length % 2 ? at(m) : (at(m - 1) + at(m)) / 2;
-};
-
-type Counting = ClassSum & { remedies: number[]; open: Map<string, number> };
-
-/** Counts one stall, remedy or end line into its class's sum, `since` (ms) the window's start. */
-function count(s: Counting, d: Decision, since: number) {
-  const key = `${d.project}|${d.step ?? "-"}`;
-  const t = new Date(d.time).getTime();
-  const inside = t >= since;
-  if (d.event === "stall") {
-    if (inside) s.stalls++;
-    s.open.set(key, new Date(d.since ?? d.time).getTime());
-  } else if (d.event === "remedy" && typeof d.minutes === "number") {
-    if (inside) s.remedies.push(d.minutes);
-    // a stall the ladder saw only as its action counts once, at its action
-    if (!s.open.has(key)) {
-      if (inside) s.stalls++;
-      s.open.set(key, t - d.minutes * MIN);
-    }
-  } else if (d.event === "end" && typeof d.minutes === "number") {
-    const from = s.open.get(key);
-    // only the minutes inside the window count
-    if (from !== undefined && s.open.delete(key) && inside) s.minutes += Math.min(d.minutes, Math.round((t - Math.max(from, since)) / MIN));
-  }
-}
-
-/** Stalls by class between `since` and `now`, from the stall, remedy and end lines of decisions.jsonl. */
-export function summarize(decisions: Decision[], since: Date, now: Date): StallSummary {
-  const classes: Partial<Record<StallClass, Counting>> = {};
-  const of = (c: StallClass) => (classes[c] ??= { stalls: 0, minutes: 0, toRemedy: null, remedies: [] as number[], open: new Map<string, number>() });
-  for (const d of decisions) {
-    if (d.class === undefined || !(STALL_CLASSES as readonly string[]).includes(d.class)) continue;
-    count(of(d.class as StallClass), d, since.getTime());
-  }
-  const out: StallSummary = { since: since.toISOString(), until: now.toISOString(), stalls: 0, minutes: 0, classes: {} };
-  for (const c of STALL_CLASSES) {
-    const s = classes[c];
-    if (!s) continue;
-    // an open stall costs until now, counted from the window's start at most
-    for (const from of s.open.values()) s.minutes += Math.round((now.getTime() - Math.max(from, since.getTime())) / MIN);
-    out.classes[c] = { stalls: s.stalls, minutes: s.minutes, toRemedy: median(s.remedies) };
-    out.stalls += s.stalls;
-    out.minutes += s.minutes;
-  }
-  return out;
-}
-
 /** The day of the last cut, kept beside decisions.jsonl. */
 const cutMarkPath = (file: string) => join(dirname(file), "decisions-cut-day");
 
@@ -373,34 +295,4 @@ export function cutDecisionsDaily(file: string, now: Date): number {
   mkdirSync(dirname(mark), { recursive: true });
   writeAtomic(mark, `${today}\n`);
   return moved;
-}
-
-/** The lines `lineclear stalls` prints. */
-function summaryLines(s: StallSummary): string[] {
-  if (s.stalls === 0) return [`no stalls since ${s.since.slice(0, 16).replace("T", " ")} UTC`];
-  const lines = [`${s.stalls} ${s.stalls === 1 ? "stall" : "stalls"}, ${s.minutes} min lost, since ${s.since.slice(0, 16).replace("T", " ")} UTC`];
-  const rows = Object.entries(s.classes)
-    .flatMap(([c, v]) => (v ? [[c, v] as const] : []))
-    .sort((a, b) => b[1].minutes - a[1].minutes);
-  for (const [c, v] of rows) {
-    lines.push(
-      `  ${CLASS_INFO[c as StallClass].label.padEnd(22)}${String(v.stalls).padStart(4)} ${String(v.minutes).padStart(6)} min${v.toRemedy === null ? "" : `  remedy after ${v.toRemedy} min`}`,
-    );
-  }
-  return lines;
-}
-
-export function stallsMain(args: string[], out: (l: string) => void, decisionsFile: string, now = new Date()): number {
-  const json = args.includes("--json");
-  const i = args.indexOf("--hours");
-  const hours = i >= 0 ? Number(args[i + 1]) : 24;
-  const bad = args.find((a, n) => a !== "--json" && a !== "--hours" && !(n === i + 1 && i >= 0));
-  if (bad !== undefined || !(hours > 0)) {
-    out("usage: lineclear stalls [--hours N] [--json]");
-    return 2;
-  }
-  const s = stallSummary(decisionsFile, now, hours);
-  if (json) out(JSON.stringify(s));
-  else for (const l of summaryLines(s)) out(l);
-  return 0;
 }

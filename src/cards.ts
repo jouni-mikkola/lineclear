@@ -1,7 +1,7 @@
 // Reading a Lineclear needs-you card: what it is about, and whether its agent only ended its turn.
 
 /** What a needs-you card is about. */
-export const askKinds = ["allowance", "merge-chat", "login", "permission", "plan", "question", "report"] as const;
+const askKinds = ["allowance", "merge-chat", "login", "permission", "plan", "question", "report"] as const;
 export type AskKind = (typeof askKinds)[number];
 
 /** The slice of a Lineclear chat card these rules read. */
