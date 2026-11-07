@@ -27,22 +27,19 @@ export interface WorkLine {
   reason: string;
 }
 
-/** One line of work done for `task` on this machine (or `machine` when the server acts for another). */
+/** One line of work done for `task` on this machine (or `machine` when the server acts for another). The same work on the same machine is told once: a repeat adds no fact. */
 export function recordWork(task: string, work: Work, env: Env = process.env, machine = machineOf(env)): void {
+  if (readWork(env).some((w) => w.step === task && w.work === work && w.machine === machine)) return;
   const file = decisionsFile(env);
   mkdirSync(dirname(file), { recursive: true });
   const line: WorkLine = { time: new Date().toISOString(), project: "-", step: task, kind: "run", work, machine, reason: `${work} ran on ${machine}` };
   appendFileSync(file, `${JSON.stringify(line)}\n`);
 }
 
-const REVIEW_SPAN_MS = 30 * 60_000;
-
-/** A reviewer's first `lineclear` call in half an hour is the review running on this machine: the chat identity `<task>/Reviewer` names the task. */
-export function recordReviewCall(env: Env = process.env, now = Date.now()): void {
+/** A reviewer's first `lineclear` call is the review running on this machine: the chat identity `<task>/Reviewer` names the task. */
+export function recordReviewCall(env: Env = process.env): void {
   const task = /^([\w.-]+)\/Reviewer$/.exec(env.LINECLEAR_CHAT ?? "")?.[1];
   if (!task) return;
-  const here = machineOf(env);
-  if (readWork(env).some((w) => w.work === "review" && w.step === task && w.machine === here && now - Date.parse(w.time) < REVIEW_SPAN_MS)) return;
   recordWork(task, "review", env);
 }
 
