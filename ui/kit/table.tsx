@@ -91,19 +91,31 @@ export function DataTable<R extends { id: string }>({
   return (
     <div data-table={label} data-rows={rows.length} className={fill ? "flex h-full min-h-0 flex-col" : undefined}>
       {sortable && (
-        <div className="mb-2 flex flex-wrap items-center gap-1 sm:hidden" role="group" aria-label={`Sort ${label}`}>
-          {[first, ...cardColumns].map((c) => (
+        <div className="mb-2 flex items-center gap-2 text-sm text-fg2 sm:hidden" role="group" aria-label={`Sort ${label}`}>
+          <label htmlFor={`sort-${label}`}>Sort by</label>
+          <select
+            id={`sort-${label}`}
+            value={sort?.key ?? ""}
+            onChange={(e) => setSort(e.target.value ? { key: e.target.value, down: false } : undefined)}
+            className="min-w-0 flex-1 rounded-sm bg-raised2 px-2 text-fg"
+          >
+            <option value="">None</option>
+            {[first, ...cardColumns].map((c) => (
+              <option key={c.key} value={c.key}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+          {sort && (
             <button
-              key={c.key}
               type="button"
-              onClick={() => by(c.key)}
-              aria-pressed={sort?.key === c.key}
-              className="rounded-sm bg-raised2 px-3 text-sm text-fg2 hover:bg-raised3 aria-pressed:text-fg"
+              onClick={() => by(sort.key)}
+              aria-label={sort.down ? "Descending" : "Ascending"}
+              className="rounded-sm bg-raised2 px-3 text-fg"
             >
-              {c.label}
-              {sortLabel(c)}
+              {sort.down ? "▼" : "▲"}
             </button>
-          ))}
+          )}
         </div>
       )}
       <ul
