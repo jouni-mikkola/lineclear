@@ -16,7 +16,6 @@ import { type Ask, setupGate } from "./project.ts";
 import { setupMain } from "./setup.ts";
 import { project } from "./project-cli.ts";
 import { roadmapMain } from "./roadmap-cli.ts";
-import { demoMain } from "./demo.ts";
 import { runMain } from "./rules.ts";
 import { startWeb } from "./web.ts";
 import { secrets, totp } from "../server/server/live/secrets.ts";
@@ -33,7 +32,7 @@ export const commands: Record<string, string> = {
   project: "Add, list, change, remove and check projects",
   roadmap: "Check or show the roadmap (roadmap show <id> prints one step)",
   setup: "Choose a model for the worker, reviewer, planner and step checker from the logged-in harnesses (the reviewer from another company than the worker)",
-  run: "Run the rule loop and serve the web pages (--once, --dry-run; --board <port> also starts herdr and the board where no service does), or only serve them on fixed demo data (--demo)",
+  run: "Run the rule loop and serve the web pages (--once, --dry-run; --board <port> also starts herdr and the board where no service does)",
   serve: "Serve the board (the web server): serve --port <port>",
   space: "The board's spaces: space add <path> --name <name>, space list, space rename, space remove",
   task: "The board's tasks: task add, list, show, tell, stop, close (task --help lists them)",
@@ -169,7 +168,7 @@ function inboxCommand(rest: string[], out: Out): number | Promise<number> {
 const COMMANDS: Record<string, (rest: string[], out: Out) => number | Promise<number>> = {
   top: (_rest, out) => topMain(out),
   roadmap: roadmapMain,
-  run: (rest, out) => (rest[0] === "--demo" ? demoMain(rest.slice(1), out) : runMain(rest, out, undefined, { web: startWeb })),
+  run: (rest, out) => runMain(rest, out, undefined, { web: startWeb }),
   serve: serveMain,
   secrets,
   totp,

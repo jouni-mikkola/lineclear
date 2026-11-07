@@ -60,7 +60,7 @@ export function machineNote(l: MachineLimits, cores = cpus().length, memGb = Mat
 export class Settings {
   private d: Stored
 
-  /** seed: these values, kept only in memory (the demo's) */
+  /** seed: these values, kept only in memory */
   constructor(private seed?: Stored) {
     const raw = (seed ?? readJson<Record<string, unknown>>('settings.json', {})) as Record<string, unknown>
     const keep = (v: unknown) =>

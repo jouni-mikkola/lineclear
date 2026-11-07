@@ -2,7 +2,6 @@
 
 ```sh
 bun install
-bun run demo          # the server with fictional data (the prototype's world), on :7421
 bun run dev           # the screen with hot reload, on :5173, talking to the server above
 bun run typecheck     # types, in seconds: all a task runs here before it merges
 bun run test changed  # by hand only: the tests that reach what you changed from main
@@ -19,11 +18,10 @@ On a machine where herdr runs as a systemd user service, give it (and the server
 
 Agents working on Lineclear: [AGENTS.md](../AGENTS.md) says what they check before merging.
 
-The demo source (`LINECLEAR_SOURCE=demo`) holds a fictional world for reviewing every screen and case without real
-agents. Your data lives in `~/.lineclear` (`LINECLEAR_HOME` to move it).
+Your data lives in `~/.lineclear` (`LINECLEAR_HOME` to move it).
 
 ```text
-server/            the web server, the demo source and the live source
+server/            the web server and the live source
   live/            herdr link, chats from logs (readers/), tasks (engine/), settings, machines (box, install)
 src/               the screen's kernel, layout and shared pieces
 plugins/<name>/    each base plugin's parts (yours: ~/.lineclear/plugins/<name>/)

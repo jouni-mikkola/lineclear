@@ -10,7 +10,7 @@ a web page cannot point its own name at this machine to read it.
 
 ## The views as they are
 
-`lineclear run --demo` serves the app on fixed demo data. The pictures of the states below are the UI bar's own sample states.
+The pictures of the states below are the UI bar's own sample states.
 
 ## The frame
 

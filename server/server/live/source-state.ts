@@ -29,7 +29,6 @@ import { has } from '../plugins.ts'
 import { REPLY_AFTER_CARD } from './source-helpers.ts'
 
 export class LiveSourceState extends Emitter<SourceEvents> {
-  readonly kind = 'live' as const
   user = userName()
   settings = new Settings()
   places = new Places()

@@ -98,7 +98,7 @@ export function webApi(
     return k;
   };
   // Home and the Inbox read the tasks from the same copy: reading them runs lineclear and git, so a server with a feed
-  // takes them from the feed's thread and never waits; one without reads them here, once a second (tests, the demo)
+  // takes them from the feed's thread and never waits; one without reads them here, once a second (tests)
   const readProjects = async (t: number) => {
     if (feed) return feed.ready();
     if (!projects || t - projects.at > 1_000) projects = { at: t, data: readProjectsNow(env, t) };
@@ -168,7 +168,7 @@ function watchInboxFolder(env: Env, onChange: () => void): () => void {
 
 /** Serves the built pages and their data. */
 export function serveWeb(dir: string, address = webAddress(), env: Env = process.env, push?: Promise<Pusher>, feed?: ProjectsFeed) {
-  // a demo or a test run (it sets LINECLEAR_DOCTOR_FILE) serves fixed data and never changes the machine it runs on
+  // a test run (it sets LINECLEAR_DOCTOR_FILE) serves fixed data and never changes the machine it runs on
   const real = env.LINECLEAR_DOCTOR_FILE === undefined;
   const projects = feed ?? (real ? projectsFeed(env) : undefined);
   const api = webApi(env, () => Date.now(), readAside(env), push, real, projects);

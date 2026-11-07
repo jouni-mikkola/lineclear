@@ -1,19 +1,70 @@
 // Push alerts: words you can decide from on an iPhone's lock screen, a tap that opens on the card, one alert per task and
 // the app icon's count.
 import { describe, expect, test } from 'bun:test'
-import { DemoWorld } from '../server/demo/world.ts'
 import { alertUrl, BROWSERS_LINK, taskLink, askText, BODY_MAX, keptTags, pushPayload, taskAlert, TITLE_MAX, waiting } from '../shared/alerts.ts'
-import type { Chat, Question } from '../shared/types.ts'
+import type { Chat, Question, Snapshot } from '../shared/types.ts'
 
-const w = new DemoWorld()
-const snap = w.snapshot()
+const GTM = 'p:vm-str:gtm'
+const agentSays = (key: string, ...messages: Chat['messages']): Chat => ({ key, cli: 'Claude Code', messages })
+const ask = (over: Partial<Question>): Question => ({ id: 'f', title: 'Q?', kind: 'Form', choices: [{ label: 'Yes' }, { label: 'No' }], to: 'x', ...over })
+const chats: Record<string, Chat> = {
+  'GTM-15/Agent': agentSays('GTM-15/Agent', {
+    id: 'm1',
+    who: 'agent',
+    text: 'You asked to say yes before merging.',
+    question: ask({ id: 'f2', title: 'Merge GTM-15?', choices: [{ label: 'Merge' }, { label: 'Not yet' }] }),
+  }),
+  'GTM-16/Agent': agentSays('GTM-16/Agent', {
+    id: 'm2',
+    who: 'agent',
+    text: 'Here is my plan.',
+    question: ask({
+      id: 'f6',
+      title: 'Plan for GTM-16',
+      kind: 'Plan',
+      choices: [{ label: 'Approve the plan' }, { label: 'Send it back with a note' }],
+      noteRequiredFor: 1,
+    }),
+  }),
+  'GTM-14/Agent': agentSays(
+    'GTM-14/Agent',
+    {
+      id: 'm3',
+      who: 'agent',
+      question: ask({
+        id: 'f4',
+        title: 'Allow: rm -rf template/skills/old?',
+        choices: [{ label: 'Yes' }, { label: "Yes, and don't ask again in this project" }, { label: 'No, and tell it what to do instead' }],
+      }),
+    },
+    { id: 'm4', who: 'you', text: 'Also update the README.', waiting: true },
+  ),
+  'HP-201/Agent': agentSays('HP-201/Agent', {
+    id: 'm5',
+    who: 'agent',
+    text: 'One choice left.',
+    question: ask({ id: 'f3', title: 'Where should Pinned live?', choices: [{ label: 'A filter on the filter row' }, { label: 'Its own tab' }] }),
+  }),
+}
+const taskRow = (id: string, status: 'need' | 'ready', over: object = {}) => ({ id, name: `Task ${id}`, status, place: GTM, sub: '', ...over })
+const snap = {
+  places: [{ id: GTM }],
+  tasks: [
+    taskRow('GTM-15', 'ready', { sub: 'Ready to merge' }),
+    taskRow('GTM-14', 'need', { sub: 'Asks permission' }),
+    taskRow('GTM-16', 'need', { sub: 'Plan to approve' }),
+    taskRow('HP-201', 'need'),
+    taskRow('GTM-11', 'need', { archived: 1 }),
+  ],
+  asks: { [GTM]: ask({ id: 'ask:1' }) },
+} as unknown as Snapshot
 const task = (id: string) => {
   const t = snap.tasks.find((x) => x.id === id)!
   return {
     rec: { id: t.id, title: t.name, project: t.place, said: t.said },
     status: t.status as 'need' | 'ready',
     sub: t.sub ?? '',
-    chat: w.chat(`${id}/Agent`),
+    chat: chats[`${id}/Agent`],
   }
 }
 const alertOf = (id: string) => {
@@ -199,7 +250,7 @@ describe("the app icon's count", () => {
     const wt = waiting(snap)
     const red = snap.tasks.filter((t) => !t.archived && (t.status === 'need' || t.status === 'ready')).length + Object.keys(snap.asks).length
     expect(wt.count).toBe(red)
-    expect(wt.count).toBe(7)
+    expect(wt.count).toBe(5)
     expect(wt.tags).not.toContain('GTM-11')
     expect(wt.tags).toContain('GTM-15')
     expect(wt.tags).toContain('ask:p:vm-str:gtm')
@@ -213,12 +264,5 @@ describe("the app icon's count", () => {
   })
   test('nothing waits: no count', () => {
     expect(waiting({ places: snap.places, tasks: [], asks: {} })).toEqual({ count: 0, tags: [] })
-  })
-  test('it follows an answer', async () => {
-    const world = new DemoWorld()
-    const before = waiting(world.snapshot()).count
-    const card = world.chat('GTM-15/Agent').messages.find((m) => m.question?.title === 'Merge GTM-15?')!.question!
-    await world.act({ type: 'answer', chat: 'GTM-15/Agent', question: card.id, choice: 0 })
-    expect(waiting(world.snapshot()).count).toBe(before - 1)
   })
 })

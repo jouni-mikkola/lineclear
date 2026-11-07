@@ -42,7 +42,7 @@ async function look(vars: Vars): Promise<DoctorProblem[]> {
   }
 }
 
-/** The problems a test or demo run states in its LINECLEAR_DOCTOR_FILE, so a screenshot never shows the host's own findings; undefined when there is no such file. */
+/** The problems a test run states in its LINECLEAR_DOCTOR_FILE, so a screenshot never shows the host's own findings; undefined when there is no such file. */
 function stated(vars: Vars): DoctorProblem[] | undefined {
   if (!vars.LINECLEAR_DOCTOR_FILE) return undefined;
   try {

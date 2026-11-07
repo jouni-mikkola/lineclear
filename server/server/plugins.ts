@@ -10,9 +10,6 @@ import { HOME, writeJson } from './store.ts'
 
 export const has = (name: string) => enabled.includes(name)
 
-/** every plugin this build knows, on or off */
-export const pluginCatalog: PluginEntry[] = catalog
-
 /** the human's own server parts that threw as they loaded, by name */
 const failed: Record<string, string> = {}
 

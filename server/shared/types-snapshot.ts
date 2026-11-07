@@ -78,8 +78,6 @@ export interface Snapshot {
   /** Unanswered request IDs by original chat, never forwarded copies. Optional for older machines/plugins. */
   attentionRequests?: Record<string, string[]>
   settings: SettingSection[]
-  /** a source like demo marks its data as fictional */
-  demo?: boolean
   /** where the human's name in chat lines comes from */
   user: string
   /** when each chat (by its key) last had something new from its agent or Lineclear (ms): it shows bold until read */
