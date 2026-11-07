@@ -1,7 +1,7 @@
 import { statSync } from '../mfs.ts'
 import { hidden } from '../agents.ts'
 import { type TaskRec, STALL_QUIET, SILENT_NEED, READY_QUIET } from './engine-helpers.ts'
-import { EngineStatus, NEED } from './status.ts'
+import { EngineStatus } from './status.ts'
 
 export class EngineStalls extends EngineStatus {
   /**
@@ -13,7 +13,7 @@ export class EngineStalls extends EngineStatus {
     for (const t of this.tasks) this.checkReady(t, now)
     for (const t of this.tasks) this.checkSilentNeed(t, now)
     for (const t of this.tasks) {
-      if (t.archived || t.paused || this.statusOf(t) !== 'work' || this.handing.has(t.id)) continue
+      if (t.archived || t.paused || this.rawStatus(t) !== 'work' || this.handing.has(t.id)) continue
       const life = this.lifeOf(t)
       const r = t.report
       // shown life since: its next stall is news again
@@ -36,7 +36,7 @@ export class EngineStalls extends EngineStatus {
    */
   protected checkSilentNeed(t: TaskRec, now: number) {
     // the standard line is what a task shows when nothing asks you: a question, plan, login or failure shows its own
-    const silent = !t.archived && !t.paused && !t.stopped && this.statusOf(t) === 'need' && this.subOf(t, 'need') === NEED.reply
+    const silent = !t.archived && !t.paused && !t.stopped && this.rawStatus(t) === 'silent'
     if (!silent) {
       t.silentAt = undefined
       return

@@ -79,7 +79,8 @@ describe('EngineStalls', () => {
     const { t, key } = await started(w, repo(), 'silent')
     w.chat.reply = 'Done for now.'
     w.agentIs(key, 'idle')
-    expect(w.engine.statusOf(t)).toBe('need')
+    // no question: not Needs you, the stall cards below nudge and restart it
+    expect(w.engine.statusOf(t)).toBe('work')
     const stuck = () => w.cards.filter((c) => c.task === t.id && c.sub.startsWith('may be stuck'))
     const at = (min: number) => Date.now() + min * 60_000
     w.engine.checkStalls(at(SILENT_NEED / 60_000 - 1))

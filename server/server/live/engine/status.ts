@@ -17,6 +17,14 @@ export const NEED = {
 export class EngineStatus extends EngineState {
   /** the one status the task list, the task's own chat, the place dots and the command all show */
   statusOf(t: TaskRec): TaskStatus {
+    const status = this.rawStatus(t)
+    // Needs you means a question: a turn that ended with none is resumed by the stall ladder, so it reads as work
+    if (status !== 'silent') return status
+    return t.paused || t.stopped ? 'need' : 'work'
+  }
+
+  /** statusOf before a quiet end reads as work: 'silent' is a turn that ended with no question, plan, login or failure */
+  protected rawStatus(t: TaskRec): TaskStatus | 'silent' {
     if (ended(t)) return 'done'
     if (t.trouble) return 'need'
     if (t.stuck) return 'work'
@@ -34,8 +42,8 @@ export class EngineStatus extends EngineState {
     if (st === 'working' || this.handing.has(t.id)) return 'work'
     if (this.agents.waiting(key).length || Date.now() - (this.wrote.get(t.id) ?? 0) < ANSWER_GRACE) return 'work'
     if (t.reported) return 'ready'
-    // its turn ended (or it stopped) without reporting done: it waits for you
-    return 'need'
+    // its turn ended (or it stopped) without reporting done: it waits for you, if it asks something
+    return this.reasonOf(key) === undefined ? 'silent' : 'need'
   }
 
   /**
