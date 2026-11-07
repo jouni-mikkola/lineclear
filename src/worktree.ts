@@ -1,4 +1,6 @@
 import { existsSync } from "node:fs";
+import { dirname } from "node:path";
+import { withHotLog } from "./hot-log.ts";
 import { readJson } from "../pi/config.ts";
 
 /** The fields of a Lineclear task that these checks read. */
@@ -9,7 +11,8 @@ interface Task {
 }
 
 function taskOf(task: string, tasksFile: string): Task | undefined {
-  const tasks: Task[] | undefined = readJson(tasksFile)?.tasks;
+  const file = readJson(tasksFile);
+  const tasks: Task[] | undefined = file ? withHotLog(dirname(tasksFile), file).tasks : undefined;
   return (Array.isArray(tasks) ? tasks : []).find((t) => t?.id === task);
 }
 

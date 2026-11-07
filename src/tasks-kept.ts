@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { withHotLog } from "./hot-log.ts";
 import { fileKey, keptBy, readJsonKept } from "./kept-read.ts";
 
 /** A task as Lineclear's files keep it: its id, and what else the reader looks at. */
@@ -12,8 +13,9 @@ export type TaskLine = { id: string } & Record<string, unknown>;
 export function readTasksKept(dir: string): { next?: Record<string, number>; tasks: TaskLine[]; red?: Record<string, string> } {
   const hotFile = join(dir, "tasks.json");
   const coldFile = join(dir, "tasks-cold.jsonl");
-  return keptBy(`tasks:${dir}`, `${fileKey(hotFile)}|${fileKey(coldFile)}`, () => {
-    const file = readJsonKept<{ next?: Record<string, number>; tasks?: TaskLine[]; red?: Record<string, string> }>(hotFile) ?? {};
+  const logFile = join(dir, "tasks-hot.jsonl");
+  return keptBy(`tasks:${dir}`, `${fileKey(hotFile)}|${fileKey(coldFile)}|${fileKey(logFile)}`, () => {
+    const file = withHotLog(dir, readJsonKept<{ next?: Record<string, number>; tasks?: TaskLine[]; red?: Record<string, string> }>(hotFile) ?? {});
     const hot = Array.isArray(file.tasks) ? file.tasks : [];
     const by = new Map<string, TaskLine>();
     let text = "";

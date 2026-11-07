@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Check, Probe } from "./doctor.ts";
+import { withHotLog } from "./hot-log.ts";
 
 /** The ids and aliases of the tasks in tasks.json; empty when there is no store yet. */
 export function storedTaskIds(dir: string): string[] {
@@ -23,7 +24,7 @@ export function storedTaskIds(dir: string): string[] {
   };
   let hot: Rec[] = [];
   try {
-    hot = (JSON.parse(readFileSync(join(dir, "tasks.json"), "utf8")).tasks ?? []) as Rec[];
+    hot = (withHotLog(dir, JSON.parse(readFileSync(join(dir, "tasks.json"), "utf8"))).tasks ?? []) as Rec[];
   } catch {}
   // the cold file is an append log: the last line of an id wins, and a "gone" line drops it
   const cold = new Map<string, Rec>();
