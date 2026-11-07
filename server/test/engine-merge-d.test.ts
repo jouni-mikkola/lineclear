@@ -219,6 +219,39 @@ describe('on GitHub: news, checks and the default way in', () => {
     expect(reds()).toBe(before + 2)
   })
 
+  test('a red main holds the next merges until a green run', async () => {
+    const w = world()
+    const g = onGitHub()
+    const tasks = []
+    for (const name of ['redhold1', 'redhold2', 'redhold3']) {
+      const { t } = await started(w, g.dir, name)
+      writeFileSync(join(t.worktree!, `${name}.txt`), 'x\n')
+      sh('git add -A && git commit -qm x', t.worktree!)
+      tasks.push(t)
+    }
+    for (const x of w.engine.tasks) if (!tasks.includes(x)) x.doneAt = 0
+    const run = (headSha: string, conclusion: string, n: number) => ({
+      headSha,
+      status: 'completed',
+      conclusion,
+      url: `https://github.com/acme/app/actions/runs/${n}`,
+      workflowName: 'Check',
+    })
+    const green = sh('git rev-parse main', g.bare)
+    expect((await w.engine.merge(tasks[0].id, { self: true })).ok).toBe(true)
+    const red = sh('git rev-parse main', g.bare)
+    g.set({ runs: [run(red, 'failure', 3), run(green, 'success', 2)] })
+    for (const t of tasks.slice(1)) {
+      const r = await w.engine.merge(t.id, { self: true })
+      expect(r.ok).toBe(false)
+      expect(r.error).toContain('is red on GitHub')
+    }
+    // the watch reverts the red commit; the held tasks' files never reached main
+    expect(sh('git ls-tree -r --name-only main', g.bare)).not.toContain('redhold2.txt')
+    g.set({ runs: [run('b'.repeat(40), 'success', 5), run(red, 'failure', 3)] })
+    expect((await w.engine.merge(tasks[1].id, { self: true })).ok).toBe(true)
+  })
+
   test('GitHub slow on the merge: one lineclear merge waits for its result, and asked again while it runs joins the same merge', async () => {
     const w = world()
     const g = onGitHub()
