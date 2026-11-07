@@ -25,3 +25,24 @@ test('a merge whose task folder was removed between two tries says which folder 
   expect(r.ok).toBe(false)
   expect(r.error).toContain(`the folder ${worktree} is gone`)
 })
+
+test('conflict markers are found by exit code and null-separated paths, the same under a Finnish locale', async () => {
+  const dir = repo()
+  sh('git checkout -qb work', dir)
+  writeFileSync(join(dir, 'a b.txt'), 'x\n<<<<<<< HEAD\ny\n')
+  writeFileSync(join(dir, 'title.md'), 'Title\n=======\n')
+  writeFileSync(join(dir, 'ok.txt'), 'fine\n')
+  sh('git add -A && git commit -qm marks', dir)
+  const lang = process.env.LANG
+  try {
+    for (const l of ['C', 'fi_FI.UTF-8']) {
+      process.env.LANG = l
+      process.env.LC_ALL = l
+      expect(await G.conflictMarkers(dir, 'main')).toEqual(['a b.txt'])
+    }
+  } finally {
+    if (lang === undefined) delete process.env.LANG
+    else process.env.LANG = lang
+    delete process.env.LC_ALL
+  }
+})

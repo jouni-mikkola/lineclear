@@ -125,19 +125,15 @@ export async function commitAll(wt: string, message: string) {
   return r.ok
 }
 
-/** the files where the branch's own changes leave a conflict marker (<<<<<<<, =======, >>>>>>>): a half-solved conflict
- *  that was committed. git diff --check names them by line. */
+/** the files the branch changed that hold a conflict marker (<<<<<<< or >>>>>>>): a half-solved conflict that was
+ *  committed. A line of seven = alone is also a Markdown heading underline, so it doesn't count. Both git calls
+ *  answer in null-separated paths and an exit code, so no locale changes the result. */
 export async function conflictMarkers(wt: string, base: string) {
-  const r = await git(wt, 'diff', '--check', await mergeBase(wt, base), 'HEAD')
-  const flagged = [...new Set(r.out.split('\n').flatMap((l) => /^(.*):\d+: leftover conflict marker/.exec(l)?.[1] ?? []))]
-  if (!flagged.length) return []
-  // a line of seven = alone is also a Markdown heading underline: only a file with <<<<<<< or >>>>>>> counts
-  const g = await git(wt, 'grep', '-lE', '^(<<<<<<<|>>>>>>>)( |$)', 'HEAD', '--', ...flagged)
-  const files = g.out
-    .split('\n')
-    .map((l) => l.replace(/^HEAD:/, ''))
-    .filter((f) => flagged.includes(f))
-  return [...new Set(files)]
+  const changed = await git(wt, 'diff', '--name-only', '--diff-filter=AMCR', '-z', await mergeBase(wt, base), 'HEAD')
+  const paths = changed.out.split('\0').filter(Boolean)
+  if (!changed.ok || !paths.length) return []
+  const g = await git(wt, 'grep', '-lzE', '-e', '^(<<<<<<<|>>>>>>>)( |$)', 'HEAD', '--', ...paths)
+  return g.code === 0 ? g.out.split('\0').filter(Boolean).map((f) => f.slice('HEAD:'.length)) : []
 }
 
 export async function mergeBase(wt: string, base: string) {
