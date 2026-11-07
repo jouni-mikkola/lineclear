@@ -23,15 +23,18 @@ export interface Finding {
 
 const RULE_FILES = ["AGENTS.md", "CLAUDE.md", "REVIEW.md"];
 const CONTEXT_LINES = 8;
-/** The diff and the rules are cut to this many characters each, so a huge change cannot overflow the model. */
+/** The diff and the rules are cut to this many characters each, to keep a review's input small and a huge change from overflowing the model. */
 const PART_MAX = 60_000;
 
 /** The repo's own rules, each file under its name. */
 function repoRules(repo: string): string {
   return RULE_FILES.filter((f) => existsSync(join(repo, f)))
     .map((f) => `--- ${f}\n${readFileSync(join(repo, f), "utf8")}`)
-    .join("\n")
-    .slice(0, PART_MAX);
+    .join("\n");
+}
+
+function cut(text: string): string {
+  return text.length > PART_MAX ? `${text.slice(0, PART_MAX)}\n(cut here)` : text;
 }
 
 /** The change since the branch left its base, with 8 lines of context, committed or not. */
@@ -63,10 +66,10 @@ function reviewQuestion(brief: string, diff: string, rules: string): string {
     stepOfBrief(brief),
     "",
     "THE REPO'S RULES",
-    rules || "(none)",
+    cut(rules) || "(none)",
     "",
     "DIFF",
-    diff.length > PART_MAX ? `${diff.slice(0, PART_MAX)}\n(the diff is cut here; say so if a finding depends on what follows)` : diff,
+    cut(diff),
   ].join("\n");
 }
 
