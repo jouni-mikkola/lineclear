@@ -91,26 +91,43 @@ describe('(f) two panes for one worktree', () => {
   })
 })
 
-describe('(g) an agent idle at 0% context', () => {
-  test('its brief is sent again, once, when it never began', async () => {
+describe("(g) a turn ends by pi's word", () => {
+  test('agent_settled changes the phase at once, with no timer', async () => {
     const w = world()
-    const { t, key } = await started(w, repo(), 'unbegun')
+    const { t, key } = await started(w, repo(), 'settles')
+    w.agentIs(key, 'working')
+    expect(w.engine.statusOf(t)).toBe('work')
+    w.chat.card = 'ask'
+    const at = Date.now()
     w.agentIs(key, 'idle')
-    const before = w.sent.length
-    w.engine.briefLate(w.engine.task(t.id)!)
-    expect(w.sent.length).toBe(before + 1)
-    expect(w.sent.at(-1)!.text).toContain('you have not started')
-    w.engine.briefLate(w.engine.task(t.id)!)
-    expect(w.sent.length).toBe(before + 1)
+    expect(Date.now() - at).toBeLessThan(500)
+    expect(w.engine.task(t.id)!.told).toBe('need')
+    expect(w.cards.at(-1)).toMatchObject({ task: t.id, status: 'need' })
   })
 
-  test('an agent at work is left alone', async () => {
+  test('an aborted turn of a reported task shows no Ready card', async () => {
     const w = world()
-    const { t, key } = await started(w, repo(), 'begun')
+    const { t, key } = await started(w, repo(), 'aborts')
+    const task = w.engine.task(t.id)!
+    task.reported = true
+    task.reportedAt = Date.now()
     w.agentIs(key, 'working')
-    const before = w.sent.length
-    w.engine.briefLate(w.engine.task(t.id)!)
-    expect(w.sent.length).toBe(before)
+    const before = w.cards.length
+    w.agentIs(key, 'idle', true)
+    expect(w.cards.slice(before).some((c) => c.status === 'ready')).toBe(false)
+    expect(w.engine.statusOf(task)).not.toBe('ready')
+  })
+
+  test('a go that cannot be sent leaves trouble and a card', async () => {
+    const w = world()
+    const { t } = await started(w, repo(), 'unsent')
+    const task = w.engine.task(t.id)!
+    spyOn(w.agents, 'send').mockRejectedValueOnce(new Error('no route to the agent'))
+    const before = w.cards.length
+    ;(w.engine as unknown as { go: (t: unknown, text: string, why: string) => void }).go(task, 'start now', 'test')
+    await Bun.sleep(20)
+    expect(task.trouble).toContain('no route')
+    expect(w.cards.slice(before).some((c) => c.status === 'need')).toBe(true)
   })
 })
 

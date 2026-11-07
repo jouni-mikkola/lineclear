@@ -4,11 +4,11 @@ import { agentEnv } from '../box.ts'
 import type { Task } from '../../../shared/types.ts'
 import { machineOf, recordWork } from '../../../../src/task-work.ts'
 import { ROOT } from '../../root.ts'
-import { hidden, type Spec } from '../agents.ts'
-import { privatePrompt, taskFirst, taskPrompt } from '../prompts.ts'
+import type { Spec } from '../agents.ts'
+import { privatePrompt, taskPrompt } from '../prompts.ts'
 import { pastTimes } from '../estimates.ts'
 import type { Made } from './worktrees.ts'
-import { type TaskRec, type Harness, ended, type DepState, splitRef, labelOf, BRIEF_WAIT } from './engine-helpers.ts'
+import { type TaskRec, type Harness, ended, type DepState, splitRef, labelOf } from './engine-helpers.ts'
 import { EngineState } from './engine-state.ts'
 
 /** what a task needs before its agent runs: the tasks it waits for, room on the machine, and the agent's start */
@@ -80,7 +80,7 @@ export abstract class EngineStart extends EngineState {
   protected busy(t: TaskRec) {
     if (ended(t) || t.archived || t.stopped || this.holding(t) || !this.places.space(t.project)) return false
     // a go sent just now counts before its agent is seen at work; one left from long ago (its agent gone) doesn't
-    const going = !!t.going && Date.now() - (this.wrote.get(t.id) ?? 0) < BRIEF_WAIT
+    const going = !!t.going && this.agents.status(this.key(t)) !== 'gone'
     if (this.inPhase(t, 'starting') || going || (this.inPhase(t, 'briefing') && !t.todo)) return true
     // the status last settled, while its agent agrees: the full status of every task for each held one was what made this slow
     const working = this.agents.status(this.key(t)) === 'working'
@@ -205,24 +205,5 @@ export abstract class EngineStart extends EngineState {
     t.facts = [t.facts, `No model was set for ${h.kind}: started on ${model}`].filter(Boolean).join(' · ')
     this.save()
     return model
-  }
-
-  /**
-   * Its brief went in and its agent never began: it sits idle with no turn in its log (0% context). Its brief is sent
-   * once more, with a line that says why, so it is never left to the human to find.
-   */
-  briefLate(t: TaskRec) {
-    const key = this.key(t)
-    const st = this.agents.status(key)
-    if (t.briefResent || t.todo || t.stopped || ended(t) || (st !== 'idle' && st !== 'done') || this.agents.waiting(key).length) return
-    if (this.chats.endedSince?.(key, this.agents.record(key)?.started ?? 0)) return
-    t.briefResent = true
-    this.save()
-    const line = hidden(`${taskFirst(t)}\n\nYour brief is above and you have not started: begin your task now.`, 'go')
-    this.agents.send(key, line, { ensure: () => this.launch(t) }).catch(() => undefined)
-    this.emit('news', t.project, `${t.id}'s agent sat idle and never started on its brief. The brief was sent again`, 'stalled', {
-      task: t.id,
-      event: 'stalled',
-    })
   }
 }

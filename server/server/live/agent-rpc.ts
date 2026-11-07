@@ -15,12 +15,14 @@ export interface RpcState {
   sessionFile?: string
 }
 
-type Line = { type?: string; id?: string; success?: boolean; error?: string; data?: { disposition?: string; sessionFile?: string } }
+type Line = { type?: string; aborted?: boolean; id?: string; success?: boolean; error?: string; data?: { disposition?: string; sessionFile?: string } }
 
 /** one `pi --mode rpc` child: commands go in as JSON lines, events and answers come back the same way (pi's rpc.md) */
 export class RpcAgent {
   readonly child: ChildProcessWithoutNullStreams
   status: RpcState['status'] = 'idle'
+  /** the last agent_settled said the turn was stopped, not finished */
+  aborted = false
   sessionFile?: string
   exited = false
   private buffer = ''
@@ -104,7 +106,9 @@ export class RpcAgent {
       return
     }
     const next = rec.type === 'agent_start' ? 'working' : rec.type === 'agent_settled' ? 'idle' : undefined
-    if (!next || next === this.status) return
+    if (!next) return
+    this.aborted = rec.type === 'agent_settled' && rec.aborted === true
+    if (next === this.status) return
     this.status = next
     this.on.change(this)
   }

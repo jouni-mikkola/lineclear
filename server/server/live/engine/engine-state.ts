@@ -28,6 +28,8 @@ export abstract class EngineState extends Emitter<Events> {
   protected data = this.store.load()
   taskIds!: TaskIds
   protected wrote = new Map<string, number>()
+  /** tasks written to whose agent has not yet said agent_start: they read as work until it does */
+  protected answering = new Set<string>()
   /** when its agent last reported its progress (lineclear status) */
   protected heard = new Map<string, number>()
   /** the last heartbeat of an agent in a tool call (lineclear alive): pi writes its log only when a call ends */

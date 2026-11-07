@@ -45,8 +45,8 @@ export class EngineTidy extends EngineMerge {
       this.frees.get(t.id)?.({ ok: false, error: `${error} Sent back to ${t.id}'s agent.`, freed: true })
       if (twice) {
         // the stall ladder's restart rung: stop it, then tell it
-        await this.stopTask(t.id).catch(() => undefined)
-        await this.tell(t.id, `${error} Your agent was restarted because this is the second release in a row.`).catch(() => undefined)
+        await this.stopTask(t.id).catch((e) => this.troubled(t, e))
+        await this.tell(t.id, `${error} Your agent was restarted because this is the second release in a row.`).catch((e) => this.troubled(t, e))
       } else await this.sendBack(t, error)
     }
   }
@@ -155,6 +155,7 @@ export class EngineTidy extends EngineMerge {
       if (!p && t.worktree && (await exists(t.worktree))) left.push(`${t.worktree} (its project is gone)`)
       clearTimeout(this.later.get(t.id))
       for (const m of [this.later, this.wrote]) m.delete(t.id)
+      this.answering.delete(t.id)
       // a Done task stays done for the ones queued after it
       if (ended(t)) this.passOn(t)
       this.data.tasks = this.data.tasks.filter((x) => x !== t)
@@ -185,7 +186,7 @@ export class EngineTidy extends EngineMerge {
     const stopped = this.agents.status(this.key(t)) !== 'gone' && !ended(t)
     const kept = stopped ? await this.stopTask(t.id) : []
     // a finished task's agent may still be about: put away as merging would
-    if (ended(t) && !t.cleaned && this.agents.status(this.key(t)) !== 'working') this.cleanup(t, true).catch(() => undefined)
+    if (ended(t) && !t.cleaned && this.agents.status(this.key(t)) !== 'working') this.cleanup(t, true).catch((e) => this.troubled(t, e))
     return { kept, stopped }
   }
 
@@ -252,15 +253,16 @@ export class EngineTidy extends EngineMerge {
     const st = this.agents.status(key)
     // a reviewer or attempt from before tasks had one agent only: put it away
     if (role !== 'Agent') {
-      if (st !== 'gone' && !this.agents.record(key)?.finished) this.agents.finish(key).catch(() => undefined)
+      if (st !== 'gone' && !this.agents.record(key)?.finished) this.agents.finish(key).catch((e) => this.troubled(t, e))
       return
     }
     if (ended(t)) {
-      if (st !== 'working' && !t.cleaned) this.cleanup(t).catch(() => undefined)
+      if (st !== 'working' && !t.cleaned) this.cleanup(t).catch((e) => this.troubled(t, e))
       return
     }
     this.begun(t)
     this.relook(t)
+    if (st === 'working') this.answering.delete(t.id)
     // at work: the go reached it
     if (st === 'working' && t.going) t.going = undefined
     // paused, it stopped; at work again on its own after that, it isn't paused any more
@@ -269,10 +271,7 @@ export class EngineTidy extends EngineMerge {
       t.paused = undefined
       t.todo = undefined
     }
-    if (st === 'working' || st === 'blocked') {
-      clearTimeout(this.later.get(t.id))
-      this.settle(t)
-    } else this.settleSoon(t)
+    this.settle(t)
   }
 
   /** automations: tasks of a project, by status (archived ones left out) */

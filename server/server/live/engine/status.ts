@@ -2,7 +2,7 @@ import type { TaskStatus } from '../../../shared/types.ts'
 import { CLI_NAME } from '../settings.ts'
 import * as Lane from './lane.ts'
 import { askOf, fitStatus } from './status-line.ts'
-import { type TaskRec, loginGone, ended, HELD, ANSWER_GRACE } from './engine-helpers.ts'
+import { type TaskRec, loginGone, ended, HELD } from './engine-helpers.ts'
 import { EngineStart } from './engine-start.ts'
 
 /** what a task that waits on you shows instead of its agent's message: a few words on why, never the message itself */
@@ -40,8 +40,9 @@ export class EngineStatus extends EngineStart {
     // on its way into main, nothing for you to do: unless its agent stopped to ask you something (then it is Ready)
     if (t.reported && t.landing && (st === 'working' || !this.asks(key))) return 'merging'
     if (st === 'working' || this.inPhase(t, 'handing')) return 'work'
-    if (this.agents.waiting(key).length || Date.now() - (this.wrote.get(t.id) ?? 0) < ANSWER_GRACE) return 'work'
-    if (t.reported) return 'ready'
+    if (this.agents.waiting(key).length || this.answering.has(t.id)) return 'work'
+    // a stopped turn is not a finished one
+    if (t.reported) return this.agents.aborted(key) ? 'silent' : 'ready'
     // its turn ended (or it stopped) without reporting done: it waits for you, if it asks something
     return this.reasonOf(key) === undefined ? 'silent' : 'need'
   }

@@ -72,6 +72,7 @@ export function world(herdr = fakeHerdr(), o: { boot?: string } = {}) {
       return { waiting: false, item: {} }
     },
     status: (key: string) => status[key] ?? 'gone',
+    aborted: (key: string) => abortedKeys.has(key),
     record: (key: string) => records[key],
     herdrView: () => undefined,
     info: (key: string) => (status[key] && status[key] !== 'gone' && panes[key] ? { pane_id: panes[key] } : undefined),
@@ -97,6 +98,7 @@ export function world(herdr = fakeHerdr(), o: { boot?: string } = {}) {
     },
   }
   const forgot: string[] = []
+  const abortedKeys = new Set<string>()
   /** agents whose turn was interrupted before a restart */
   const stopped: string[] = []
   const posted: { key: string; id: string; question?: { kind: string; steps?: string[] }; card?: { text: string; restart?: boolean } }[] = []
@@ -133,8 +135,10 @@ export function world(herdr = fakeHerdr(), o: { boot?: string } = {}) {
   const cards: { task: string; status: string; sub: string }[] = []
   engine.on('card', (t, status, sub) => cards.push({ task: t.id, status, sub }))
   /** herdr says the agent's state changed */
-  const agentIs = (key: string, st: string) => {
+  const agentIs = (key: string, st: string, aborted = false) => {
     status[key] = st
+    if (aborted) abortedKeys.add(key)
+    else abortedKeys.delete(key)
     engine.agentStatus(key)
   }
   /** what waits to go in to it goes in */

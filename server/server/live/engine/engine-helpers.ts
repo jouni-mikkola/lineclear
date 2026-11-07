@@ -62,7 +62,6 @@ export interface TaskRec {
   /** when it was told that it is Ready with no review and no merge: once per Ready */
   readyNudged?: number
   /** its brief was sent again because its agent never began on it: once */
-  briefResent?: boolean
   /** its place was put away once done: agent, space, worktree and branch (what lost nothing) */
   cleaned?: boolean
   /** what putting it away kept, and why ("~/x (uncommitted changes)") */
@@ -287,12 +286,6 @@ export type Events = {
   /** a card for its project's chat: the task now waits on you (needs you, or ready), or it is done */
   card: [task: TaskRec, status: TaskStatus, sub: string]
 }
-
-/** a message you wrote makes the agent busy a moment later: until then it counts as working */
-export const ANSWER_GRACE = 6000
-
-/** an agent that never gets to work on its brief leaves To do after this long anyway (and then waits on you) */
-export const BRIEF_WAIT = 120_000
 
 /** what a task for later (task add --later) is told: its agent reads the brief and waits for a go */
 export const LATER = "Don't start yet: wait for a go."
