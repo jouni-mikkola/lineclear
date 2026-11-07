@@ -1,4 +1,5 @@
 Review before the merge, unless your change touches only files under docs/ (a roadmap file too) and passed the check (then it needs no review): have the change reviewed by fresh eyes using the model {{reviewer}}, {{reviewer_note}}.
+Run `lineclear review {{id}}` in your worktree: it is one model call with no tools that gets this brief, the diff against the base and the repo's rules, and stores the tagged findings as JSON. It replaces starting a reviewer agent.
 The reviewer reads the change against the why and the done-when above. Review the diff once and fix every
 critical and major finding. Review again only when a critical finding was fixed, for at most {{rounds}} rounds in all.
 The reviewer reads the diff and your `--changed` result; it does not run the full check. A finding still open after that makes
