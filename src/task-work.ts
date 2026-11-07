@@ -27,23 +27,23 @@ export interface WorkLine {
   reason: string;
 }
 
+/** The same work on the same machine within this span is one line: a caller that asks every tick writes once. */
+const WORK_SPAN_MS = 30 * 60_000;
+
 /** One line of work done for `task` on this machine (or `machine` when the server acts for another). */
-export function recordWork(task: string, work: Work, env: Env = process.env, machine = machineOf(env)): void {
+export function recordWork(task: string, work: Work, env: Env = process.env, machine = machineOf(env), now = Date.now()): void {
+  if (readWork(env).some((w) => w.work === work && w.step === task && w.machine === machine && now - Date.parse(w.time) < WORK_SPAN_MS)) return;
   const file = decisionsFile(env);
   mkdirSync(dirname(file), { recursive: true });
-  const line: WorkLine = { time: new Date().toISOString(), project: "-", step: task, kind: "run", work, machine, reason: `${work} ran on ${machine}` };
+  const line: WorkLine = { time: new Date(now).toISOString(), project: "-", step: task, kind: "run", work, machine, reason: `${work} ran on ${machine}` };
   appendFileSync(file, `${JSON.stringify(line)}\n`);
 }
-
-const REVIEW_SPAN_MS = 30 * 60_000;
 
 /** A reviewer's first `lineclear` call in half an hour is the review running on this machine: the chat identity `<task>/Reviewer` names the task. */
 export function recordReviewCall(env: Env = process.env, now = Date.now()): void {
   const task = /^([\w.-]+)\/Reviewer$/.exec(env.LINECLEAR_CHAT ?? "")?.[1];
   if (!task) return;
-  const here = machineOf(env);
-  if (readWork(env).some((w) => w.work === "review" && w.step === task && w.machine === here && now - Date.parse(w.time) < REVIEW_SPAN_MS)) return;
-  recordWork(task, "review", env);
+  recordWork(task, "review", env, machineOf(env), now);
 }
 
 export function readWork(env: Env = process.env): WorkLine[] {
