@@ -37,6 +37,8 @@ export interface Decision {
   /** Minutes from the stall to its remedy, or the minutes it cost when it ended, and when the stall began. */
   minutes?: number;
   since?: string;
+  /** The machine a failed start was meant for (see start-failures.ts). */
+  machine?: string;
 }
 
 /** What survives a restart for one project: the last health result and the last decision per step. */
