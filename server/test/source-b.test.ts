@@ -457,6 +457,8 @@ describe("a task's own progress (lineclear status)", () => {
       expect(view().report!.eta).toBeUndefined()
       // done: its job is over, and so is its report
       st = 'idle'
+      // asked first: else the merge starts at once and races the Ready this looks for
+      t.askFirst = true
       await src.cli(['done', t.id, '--summary', 'Fixed'], { chat: key })
       expect(view().status).toBe('ready')
       expect(view().report).toBeUndefined()

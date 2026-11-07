@@ -113,6 +113,10 @@ if (import.meta.main) {
     out(st.permission ?? 'WRITE')
   }
   if (a0 === 'api') {
+    if (/^repos\/[^/]+\/[^/]+$/.test(a1 ?? '')) {
+      if (st.authed === false || st.down) fail('Cannot read repository permissions')
+      out(String(['WRITE', 'MAINTAIN', 'ADMIN'].includes(st.permission ?? 'WRITE')))
+    }
     const path = args.at(-1)!.split('?')[0]
     const job = path.match(/\/actions\/jobs\/(\d+)\/logs$/)?.[1]
     if (job) out(st.logs?.[job] ?? fail('gh: Not Found (HTTP 404)')!)
