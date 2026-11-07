@@ -36,7 +36,7 @@ process.env.LINECLEAR_URL = "http://127.0.0.1:9";
 for (const k of ["LINECLEAR_CHAT", "LINECLEAR_COMMAND", "LINECLEAR_CHAT", "LINECLEAR_TASK", "LINECLEAR_PORT", "LINECLEAR_WEB_PORT", "LINECLEAR_BOX"])
   delete process.env[k];
 for (const k of ["LINECLEAR_HOME", "LINECLEAR_MACHINE", "LINECLEAR_SHARED_HOME"]) delete process.env[k];
-// the secrets vault the CLI reads (src/secrets.ts): never the owner's real one
+// the secrets vault the CLI reads (server/server/live/secrets.ts): never the owner's real one
 process.env.LINECLEAR_MAIN_HOME = join(scope, "main-home");
 // A git a test starts never waits on fsync: a throwaway repo needs no durability, and under disk load every
 // commit and clone would stretch the test.

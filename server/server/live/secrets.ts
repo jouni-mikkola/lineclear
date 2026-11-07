@@ -207,7 +207,7 @@ function spaceOfProject(project: string, env: Env): string | undefined {
 
 /**
  * The levels a project's secrets come from, the most specific first: its space, this machine, Everywhere.
- * For another machine its own levels lead, then this machine's space, where 'secrets import' writes.
+ * For another machine its own levels lead, then this machine's space, where the owner's secrets are kept.
  */
 function chainOf(project: string | undefined, env: Env, machine?: string): string[] {
   const there = machine === undefined ? env : { ...env, LINECLEAR_MACHINE: machine }
