@@ -97,3 +97,50 @@ test("the line shows every project to its main end, and +N names what it opens",
   await expect(more).toHaveAccessibleName(/^Show \d+ more asks?$/);
   await expect(line).toHaveScreenshot("home-line-two.png");
 });
+
+test("the table keeps a 200-character Last and 200 rows inside its edge, shows no dash, and a phone row leads with its state", async ({ page }) => {
+  const now = Date.now();
+  const task = (i: number) => ({
+    id: `t${i}`,
+    title: `S${i} ${"a long title ".repeat(i === 0 ? 20 : 1)}`,
+    state: "work",
+    stage: "work",
+    step: `S${i}`,
+    last: { text: "x".repeat(200), at: now - 60_000 },
+    // the first row knows nothing of its model and time: the cells stay empty
+    ...(i === 0 ? {} : { since: now - 5 * 60_000, model: "vendor-b/a-model-with-a-long-name" }),
+  });
+  const body = {
+    projects: [{ name: "shop", done: 0, total: 200, unit: "steps", broken: false, tasks: Array.from({ length: 200 }, (_, i) => task(i)) }],
+    host: "this machine",
+  };
+  await page.route("**/api/home", (r) => r.fulfill({ json: body }));
+  await page.goto("/");
+  await page.waitForSelector("[data-row-id]:visible");
+  await expect(page.locator('[data-table="Working tasks"]')).toHaveAttribute("data-rows", "200");
+  const fit = await page.evaluate(() => {
+    const visible = (el: Element) => (el as HTMLElement).offsetParent !== null;
+    const holders = [...document.querySelectorAll('[data-table="Working tasks"] table, [data-table-cards]')].filter(visible);
+    const scroll = holders.map((h) => (h.closest("div,ul") as HTMLElement).scrollWidth - (h.closest("div,ul") as HTMLElement).clientWidth);
+    const edge = holders[0]?.closest("div,ul")?.getBoundingClientRect().right ?? 0;
+    let past = 0;
+    for (const c of document.querySelectorAll('[data-table="Working tasks"] td, [data-table-cards] button *')) {
+      if (visible(c)) past = Math.max(past, c.getBoundingClientRect().right - edge);
+    }
+    const cells = [...document.querySelectorAll('[data-table="Working tasks"] td, [data-table-cards] button')]
+      .filter(visible)
+      .map((c) => c.textContent?.trim());
+    return {
+      scroll,
+      past,
+      dash: cells.filter((t) => t === "-" || /(^|\s)-($|\s)/.test(t ?? "")).length,
+      zero: cells.some((t) => /\bMin\b.*\b0\b/.test(t ?? "")),
+    };
+  });
+  expect(fit.scroll.every((s) => s <= 0)).toBe(true);
+  expect(fit.past).toBeLessThanOrEqual(0);
+  expect(fit.dash).toBe(0);
+  expect(fit.zero).toBe(false);
+  const first = page.locator("[data-table-cards] [data-row-id] button:visible").first();
+  if (await first.count()) await expect(first).toHaveText(/^at work/);
+});

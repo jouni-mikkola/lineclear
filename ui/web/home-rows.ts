@@ -5,8 +5,6 @@ import type { HomeData } from "./data.ts";
 export interface Row extends AgentRow {
   stuck: boolean;
   last?: Task["last"];
-  files?: number;
-  check?: "pass" | "fail";
   task: Task;
   /** The ask this task waits on, shown in its open row. */
   ask?: InboxItem;
@@ -17,8 +15,6 @@ export function rowsOf(projects: Project[], loose: HomeData["loose"], host: stri
   const tasks = new Map([...projects.flatMap((p) => p.tasks), ...(loose ?? [])].map((t) => [t.id, t]));
   return agentStatus(projects, loose, host, now).flatMap((r) => {
     const t = tasks.get(r.id);
-    return t
-      ? [{ ...r, stuck: t.state === "need" || !!t.stalled, last: t.last, files: t.files, check: t.check, task: t, ask: asks.find((a) => a.task === t.id) }]
-      : [];
+    return t ? [{ ...r, stuck: t.state === "need" || !!t.stalled, last: t.last, task: t, ask: asks.find((a) => a.task === t.id) }] : [];
   });
 }
