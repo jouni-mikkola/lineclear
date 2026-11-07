@@ -148,7 +148,7 @@ Result: With 45 ready steps on disjoint locks, 45 agents are working within 5 mi
 
 ### L461 One agent per step
 Result: A step never has two agents working at once, and a step already landed starts no agent.
-- why: six tasks started for L436 with five working at once, and six tasks (VEL-9 to VEL-14) ended in 0.4 minutes with nothing to merge; each duplicate costs a slot and about 76 k new input tokens.
+- why: six tasks started for one step with five working at once, and six others ended in 0.4 minutes with nothing to merge; each duplicate holds a slot and starts an agent that reads the brief and the repo.
 - done when: `lineclear task list` after the merge shows at most 1 working task per step id over 20 new tasks, and 0 tasks that end with "Nothing to merge" in under 1 minute; a test adds the same step twice and sees one start and one refusal, and adds a landed step and sees no start. Baseline today: 5 working agents on L436 and 6 empty tasks of 22.
 - locks: one-start
 - after: none
@@ -156,15 +156,15 @@ Result: A step never has two agents working at once, and a step already landed s
 
 ### L462 The start has no fixed wait
 Result: A task's agent makes its first tool call at most 10 s after `lineclear task add`, median, with the wait named.
-- why: L451 met p90 (24.6 s) but not the median: every start takes 23.5 to 24.7 s with almost no spread, so a fixed wait or a fixed-cost step sits in the start path.
+- why: L451 met p90 (24.6 s) but not the median: every start takes 23 to 25 s with almost no spread, so a fixed wait or a fixed-cost step sits in the start path.
 - done when: `bun scripts/core-baseline.ts start 20` over 20 new tasks prints a median of 10 s or less and a p90 of 15 s or less; `bun scripts/core-baseline.ts start` also prints the time of each start phase (worktree, install, session, first call). Baseline today: median 23.5 s, p90 24.6 s.
-- locks: start-phases
+- locks: core-baseline
 - after: none
 - files: scripts/core-baseline.ts, server/server/live/engine/worktrees.ts, server/server/live/agent-process.ts
 
 ### L463 A start never lacks a model
 Result: A task whose agent is pi starts with a model, or says in one line which setting to change, and never ends in "No model is set for pi".
-- why: this task's own first start went wrong with "No model is set for pi" and waited for the human; the default model is empty for pi.
+- why: when no default model is set for pi, a start ends in "No model is set for pi" and waits for the owner.
 - done when: a test starts a task with the default model unset and sees the machine's first available model chosen and the choice noted in the facts; `lineclear doctor` prints the model a new task would use. Baseline today: a start with no model sets the task to "Needs you".
 - locks: start-model
 - after: none
@@ -179,8 +179,8 @@ Result: When main goes red, merges pause until it is green, so a burst of failur
 - files: server/server/live/engine/engine-merge.ts, server/server/live/engine/merge.ts, src/main-branch.ts
 
 ### L465 No shard is the tail
-Result: Every shard of `check.yml` ends within 40 s of the median shard, so the run finishes in 45 s at the median and 60 s at p90.
-- why: L455 is not met (47 s median, 68 s p90) because `full check (5/8)` takes 61 s at p90 and 189 s at worst while shards 1 to 4 and 7 take 17 to 24 s.
+Result: No shard of `check.yml` runs over 60 s, so the run finishes in 45 s at the median and 60 s at p90.
+- why: L455 is not met (47 s median, 68 s p90) because `full check (5/8)` takes 61 s at p90 and 189 s at worst while the other shards take 17 to 35 s at the median and 43 s at worst.
 - done when: `bun scripts/core-baseline.ts gh 20` over 20 runs prints a run median of 45 s or less and a p90 of 60 s or less, and no job with a worst above 60 s. Baseline today: run 47 s and 68 s, shard 5/8 worst 189 s.
 - locks: shard-balance
 - after: none
@@ -204,15 +204,15 @@ Result: A reviewer reads the diff and the changed files only, and spends 40 k ne
 
 ### L468 Chat tokens can be measured
 Result: `bun scripts/core-baseline.ts chat-tokens` prints the coordinator's and the Dispatcher's tokens on every machine.
-- why: it printed 0 runs for both roles here, because the session folders it reads do not exist; L458's 1 M and 500 k p90 limits are unproven.
+- why: it reads session folders that a machine may not have, so it prints 0 runs and L458's 1 M and 500 k p90 limits are unproven.
 - done when: `bun scripts/core-baseline.ts chat-tokens 20` prints 1 or more runs for the coordinator and the Dispatcher on a machine that has had a chat, and a test reads a fake session folder and sees both roles. Baseline today: 0 runs.
-- locks: chat-measure
+- locks: core-baseline
 - after: none
 - files: scripts/core-baseline.ts, src/session-text.ts, test/core-baseline.test.ts
 
 ### L469 The decision log is small
 Result: `decisions.jsonl` holds one line per decision, not one per tick, so it grows under 20 KB an hour and the stall counts stay readable.
-- why: it holds 4519 `run` lines in 10 hours (648 KB, 450 an hour), 99.8 % of the file, and a stall count over it needs a full scan.
+- why: it holds 4528 `run` lines in 10.5 hours (about 430 an hour), 99.6 % of the file, and `freshDecisions` in `src/decision-dedupe.ts` does not drop them.
 - done when: `wc -c ~/.config/lineclear/decisions.jsonl` grows by at most 20 KB over one hour with 5 tasks working; a test runs 100 ticks of an unchanged world and sees 1 line, not 100. Baseline today: 648 KB in 10 hours.
 - locks: decision-log
 - after: none
