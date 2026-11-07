@@ -5,14 +5,14 @@ What Lineclear is and why: [docs/idea.md](docs/idea.md). The order of work: [doc
 ## Commands
 
 - Checks are light and run on GitHub (`check.yml`, 5 minutes a job at most), never on an owner's machine: no browser suite, no coverage run, no local full check in a release or promotion (next goes out when the merged commit's GitHub `check` is green). `test/light-checks.test.ts` fails when that changes.
-- `bun run check`: on a machine of yours only the types (tsc); no test runs there. GitHub runs the tests, sharded to finish in about a minute: `lineclear pr` pushes the branch, `lineclear checks` waits for the result, and it must be green before a merge. On a runner (`GITHUB_ACTIONS`) the same script runs the change's tests, or `--full` runs everything in shards; a test case is under 2 s (a file with a slower one needs a baseline; `docs/numbers.md`).
+- `bun run check`: on a machine of yours it runs nothing (no tsc, no tests). GitHub runs the types and the tests, sharded to finish in about a minute: `lineclear pr` pushes the branch, `lineclear checks` waits for the result, and it must be green before a merge. On a runner (`GITHUB_ACTIONS`) the same script runs the change's tests, or `--full` runs everything in shards; a test case is under 2 s (a file with a slower one needs a baseline; `docs/numbers.md`).
 - `bun run types` (tsc), `bun run test` (bun test).
 - `bun run gates`: Biome (lint and format), knip (dead code) and the module borders of `docs/architecture.md`. Any fault fails.
 - `bun run release <version>`: refuses on a dirty tree or a red full check; otherwise sets the version, commits and tags `v<version>` here, installs from the tag into a fresh HOME and runs its doctor. It never pushes.
 - `bun run dispatcher:eval`: asks the Dispatcher's model the 58 requests of `test/dispatcher-eval/` and prints the share it called right (goal 100 %, never below 95 %). It spends tokens: not in `check`, run before each release and in U43.
 - `bun run ui:test`: the UI bar in headless Chromium (Playwright, once: `bunx playwright install chromium`) on the pages `lineclear run` serves, on port 7432 or `LINECLEAR_UI_PORT`
   The design system is in `docs/design.md`. Home is `/`, the Inbox `/inbox`, both with `?state=`.
-- `server/`: the fork of herdr-projects 2.0 (MIT, see `server/NOTICE`). `bin/lineclear serve --port <port>` starts it; `bun run check` runs its types and tests too (it prints each step's time).
+- `server/`: the fork of herdr-projects 2.0 (MIT, see `server/NOTICE`). `bin/lineclear serve --port <port>` starts it; GitHub's `bun run check` runs its types and tests too (it prints each step's time).
 - `bin/lineclear --help` lists the CLI. `bin/lineclear roadmap check .` checks `docs/ROADMAP.md`.
 
 ## Layout
