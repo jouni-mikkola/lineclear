@@ -44,6 +44,8 @@ export function fakeWorld(env: Record<string, string | undefined>, list: T[], ro
   const adds: string[][] = [];
   const cards: { id: string; task: string; at: number }[] = [];
   const tasks = { list };
+  /** The tasks started on each other machine. */
+  const remote: Record<string, T[]> = {};
   const did = (line: string) => {
     log.push(line);
     return undefined;
@@ -69,11 +71,17 @@ export function fakeWorld(env: Record<string, string | undefined>, list: T[], ro
     lastError: () => undefined,
     ownerWrote: () => false,
     nudge: (id) => did(`nudge ${id}`),
-    addTask: (_s, title, brief, extra) => {
-      adds.push([title, brief, ...extra]);
-      tasks.list = [...tasks.list, { id: `LIN-${100 + adds.length}`, title, status: "work" }];
-      return undefined;
-    },
+    addTasks: (_s, jobs) =>
+      jobs.map(({ host, title, brief, extra }) => {
+        if (host !== undefined) {
+          const there = (remote[host] ??= []);
+          there.push({ id: `T${host}${there.length}@${host}`, title, status: "work" });
+          return undefined;
+        }
+        adds.push([title, brief, ...extra]);
+        tasks.list = [...tasks.list, { id: `LIN-${100 + adds.length}`, title, status: "work" }];
+        return undefined;
+      }),
   };
-  return { world, clock, log, adds, cards, tasks };
+  return { world, clock, log, adds, cards, tasks, remote };
 }

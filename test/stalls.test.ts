@@ -54,7 +54,7 @@ function setup(o: Opts = {}) {
     chatCards: () => chat,
     started: (id) => starts.get(id) ?? { kind: "busy" },
     nudge: (id, text) => (log.push(`nudge ${id} ${text.slice(0, 40)}`), undefined),
-    addTask: (_s, title, brief, extra) => (adds.push([title, brief, ...extra]), undefined),
+    addTasks: (_s, jobs) => jobs.map(({ title, brief, extra }) => (adds.push([title, brief, ...extra]), undefined)),
   });
   recordTaskSteps(config, Object.fromEntries((o.tasks ?? [{ id: "LIN-5", title: "A Alpha" }]).map((t) => [t.id, t.title.split(" ")[0] as string])));
   const stall = (id: string) => cards.push({ id, task: "LIN-5", at: clock.at.getTime() + cards.length + 1 });

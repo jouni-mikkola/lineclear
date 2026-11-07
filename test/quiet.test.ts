@@ -40,7 +40,7 @@ test("a burst of load, quota and status events sends no message to any agent and
     chatCards: () => chat,
     lastError: () => error,
     nudge: (id) => (agentCalls.push(`nudge ${id}`), undefined),
-    addTask: () => undefined,
+    addTasks: (_s, jobs) => jobs.map(() => undefined),
   });
   for (let i = 0; i < 7; i++) {
     load = i % 2 === 0 ? 50 : 0; // CPU load up and down
