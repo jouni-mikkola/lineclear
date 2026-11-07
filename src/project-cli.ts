@@ -14,7 +14,7 @@ import {
   tierNames,
   tiersOf,
 } from "./project.ts";
-import { failureTail, maskSecrets, secretNames } from "./secrets.ts";
+import { failureTail, maskSecrets, secretNames } from "../server/server/live/secrets.ts";
 
 /** Each project with its commands, its model lists and its secret names, never their values. */
 export function listProjects(out: (l: string) => void, env = process.env): number {

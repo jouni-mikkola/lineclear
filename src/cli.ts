@@ -19,7 +19,7 @@ import { roadmapMain } from "./roadmap-cli.ts";
 import { demoMain } from "./demo.ts";
 import { runMain } from "./rules.ts";
 import { startWeb } from "./web.ts";
-import { secrets, totp } from "./secrets.ts";
+import { secrets, totp } from "../server/server/live/secrets.ts";
 import { topMain } from "./top-cmd.ts";
 import { boardMain, isBoardJob, serveMain } from "./serve.ts";
 import { waitsMain } from "./waits.ts";
@@ -50,7 +50,7 @@ export const commands: Record<string, string> = {
   todo: "Show a task that waits for a go as To do: todo <id>",
   done: "End a task that has nothing to merge: done <id>",
   secret: "Use a secret by name in a command: secret run NAME -- <command>",
-  secrets: "Set, list and load secrets from the vault Settings > Secrets shows (values come from stdin, never from arguments)",
+  secrets: 'Load the folder\'s secrets into a shell: eval "$(lineclear secrets env)" (add them in Settings > Secrets)',
   alive: "A task's agent beats: alive <id>",
   room: "A machine's room as herdr reads it, with its tasks at work and its slots: room [<machine>]",
   progress: 'A space\'s coordinator saves or reads its progress: progress ["<text>"]',

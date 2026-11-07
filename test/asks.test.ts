@@ -6,7 +6,7 @@ import { saysDone, allowanceReset, closedReports, openNeedCards, routeAsks, rule
 import { askKind, type Card, isIdle } from "../src/cards.ts";
 import { inboxMain } from "../src/inbox-answer.ts";
 import { addItem, closeItem, isOpen, readItems } from "../src/inbox.ts";
-import { storedLogin } from "../src/secrets.ts";
+import { storedLogin } from "../server/server/live/secrets.ts";
 import { readWaits } from "../src/waits.ts";
 import { tmp } from "./helpers.ts";
 
