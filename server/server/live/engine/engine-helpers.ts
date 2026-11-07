@@ -245,12 +245,6 @@ export const COMMENT: Record<string, string> = { APPROVED: 'Approved', CHANGES_R
 /** now, as GitHub writes times (to the second): what is compared with them */
 export const ghNow = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z')
 
-/** a pull request's footer, as the agent's CLI signs its work */
-export const SIGNED: Record<string, string> = {
-  claude: '🤖 Generated with [Claude Code](https://claude.com/claude-code)',
-  codex: '🤖 Generated with [Codex](https://openai.com/codex)',
-}
-
 export const troubleOf = (e: unknown) => ((e as Error)?.message ?? String(e)).split('\n')[0].slice(0, 90)
 
 /** a title fits one row: one too long (from an automation saved before the limit) is cut at a word */

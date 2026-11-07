@@ -206,7 +206,7 @@ export class EngineLand extends EngineHandoff {
     else {
       const rb = await G.rebase(wt, t.base)
       if (!rb.ok) return this.conflict(t, self, (await Lane.conflictFiles(wt, t.base)) ?? (await Lane.sharedFiles(wt, t.base)))
-      const message = `${t.id}: ${t.title}${t.said ? `\n\n${t.said}` : ''}${t.facts ? `\n\nFacts: ${t.facts}` : ''}`
+      const message = `${t.id}: ${t.title}${t.said ? `\n\n${t.said}` : ''}`
       const m = await G.mergeHere(p.path, t.branch, t.base, message, true)
       if (!m.ok) {
         if (/conflict/i.test(`${m.out}${m.err}`)) this.land(t, 'rebase')
@@ -327,7 +327,7 @@ export class EngineLand extends EngineHandoff {
       await this.sendBack(t, `${why} ${this.fixIt(t)}`)
       return { ok: false, error: `${why} Sent back to ${t.id}'s agent to fix.` }
     }
-    const m = await GH.mergePr(g, wt, n, head, `${t.id}: ${t.title} (#${n})`, [t.said, t.facts && `Facts: ${t.facts}`].filter(Boolean).join('\n\n'))
+    const m = await GH.mergePr(g, wt, n, head, `${t.id}: ${t.title} (#${n})`, t.said ?? '')
     let state = (await GH.viewPr(g, wt, n))?.state
     // a repo with a merge queue only queues the pull request: GitHub's full check runs there and merges it when green
     if (state !== 'MERGED' && /merge queue|automatically merged|auto-merge/i.test(`${m.out}\n${m.err}`)) {
