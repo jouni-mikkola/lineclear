@@ -12,6 +12,14 @@ export const IDLE_NUDGE =
 export const PROMISE_NUDGE =
   'Your turn ended with a promise of the next action ("I\'ll keep calling", "I\'ll check again") and no declared wait. Run that action now. If it cannot run yet, declare the wait with `lineclear wait task|until|owner ...` and end your turn.';
 
+/** The answer to an ordinary question an agent ended its turn with. */
+export const DECIDE_TEXT =
+  "Decide yourself by the brief: the owner is not asked this. Take the safer choice, list the decision in your facts, and carry on. Only a login code, money beyond the budget, or something that leaves the machine goes to the owner.";
+
+/** The nudge for a quiet turn in Merging: a merge left running holds every merge behind it in the lane. */
+export const mergeNudge = (task: string) =>
+  `Your turn ended while your merge is still in progress, and it holds every merge behind it. Run \`lineclear merge ${task}\` again, in the foreground, and wait for its answer until the task is through.`;
+
 type Part = { type?: string; name?: string; text?: string; arguments?: { command?: unknown } };
 type Message = { role?: string; content?: string | Part[] };
 
