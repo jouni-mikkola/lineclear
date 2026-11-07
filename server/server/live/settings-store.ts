@@ -6,30 +6,20 @@ import type { SetBy } from '../../shared/brief.ts'
 import { settingsBlock, settingsLines, type Said, type Ways } from './prompts.ts'
 import { adoptModel, projectModel } from './project-models.ts'
 import { effortFor, effortsOf, findModel, knowsModels, modelsOf } from '../../../src/models.ts'
+import { KEYS, levelsOf, defaultOf, CLI_NAME, kindOf, CATALOG } from './settings-catalog.ts'
+import { agentRow, LINECLEAR_MODELS, numOf, numValue, refuse, roleKind } from './settings-rules.ts'
 import {
-  type MachineLimits,
   defaultMaxTasks,
+  kindOfLevel,
+  ROLES,
   type Stored,
   type Values,
-  KEYS,
-  refuse,
   type Level,
   type LevelKind,
-  levelsOf,
-  kindOfLevel,
-  defaultOf,
-  LINECLEAR_MODELS,
-  kindOf,
-  numOf,
-  numValue,
-  CLI_NAME,
+  type MachineLimits,
   type Role,
-  roleKind,
-  ROLES,
-  CATALOG,
   type Section,
-  agentRow,
-} from './settings-catalog.ts'
+} from './settings-types.ts'
 
 /** under a machine's rows: why the defaults are what they are, in this machine's own numbers */
 export function machineNote(l: MachineLimits, cores = cpus().length, memGb = Math.round(totalmem() / 2 ** 30)) {
