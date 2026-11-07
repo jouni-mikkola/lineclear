@@ -26,7 +26,13 @@ test("an unknown command prints one line and exits 2", async () => {
 });
 
 test("bin/lineclear runs", async () => {
-  const env = { ...process.env, LINECLEAR_CONFIG: join(tmpdir(), "lc-bin-config"), LINECLEAR_HOME: join(tmpdir(), "lc-bin-home"), LINECLEAR_PORT: "7999" };
+  const env = {
+    ...process.env,
+    LINECLEAR_CONFIG: join(tmpdir(), "lc-bin-config"),
+    LINECLEAR_HOME: join(tmpdir(), "lc-bin-home"),
+    LINECLEAR_PORT: "7999",
+    PATH: `${dirname(process.execPath)}:/usr/bin:/bin`,
+  };
   const p = Bun.spawnSync(["bin/lineclear", "nope"], { env });
   expect(p.exitCode).toBe(2);
   expect(p.stdout.toString().trim().split("\n")).toEqual([`lineclear: unknown command 'nope', try 'lineclear --help'`]);
@@ -132,3 +138,32 @@ test("a release build has no .git and is never refused", () => {
   expect(stableRefusal(build, ["project", "list"], env, env.HOME)).toContain("stable config folder");
   rmSync(build, { recursive: true });
 });
+
+test("every listed command is one the CLI knows", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "lc-help-"));
+  const env = {
+    ...process.env,
+    HOME: dir,
+    LINECLEAR_CONFIG: dir,
+    LINECLEAR_HOME: dir,
+    LINECLEAR_PORT: "7999",
+    PATH: `${dirname(process.execPath)}:/usr/bin:/bin`,
+  };
+  const bin = join(dirname(import.meta.dir), "bin", "lineclear");
+  try {
+    const unknown = await Promise.all(
+      Object.keys(commands).map(async (name) => {
+        const p = Bun.spawn([bin, name, "--help"], { env, stdout: "pipe", stderr: "pipe", stdin: "ignore", detached: true });
+        // a command that forwards to the server waits on its closed port: it got past the dispatch, so end it and its children
+        const kill = setTimeout(() => process.kill(-p.pid, "SIGKILL"), 1500);
+        const text = (await new Response(p.stdout).text()) + (await new Response(p.stderr).text());
+        await p.exited;
+        clearTimeout(kill);
+        return /unknown command/.test(text) ? name : "";
+      }),
+    );
+    expect(unknown.filter(Boolean)).toEqual([]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}, 10000);
