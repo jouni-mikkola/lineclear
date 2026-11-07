@@ -205,12 +205,11 @@ function planStep(s: Starting, step: Step): Planned | undefined {
   const localRoom = !cap.offHere && !cap.overloaded && cap.max !== undefined && cap.free > 0;
   const candidates: Candidate[] = [
     ...(localRoom ? [{ host: undefined, load: world.load() + cap.startedHere, loadLimit: limit, free: cap.free }] : []),
-    ...[...cap.remoteFree]
-      .flatMap(([h, n]) => {
-        const r = s.rooms.get(h);
-        const free = r ? Math.min(n, roomSlots(r)) : 0;
-        return r && free > 0 ? [{ host: h, load: r.load, loadLimit: r.loadLimit, free }] : [];
-      }),
+    ...[...cap.remoteFree].flatMap(([h, n]) => {
+      const r = s.rooms.get(h);
+      const free = r ? Math.min(n, roomSlots(r)) : 0;
+      return r && free > 0 ? [{ host: h, load: r.load, loadLimit: r.loadLimit, free }] : [];
+    }),
   ];
   const host = mostRoom(candidates)?.host;
   const remoteRoom = host === undefined ? undefined : s.rooms.get(host);

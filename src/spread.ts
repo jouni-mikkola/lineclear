@@ -106,7 +106,7 @@ export function mostRoom(candidates: Candidate[]): Candidate | undefined {
 }
 
 /** How many more agents the machine's free memory holds: `floor((free - reserve) / per-agent)`; unlimited when it does not say. */
-export const memorySlots = (r: Room) => (r.freeKb === undefined ? Infinity : Math.max(0, Math.floor((r.freeKb - MEM_RESERVE_KB) / MEM_PER_AGENT_KB)));
+const memorySlots = (r: Room) => (r.freeKb === undefined ? Infinity : Math.max(0, Math.floor((r.freeKb - MEM_RESERVE_KB) / MEM_PER_AGENT_KB)));
 
 /** Task slots the machine has left for new starts: its free slots, held down by its memory. */
 export const roomSlots = (r: Room) => Math.max(0, Math.min((r.max ?? 0) - r.working, memorySlots(r)));
