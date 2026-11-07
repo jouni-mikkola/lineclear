@@ -9,7 +9,19 @@ import { FORK_PATH } from "../ui/test/chain-path.ts";
 import { roadmapSample } from "../ui/test/samples/roadmap-samples.ts";
 import { stepFiles, stepParts } from "../src/parts.ts";
 import { roadmapMain } from "../src/roadmap-cli.ts";
-import { checkRoadmap, closedSteps, doneIds, doneItems, fitTitle, formErrors, parseRoadmap, resultFlag, resultOf, type Step, TITLE_MAX } from "../src/roadmap.ts";
+import {
+  checkRoadmap,
+  closedSteps,
+  doneIds,
+  doneItems,
+  fitTitle,
+  formErrors,
+  parseRoadmap,
+  resultFlag,
+  resultOf,
+  type Step,
+  TITLE_MAX,
+} from "../src/roadmap.ts";
 
 const temps: string[] = [];
 const scratch = mkdtempSync(join(tmpdir(), "lc-roadmap-cfg-"));

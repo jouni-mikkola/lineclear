@@ -4,7 +4,6 @@ import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { changeSettings } from "../../src/project-change.ts";
 import { proposeTiers, readSettings, type Settings, tiersOf } from "../../src/project.ts";
-import { checkRoadmap, type Step } from "../../src/roadmap.ts";
 import { checkSteps } from "../../src/stepcheck.ts";
 import { machineOf, readWork } from "../../src/task-work.ts";
 import { sh, tmp } from "../helpers.ts";
