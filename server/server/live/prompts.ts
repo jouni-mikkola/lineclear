@@ -165,11 +165,9 @@ export function goLine(ids: string[], notes: string[], cleared = false) {
 
 /** GitHub news on a done task's pull request: what happened, never what to do */
 export function prNewsLine(id: string, pr: { number: number; url: string }, news: string[]) {
-  return [
-    `GitHub news on PR #${pr.number} (${pr.url}), since you reported ${id} ready:`,
-    ...news,
-    'The lineclear-agent skill says how to handle it.',
-  ].join('\n')
+  return [`GitHub news on PR #${pr.number} (${pr.url}), since you reported ${id} ready:`, ...news, 'The lineclear-agent skill says how to handle it.'].join(
+    '\n',
+  )
 }
 
 /** Personal settings are supplemental to repository rules and the human's requests. */
