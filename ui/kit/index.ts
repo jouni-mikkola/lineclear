@@ -1,5 +1,6 @@
 // Lineclear's design system: every view is built from these parts. The spec is docs/design.md.
 export * from "./browsers.tsx";
+export * from "./live-picture.tsx";
 export * from "./chat.tsx";
 export { Lightbox } from "./chat-files.tsx";
 export * from "./no-dispatcher.tsx";
