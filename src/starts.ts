@@ -86,8 +86,9 @@ export function bindStarts(state: StartRecord, tasks: Task[]) {
   const { pendingStarts: pending, taskSteps } = state;
   for (const t of tasks) {
     const step = pending[t.title];
-    if (t.id === undefined || step === undefined || taskSteps[t.id] !== undefined || t.status === "done") continue;
-    taskSteps[t.id] = step;
+    if (t.id === undefined || step === undefined || taskSteps[t.id] !== undefined) continue;
+    // A task that ended before it was bound still settles its title, or the step would wait for it for good.
+    if (t.status !== "done") taskSteps[t.id] = step;
     delete pending[t.title];
   }
 }

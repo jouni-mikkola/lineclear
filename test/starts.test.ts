@@ -115,3 +115,15 @@ test("reservations go to the oldest waiting step, and a step reserves nothing un
   expect(lockWhy(byId.get("A")!, new Map(), reserved)).toContain("reserved for B");
   expect(lockWhy(byId.get("B")!, new Map(), reserved)).toBeUndefined();
 });
+
+test("the same step added twice starts once and is refused once, and a landed step starts nothing", () => {
+  const t = setup({ steps: [step("A", "none")] });
+  t.doTick();
+  t.doTick();
+  expect(t.adds().length).toBe(1);
+  expect(t.decisions().some((x) => x.step === "A" && x.reason.includes("does not start twice"))).toBe(true);
+  const landed = setup({ steps: [step("A", "none")], tasks: [{ id: "LIN-1", title: "A Title A", status: "done", closed: true, closedBy: "done" }] });
+  writeFileSync(join(landed.config, "projects", "demo", "state.json"), JSON.stringify({ taskSteps: { "LIN-1": "A" }, closedSteps: { A: "LIN-1" } }));
+  landed.doTick();
+  expect(landed.adds()).toEqual([]);
+});
