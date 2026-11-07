@@ -161,4 +161,37 @@ describe('room on the machine', () => {
     w.engine.release(now + 31_000)
     await until(() => w.started.some((s) => s.key === `${b.id}/Agent`))
   })
+
+  test('a full home machine sends a new task to a free machine that has the repo; --on a free machine starts while home is busy', async () => {
+    const w = fresh({ 'machine.maxTasks': '1' })
+    const a = await started(w, repo(), 'room-other', 'First', 'Add a.txt.')
+    w.brief(a.key)
+    w.engine.addMachine({ label: 'elite', target: 'elite', session: 's', herdr: 'herdr', home: '/home/e', path: '/bin', os: 'Linux' })
+    w.engine.addMachine({ label: 'nofolder', target: 'n', session: 's', herdr: 'herdr', home: '/home/n', path: '/bin', os: 'Linux' })
+    a.p.machines = { elite: '~/repo' }
+    w.engine.machine = (m) => (m ? { herdr: true } : undefined)
+    // home has its one slot taken: the task with no machine goes to elite, not to nofolder (no repo there)
+    const b = w.engine.add({ project: a.p.name, title: 'Other', desc: 'Add b.txt.', by: 'test' })
+    expect(b.machine).toBe('elite')
+    expect(b.held).toBeUndefined()
+    // elite's own slot is taken now: the next is held, and starts on whichever machine gets room
+    const c = w.engine.add({ project: a.p.name, title: 'Held', desc: 'Add c.txt.', by: 'test' })
+    expect(c.held?.why).toBe('slots')
+    expect(c.machine).toBeUndefined()
+    // named: it counts against that machine only
+    const d = w.engine.add({ project: a.p.name, title: 'Named', desc: 'Add d.txt.', by: 'test', machine: 'nofolder' })
+    expect(d.held).toBeUndefined()
+    expect(w.engine.workingOn('nofolder')).toBe(1)
+    w.agentIs(a.key, 'idle')
+    w.engine.release()
+    expect(c.held).toBeUndefined()
+    expect(c.machine).toBeUndefined()
+  })
+
+  test('a named machine that is loaded holds the task even when home is free', () => {
+    const w = fresh({ 'machine.maxTasks': '2' })
+    w.engine.machine = (m) => (m ? { herdr: true, busy: 'cpu' } : undefined)
+    expect(w.engine.room('elite')).toEqual({ why: 'machine' })
+    expect(w.engine.room()).toEqual({})
+  })
 })

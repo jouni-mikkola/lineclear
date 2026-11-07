@@ -62,7 +62,7 @@ export class EngineTidy extends EngineMerge {
     // refused before any herdr call: a Done task has no pane
     if (ended(t)) throw new Error(this.overWords(t))
     const waits = this.statusOf(t) === 'todo' || this.holding(t)
-    const r = gate && waits && !ended(t) ? this.room() : {}
+    const r: { why?: 'slots' | 'machine'; machine?: string } = gate && waits && !ended(t) ? this.roomFor(t) : {}
     if (r.why) {
       if (!t.worktree) {
         // its brief takes the words, as below; it starts on it once there's room
@@ -78,6 +78,7 @@ export class EngineTidy extends EngineMerge {
       t.desc = [work, text, how].filter(Boolean).join('\n\n')
       // a message is the go, as for one at work
       t.held = undefined
+      if (r.machine) t.machine = r.machine
       await this.startTask(t)
       return {}
     }

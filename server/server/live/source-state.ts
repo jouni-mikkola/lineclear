@@ -62,6 +62,8 @@ export class LiveSourceState extends Emitter<SourceEvents> {
     undefined,
     { read: () => readJson('health.json', {}), write: (w) => writeJson('health.json', w) },
   )
+  /** what the last look at each other machine found (source-views.ts readBoxes) */
+  protected boxes = new Map<string, { read?: { busy?: 'cpu' | 'memory'; herdr: boolean }; at: number; reading: boolean }>()
   /** when each chat last had something new, and how far you have read each (on the main machine) */
   unread = new Unread()
   /** when this server started: only what comes after it buzzes as a new message */

@@ -96,7 +96,7 @@ export abstract class EngineState extends Emitter<Events> {
   installed = (kind: string) => !!Bun.which(kind)
   /** how loaded this machine is now: over a start limit (health.ts busy), and whether herdr answers; none until first
    *  measured, which holds nothing by load */
-  machine?: () => { busy?: 'cpu' | 'memory'; herdr: boolean } | undefined
+  machine?: (machine?: string) => { busy?: 'cpu' | 'memory'; herdr: boolean } | undefined
   /** when a held task last started while load decided */
   protected lastStart = 0
   protected releasing = false
@@ -353,13 +353,33 @@ export abstract class EngineState extends Emitter<Events> {
     return this.tasks.filter((t) => (t.machine ?? undefined) === machine && this.busy(t)).length
   }
 
-  /** whether one more task may start now, and if not, why: its slots are all taken, or the machine is too loaded */
-  room(): { why?: 'slots' | 'machine' } {
+  /** whether one more task may start on a machine now (none given: the server's own), and if not, why: its slots are
+   *  all taken, or the machine is too loaded. Every machine has the slots Settings gives (one store). */
+  room(machine?: string): { why?: 'slots' | 'machine' } {
     const l = this.settings.machine()
-    if (l.max !== null && this.working() >= l.max) return { why: 'slots' }
-    const m = this.machine?.()
+    if (l.max !== null && this.workingOn(machine) >= l.max) return { why: 'slots' }
+    const m = this.machine?.(machine)
     if (m && (m.busy || !m.herdr)) return { why: 'machine' }
     return {}
+  }
+
+  /**
+   * Where a task may start now. One that has a place (a worktree, or named with --on) has only that machine. Any other
+   * goes to the machine with the most free slots that has its space's repo and answers; the server's own on a tie.
+   * No room anywhere: why the server's own (or the named machine) has none.
+   */
+  roomFor(t: TaskRec): { why?: 'slots' | 'machine'; machine?: string } {
+    if (t.machine || t.worktree) return { ...this.room(t.machine), machine: t.machine }
+    const own = this.room()
+    const repo = this.places.space(t.project)?.machines ?? {}
+    const max = this.settings.machine().max
+    const free = (m?: string) => (max ?? Number.POSITIVE_INFINITY) - this.workingOn(m)
+    let best: { machine?: string; free: number } | undefined = own.why ? undefined : { free: free() }
+    for (const label of this.machines.keys()) {
+      if (!repo[label] || !this.machine?.(label)?.herdr || this.room(label).why) continue
+      if (!best || free(label) > best.free) best = { machine: label, free: free(label) }
+    }
+    return best ? { machine: best.machine } : { why: own.why }
   }
 
   /** tasks held now, oldest first */
@@ -374,7 +394,7 @@ export abstract class EngineState extends Emitter<Events> {
     t.after = undefined
     t.todo = undefined
     const id = `held:${t.id}:${Date.now()}`
-    const words = why === 'slots' ? `waiting for a free slot (${this.working()} of ${l.max} working)` : 'waiting for the machine: it is busy'
+    const words = why === 'slots' ? `waiting for a free slot (${this.workingOn(t.machine)} of ${l.max} working)` : 'waiting for the machine: it is busy'
     this.chats.post(this.key(t), { id, card: { id, task: t.id, status: 'queued', text: words } })
     this.save()
     this.settleOne(t)

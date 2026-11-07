@@ -12,6 +12,7 @@ import type { ArtifactRec } from './artifacts.ts'
 import { BOX } from './box.ts'
 import { HOST, NAME, placeId } from './places.ts'
 import { restartHint, type Harness } from './restart.ts'
+import { room } from './herdr-forward.ts'
 import { repositorySection } from './settings.ts'
 import { secretPages } from './secrets.ts'
 import { pluginSection } from '../plugins.ts'
@@ -29,8 +30,29 @@ export class LiveSourceViews extends LiveSourceState {
       this.sweptAt = now
       void this.sweepBrowsers().catch(() => undefined)
     }
+    this.readBoxes(now)
     this.engine.release(now)
     if (this.health.last?.at !== at) this.emit('snapshot')
+  }
+
+  /** the load of each machine tasks run on besides this one, read at most once a minute; held tasks look again when it is in */
+  protected readBoxes(now: number) {
+    const limit = this.settings.machine().startLoad
+    for (const label of this.engine.machines.keys()) {
+      const had = this.boxes.get(label)
+      if (had?.reading || (had && now - had.at < 60_000)) continue
+      const box = { read: had?.read, at: now, reading: true }
+      this.boxes.set(label, box)
+      void room(label)
+        .then((r) => {
+          box.read = { herdr: !!r, busy: r && limit !== null && r.load > limit * r.cores ? ('cpu' as const) : undefined }
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          box.reading = false
+          this.engine.release()
+        })
+    }
   }
 
   /** before it stops: the merges on their way finish (engine.drain) */
