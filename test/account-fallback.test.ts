@@ -45,6 +45,14 @@ test("the project's lists are found from its repo, and empty ones are left out",
   expect(projectLists(tmp("elsewhere"), env)).toEqual({});
 });
 
+test("a worktree finds its project through the .git file", () => {
+  const { repo, env } = setup();
+  sh(["git", "-C", repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "x"]);
+  const work = join(repo, "..", "work");
+  sh(["git", "-C", repo, "worktree", "add", "-q", "-b", "w", work]);
+  expect(Object.keys(projectLists(work, env))).toEqual(["worker", "reviewer"]);
+});
+
 test("a full account moves the run to the next model of the list, in the same process", async () => {
   const { repo, env } = setup();
   const models = new Map<string, any>();

@@ -28,7 +28,7 @@ export function kitSkills(env: Env = process.env): string[] {
   return paths;
 }
 
-/** True in a task's agent: its chat is `<task>/Agent`. The Dispatcher, reviewers and a hand-run pi are never nudged. */
+/** True in a task's agent: its chat is `<task>/Agent`. The Dispatcher, reviewers and a hand-run pi keep their tool results whole. */
 export const taskAgent = (env: Env) => /\/Agent$/.test(env.LINECLEAR_CHAT ?? "");
 
 type Pi = {
