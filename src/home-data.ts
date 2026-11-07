@@ -14,7 +14,7 @@ import { roadmapSource, lineclearAllTasks } from "./roadmap-source.ts";
 import { planInputs, titledByStep } from "./task-steps.ts";
 import { keptBy, readJsonKept, refsKey } from "./kept-read.ts";
 import { spaceStops, waitBlocker, waitingOf } from "./home-waits.ts";
-import { remoteTasks } from "./spread.ts";
+import { machineTasksShown } from "./task-read.ts";
 import { readWaits, type Wait, type WaitGroup, waitsForOwner } from "./waits.ts";
 import { type Move, readMoves } from "./full.ts";
 import { listProjectNames, readSettings } from "./project.ts";
@@ -84,8 +84,6 @@ export interface HomeTask {
   progress?: number;
   at: number;
   text?: string;
-  /** Its machine did not answer the last read: when it last did (ms). The row says so and the task counts as waiting for no one. */
-  silentSince?: number;
 }
 
 /** Why work waits in a project, in words: what runs now, what each paused task waits for, why a ready step has not started. */
@@ -292,7 +290,7 @@ function spaceView(s: SpaceRecord, ctx: SpaceContext, owner?: { project: string;
   const head = existsSync(s.path) ? mainHead(s.path) : undefined;
   const broken = head !== undefined && ctx.red[s.path] !== undefined && ctx.red[s.path] === head;
   const every = ctx.every;
-  const listed = typeof every === "string" ? every : [...every.filter((t) => String(t.id).startsWith(`${s.key}-`)), ...remoteTasks(s.name, env)];
+  const listed = typeof every === "string" ? every : [...every.filter((t) => String(t.id).startsWith(`${s.key}-`)), ...machineTasksShown(env, s.name)];
   const lines = new Map(typeof listed === "string" ? [] : listed.flatMap((t) => (t.id && t.sub ? [[t.id, t.sub] as const] : [])));
   const status = new Map(typeof listed === "string" ? [] : listed.flatMap((t) => (t.id ? [[t.id, t.status] as const] : [])));
   // a turn that ended with no question and no declared wait is not Needs you: the stall ladder resumes it

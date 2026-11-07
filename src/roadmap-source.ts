@@ -1,8 +1,7 @@
-import { readTasks } from "./task-read.ts";
+import { machineTasksShown, readTasks } from "./task-read.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { keptBy, refsKey } from "./kept-read.ts";
-import { remoteTasks } from "./spread.ts";
 import type { Task } from "./roadmap.ts";
 import { mainRefs } from "./main-branch.ts";
 import { git } from "./git.ts";
@@ -19,7 +18,7 @@ export function lineclearAllTasks(env: Env = process.env): (Task & { machine?: s
 export function lineclearTasks(space: string, env: Env = process.env): Task[] | string {
   const r = readTasks(env, space);
   // The tasks of the project's other machines count as its own: ids end in `@host`, titles say where they run.
-  return "tasks" in r ? [...r.tasks, ...remoteTasks(space, env)] : `task list failed: ${r.why}`;
+  return "tasks" in r ? [...r.tasks, ...machineTasksShown(env, space)] : `task list failed: ${r.why}`;
 }
 
 type Source = { text: string; commits: { commit: string; at: number; subject: string; body: string }[] };

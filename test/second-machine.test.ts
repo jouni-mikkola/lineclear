@@ -75,6 +75,8 @@ if (cmd === "task" && sub === "list") {
 } else if (cmd === "task" && sub === "add") {
   const line = [cmd, sub, ...rest].join(" ");
   fs.appendFileSync(rest.includes("--on") ? "${seen}" : "${fake}/adds.log", (rest.includes("--on") ? "ADD " : "") + line + "\\n");
+  // the one store holds the new task at once, so a later read lists it even when the machine is down
+  if (rest.includes("--on")) fs.writeFileSync("${home}/tasks.json", JSON.stringify([...remote, { id: "FAR-" + (remote.length + 1), title: rest[0], status: "work" }]));
 } else if (cmd === "task" && sub === "show") process.stdout.write(fs.readFileSync("${fake}/show.json"));
 else if (cmd === "task" && sub === "close") fs.appendFileSync("${fake}/closes.log", [cmd, sub, ...rest].join(" ") + "\\n");
 else if (cmd === "room") console.log(JSON.stringify({ max: ${o.localMax ?? 0} }));

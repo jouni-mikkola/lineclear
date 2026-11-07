@@ -6,7 +6,6 @@ import { projectsData, type HomeProject } from "./home-data.ts";
 import { listProjectNames, readSettings } from "./project.ts";
 import { lineclearTasks } from "./roadmap-source.ts";
 import { readState } from "./rules.ts";
-import { notReached, silentMachines } from "./spread.ts";
 import { countWaiting, waitingForYou } from "./waiting.ts";
 import { readWaits, type Wait, waitsForOwner } from "./waits.ts";
 
@@ -22,7 +21,6 @@ function needing(project: string, env: NodeJS.ProcessEnv): string[] {
   const settings = readSettings(project, env);
   const tasks = typeof settings === "string" ? [] : lineclearTasks(settings.space, env);
   if (typeof tasks === "string") return [];
-  const silent = silentMachines(env);
   const paused = new Set(
     readWaits(env)
       .filter((w) => !waitsForOwner(w))
@@ -32,7 +30,7 @@ function needing(project: string, env: NodeJS.ProcessEnv): string[] {
     tasks
       // another machine's line carries an "on <machine>" tail that is not part of what the task says
       .map((t) => ({ ...t, sub: t.sub?.replace(/(?: · )?on [^ ]+$/, "") || undefined }))
-      .filter((t) => !silent.has(String(t.id).split("@")[1] ?? "") && t.status === "need" && t.sub !== IDLE_TEXT && !paused.has(t.id ?? ""))
+      .filter((t) => t.status === "need" && t.sub !== IDLE_TEXT && !paused.has(t.id ?? ""))
       .map((t) => `${t.id} waits for you${t.sub ? `: ${t.sub}` : ""}`)
   );
 }
@@ -111,7 +109,6 @@ export function status(out: (l: string) => void, env = process.env, only?: strin
     for (const l of [...lines, ...rest]) out(l);
     return 0;
   }
-  for (const [host, good] of silentMachines(env)) rest.push(clip(`-  ${notReached(host, good)}`));
   for (const w of readWaits(env).filter((w) => w.project === undefined || !all.includes(w.project))) rest.push(clip(`-  ${describeWait(w)}`));
   // The count comes first too: it is the same list as Home's headline and the Inbox badge.
   const n = countWaiting(waitingForYou(env));

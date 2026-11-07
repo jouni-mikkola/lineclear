@@ -11,7 +11,6 @@ export interface StatusTask {
   machine?: string;
   since?: number;
   stalled?: boolean;
-  silentSince?: number;
   text?: string;
   /** Tokens sent to the model so far: fresh and read from cache. */
   input?: number;
@@ -38,8 +37,7 @@ export interface AgentRow {
 
 const PHASE: Record<string, string> = { work: "at work", review: "in review", ready: "ready to merge" };
 
-const waitOf = (t: StatusTask): string =>
-  t.state === "need" ? (t.text ?? "waits for you") : t.silentSince ? "not reached" : t.stalled ? "no sign of life" : "";
+const waitOf = (t: StatusTask): string => (t.state === "need" ? (t.text ?? "waits for you") : t.stalled ? "no sign of life" : "");
 
 /** Every agent at work or waiting on you, in the order of the projects, then the tasks of spaces with no project. */
 export function agentStatus(projects: StatusProject[], loose: (StatusTask & { space: string })[] = [], host: string, now: number): AgentRow[] {
