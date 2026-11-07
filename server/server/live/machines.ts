@@ -20,6 +20,7 @@ export class Machines extends MachinesActions {
         for (const f of readdirSync(join(dir, d))) if (f !== 'waiting.json') rmSync(join(dir, d, f), { recursive: true, force: true })
         if (!readdirSync(join(dir, d)).length) rmSync(join(dir, d), { recursive: true })
       }
+      if (existsSync(dir) && !readdirSync(dir).length) rmSync(dir, { recursive: true })
       void this.sync()
       this.timers.push(setInterval(() => void this.sync(), 15_000))
     }
