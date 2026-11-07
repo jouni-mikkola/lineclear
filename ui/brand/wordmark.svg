@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 265 64" fill="none">
+  <title>Lineclear</title>
+  <path fill="#ece9e4" fill-rule="evenodd" d="M5 22a17 17 0 1 0 34 0a17 17 0 1 0 -34 0ZM12 22a10 10 0 1 0 20 0a10 10 0 1 0 -20 0Z"/>
+  <circle cx="22" cy="22" r="6.5" fill="#d97757"/>
+  <path d="M22 38V55H57" stroke="#ece9e4" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <g transform="translate(76 23)" stroke="#ece9e4" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" fill="none"><path transform="translate(0 0)" d="M2 0V32"/><path transform="translate(10 0)" d="M2 12V32"/><circle cx="12" cy="2" r="3.3" fill="#ece9e4" stroke="none"/><path transform="translate(20 0)" d="M2 12V32M2 20C2 10 16 10 16 20V32"/><path transform="translate(44 0)" d="M2 22H18C18 15 14 12 10 12C5 12 2 16 2 22C2 28 5 32 10 32C13 32 16 31 17.5 28"/><path transform="translate(70 0)" d="M17 15C15.5 13 13 12 10 12C5 12 2 16 2 22C2 28 5 32 10 32C13 32 15.5 31 17 29"/><path transform="translate(95 0)" d="M2 0V32"/><path transform="translate(105 0)" d="M2 22H18C18 15 14 12 10 12C5 12 2 16 2 22C2 28 5 32 10 32C13 32 16 31 17.5 28"/><path transform="translate(131 0)" d="M17 12V32M17 22A7.5 7.5 0 1 0 2 22A7.5 7.5 0 1 0 17 22"/><path transform="translate(156 0)" d="M2 12V32M2 21C2 14 8 12 15 13"/></g>
+</svg>

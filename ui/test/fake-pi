@@ -1,0 +1,4 @@
+#!/bin/sh
+# Stands in for pi in the UI tests: `--list-models` prints the table in $PI_CODING_AGENT_DIR/models.txt (one `provider model` per line) when it exists, nothing otherwise.
+[ -f "$PI_CODING_AGENT_DIR/models.txt" ] && { echo "provider model"; cat "$PI_CODING_AGENT_DIR/models.txt"; }
+exit 0
