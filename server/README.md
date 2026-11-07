@@ -48,7 +48,7 @@ Write what needs doing to a space's coordinator: it makes it a task or several, 
 
 ### 💬 Know when a task needs an answer
 
-An agent that asks you something, wants a permission or a plan approved shows under `Needs you`, and its question comes as a card you answer with a tap, from the chat or straight from an [alert](docs/get-started.md#install-it-as-an-app-with-alerts) on your lock screen. Each task's chat also shows its live terminal, files, diff, pull request and a [shared browser](docs/browser.md) you can take over. Reports and draft screens come as [artifacts](docs/artifacts.md) you mark up beside the chat, and you can call a coordinator by [voice](docs/get-started.md#voice).
+An agent that asks you something, wants a permission or a plan approved shows under `Needs you`, and its question comes as a card you answer with a tap, from the chat or straight from an [alert](docs/get-started.md#install-it-as-an-app-with-alerts) on your lock screen. Each task's chat also shows its live terminal, files, diff and pull request. Reports and draft screens come as [artifacts](docs/artifacts.md) you mark up beside the chat, and you can call a coordinator by [voice](docs/get-started.md#voice).
 
 ## Open Lineclear in three steps
 
@@ -83,7 +83,7 @@ The next herdr start, or the next press of the open key, swaps the running Linec
 
 ### Do I need to know how to code?
 
-You need to be comfortable in a terminal for the install. After that everything happens in the app: you write to coordinators and answer cards, and Settings holds the few defaults. You'll need macOS or Linux, herdr 0.9 or newer, Git, Tailscale to reach it from your other devices, and an agent CLI herdr can start: Claude Code, Codex, pi or another. Bun comes by itself. `gh` (pull requests), Chrome for the shared browser and an ElevenLabs key for voice are optional. [Get started](docs/get-started.md) covers the prerequisites.
+You need to be comfortable in a terminal for the install. After that everything happens in the app: you write to coordinators and answer cards, and Settings holds the few defaults. You'll need macOS or Linux, herdr 0.9 or newer, Git, Tailscale to reach it from your other devices, and an agent CLI herdr can start: Claude Code, Codex, pi or another. Bun comes by itself. `gh` (pull requests), an ElevenLabs key for voice are optional. [Get started](docs/get-started.md) covers the prerequisites.
 
 ### How do I check that Lineclear is running?
 

@@ -112,4 +112,4 @@ report that operational follow-up instead of using an unauthenticated fallback.
 
 ## References
 
-[lineclear](../lineclear/SKILL.md): chat lines, cards, artifacts, the shared browser.
+[lineclear](../lineclear/SKILL.md): chat lines, cards, artifacts.

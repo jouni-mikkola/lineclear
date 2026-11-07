@@ -177,11 +177,6 @@ export function commandSay(cmd: string): Said {
       }
       return said('run', S[what] ?? S1[sub] ?? `Use lineclear ${sub}`.trim())
     }
-    case 'agent-browser':
-      return said(
-        'web',
-        sub === 'open' || sub === 'goto' ? `Open ${host(args[1])} in the browser` : sub === 'screenshot' ? 'Take a screenshot' : 'Use the browser',
-      )
     case 'cat':
     case 'head':
     case 'tail':

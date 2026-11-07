@@ -10,14 +10,11 @@ pull requests of GitHub repos); nothing to install by hand.
   run over SSH (one shared connection); the agents' logs and Claude Code's hook events are copied over as they grow.
 - The helper: Lineclear puts a small folder there over SSH, `~/.lineclear/helper/`: the `lineclear` command for its
   agents (it reaches Lineclear through an SSH tunnel from the main machine, so the API stays off the network), the
-  hook recorder, the log copier, a health reader, the skills, and the pinned agent-browser with Chrome. A new machine
+  hook recorder, the log copier, a health reader, and the skills. A new machine
   gets it as soon as herdr has it saved; it is put there again whenever Lineclear updates and its copy changed.
 - `lineclear doctor` (on the main machine) checks every machine, puts the helper there again, starts its worker again
   and says what is missing. Settings → Machines says how each one is: Ready, Putting the helper there…, Can't reach it
   (and why), or what it needs.
-- A task's shared browser runs on the task's own machine, next to its app. Where that machine can run `tailscale
-  serve`, your screen takes the browser's frames and sends your input straight to it over the tailnet (the main
-  machine only hands out the link, under a path no one can guess); elsewhere they come through the main machine.
 - A machine that can't be reached says `Can't reach` on its heading; its chats keep what they last showed and what you
   send waits until it is back.
 - From before: a machine that had its own copy of Lineclear reporting to this one gives its spaces, tasks and chats

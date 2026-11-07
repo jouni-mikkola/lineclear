@@ -93,11 +93,6 @@ describe('machine health', () => {
       disks: [{ path: '/tmp', pct: 40, freeGb: 60, dev: 1 }],
       gpus: [],
     })
-    // browsers done tasks left open (never this machine's real ones): closed first, and counted in the news
-    const browsers = src.browsers!
-    const sweep = browsers.sweep
-    let keep: ((t: string) => boolean) | undefined
-    browsers.sweep = async (k) => ((keep = k), ['TG-4', 'TG-5'])
     try {
       src.agents.reachable = true
       src.healthTick()
@@ -109,8 +104,6 @@ describe('machine health', () => {
         `<lineclear><health kind="memory" what="over">Machine ${HOST}: memory is over 90%: 96% in use.\nCPU 13% (load 2.0 on 16 cores) · Memory 96% (96 GB of 100 GB) · Disk /tmp 40% (60 GB free)\nTasks: `,
       )
       expect(news).toContain('Using it most now:')
-      expect(news).toContain('Lineclear closed 2 shared browsers that finished tasks left open (TG-4, TG-5).')
-      expect(keep!('TG-4')).toBe(false)
       expect(news).toContain('lineclear task pause <id>')
       expect(news).toContain(
         'Act on it if the human asked you to handle such things. If it can’t wait, alert the human with lineclear alert and say why. A card in this chat already shows the human the news: reply after it in one or two short lines',
@@ -151,7 +144,6 @@ describe('machine health', () => {
       const cards = src.chats.chat(machine).messages.filter((m) => m.card?.text.startsWith('memory'))
       expect(cards.map((m) => m.card?.text)).toEqual(['memory is back to normal'])
     } finally {
-      browsers.sweep = sweep
       src.agents.send = send
       src.agents.reachable = reach
       mon.take = take

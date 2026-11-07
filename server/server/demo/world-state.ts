@@ -1,5 +1,3 @@
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import {
   apart,
   cardMessage,
@@ -31,7 +29,6 @@ import { demoActivity } from './activity.ts'
 import { settingsBlock } from '../live/prompts.ts'
 import { repositorySection } from '../live/settings.ts'
 import { secretPages, Vault } from '../live/secrets.ts'
-import { Browsers } from '../live/browser.ts'
 import { sortPlaces, type PlaceOrder, type SectionDefs } from '../../shared/order.ts'
 import { DEFAULT_WAYS, DEFAULT_REVIEWER, seq, id, CLAUDE_CONTROLS, demoPath, OTHER_CONTROLS } from './world-helpers.ts'
 
@@ -69,22 +66,6 @@ export class DemoWorldState extends Emitter<SourceEvents> {
   files: Record<string, () => Blob> = { ...D.FILES }
   /** files uploaded for a chat (chat, newline, path): each can be seen before it is sent */
   protected uploaded = new Set<string>()
-  /** a real shared browser for the demo's tasks, to review the Browser panel (LINECLEAR_DEMO_BROWSER=1 and
-   *  agent-browser): in its own namespace, its profiles in a temporary folder */
-  browsers = process.env.LINECLEAR_DEMO_BROWSER
-    ? new Browsers({
-        host: D.DEMO_HOST,
-        user: () => 'Elias',
-        working: () => false,
-        tell: () => undefined,
-        env: (task) => ({
-          AGENT_BROWSER_NAMESPACE: 'lineclear-demo',
-          AGENT_BROWSER_SESSION: task,
-          AGENT_BROWSER_PROFILE: join(tmpdir(), 'lineclear-demo', 'browser', task),
-        }),
-      })
-    : null
-
   /* ---------- adding projects ---------- */
 
   /** made-up folders: each machine's from the data, plus the ones made here */
@@ -175,11 +156,7 @@ export class DemoWorldState extends Emitter<SourceEvents> {
       name: 'Lineclear',
       host: D.DEMO_HOST,
       ...sortPlaces(this.places, this.machines, this.order, this.groups),
-      tasks: this.tasks.map((t) =>
-        t.status === 'done'
-          ? t
-          : { ...t, browser: this.browsers?.status() ?? { ready: false, hint: 'The demo has no browser: start it with LINECLEAR_DEMO_BROWSER=1.' } },
-      ),
+      tasks: this.tasks,
       artifacts: this.artifacts,
       asks: this.asks,
       attentionRequests: Object.fromEntries([
@@ -379,15 +356,6 @@ export class DemoWorldState extends Emitter<SourceEvents> {
   }
 
   /* ---------- acting ---------- */
-
-  browser(task: string, out: { send(d: string): void; close(): void; buffered?(): number }) {
-    if (!this.browsers) {
-      out.send(JSON.stringify({ type: 'error', message: 'The demo has no browser.' }))
-      out.close()
-      return { message() {}, end() {} }
-    }
-    return this.browsers.attach(task, out)
-  }
 
   protected answer(a: Extract<Action, { type: 'answer' }>) {
     const c = this.chats[a.chat]

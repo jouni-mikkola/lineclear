@@ -166,14 +166,6 @@ export const CATALOG: Section[] = [
     ],
   },
   {
-    // a task's shared browser closes after this long with no agent command and no one watching it in its Browser panel
-    // (browser.ts closeIdle); its sign-ins stay, and the next command or a look starts it again
-    name: 'Browser',
-    about:
-      "A task's browser closes after this long with no agent using it and no one watching it, so it stops using CPU. Sign-ins stay; the agent's next command or opening the Browser panel starts it again.",
-    rows: [{ label: 'Close idle browser after', key: 'browser.idleClose', value: '10 min', num: { min: 1, max: 1440, unit: 'min', off: true } }],
-  },
-  {
     // what buzzes from each place's coordinator chat (shared/alerts.ts notifies); a machine's or space's own is set from its row's menu
     name: 'Notify',
     about:

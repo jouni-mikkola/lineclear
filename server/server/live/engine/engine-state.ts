@@ -7,8 +7,6 @@ import { Emitter } from '../../source.ts'
 import { machineOf, recordWork } from '../../../../src/task-work.ts'
 import { readJson, writeJson } from '../../store.ts'
 import { ROOT } from '../../root.ts'
-import { has } from '../../plugins.ts'
-import { browserEnv } from '../browser.ts'
 import { hidden, type Agents, type Spec } from '../agents.ts'
 import type { Chats } from '../chats.ts'
 import { HOST, type Places, type Space } from '../places.ts'
@@ -401,10 +399,7 @@ export abstract class EngineState extends Emitter<Events> {
   }
 
   protected env(key: string) {
-    return {
-      ...(has('browser') ? browserEnv(key.split('/')[0]) : {}),
-      ...agentEnv(key, ROOT),
-    }
+    return agentEnv(key, ROOT)
   }
 
   /**

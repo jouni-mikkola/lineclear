@@ -8,8 +8,7 @@ CLI herdr can start works (chats are read for Claude Code, Codex and pi).
 ## Install
 
 Needs herdr 0.9 or later, on Linux or macOS. It runs on [Bun](https://bun.sh): with none found, it gets one pinned,
-checksum-checked Bun into `~/.lineclear/bun/` by itself. Tasks' shared browser also needs Chrome for agent-browser,
-once on the main machine: `bin/agent-browser install` (on Linux, `install --with-deps` adds what Chrome needs). Other
+checksum-checked Bun into `~/.lineclear/bun/` by itself. Other
 machines need nothing installed by hand ([Other machines](machines.md)).
 
 ```sh
@@ -56,4 +55,4 @@ app is closed or in the background.
 
 - [Upgrading and updates](upgrading.md): coming from herdr-projects, going back, and how Lineclear keeps itself up to date.
 - [Other machines](machines.md): run spaces and tasks on more machines from the same app.
-- [Spaces](spaces.md), [Chats](chat.md), [Tasks](tasks.md), [Artifacts](artifacts.md), [Shared browser](browser.md) and [Settings](settings.md): how it all works.
+- [Spaces](spaces.md), [Chats](chat.md), [Tasks](tasks.md), [Artifacts](artifacts.md) and [Settings](settings.md): how it all works.

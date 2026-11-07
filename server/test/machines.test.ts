@@ -14,10 +14,10 @@ const perl = spawnSync('perl', ['-MJSON::PP', '-e1']).status === 0
 
 describe('the helper', () => {
   test('its files: the command, the scripts and the skills; its version changes with them', () => {
-    const files = helperFiles('Linux', 'x86_64').map(([to]) => to)
+    const files = helperFiles().map(([to]) => to)
     for (const f of ['bin/lineclear', 'skill/lineclear/SKILL.md', 'skill/lineclear-coordinator/SKILL.md', 'skill/lineclear-agent/SKILL.md'])
       expect(files).toContain(f)
-    expect(helperVersion('Linux', 'x86_64')).toMatch(/^[0-9a-f]{16}$/)
+    expect(helperVersion()).toMatch(/^[0-9a-f]{16}$/)
   })
 
   test.if(perl)('the lineclear command there says plainly when the way back is down', () => {

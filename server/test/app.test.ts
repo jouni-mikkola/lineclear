@@ -34,10 +34,6 @@ class Stub extends Emitter<SourceEvents> {
   async attachment(chat: string, path: string) {
     return chat === 'c' && path.startsWith('/inbox/') ? new Blob(['<svg onload="alert(1)"/>']) : null
   }
-  browser(task: string, ws: { send(d: string): void }) {
-    ws.send(JSON.stringify({ type: 'state', task }))
-    return { message: (d: string) => ws.send(d), end() {} }
-  }
   async folders(machine: string, path: string) {
     if (path.startsWith('/')) throw new Error('Only folders in your home can be added.')
     return { path, exists: true, dir: true, repo: null, entries: [{ name: 'dev', path: `~/dev`, repo: false }], machine }
@@ -84,28 +80,16 @@ describe('who may act', () => {
     expect((await post({})).status).toBe(200)
   })
   test('a WebSocket from another website is refused', async () => {
-    for (const path of ['/api/ws', '/api/browser?task=X-1']) {
-      const r = await fetch(`${base}${path}`, {
-        headers: {
-          origin: 'https://evil.example',
-          upgrade: 'websocket',
-          connection: 'Upgrade',
-          'sec-websocket-key': 'dGhlIHNhbXBsZSBub25jZQ==',
-          'sec-websocket-version': '13',
-        },
-      })
-      expect(r.status).toBe(403)
-    }
-  })
-  test('the Browser panel’s link reaches the task’s browser through the app, both ways', async () => {
-    const ws = new WebSocket(`ws://127.0.0.1:${server.port}/api/browser?task=X-1`)
-    const got: unknown[] = []
-    ws.onmessage = (e) => got.push(JSON.parse(String(e.data)))
-    await new Promise((r) => (ws.onopen = r))
-    ws.send(JSON.stringify({ type: 'take' }))
-    while (got.length < 2) await new Promise((r) => setTimeout(r, 10))
-    expect(got).toEqual([{ type: 'state', task: 'X-1' }, { type: 'take' }])
-    ws.close()
+    const r = await fetch(`${base}/api/ws`, {
+      headers: {
+        origin: 'https://evil.example',
+        upgrade: 'websocket',
+        connection: 'Upgrade',
+        'sec-websocket-key': 'dGhlIHNhbXBsZSBub25jZQ==',
+        'sec-websocket-version': '13',
+      },
+    })
+    expect(r.status).toBe(403)
   })
 })
 

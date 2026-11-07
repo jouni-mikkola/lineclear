@@ -10,10 +10,8 @@ import { frameResponse, wrapPage } from './frame.ts'
 import type { Source } from './source.ts'
 import type { Push } from './push.ts'
 
-type Sock =
-  /** visible: the screen is on; push: its push subscription, which gets no alerts while the screen is on */
-  | { kind: 'live'; chats: string[]; term: string | null; visible: boolean; push: string | null; link?: boolean }
-  | { kind: 'browser'; task: string; bridge?: ReturnType<NonNullable<Source['browser']>> }
+/** visible: the screen is on; push: its push subscription, which gets no alerts while the screen is on */
+type Sock = { chats: string[]; term: string | null; visible: boolean; push: string | null; link?: boolean }
 
 const FONT = join(import.meta.dir, '..', 'node_modules', 'inter-ui', 'variable', 'InterVariable.woff2')
 
@@ -48,7 +46,6 @@ export function startApp({ source, push, port, host = '127.0.0.1', updates }: Ap
     const chats = new Set<string>()
     const terms = new Set<string>()
     for (const ws of live) {
-      if (ws.data.kind !== 'live') continue
       ws.data.chats.forEach((c) => chats.add(c))
       if (ws.data.term) terms.add(ws.data.term)
     }
@@ -69,28 +66,28 @@ export function startApp({ source, push, port, host = '127.0.0.1', updates }: Ap
   source.on('chat', (key) => {
     const chat = source.chat(key)
     if (!chat) return
-    for (const ws of live) if (ws.data.kind === 'live' && ws.data.chats.includes(key)) send(ws, { type: 'chat', chat })
+    for (const ws of live) if (ws.data.chats.includes(key)) send(ws, { type: 'chat', chat })
   })
   source.on('terminal', (key, screen) => {
-    for (const ws of live) if (ws.data.kind === 'live' && ws.data.term === key) send(ws, { type: 'terminal', chat: key, ...screen })
+    for (const ws of live) if (ws.data.term === key) send(ws, { type: 'terminal', chat: key, ...screen })
   })
   // a worker for another machine: its news goes to the main machine's home space, over its main machine's link; while
   // there is none (the main server restarts) the last few wait for it
   const unsent: unknown[] = []
   source.on('news', (news) => {
-    const links = [...live].filter((ws) => ws.data.kind === 'live' && ws.data.link)
+    const links = [...live].filter((ws) => ws.data.link)
     for (const ws of links) send(ws, { type: 'news', news } as unknown as ServerEvent)
     if (!links.length && unsent.push(news) > 20) unsent.shift()
   })
   // alerts only go out as push, and not to a device whose app is on screen: it shows nothing for them
   source.on('alert', (alert) => {
     // a worker for another machine: its main machine's link pushes them
-    for (const ws of live) if (ws.data.kind === 'live' && ws.data.link) send(ws, { type: 'alert', alert } as unknown as ServerEvent)
+    for (const ws of live) if (ws.data.link) send(ws, { type: 'alert', alert } as unknown as ServerEvent)
     // what its place's Notify lets through: All, Needs me or Off
     const snap = source.snapshot()
     if (!notifies(snap, alert)) return
     const onScreen = new Set<string>()
-    for (const ws of live) if (ws.data.kind === 'live' && ws.data.visible && ws.data.push) onScreen.add(ws.data.push)
+    for (const ws of live) if (ws.data.visible && ws.data.push) onScreen.add(ws.data.push)
     push?.send(alert, onScreen, waiting(snap)).then(() => source.emit('snapshot'))
   })
 
@@ -110,13 +107,7 @@ export function startApp({ source, push, port, host = '127.0.0.1', updates }: Ap
       if (path.startsWith('/api/') && path !== '/api/font/InterVariable.woff2' && !sameSite(req, path)) return new Response('forbidden', { status: 403 })
 
       if (path === '/api/ws')
-        return srv.upgrade(req, { data: { kind: 'live', chats: [], term: null, visible: false, push: null } })
-          ? undefined
-          : new Response('upgrade failed', { status: 400 })
-      if (path === '/api/browser') {
-        if (!source.browser) return new Response('no browser here', { status: 404 })
-        return srv.upgrade(req, { data: { kind: 'browser', task: q.get('task') ?? '' } }) ? undefined : new Response('upgrade failed', { status: 400 })
-      }
+        return srv.upgrade(req, { data: { chats: [], term: null, visible: false, push: null } }) ? undefined : new Response('upgrade failed', { status: 400 })
 
       try {
         if (path === '/api/chat') {
@@ -248,46 +239,34 @@ export function startApp({ source, push, port, host = '127.0.0.1', updates }: Ap
     },
     websocket: {
       open(ws) {
-        if (ws.data.kind === 'live') {
-          live.add(ws)
-          send(ws, { type: 'snapshot', snapshot: source.snapshot() })
-          send(ws, { type: 'update', update })
-        } else if (ws.data.kind === 'browser' && source.browser) {
-          ws.data.bridge = source.browser(ws.data.task, { send: (d) => ws.send(d), close: () => ws.close(), buffered: () => ws.getBufferedAmount() })
-        }
+        live.add(ws)
+        send(ws, { type: 'snapshot', snapshot: source.snapshot() })
+        send(ws, { type: 'update', update })
       },
       message(ws, msg) {
         const d = ws.data
-        if (d.kind === 'live') {
-          const m = JSON.parse(String(msg)) as
-            | { type: 'ping' }
-            | { type: 'watch'; chats: string[]; term: string | null; visible?: boolean; push?: string | null; link?: boolean }
-          if (m.type === 'ping') return void send(ws, { type: 'pong' })
-          if (m.type !== 'watch') return
-          const before = new Set(d.chats)
-          d.chats = m.chats
-          d.term = m.term
-          d.visible = !!m.visible
-          d.push = m.push ?? null
-          d.link = !!m.link
-          if (d.link) for (const news of unsent.splice(0)) send(ws, { type: 'news', news } as unknown as ServerEvent)
-          for (const k of m.chats) {
-            if (before.has(k)) continue
-            const chat = source.chat(k)
-            if (chat) send(ws, { type: 'chat', chat })
-          }
-          rewatch()
-        } else if (d.kind === 'browser') {
-          if (typeof msg === 'string') d.bridge?.message(msg)
+        const m = JSON.parse(String(msg)) as
+          | { type: 'ping' }
+          | { type: 'watch'; chats: string[]; term: string | null; visible?: boolean; push?: string | null; link?: boolean }
+        if (m.type === 'ping') return void send(ws, { type: 'pong' })
+        if (m.type !== 'watch') return
+        const before = new Set(d.chats)
+        d.chats = m.chats
+        d.term = m.term
+        d.visible = !!m.visible
+        d.push = m.push ?? null
+        d.link = !!m.link
+        if (d.link) for (const news of unsent.splice(0)) send(ws, { type: 'news', news } as unknown as ServerEvent)
+        for (const k of m.chats) {
+          if (before.has(k)) continue
+          const chat = source.chat(k)
+          if (chat) send(ws, { type: 'chat', chat })
         }
+        rewatch()
       },
       close(ws) {
-        if (ws.data.kind === 'live') {
-          live.delete(ws)
-          rewatch()
-        } else if (ws.data.kind === 'browser') {
-          ws.data.bridge?.end()
-        }
+        live.delete(ws)
+        rewatch()
       },
     },
   })
@@ -341,7 +320,6 @@ function sameSite(req: Request, path: string): boolean {
     site === 'cross-site' &&
     (writes ||
       path === '/api/ws' ||
-      path === '/api/browser' ||
       path === '/api/file' ||
       path === '/api/folders' ||
       path === '/api/worktree' ||

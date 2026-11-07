@@ -1,7 +1,7 @@
 // Another machine, reached over SSH. Lineclear is installed once, on the main machine; every other machine saved in
 // herdr's Remote (herdr machine list) is run from it by a worker process of its own (machines.ts), with LINECLEAR_BOX
 // naming the machine. In that worker, everything that touches the machine goes through here: herdr's API rides herdr's
-// own remote bridge (herdr.ts), commands (git, gh, agent-browser) and file reads run over one shared SSH connection
+// own remote bridge (herdr.ts), commands (git, gh) and file reads run over one shared SSH connection
 // (a ControlMaster), and the CLIs' logs are mirrored to the main machine as they grow (mirror.ts). The machine itself
 // needs only herdr, git, perl and the agent CLIs, plus the small helper Lineclear puts there (helper/, install.ts).
 import { AsyncLocalStorage } from 'node:async_hooks'
@@ -66,11 +66,6 @@ const control = () => {
   mkdirSync(dir, { recursive: true, mode: 0o700 })
   return join(dir, '%C')
 }
-
-/** what holds an SSH connection open (a tunnel, a forward): it ends with the connection, where a plain sleep would
- *  stay on the machine for good, one more on every restart. A byte written now and then fails once the connection is
- *  gone; watching $PPID can't tell, since exe.dev's sshd hands sessions to a root init that never ends */
-const HOLD = 'while printf . 2>/dev/null; do sleep 30; done'
 
 /** single-quoted for a POSIX shell */
 export const q = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`
@@ -237,32 +232,6 @@ export function agentEnv(chat: string, root: string, data = process.env.LINECLEA
     LINECLEAR_URL: `http://127.0.0.1:${readJson<{ port?: number }>('server.json', {}).port ?? process.env.LINECLEAR_PORT ?? DEFAULT_PORT}`,
     PATH: [join(root, 'bin'), stableBin(data), process.env.PATH ?? ''].filter(Boolean).join(':'),
   }
-}
-
-/** a port on the box, reached here: a local port forwarded over SSH to its 127.0.0.1 (a browser's stream, its
- *  DevTools). Kept while it is used; close() ends it */
-export async function forward(b: BoxInfo, port: number): Promise<{ port: number; close(): void }> {
-  const free = Bun.listen({ hostname: '127.0.0.1', port: 0, socket: { data() {} } })
-  const local = free.port
-  free.stop(true)
-  const p = Bun.spawn(
-    sshArgs(b.target, HOLD, { extra: ['-o', 'ControlPath=none', '-o', 'ExitOnForwardFailure=yes', '-L', `127.0.0.1:${local}:127.0.0.1:${port}`] }),
-    { stdin: 'ignore', stdout: 'ignore', stderr: 'ignore' },
-  )
-  // ready once the port answers
-  for (let i = 0; i < 50; i++) {
-    const ok = await new Promise<boolean>((res) => {
-      Bun.connect({
-        hostname: '127.0.0.1',
-        port: local,
-        socket: { open: (s) => (s.end(), res(true)), error: () => res(false), connectError: () => res(false), data() {} },
-      }).catch(() => res(false))
-    })
-    if (ok) break
-    if (p.exitCode !== null) throw new Error(`Could not reach port ${port} on ${b.label}`)
-    await Bun.sleep(100)
-  }
-  return { port: local, close: () => p.kill() }
 }
 
 // Tasks that another machine's worker runs: a command on the main machine goes to that worker, and the machine itself

@@ -1,4 +1,3 @@
-import type { BrowserNote } from './browser.ts'
 import type { Place, Machine, Task, Artifact, Section } from './types-core.ts'
 import type { SettingSection, Chat } from './types-chat.ts'
 
@@ -117,8 +116,6 @@ export type Action =
   | { type: 'artifact-note'; place: string; artifact: string; v: number; note: string; target?: string }
   | { type: 'artifact-say'; place: string; artifact: string; v: number; text: string }
   | { type: 'artifact-delete'; place: string; artifact: string }
-  /** Mark up's notes from the shared browser, sent together into the task's chat */
-  | { type: 'browser-notes'; chat: string; url: string; title?: string; viewport?: { w: number; h: number }; notes: BrowserNote[] }
   | { type: 'model'; chat: string; model: string }
   | { type: 'effort'; chat: string; effort: string }
   | { type: 'keys'; chat: string; keys: string[] }

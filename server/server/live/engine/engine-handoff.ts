@@ -172,7 +172,6 @@ export class EngineHandoff extends EngineLaunch {
     })
     clearTimeout(this.later.get(t.id))
     this.settle(t)
-    this.emit('gone', t, true)
     this.dropEndedOutbox()
   }
 

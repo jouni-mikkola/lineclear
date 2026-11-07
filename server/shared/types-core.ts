@@ -243,8 +243,6 @@ export interface Task {
   pinned?: number
   /** not done, its worktree gone and its agent dead for over 2 h: it holds no locks */
   orphaned?: boolean
-  /** the shared browser (the browser plugin), for a task not merged: whether it works on its machine, and if not why */
-  browser?: { ready: boolean; hint?: string }
 }
 
 /** A question card: built-in choice cards, a CLI's own menus, plans. */

@@ -17,7 +17,6 @@ import { has } from '../plugins.ts'
 import { repositorySection } from './settings.ts'
 import { secretPages } from './secrets.ts'
 import { pluginSection } from '../plugins.ts'
-import { STOPPED } from './source-helpers.ts'
 import { LiveSourceState } from './source-state.ts'
 
 export class LiveSourceViews extends LiveSourceState {
@@ -26,11 +25,6 @@ export class LiveSourceViews extends LiveSourceState {
   healthTick(now = Date.now()) {
     const at = this.health.last?.at
     this.health.tick(now)
-    // too busy to start held tasks: browsers finished tasks left open go first (at most once a minute)
-    if (this.health.last?.at !== at && this.health.busy() && now - this.sweptAt > 60_000) {
-      this.sweptAt = now
-      void this.sweepBrowsers().catch(() => undefined)
-    }
     this.readBoxes(now)
     this.engine.release(now)
     if (this.health.last?.at !== at) this.emit('snapshot')
@@ -160,9 +154,7 @@ export class LiveSourceViews extends LiveSourceState {
       places,
       machines,
       tasks: [
-        ...this.engine.tasks
-          .filter((t) => this.places.space(t.project))
-          .map((t) => ({ ...this.engine.view(t), ...(this.browsers && !ended(t) ? { browser: t.stopped ? STOPPED : this.browsers.status() } : {}) })),
+        ...this.engine.tasks.filter((t) => this.places.space(t.project)).map((t) => this.engine.view(t)),
         ...peers.flatMap((l) => this.peers!.tasksOf(l)),
       ],
       artifacts: [...Object.values(this.artifacts.list).map((a) => this.artifactView(a)), ...peers.flatMap((l) => l.snap?.artifacts ?? [])].sort(

@@ -9,7 +9,6 @@ import { HOME, readJson, writeJson } from '../store.ts'
 import { ROOT } from '../root.ts'
 import { wrapPage } from '../frame.ts'
 import { Agents, hidden, type Spec } from './agents.ts'
-import { Browsers } from './browser.ts'
 import { Chats } from './chats.ts'
 import { ended, Engine } from './engine/engine.ts'
 import { sh } from './engine/git.ts'
@@ -77,8 +76,6 @@ export class LiveSourceState extends Emitter<SourceEvents> {
   /** agents that stopped or run on outdated files, started again by Lineclear (revive.ts) */
   revivals = new Revivals()
   protected reviving = new Set<string>()
-  /** when a busy machine last had its finished tasks' browsers closed */
-  protected sweptAt = 0
   devices: () => string[] = () => []
   /** the main machine runs every other machine saved in herdr, each from a worker of its own (machines.ts); a worker
    *  is one of those (box.ts) */
@@ -87,31 +84,6 @@ export class LiveSourceState extends Emitter<SourceEvents> {
    *  `peers` shows a change */
   syncMachines() {
     if (this.peers) this.engine.setMachines(this.peers.boxes())
-  }
-
-  /** each task's shared browser */
-  browsers = has('browser')
-    ? new Browsers({
-        host: NAME,
-        user: () => this.user,
-        working: (task) => this.agents.status(`${task}/Agent`) === 'working',
-        tell: (task, text) => void this.agents.send(`${task}/Agent`, hidden(text, 'browser')).catch(() => undefined),
-        idleClose: (task) => {
-          const t = this.engine.task(task)
-          return this.settings.idleClose(t ? this.levelOf(t.project) : 'machine')
-        },
-      })
-    : null
-
-  /** the shared browsers whose task stopped, is done or gone: closed (and a done or gone one's profile removed). Says
-   *  which tasks they were */
-  async sweepBrowsers(): Promise<string[]> {
-    if (!this.browsers) return []
-    const task = (id: string) => this.engine.tasks.find((t) => t.id === id)
-    return this.browsers.sweep(
-      (id) => !!task(id) && !ended(task(id)!) && !task(id)!.stopped && !task(id)!.archived,
-      (id) => !task(id) || ended(task(id)!),
-    )
   }
 
   /* ---------- names ---------- */
@@ -354,8 +326,6 @@ export class LiveSourceState extends Emitter<SourceEvents> {
     this.emit('news', { place: machine, line: words, kind: 'health', about: { kind: e.kind, what: e.what } })
     // herdr gone takes its agents with it, coordinators too: they hear of it once it is back
     if (e.kind === 'herdr' && e.what === 'over') return
-    // browsers that finished tasks left open go first: a web game in one takes a core or two for nothing
-    const swept = e.what === 'over' && (e.kind === 'cpu' || e.kind === 'memory') ? await this.sweepBrowsers().catch(() => []) : []
     const procs =
       e.kind === 'cpu' || e.kind === 'memory'
         ? procLines(
@@ -372,10 +342,7 @@ export class LiveSourceState extends Emitter<SourceEvents> {
         : e.kind === 'disk'
           ? "Decide what to do: clean up (finished tasks' leftovers, caches, /tmp), pause tasks, or tell the human."
           : 'Decide what to do: pause tasks (lineclear task pause <id>; a message to one lets it go on), queue them after others (lineclear task queue <id> --after <ids>), or tell the human.'
-    const closed = swept.length
-      ? [`Lineclear closed ${swept.length} shared browser${swept.length > 1 ? 's' : ''} that finished tasks left open (${swept.join(', ')}).`]
-      : []
-    const text = [`Machine ${NAME}: ${words}.`, summary(s), `Tasks: ${this.workingLine()}.`, ...closed, ...procs, what].join('\n')
+    const text = [`Machine ${NAME}: ${words}.`, summary(s), `Tasks: ${this.workingLine()}.`, ...procs, what].join('\n')
     const tail = `Act on it if the human asked you to handle such things. If it can’t wait, alert the human with lineclear alert and say why. A card in this chat already shows the human the news: ${REPLY_AFTER_CARD}`
     this.agents
       .send(machine, hidden(`${text}\n${tail}`, 'health', { kind: e.kind, what: e.what }), { ensure: () => this.coordinator(machine) })

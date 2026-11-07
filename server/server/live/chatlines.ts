@@ -13,12 +13,6 @@
 //   <artifact-note from="Elias" title="Weekly board" artifact="wk3n" version="2" on="“Send” (button.primary in Board)">Make it say “Send event”.</artifact-note>
 //   <reply from="Elias" to="Tests pass on the branch">Merge it then</reply>     (the start of the message it answers)
 //   <reply from="Elias" to="Weekly board · v2" artifact="wk3n">Bars in blue</reply>     (an artifact card)
-//   <browser-notes from="Elias" url="http://localhost:5173/" title="Settings" viewport="1280×720">   (the shared
-//   1. button "Save"                                                                  browser's Mark up: one
-//      Note: Make it say "Save changes".                                              or more notes, numbered as
-//      Selector: form > button.primary                                                their pins; each shot follows
-//      ...                                                                            as an attachment)
-//   </browser-notes>
 //   agent → <react emoji="👀" to="What needs me today?"/>   or   <react emoji="👀" file="screenshot.png" path="~/inbox/screenshot.png"/>
 //   agent → <reply to="What needs me today?"/>      a line of its own, then its reply
 //   agent → <no-reply>SHE-72 merged, nothing to do</no-reply>   a reply that is only this shows nothing (news with nothing to say)
@@ -26,7 +20,6 @@
 // Lineclear's own lines to agents are <lineclear type="news">…</lineclear> and the like (agents.ts hidden). The older
 // [square bracket] lines still read back, from agents started before the change and from old chat logs.
 
-import type { BrowserNote } from '../../shared/browser.ts'
 import { excerpt } from '../../shared/excerpt.ts'
 import { artifactQuote, type ArtifactPost } from '../../shared/types.ts'
 
@@ -68,45 +61,11 @@ export const line = {
   artifactSay: (user: string, art: Art, text: string) => tag('artifact-comment', { from: user, ...art }, text),
   /** a note on the artifact, or on one element of it (`on`: its words and where it is) */
   note: (user: string, art: Art, on: string | undefined, note: string) => tag('artifact-note', { from: user, ...art, on }, note),
-  /** notes from the shared browser's Mark up, numbered as their pins; their shots go as attachments after */
-  browserNotes: (user: string, page: { url: string; title?: string; viewport?: { w: number; h: number } }, notes: BrowserNote[]) =>
-    tag(
-      'browser-notes',
-      { from: user, url: page.url, title: page.title || undefined, viewport: page.viewport ? `${page.viewport.w}×${page.viewport.h}` : undefined },
-      `\n${notes.map((n, i) => browserNote(i + 1, n, page.url)).join('\n')}\n`,
-    ),
   /** your words in reply to a message (a file by its name): the words may run over several lines */
   reply: (user: string, quoted: string, text: string) => tag('reply', { from: user, to: excerpt(quoted) }, text),
   /** your words in reply to an artifact's card: by its title and version, and its id */
   replyArtifact: (user: string, art: Art, text: string) =>
     tag('reply', { from: user, to: artifactQuote(art.title, art.version), artifact: art.artifact }, text),
-}
-
-/** one note: what and where, your words, then what helps find it in the code; continuation lines are indented */
-function browserNote(n: number, { comment, pick: p }: BrowserNote, url: string) {
-  const one = (s: string) => s.replace(/\s*\n\s*/g, ' ').trim()
-  const pad = '   '
-  const out = [`${n}. ${one(p.element)}`, `${pad}Note: ${comment.trim().replace(/\n/g, `\n${pad}      `)}`, `${pad}Selector: ${one(p.selector)}`]
-  const facts = [
-    p.text && `Text: "${one(p.text)}"`,
-    p.nearby && `Near: "${one(p.nearby)}"`,
-    p.react && `React: ${one(p.react)}`,
-    p.attrs && `Attributes: ${one(p.attrs)}`,
-    p.a11y && `Accessibility: ${one(p.a11y)}`,
-  ]
-  const where = [
-    `Box: x ${p.box.x}, y ${p.box.y}, ${p.box.w}×${p.box.h}${p.fixed ? ' (fixed)' : ''}${p.frame ? ' (inside a frame)' : ''}`,
-    p.classes && `Classes: ${one(p.classes)}`,
-  ]
-  for (const row of [facts, where]) {
-    const r = row.filter(Boolean).join(' · ')
-    if (r) out.push(pad + r)
-  }
-  if (p.styles) out.push(`${pad}Styles: ${one(p.styles)}`)
-  // a note made on another page than the one the browser shows now says which
-  if (p.url && p.url !== url) out.push(`${pad}Page: ${p.url}`)
-  if (p.shot) out.push(`${pad}Shot: ${p.shot.split('/').pop()}`)
-  return out.join('\n')
 }
 
 export type Parsed =
@@ -149,7 +108,6 @@ const OLD = {
   artifactSay: /^\[(.+?) wrote about "(.*?)" \(artifact [\w-]+ v\d+\): ([\s\S]*)\]$/u,
   note: /^\[(.+?) noted on (.*?): ([\s\S]*)\]$/u,
   reply: /^\[(.+?) replied to "(.*?)": ([\s\S]*)\]$/u,
-  browserNotes: /^\[(.+?) noted in the browser on (\S+)[^\n]*:\n([\s\S]*)\]$/u,
   agentReact: /^\[react (\S+) to "(.*)"\]$/u,
   agentReply: /^\[reply to "(.*)"\]$/u,
   agentReplyFile: /^\[reply to ([^":]+?): (.+)\]$/u,
@@ -186,7 +144,7 @@ export function parseUserLine(l: string): Parsed | null {
 }
 
 /** the tags whose words may run over several lines */
-const LONG = /^<(answer|artifact-sent|artifact-comment|artifact-note|reply|browser-notes)[\s>]/
+const LONG = /^<(answer|artifact-sent|artifact-comment|artifact-note|reply)[\s>]/
 
 /** what you sent, line by line, a tag whose words run over several lines kept whole */
 export function userLines(text: string): string[] {
@@ -219,24 +177,6 @@ function withFiles(text: string) {
   let end = lines.length
   while (end > 0 && parseUserLine(lines[end - 1])?.kind === 'attach') end--
   return { head: lines.slice(0, end).join('\n').trim(), rest: lines.slice(end) }
-}
-
-/** notes from the shared browser, read back from the log: the page and each note's element and words (the files that
- *  follow are its shots) */
-export function parseBrowserNotes(text: string): { url: string; notes: { element: string; note: string }[]; rest: string[] } | null {
-  const { head, rest } = withFiles(text)
-  const t = head.startsWith('<') ? tagOf(head) : null
-  const m = t ? null : head.match(OLD.browserNotes)
-  const url = t?.name === 'browser-notes' ? t.a.url : m?.[2]
-  if (!url) return null
-  const notes: { element: string; note: string }[] = []
-  for (const l of (t ? t.body! : m![3]).split('\n')) {
-    const head = l.match(/^(\d+)\. (.+)$/)
-    if (head) notes.push({ element: head[2], note: '' })
-    else if (notes.length && l.startsWith('   Note: ')) notes[notes.length - 1].note = l.slice('   Note: '.length)
-    else if (notes.length && /^ {9}/.test(l) && notes[notes.length - 1].note) notes[notes.length - 1].note += `\n${l.trim()}`
-  }
-  return { url, notes, rest }
 }
 
 /** your reply to a message, read back from the log: the reply line, then any files that came with it */

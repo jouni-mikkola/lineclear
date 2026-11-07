@@ -365,7 +365,6 @@ export class EngineLand extends EngineHandoff {
     t.trouble = undefined
     t.stopped = undefined
     this.settle(t)
-    this.emit('gone', t, true)
     this.dropEndedOutbox()
     if (this.agents.status(this.key(t)) !== 'working') await this.cleanup(t)
     return { ok: true, note }

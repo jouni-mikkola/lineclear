@@ -2,8 +2,7 @@ import { clip } from '../../shared/alerts.ts'
 import type { TaskStatus, UpdateCard } from '../../shared/types.ts'
 import type { Overview } from '../source.ts'
 import { hidden } from './agents.ts'
-import type { BrowserBridge, BrowserClient } from './browser.ts'
-import { ended, type TaskRec } from './engine/engine.ts'
+import type { TaskRec } from './engine/engine.ts'
 import { BOX } from './box.ts'
 import { HOST, placeId } from './places.ts'
 import { relaunchedLine } from './prompts.ts'
@@ -202,42 +201,5 @@ export class LiveSourceUpkeep extends LiveSourceCli {
     if (this.watched.includes(t.project)) this.emit('chat', t.project)
     // what it asks, kept on its card though no one looks yet
     else if (status === 'need') this.withAsks(this.chats.chat(t.project))
-  }
-
-  /** a Browser panel's link to a task's shared browser: here, or passed through to the machine the task is on */
-  browser(task: string, out: BrowserClient): BrowserBridge {
-    const peer = this.peers?.owner(task)
-    if (peer) {
-      const url = new URL(`${peer.rec.url}/api/browser?task=${encodeURIComponent(task)}`)
-      url.protocol = url.protocol.replace('http', 'ws')
-      const ws = new WebSocket(url)
-      const early: string[] = []
-      ws.onopen = () => early.splice(0).forEach((m) => ws.send(m))
-      // frames (the big messages) are skipped for a screen that can't keep up, as on the task's own machine
-      ws.onmessage = (e) => {
-        const d = String(e.data)
-        if (d.length < 20_000 || (out.buffered?.() ?? 0) < 2_000_000) out.send(d)
-      }
-      ws.onclose = () => out.close()
-      return { message: (m) => (ws.readyState === WebSocket.OPEN ? ws.send(m) : early.push(m)), end: () => ws.close() }
-    }
-    const t = this.engine.tasks.find((x) => x.id === task)
-    // a stopped task's browser stays closed until the task is talked to again
-    if (!this.browsers || !t || ended(t) || t.stopped) {
-      out.send(
-        JSON.stringify({
-          type: 'error',
-          gone: true,
-          message: !this.browsers
-            ? 'The browser is not in the plugin list.'
-            : t?.stopped
-              ? 'The browser closed when the task was stopped.'
-              : 'No such task here.',
-        }),
-      )
-      out.close()
-      return { message() {}, end() {} }
-    }
-    return this.browsers.attach(task, out)
   }
 }

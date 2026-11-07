@@ -1,26 +1,6 @@
 import { Settings, effortFor, pastTimes, span, readJson, writeJson } from './live-fixture.ts'
 import { describe, expect, test } from 'bun:test'
 
-describe('browser settings', () => {
-  test('Settings: an idle browser closes after 10 min; a space or machine sets its own, or off', () => {
-    const s = new Settings()
-    expect(s.get('browser.idleClose')).toBe('10 min')
-    expect(s.idleClose()).toBe(600_000)
-    expect(s.set('browser.idleClose', '30').ok).toBe(true)
-    expect(s.get('browser.idleClose')).toBe('30 min')
-    expect(s.set('browser.idleClose', 'off', 'machine').ok).toBe(true)
-    expect(s.idleClose()).toBeNull()
-    expect(s.idleClose('all')).toBe(1_800_000)
-    expect(s.set('browser.idleClose', '2 min', { space: 'games' }).ok).toBe(true)
-    expect(s.idleClose({ space: 'games' })).toBe(120_000)
-    expect(s.set('browser.idleClose', '0').ok).toBe(false)
-    expect(s.set('browser.idleClose', 'soon').error).toBe('Write a number from 1 to 1440 (whole), in min, or off.')
-    s.set('browser.idleClose', null, { space: 'games' })
-    s.set('browser.idleClose', null, 'machine')
-    s.set('browser.idleClose', null)
-  })
-})
-
 describe('settings', () => {
   test('only app settings are left, set Everywhere; none belongs to a task', () => {
     const s = new Settings()

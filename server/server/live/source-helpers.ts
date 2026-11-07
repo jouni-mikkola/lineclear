@@ -31,9 +31,6 @@ export function statusLine(t: Task) {
   return t.status === 'work' && t.report && !t.report.paused ? t.report.msg : t.sub
 }
 
-/** a stopped task's Browser item */
-export const STOPPED = { ready: false, hint: 'The browser closed when the task was stopped. Write to the task to start it again.' }
-
 /** a chat's own folder in the inbox: never "." or "..", so it can't lead out of it */
 export function chatDir(chat: string) {
   return chat.replace(/[^a-zA-Z0-9_.-]+/g, '_').replace(/^\.+/, '_')
