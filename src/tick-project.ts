@@ -298,7 +298,8 @@ function whyStale(s: Starting, step: Step): string | undefined {
   if (!step.reopened && doneIds(main.commits, new Set([step.id])).has(step.id)) return "it is merged on origin/main already";
   if (state.closedSteps?.[step.id] !== undefined) return `it was closed with nothing to merge by ${state.closedSteps[step.id]}`;
   const startedAt = state.startedSteps?.[step.id];
-  if (startedAt !== undefined && world.now().getTime() - startedAt < RECENT_START_MS) return "a task was started for it a moment ago, so it does not start twice";
+  if (startedAt !== undefined && world.now().getTime() - startedAt < RECENT_START_MS)
+    return "a task was started for it a moment ago, so it does not start twice";
   const here = world.tasks(settings.space);
   if (typeof here === "string") return `its tasks cannot be read again: ${here}`;
   const remote: Task[] = [];
