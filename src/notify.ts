@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { writeAtomic } from "../pi/atomic.ts";
 import { isOpen, type Item, KIND_LABEL, readItems } from "./inbox.ts";
@@ -65,5 +65,30 @@ export function watchInbox(push: Pusher, env: NodeJS.ProcessEnv = process.env, m
   };
   tick();
   const timer = setInterval(tick, ms);
+  return () => clearInterval(timer);
+}
+
+/**
+ * Calls `onChange` once a second at most when the Inbox folder changes: an item written or closed replaces a file, which
+ * moves the folder's time. One stat of the folder is the whole cost, and a folder removed and made again is noticed too.
+ * Returns a function that stops it.
+ */
+export function watchInboxFolder(env: Record<string, string | undefined>, onChange: () => void): () => void {
+  const dir = join(configDir(env as NodeJS.ProcessEnv), "inbox");
+  const stamp = () => {
+    try {
+      const s = statSync(dir);
+      return `${s.ino}:${s.mtimeMs}`;
+    } catch {
+      return "";
+    }
+  };
+  let seen = stamp();
+  const timer = setInterval(() => {
+    const now = stamp();
+    if (now === seen) return;
+    seen = now;
+    onChange();
+  }, 1000);
   return () => clearInterval(timer);
 }

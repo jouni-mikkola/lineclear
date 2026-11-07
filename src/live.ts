@@ -1,5 +1,4 @@
 import { diff } from "./live-diff.ts";
-import { gzipJson } from "./web-files.ts";
 
 // The views' changes as they happen: `GET /api/live?v=<path>&r=<rev>&...` is a server-sent stream of what changed in
 // each answer the page holds. A page that holds revision `r` of an answer gets one `patch` per change, a few bytes of
@@ -129,6 +128,18 @@ export function wantedViews(params: URLSearchParams): Map<string, number> {
   const wanted = new Map<string, number>();
   for (const [i, p] of paths.entries()) if (LIVE_PATH.test(p.split("?")[0] ?? "")) wanted.set(p, Number(revs[i]) || 0);
   return wanted;
+}
+
+/** A JSON answer gzipped when the browser takes it: a roadmap is a third of its size so. */
+function gzipJson(res: Response, acceptEncoding: string): Response | Promise<Response> {
+  if (!res.headers.get("content-type")?.startsWith("application/json") || !/\bgzip\b/.test(acceptEncoding)) return res;
+  return res.arrayBuffer().then((body) => {
+    const headers = new Headers(res.headers);
+    headers.set("content-encoding", "gzip");
+    headers.append("vary", "accept-encoding");
+    headers.delete("content-length");
+    return new Response(Bun.gzipSync(new Uint8Array(body)) as BodyInit, { status: res.status, headers });
+  });
 }
 
 /** The answer of an API request: the stream or a live answer with its revision (so the page can tell which changes of the stream are after it), else the plain answer, compressed. */

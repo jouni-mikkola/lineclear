@@ -23,6 +23,35 @@ export function readAside(env: Env): Aside {
   };
 }
 
+export interface Kept<T> {
+  /** The last value at once, undefined before the first; a new read starts when it is old. */
+  now(): T | undefined;
+  /** The same, but it waits for a new read when there is no value yet, or the last one is older than `wait` ms. */
+  ready(wait?: number): Promise<T | undefined>;
+}
+
+/** A value read by `read` and kept for `ms`. One read runs at a time, and a failed read keeps the last value. */
+export function keptAside<T>(read: () => Promise<T>, ms: number, now: () => number): Kept<T> {
+  let value: T | undefined;
+  let at = -Infinity;
+  let reading: Promise<T | undefined> | undefined;
+  const refresh = () =>
+    (reading ??= read()
+      .then(
+        (v) => (value = v),
+        (e) => (console.error(`lineclear: a read failed: ${(e as Error).message}`), value),
+      )
+      .finally(() => {
+        at = now();
+        reading = undefined;
+      }));
+  const get = () => {
+    if (now() - at > ms) void refresh();
+    return value;
+  };
+  return { now: get, ready: async (wait = Infinity) => (value === undefined || now() - at > wait ? refresh() : get()) };
+}
+
 if (import.meta.main) {
   const [what, arg] = process.argv.slice(2);
   const read = what === "roadmap" && arg ? roadmapData(arg) : undefined;

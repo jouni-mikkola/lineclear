@@ -50,7 +50,7 @@ give events, so most reads can wait for one:
   Agent state comes from herdr's own detection, not from `agent read` text. The herdr call sites are the audit of
   `agents-delivery.ts` and `starts.ts`, not of this area.
 - The board server already holds a WebSocket (`watchSocket`, used by `chat.ts:349`) and a folder stamp
-  (`watchInboxFolder`, `web.ts:149`). Inbox, task and chat changes can ride those.
+  (`watchInboxFolder`, `notify.ts`). Inbox, task and chat changes can ride those.
 
 ## Findings
 
@@ -136,7 +136,7 @@ stopped text". The board has the merge line; ask it by its API and read the task
 (`closeOver`), `autoplan.ts:248` (`settlePlans`), `plan.ts:121,123`, and **every 2 s** by `notify.ts:64`
 (`watchInbox`, `:93`). Grows: with I items of about 1 KB the push watcher alone parses I KB x 0.5/s: 1,000 items is
 0.5 MB/s, 43 GB a day of parsing. The server already watches the folder with one `stat` a second
-(`web.ts:149-170`, `watchInboxFolder`), so `notify.ts` polls a folder a second time. Also `inbox.ts:109` swallows a
+(`notify.ts`, `watchInboxFolder`), so `notify.ts` polls a folder a second time. Also `inbox.ts:109` swallows a
 parse error ("a half-written file is read again next time") although files are written by `writeAtomic`, so the
 catch can only hide a real corruption. Replacement: `notifyNew` runs from `watchInboxFolder`'s change callback, closed
 items move to `inbox/closed/` so `readItems` reads only open ones, a corrupt file is reported once. Step L565.
