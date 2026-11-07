@@ -65,6 +65,25 @@ export function readMachineTasks(env: Env, host: string): { tasks: Listed[] } | 
 }
 
 /**
+ * The tasks of a space that run on other machines, from the one store. Ids end in `@host` so they never meet a local
+ * id, and the line says where they run. `host` limits it to one machine. A failed read is a text, never an empty list:
+ * an empty list would free the steps and locks of tasks that are still there.
+ */
+export function machineTasks(env: Env, space: string, host?: string): Task[] | string {
+  const all = readList([], env);
+  if (!("tasks" in all)) return `task list failed: ${all.why}`;
+  return all.tasks
+    .filter((t) => t.machine !== undefined && (host === undefined || t.machine === host) && (t.space === undefined || t.space === space))
+    .map((t) => ({ ...t, ...(t.id ? { id: `${t.id}@${t.machine}` } : {}), sub: t.sub ? `${t.sub} · on ${t.machine}` : `on ${t.machine}` }));
+}
+
+/** For a view: the machine tasks of a space, none when the read failed. */
+export const machineTasksShown = (env: Env, space: string): Task[] => {
+  const r = machineTasks(env, space);
+  return typeof r === "string" ? [] : r;
+};
+
+/**
  * This machine's tasks of one space, or of every space. The all-spaces list is read once and filtered here. A board
  * that does not name the space in its tasks (an older one, a stand-in), or fails to list them all, is asked for the
  * space itself.
@@ -76,5 +95,6 @@ export function readTasks(env: Env, space?: string, archived = false): { tasks: 
   if ("tasks" in all && (all.tasks.length === 0 || all.tasks.some((t) => t.space !== undefined))) {
     return { tasks: all.tasks.filter((t) => !t.machine && t.space === space) };
   }
-  return readList(["--space", space, ...flag], env);
+  const own = readList(["--space", space, ...flag], env);
+  return "tasks" in own ? { tasks: own.tasks.filter((t) => !t.machine) } : own;
 }

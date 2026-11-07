@@ -8,7 +8,6 @@ import type { DecisionCode } from "./decision-code.ts";
 import { freshDecisions } from "./decision-dedupe.ts";
 import { answerCard, closeItem, isOpen, type Item, readItems } from "./inbox.ts";
 import { listProjectNames, projectsDir, readSettings, type Settings } from "./project.ts";
-import type { Task } from "./roadmap.ts";
 import { classify, type StallEntry } from "./stall-class.ts";
 import { holdProjectTick, type StartRecord } from "./starts.ts";
 import { tickProject } from "./tick-project.ts";
@@ -66,10 +65,6 @@ export interface State extends StartRecord {
   lockWaits?: Record<string, number>;
   /** Each task's start: when first seen (ms), the start ladder's rung and when it last climbed, or that it answered (see starts.ts). */
   starts?: Record<string, { since: number; rung: number; at?: number; acted?: boolean }>;
-  /** What each other machine last said about the project's tasks: kept when it cannot be reached, and read by the views. */
-  remoteSeen?: Record<string, Task[]>;
-  /** Per other machine: when it last answered, whether its last read went unanswered, and whether a day of silence dropped its tasks from the views. */
-  machineReads?: Record<string, { good: number; missed?: true; dropped?: true }>;
   /** The project's open stalls, by `<task or step>|<class>`. */
   stalls?: Record<string, StallEntry>;
   /** Steps whose task ended with nothing to merge, with that task: kept for good, so archiving the task does not start the step again. */

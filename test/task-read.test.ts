@@ -30,7 +30,7 @@ test("every reader of a tick shares one task list, filtered by space here", () =
   const t = counting();
   forgetTaskReads();
   expect(lineclearAllTasks(t.env)).toHaveLength(2);
-  expect((lineclearTasks("alpha", t.env) as { id: string }[]).map((x) => x.id)).toEqual(["A-1"]);
+  expect((lineclearTasks("alpha", t.env) as { id: string }[]).map((x) => x.id)).toEqual(["A-1", "A-2@other"]);
   expect(lineclearTasks("beta", t.env)).toHaveLength(1);
   expect(lineclearTasks("empty", t.env)).toHaveLength(0);
   expect(t.calls()).toBe(1);

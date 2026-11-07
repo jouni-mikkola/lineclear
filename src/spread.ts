@@ -1,10 +1,7 @@
 import { machineLimits } from "./machine-limits.ts";
 import { serverBin } from "./paths.ts";
-import { readMachineTasks } from "./task-read.ts";
-import { listProjectNames, projectsDir, readSettings } from "./project.ts";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import type { Task } from "./roadmap.ts";
+import { forgetTaskReads, readMachineTasks } from "./task-read.ts";
 import { type Cmd, type Ran, runAll } from "./run-all.ts";
 import { quote, REMOTE_PATH, sshArgs } from "./ssh.ts";
 import { secretsText } from "../server/server/live/secrets.ts";
@@ -31,54 +28,28 @@ export interface Room {
   freeKb?: number;
 }
 
-/** A machine that has not answered for this long loses its known tasks from the views. */
-export const SILENT_DROP_MS = 24 * 60 * 60 * 1000;
-
-/** One machine's reads: when it last answered, whether the last read went unanswered, and whether its tasks were dropped for it. */
-export interface MachineRead {
-  good: number;
-  missed?: true;
-  dropped?: true;
-}
-
 /**
- * Asks each machine for its room once. One that cannot be reached is skipped, but still holds what it last ran: its
- * known tasks keep their locks and steps. The state's `remoteSeen` is the project's memory of that and `machineReads` of when each
- * machine last answered, both updated here. After a day of silence the views drop its tasks (noted once with the tasks it dropped).
+ * Asks each machine for its room once. One that cannot be reached is skipped, but still holds what the store says it
+ * runs: `stored` gives those tasks, so they keep their locks and steps. No copy of them is kept between ticks.
  */
 export function askMachines(
   hosts: string[],
-  state: { remoteSeen?: Record<string, Task[]>; machineReads?: Record<string, MachineRead> },
-  now: number,
   room: (host: string) => Room | string,
+  stored: (host: string) => Task[] | string,
   note: (host: string, why: string) => void,
 ) {
-  const seen = (state.remoteSeen ??= {});
-  const reads = (state.machineReads ??= {});
-  for (const host of Object.keys(seen)) if (!hosts.includes(host)) delete seen[host];
-  for (const host of Object.keys(reads)) if (!hosts.includes(host)) delete reads[host];
   const rooms = new Map<string, Room>();
   const remote: Task[] = [];
   for (const host of hosts) {
     const r = room(host);
     if (typeof r === "string") {
-      const known = (seen[host] ?? []).filter((t) => t.status !== "done");
-      note(host, `machine ${host} skipped: ${r}${known.length > 0 ? `; its ${known.length} known open tasks still count` : ""}`);
-      remote.push(...(seen[host] ?? []));
-      const read = (reads[host] ??= { good: now });
-      read.missed = true;
-      if (!read.dropped && now - read.good >= SILENT_DROP_MS) {
-        read.dropped = true;
-        const names = known.map((t) => t.id ?? t.title);
-        note(
-          host,
-          `machine ${host} has not answered since ${new Date(read.good).toISOString()}: its ${names.length} known tasks leave the views and the count${names.length > 0 ? ` (${names.join(", ")})` : ""}`,
-        );
-      }
+      const said = stored(host);
+      const known = typeof said === "string" ? [] : said;
+      const open = known.filter((t) => t.status !== "done").length;
+      note(host, `machine ${host} skipped: ${r}${open > 0 ? `; its ${open} known open tasks still count` : typeof said === "string" ? `; ${said}` : ""}`);
+      remote.push(...known);
     } else {
       rooms.set(host, r);
-      seen[host] = r.tasks;
-      reads[host] = { good: now };
       remote.push(...r.tasks);
     }
   }
@@ -138,54 +109,6 @@ export function readRoom(host: string, space: string, snapshot: unknown, env: En
     loadLimit,
     freeKb: row.room.freeKb,
   };
-}
-
-/** What a view says of a machine that did not answer its last read; `good` is the time of its last good one (ms). */
-export const notReached = (host: string, good: number) => `${host} not reached since ${new Date(good).toISOString().slice(0, 16).replace("T", " ")} UTC`;
-
-/** What the rule loop knows of a space's other machines: their tasks as last said and when each last answered. */
-function remoteMemory(space: string, env: Env): { seen: Record<string, Task[]>; reads: Record<string, MachineRead>; hosts: string[] } {
-  const none = { seen: {}, reads: {}, hosts: [] };
-  for (const name of listProjectNames(env as NodeJS.ProcessEnv)) {
-    const s = readSettings(name, env as NodeJS.ProcessEnv);
-    if (typeof s === "string" || s.space !== space || !s.machines?.length) continue;
-    try {
-      const state = JSON.parse(readFileSync(join(projectsDir(env as NodeJS.ProcessEnv), name, "state.json"), "utf8"));
-      return { seen: state.remoteSeen ?? {}, reads: state.machineReads ?? {}, hosts: s.machines };
-    } catch {
-      return none;
-    }
-  }
-  return none;
-}
-
-/** The machines that did not answer their last read, each with when it last did (ms), across every project. */
-export function silentMachines(env: Env = process.env): Map<string, number> {
-  const out = new Map<string, number>();
-  for (const name of listProjectNames(env as NodeJS.ProcessEnv)) {
-    try {
-      const state = JSON.parse(readFileSync(join(projectsDir(env as NodeJS.ProcessEnv), name, "state.json"), "utf8"));
-      for (const [host, r] of Object.entries((state.machineReads ?? {}) as Record<string, MachineRead>))
-        if (r.missed) out.set(host, Math.max(out.get(host) ?? 0, r.good));
-    } catch {
-      // a project with no state yet has read no machine
-    }
-  }
-  return out;
-}
-
-/**
- * The tasks of a project's other machines, for the views. The rule loop writes what each machine said into the
- * project's state at every tick, so a view never waits on the server. A machine that is down still shows its last tasks,
- * each with `silentSince` (ms of its last good read) while it does not answer, and none once it was silent for a day.
- */
-export function remoteTasks(space: string, env: Env = process.env): (Task & { silentSince?: number })[] {
-  const { seen, reads, hosts } = remoteMemory(space, env);
-  return hosts.flatMap((h) => {
-    const read = reads[h];
-    if (read?.dropped || !Array.isArray(seen[h])) return [];
-    return (seen[h] as Task[]).map((t) => (read?.missed ? { ...t, silentSince: read.good } : t));
-  });
 }
 
 /** The folder of a project's clone on the other machine, named after its space. */
@@ -262,6 +185,8 @@ export function addTasksAt(space: string, origin: string | undefined, tasks: New
     })),
     env,
   );
+  // the store lists the new tasks now: the next read must not come from before
+  forgetTaskReads();
   return tasks.map((t) => {
     const i = go.indexOf(t);
     return i < 0 ? notReady.get(t.host as string) : failure(ran[i] as Ran);

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { status } from "../src/status.ts";
 import { countWaiting, waitingForYou } from "../src/waiting.ts";
 import { projectsData } from "../src/home-data.ts";
-import { askMachines, type MachineRead, type Room, SILENT_DROP_MS } from "../src/spread.ts";
+import { forgetTaskReads } from "../src/task-read.ts";
 import { webApi } from "../src/web.ts";
 import { clearWait, writeWait } from "../src/waits.ts";
 import { tmp } from "./helpers.ts";
@@ -50,7 +50,7 @@ function setup() {
     LINECLEAR_SERVER_BIN: bin,
     HOME: dir,
   };
-  return { dir, world };
+  return { dir, world, list };
 }
 
 const planter = (dir: string) => (n: number, w: object) =>
@@ -171,19 +171,20 @@ test.each([false, true])(
   },
 );
 
-// a project on this machine and on "box": box's tasks reach Home through the project's state, with the tail spread adds
-function plantBox(dir: string, tasks: { id: string; sub: string }[]) {
+// a project on this machine and on "box": box's tasks reach Home through the store's task list, with the tail spread adds
+function plantBox(dir: string, list: object[], tasks: { id: string; sub: string }[]) {
   const project = join(dir, "config", "projects", "web");
   mkdirSync(project, { recursive: true });
   writeFileSync(join(project, "settings.json"), JSON.stringify({ repo: join(dir, "none"), space: "web-shop", machines: ["box"] }));
-  const seen = tasks.map((t) => ({ id: `${t.id}@box`, title: t.id, status: "need", sub: `${t.sub} · on box` }));
-  writeFileSync(join(project, "state.json"), JSON.stringify({ remoteSeen: { box: seen } }));
+  const there = tasks.map((t) => ({ id: t.id, title: t.id, status: "need", sub: t.sub, machine: "box", space: "web-shop" }));
+  writeFileSync(join(dir, "lineclear-bin"), `#!/bin/sh\necho '${JSON.stringify([...list, ...there])}'\n`);
+  forgetTaskReads();
 }
 
 test("an idle task of another machine counts in none of Home, the Inbox badge and status; a question counts with its line", () => {
-  const { dir, world } = setup();
+  const { dir, world, list } = setup();
   const before = countWaiting(waitingForYou(world));
-  plantBox(dir, [{ id: "WEB-8", sub: "Waits for your reply" }]);
+  plantBox(dir, list, [{ id: "WEB-8", sub: "Waits for your reply" }]);
   const home = projectsData(world, Date.now()).flatMap((p) => p.tasks);
   expect(home.find((t) => t.id === "WEB-8@box")).toMatchObject({ state: "need", stage: "work" });
   expect(waitingForYou(world).tasks.map((t) => t.task)).not.toContain("WEB-8@box");
@@ -193,73 +194,11 @@ test("an idle task of another machine counts in none of Home, the Inbox badge an
   expect(lines.join("\n")).not.toContain("WEB-8@box");
   expect(lines).toContain(`${before} things wait for you`);
 
-  plantBox(dir, [{ id: "WEB-9", sub: "Which one?" }]);
+  plantBox(dir, list, [{ id: "WEB-9", sub: "Which one?" }]);
   expect(waitingForYou(world).tasks.find((t) => t.task === "WEB-9@box")).toMatchObject({ text: "Which one?" });
   expect(countWaiting(waitingForYou(world))).toBe(before + 1);
   const again: string[] = [];
   status((l) => again.push(l), world);
   expect(again).toContain(`${before + 1} things wait for you`);
-  rmSync(dir, { recursive: true, force: true });
-});
-
-// a machine "box" over four reads: it answers, misses one, is silent for a day, then answers again
-test("a silent machine's tasks are not waiting, drop after a day with one note, and return when it answers", () => {
-  const { dir, world } = setup();
-  const T0 = Date.parse("2026-01-05T09:00:00Z");
-  const task = { id: "WEB-9@box", title: "WEB-9", status: "need", sub: "Which one? · on box" };
-  const memory: { remoteSeen?: Record<string, (typeof task)[]>; machineReads?: Record<string, MachineRead> } = {};
-  const notes: string[] = [];
-  const ask = (now: number, answer: Room | string) =>
-    askMachines(
-      ["box"],
-      memory,
-      now,
-      () => answer,
-      (_h, why) => notes.push(why),
-    );
-  const save = () => {
-    const project = join(dir, "config", "projects", "web");
-    mkdirSync(project, { recursive: true });
-    writeFileSync(join(project, "settings.json"), JSON.stringify({ repo: join(dir, "none"), space: "web-shop", machines: ["box"] }));
-    writeFileSync(join(project, "state.json"), JSON.stringify(memory));
-  };
-  const row = () =>
-    projectsData(world, Date.now())
-      .flatMap((p) => p.tasks)
-      .find((t) => t.id === "WEB-9@box");
-  const room = { host: "box", tasks: [task], working: 1, max: 4, load: 0, loadLimit: 4 } satisfies Room;
-  const before = countWaiting(waitingForYou(world));
-
-  ask(T0, room);
-  save();
-  expect(row()).toMatchObject({ state: "need" });
-  expect(row()?.silentSince).toBeUndefined();
-  expect(countWaiting(waitingForYou(world))).toBe(before + 1);
-
-  // one missed read: still known, holds its slot (in remote), no longer waiting, says since when
-  expect(ask(T0 + 60_000, "unreachable").remote).toHaveLength(1);
-  save();
-  expect(row()).toMatchObject({ state: "work", silentSince: T0 });
-  expect(row()?.last?.text).toBe("box not reached since 2026-01-05 09:00 UTC");
-  expect(countWaiting(waitingForYou(world))).toBe(before);
-  const lines: string[] = [];
-  status((l) => lines.push(l), world);
-  expect(lines.filter((l) => l.includes("box"))).toEqual(["-  box not reached since 2026-01-05 09:00 UTC"]);
-
-  // a day without an answer: gone from the views, noted once, locks kept
-  expect(ask(T0 + SILENT_DROP_MS, "unreachable").remote).toHaveLength(1);
-  ask(T0 + SILENT_DROP_MS + 60_000, "unreachable");
-  save();
-  expect(row()).toBeUndefined();
-  const dropNotes = notes.filter((n) => n.includes("leave the views"));
-  expect(dropNotes).toHaveLength(1);
-  expect(dropNotes[0]).toContain("WEB-9@box");
-
-  // it answers again
-  ask(T0 + SILENT_DROP_MS + 120_000, room);
-  save();
-  expect(row()).toMatchObject({ state: "need" });
-  expect(row()?.silentSince).toBeUndefined();
-  expect(countWaiting(waitingForYou(world))).toBe(before + 1);
   rmSync(dir, { recursive: true, force: true });
 });

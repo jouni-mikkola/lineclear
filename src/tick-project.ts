@@ -8,6 +8,7 @@ import { statusesFrom, stepInputs } from "./task-steps.ts";
 import { kindOf } from "./decision-code.ts";
 import type { Decision, State } from "./rules.ts";
 import { askMachines } from "./spread.ts";
+import { machineTasks } from "./task-read.ts";
 import { climbStalls, serviceAccounts } from "./stalls.ts";
 import { bindStarts, liveSteps } from "./starts.ts";
 import { capacityOf, type MainInfo, type Note, startReadySteps, type Tick, workerPicker } from "./tick-start.ts";
@@ -101,9 +102,8 @@ export function tickProject(
   // The project's other machines: asked once per tick. One that cannot be reached is skipped and noted.
   const { rooms, remote } = askMachines(
     settings.machines ?? [],
-    state,
-    world.now().getTime(),
     (host) => world.room?.(host, settings.space) ?? "this world cannot reach other machines",
+    (host) => machineTasks(env, settings.space, host),
     (host, why) => note("unreachable", why, `machine:${host}`, host),
   );
   bindStarts(state, tasks);

@@ -15,6 +15,6 @@ export function rowsOf(projects: Project[], loose: HomeData["loose"], host: stri
   const tasks = new Map([...projects.flatMap((p) => p.tasks), ...(loose ?? [])].map((t) => [t.id, t]));
   return agentStatus(projects, loose, host, now).flatMap((r) => {
     const t = tasks.get(r.id);
-    return t ? [{ ...r, stuck: t.state === "need" || !!t.stalled || !!t.silentSince, last: t.last, task: t, ask: asks.find((a) => a.task === t.id) }] : [];
+    return t ? [{ ...r, stuck: t.state === "need" || !!t.stalled, last: t.last, task: t, ask: asks.find((a) => a.task === t.id) }] : [];
   });
 }
