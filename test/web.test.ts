@@ -6,7 +6,7 @@ import { PAGE_TOKEN, serveWeb, webApi } from "../src/web.ts";
 import { webAddress } from "../src/web-address.ts";
 import { webResponse } from "../src/web-files.ts";
 import { listProjects } from "../src/project-cli.ts";
-import { json, until, webShopDir } from "./helpers.ts";
+import { json, webShopDir } from "./helpers.ts";
 
 const root = mkdtempSync(join(tmpdir(), "lc-web-"));
 const dist = join(root, "dist");
