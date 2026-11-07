@@ -18,7 +18,6 @@
   "dependencies": {
     "agent-browser": "0.39.4",
     "inter-ui": "4.1.1",
-    "rrule": "2.8.1",
     "web-push": "3.6.7"
   },
   "devDependencies": {

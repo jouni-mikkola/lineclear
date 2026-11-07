@@ -22,7 +22,7 @@ export const yours = (text: string) =>
     .some((ln) => ln.trim() && !['react', 'unreact'].includes(parseUserLine(ln.trim())?.kind ?? ''))
 
 /** The turn the agent is in, by its log: one your message started ('yours'), one it started itself on Lineclear's news,
- *  an automation or its background work waking it ('own', with that turn's id), or none ('over': its reply ended the
+ *  its background work waking it ('own', with that turn's id), or none ('over': its reply ended the
  *  last one, and what herdr still sees working is background work: a subagent, a shell). No turn marks: 'unknown'. */
 export function turnOf(ev: LogEvent[], sent: { at: number }[]): { kind: 'yours' | 'own' | 'over' | 'unknown'; id?: string } {
   if (!ev.some((e) => e.kind === 'turn-start' || e.kind === 'turn-end')) return { kind: 'unknown' }

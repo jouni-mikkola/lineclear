@@ -14,9 +14,6 @@ export const REPLY_AFTER_CARD =
   'reply after it in one or two short lines of plain words: what it means here, what comes next, and whether the human needs to know or do anything (“Letter garden is live. TG-30 starts next, nothing needed from you.”). Never <no-reply> to it.'
 
 /** what a task holds, in words for the screen without its path: "uncommitted changes" */
-/** who added a task an automation added: "the automation “Nightly”" */
-export const BY_AUTOMATION = 'the automation'
-
 export const heldWords = (h: string) => /\(([^)]*)\)$/.exec(h)?.[1] ?? h
 
 /** a time left as minutes: "5m", "5 min", "90", "1h", "1h20m", "1.5h"; null when it is none of those */

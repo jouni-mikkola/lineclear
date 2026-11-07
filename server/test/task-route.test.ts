@@ -25,7 +25,6 @@ test("a task another machine's worker runs: task show goes there; an empty list 
           places: [{ id: 'p:far3:~', name: 'home', machine: 'far3', home: true, level: 1, status: 'idle', mode: 'regular', chat: 'p:far3:~' }],
           machines: [{ id: 'm:far3', machine: 'far3', name: 'far3', status: 'idle' }],
           tasks: [{ id: 'FAR-27', name: 'Far task', status: 'work' }],
-          automations: {},
           asks: {},
           settings: [],
           overrides: {},

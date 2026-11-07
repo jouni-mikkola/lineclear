@@ -6,8 +6,6 @@ process.env.LINECLEAR_HOME = mkdtempSync(join(tmpdir(), 'shep-test-'))
 
 export const { agentLines, excerpt, findQuoted, line, matches, parseReply, parseUserLine, userLines } = await import('../server/live/chatlines.ts')
 export const { parseMenu } = await import('../server/live/chats.ts')
-export const { Automations } = await import('../server/live/automations.ts')
-export const T = await import('../server/live/trigger.ts')
 export const { CATALOG, Settings, effortFor, setForTask } = await import('../server/live/settings.ts')
 export const { coordinatorPrompt, settingsBlock, splitBrief, taskPrompt } = await import('../server/live/prompts.ts')
 export const { pastTimes, span } = await import('../server/live/estimates.ts')

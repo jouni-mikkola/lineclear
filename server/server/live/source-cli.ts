@@ -1,16 +1,13 @@
 import { randomUUID } from 'node:crypto'
-import { age } from '../../shared/time.ts'
 import { HELP, one, parseArgs, summaryOpts, type Parsed } from './args.ts'
-import type { Automation } from './automations.ts'
-import { eventRules, eventsText, nextWords, timeRule, triggerWords } from './trigger.ts'
-import { checkTitle, ended, type TaskRec } from './engine/engine.ts'
+import { ended } from './engine/engine.ts'
 import { room } from './herdr-forward.ts'
 import { BOX, boxHome, forwardTask, machineRef } from './box.ts'
 import { HOST, NAME, placeId } from './places.ts'
 import { settingsBlock } from './prompts.ts'
 import { CATALOG, type Level } from './settings.ts'
 import { summary } from './health.ts'
-import { harnessOf, mainCli } from './source-helpers.ts'
+import { mainCli } from './source-helpers.ts'
 import { LiveSourceSubcommands } from './source-subcommands.ts'
 
 export class LiveSourceCli extends LiveSourceSubcommands {
@@ -273,80 +270,7 @@ export class LiveSourceCli extends LiveSourceSubcommands {
         this.settingChanged(a1)
         const where = pr ? `${named}'s` : level === 'machine' ? `${NAME}'s` : "Everywhere's"
         const now = this.settings.get(a1, pr)
-        // a trigger in words too, to tell the human
         return `${a0 === 'unset' ? `${a1}: ${where} own is unset; it is ${now} now.` : `${a1} = ${now} (${where})`}${a1.endsWith('.instructions') ? '\nUsed at the next start or restart; running agents are unchanged. Reviewer changes need a new or restarted task agent.' : ''}`
-      }
-      case 'automation': {
-        const op = a1 ?? 'list'
-        const pr = one(p, 'space') || op !== 'list' ? this.projectFor(p, ctx) : null
-        const place = pr ? placeId.space(pr.name) : ''
-        const name = rest[0]
-        const odd = [...Object.keys(p.opts), ...p.flags].filter(
-          (f) => !['when', 'on', 'task', 'brief', 'desc', 'space', 'agent', 'model', 'effort', 'name'].includes(f),
-        )
-        if (odd.length)
-          throw new Error(
-            `Automation ${op} takes no --${odd[0]}: only --when (a time rule), --on (events), --task, --brief, --agent, --model, --effort, --name and --space`,
-          )
-        const agent = one(p, 'agent') || one(p, 'model') || one(p, 'effort') ? harnessOf(p, this.settings) : undefined
-        const brief = one(p, 'brief') ?? one(p, 'desc')
-        const zone = this.settings.zone()
-        const runs = (x: Automation) =>
-          x.runs?.at(-1) ? `last ran ${age(x.runs.at(-1)!.at)} ago: ${x.runs.at(-1)!.task ?? `failed (${x.runs.at(-1)!.error})`}` : 'not run yet'
-        // its trigger in words, its next runs, and as kept (for an edit)
-        const told = (x: Automation) => {
-          const next = x.on ? nextWords(x.trigger.time, zone) : []
-          return `${triggerWords(x.trigger, zone)}${next.length ? `; next ${next.join(', ')}` : ''} [${[x.trigger.time && `--when "${x.trigger.time}"`, x.trigger.on?.length && `--on "${eventsText(x.trigger.on)}"`].filter(Boolean).join(' ')}]`
-        }
-        if (op === 'add') {
-          if (!name || !one(p, 'task') || (!one(p, 'when') && !one(p, 'on')))
-            throw new Error('lineclear automation add "<name>" --task "<title>" [--brief "<brief>"] [--when "<time rule>"] [--on "<events>"] (one or both)')
-          const x = this.automation(place, 'add', undefined, {
-            name,
-            when: one(p, 'when'),
-            on: one(p, 'on'),
-            title: one(p, 'task')!,
-            brief,
-            agent,
-          }) as Automation
-          return `Automation “${x.name}” is on: ${told(x)}. It adds the task “${x.task.title}” to ${pr!.name}, with a fresh agent. Tell the human when it runs in these words.`
-        }
-        if (op === 'edit') {
-          if (!name)
-            throw new Error(
-              'lineclear automation edit "<name>" [--name "<new name>"] [--task …] [--brief …] [--when "<time rule>" | off] [--on "<events>" | none] [--agent …]',
-            )
-          const when = one(p, 'when')
-          const on = one(p, 'on')
-          const x = this.automations.edit(place, name, {
-            name: one(p, 'name'),
-            time: when !== undefined ? timeRule(when) : undefined,
-            on: on !== undefined ? eventRules(on) : undefined,
-            task: {
-              ...(one(p, 'task') ? { title: checkTitle(one(p, 'task')!) } : {}),
-              ...(brief !== undefined ? { desc: brief || undefined } : {}),
-              ...(agent ? { agent } : {}),
-            },
-          })
-          this.emit('snapshot')
-          return `Automation “${x.name}” changed: ${told(x)}.`
-        }
-        if (op === 'pause' || op === 'resume' || op === 'run' || op === 'remove') {
-          if (!name) throw new Error(`lineclear automation ${op} "<name>"`)
-          const r = this.automation(place, op, name)
-          if (op === 'run') return `Ran “${name}”: added ${(r as TaskRec).id}.`
-          return op === 'remove' ? 'Removed.' : op === 'pause' ? `Paused “${name}”.` : `“${name}” is on again.`
-        }
-        if (op !== 'list') throw new Error('lineclear automation add|edit|pause|resume|run|remove|list')
-        return (
-          this.automations.list
-            .filter((x) => !place || x.place === place)
-            .map(
-              (x) =>
-                `${x.name} · ${told(x)} · adds “${x.task.title}”${x.task.agent?.kind ? ` (${[x.task.agent.kind, x.task.agent.model, x.task.agent.effort].filter(Boolean).join(', ')})` : ''} · ${this.places.space(x.place)?.name ?? x.place}${x.on ? '' : ' · paused'} · ${runs(x)}`,
-            )
-            .join('\n') || 'No automations.'
-        )
       }
       case 'doctor': {
         if (BOX) throw new Error(`lineclear doctor checks every machine from the main one: run it there (${HOST} is run from it over SSH).`)

@@ -2,7 +2,18 @@ import { cpus } from 'node:os'
 import { NOTIFY, NOTIFY_DEFAULT, NOTIFY_KEY } from '../../shared/alerts.ts'
 import { SEVERITIES } from './prompts.ts'
 import { effortFor, effortsOf, findModel, LEVELS, modelsOf } from '../../../src/models.ts'
-import { OWN_ZONE, validZone } from './trigger.ts'
+
+/** the time zone this machine runs in: time.zone's default */
+const OWN_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+
+function validZone(zone: string) {
+  try {
+    new Intl.DateTimeFormat('en', { timeZone: zone })
+    return true
+  } catch {
+    return false
+  }
+}
 
 /** pi runs every agent: it is the one CLI to pick, by its name or its herdr kind */
 export const CLIS: string[] = ['pi']
@@ -170,10 +181,9 @@ export const CATALOG: Section[] = [
     rows: [{ label: 'Notify', key: NOTIFY_KEY, value: NOTIFY_DEFAULT, options: [...NOTIFY] }],
   },
   {
-    // the zone every time rule's times are in: automations
     name: 'Time zone',
     levels: ['all'],
-    about: 'The time zone of every schedule: automations, on every machine.',
+    about: 'The time zone of every schedule, on every machine.',
     rows: [{ label: 'Time zone', key: 'time.zone', value: OWN_ZONE, text: true }],
   },
   {

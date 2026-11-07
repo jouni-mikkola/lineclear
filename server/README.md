@@ -44,7 +44,7 @@ Places, chats, tasks, artifacts, the terminal, the browser, voice, alerts: every
 
 ### ⚡ Stop briefing every agent yourself
 
-Write what needs doing to a space's coordinator: it makes it a task or several, each with a brief and a Settings block that says how it is reviewed and merged. Each agent starts on Claude Code, Codex, pi or another CLI herdr can start, in a worktree of its own, at once or as soon as the machine has room. Want more control? Ask for it "for later", "after SHE-12", or "ask me before merging". Add [automations](docs/coordinator-timer.md) that start tasks on a schedule.
+Write what needs doing to a space's coordinator: it makes it a task or several, each with a brief and a Settings block that says how it is reviewed and merged. Each agent starts on Claude Code, Codex, pi or another CLI herdr can start, in a worktree of its own, at once or as soon as the machine has room. Want more control? Ask for it "for later", "after SHE-12", or "ask me before merging".
 
 ### 💬 Know when a task needs an answer
 
@@ -64,7 +64,7 @@ An agent that asks you something, wants a permission or a plan approved shows un
 
 <table align="center">
 <tr>
-<td align="center" valign="top"><sub>For developers who run coding agents in herdr on macOS or Linux</sub><br /><h2>Free</h2><div align="left">&nbsp;&nbsp;&nbsp;✓&nbsp; A coordinator for every space that turns what you write into tasks<br />&nbsp;&nbsp;&nbsp;✓&nbsp; Every task on its own worktree and branch, with its own agent<br />&nbsp;&nbsp;&nbsp;✓&nbsp; A review by fresh eyes before it merges, through a pull request on GitHub<br />&nbsp;&nbsp;&nbsp;✓&nbsp; Cards, alerts and voice calls on your phone, tablet or desktop<br />&nbsp;&nbsp;&nbsp;✓&nbsp; Every machine you saved in herdr, from one app<br />&nbsp;&nbsp;&nbsp;✓&nbsp; Your own plugins and themes, kept through every update<br />&nbsp;&nbsp;&nbsp;✓&nbsp; coordinator timer, automations, artifacts, a shared browser and split view</div></td>
+<td align="center" valign="top"><sub>For developers who run coding agents in herdr on macOS or Linux</sub><br /><h2>Free</h2><div align="left">&nbsp;&nbsp;&nbsp;✓&nbsp; A coordinator for every space that turns what you write into tasks<br />&nbsp;&nbsp;&nbsp;✓&nbsp; Every task on its own worktree and branch, with its own agent<br />&nbsp;&nbsp;&nbsp;✓&nbsp; A review by fresh eyes before it merges, through a pull request on GitHub<br />&nbsp;&nbsp;&nbsp;✓&nbsp; Cards, alerts and voice calls on your phone, tablet or desktop<br />&nbsp;&nbsp;&nbsp;✓&nbsp; Every machine you saved in herdr, from one app<br />&nbsp;&nbsp;&nbsp;✓&nbsp; Your own plugins and themes, kept through every update<br />&nbsp;&nbsp;&nbsp;✓&nbsp; coordinator timer, artifacts, a shared browser and split view</div></td>
 </tr>
 <tr>
 <td align="center"><a href="https://github.com/eliasstravik/herdr-projects/blob/main/docs/get-started.md"><img src="assets/buttons/install-lineclear.svg" alt="Install Lineclear" /></a></td>
@@ -117,11 +117,11 @@ Yes. Lineclear is installed once, on the main machine. Every other machine you s
 
 ### Do I have to start every task through a coordinator?
 
-Mostly. The app has no new-task button: you ask a space's coordinator in your own words and it adds the task (`lineclear task add`), so every one gets a brief and the same rules. An [automation](docs/coordinator-timer.md) adds tasks on a schedule or when something happens, such as a merge.
+Mostly. The app has no new-task button: you ask a space's coordinator in your own words and it adds the task (`lineclear task add`), so every one gets a brief and the same rules.
 
 ### What if the safety settings aren't enough?
 
-They are soft. A task's review, merge and rules are lines in its brief, and its agent follows them. Codex runs with full access and every agent has a shell: one can do anything you can, a review is another agent's judgement and not a proof, and automations run with nobody watching. Set Merge to "ask me first" for a yes before anything lands,.
+They are soft. A task's review, merge and rules are lines in its brief, and its agent follows them. Codex runs with full access and every agent has a shell: one can do anything you can, a review is another agent's judgement and not a proof. Set Merge to "ask me first" for a yes before anything lands,.
 
 ### What does it cost?
 

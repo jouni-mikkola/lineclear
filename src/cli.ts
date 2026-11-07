@@ -44,7 +44,6 @@ export const commands: Record<string, string> = {
   pr: "Push a task's branch and open its pull request: pr <id>",
   checks: "Wait for GitHub's checks on a task's pull request: checks <id>",
   alert: 'Send an alert to your devices: alert "<title>" --body "<why now>"',
-  automation: "Timed tasks: automation add, edit, list, pause, resume, run, remove",
   restart: "Restart a space's coordinator or a task's agent: restart <space|id>",
   set: "Change a setting of the board: set <key> <value> [--machine | --space <name>]",
   unset: "Go back to a setting's default: unset <key>",

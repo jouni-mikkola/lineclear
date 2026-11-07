@@ -247,26 +247,6 @@ export interface Task {
   browser?: { ready: boolean; hint?: string }
 }
 
-/** An automation as a project's Tasks lists it: its name, when it runs, the task it adds */
-export interface Automation {
-  name: string
-  /** its trigger in words: "Monday to Friday at 9:00 (Stockholm)", "When a task is merged" */
-  when: string
-  /** the title of the task it adds */
-  what: string
-  /** the brief of the task it adds */
-  brief?: string
-  /** off: paused */
-  on: boolean
-  /** its trigger as kept, for agents: its time rule (an RRULE, or "once …") and its event rules ("ready, merged") */
-  time?: string
-  events?: string
-  /** its next runs by its time rule, in words ("Tomorrow 9:00"); none while paused or without one */
-  next: string[]
-  /** its latest runs, newest first: when (ms), and the task it added or why it couldn't */
-  runs: { at: number; task?: string; error?: string }[]
-}
-
 /** A question card: built-in choice cards, a CLI's own menus, plans. */
 interface Choice {
   label: string

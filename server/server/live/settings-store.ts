@@ -239,11 +239,6 @@ export class Settings {
     return `Private instructions for ${role} (from ${scope}):\n${p.value.trim() || '(none)'}`
   }
 
-  /** the time zone of every time rule */
-  zone() {
-    return this.pick('time.zone', 'all').value
-  }
-
   /** how long a task's shared browser may sit idle before it closes, in ms, at a level; null: it never does */
   idleClose(l: Level = 'machine'): number | null {
     const n = Number.parseFloat(this.pick('browser.idleClose', l).value)

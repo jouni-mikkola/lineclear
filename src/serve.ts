@@ -53,7 +53,6 @@ const BOARD_COMMANDS = [
   "secret",
   "checks",
   "alert",
-  "automation",
   "restart",
   "set",
   "unset",

@@ -1,6 +1,6 @@
 ---
 name: lineclear-coordinator
-description: How a Lineclear coordinator runs its space (a folder on a machine with a name; a machine's home space also looks after the machine, and the main machine's home space keeps every machine's overview) - making tasks and writing their briefs, queuing them, handling news in tags (a task ready, merged, stuck or stalled, main red, a machine struggling), merging and closing, and automations that add tasks. Use when you are a Lineclear coordinator and the human asks for work, or news arrives. Not for a task's own agent working its brief (lineclear-agent), and not for chat lines, cards or artifacts (lineclear).
+description: How a Lineclear coordinator runs its space (a folder on a machine with a name; a machine's home space also looks after the machine, and the main machine's home space keeps every machine's overview) - making tasks and writing their briefs, queuing them, handling news in tags (a task ready, merged, stuck or stalled, main red, a machine struggling), and merging and closing. Use when you are a Lineclear coordinator and the human asks for work, or news arrives. Not for a task's own agent working its brief (lineclear-agent), and not for chat lines, cards or artifacts (lineclear).
 ---
 
 # Lineclear coordinator
@@ -69,23 +69,6 @@ How to do the work inside a task is its agent's judgment, not yours.
 6. **Machine health** (a home space): `<health>` lines carry the numbers and what uses the machine most.
    Pause or queue the tasks that use most and matter least, never stop or delete one for it; clean up only what is
    safely finished, never a task's uncommitted work. Once back under, let them go on (`lineclear task tell <id> "go on"`).
-7. **Automations**: `lineclear automation add "<name>" --task "<title>" --brief "<brief>" [--when "<time rule>"]
-   [--on "<events>"]` adds that task to the space on its trigger, each time with a fresh agent of its own; a brief as
-   full as any task's. `edit`, `pause`, `resume`, `run`, `remove`, `list` (`lineclear help`). Only on the human's word.
-8. **Triggers from words**: an automation takes a time rule, event rules, or both. The
-   human never writes or reads a rule: turn their words into one, and tell them back the words Lineclear prints with
-   the next runs, so they can see it is what they meant.
-   - Time rule (`--when`): an iCalendar RRULE in the time zone
-     of `time.zone`. Every N minutes: `FREQ=MINUTELY;INTERVAL=N`; within hours: `BYHOUR=` every hour it may run in
-     (8:00-22:00 is `BYHOUR=8,9,…,21`); days: `BYDAY=MO,TU,WE,TH,FR`; at a time: `FREQ=DAILY;BYHOUR=9;BYMINUTE=0`;
-     every other week: `FREQ=WEEKLY;INTERVAL=2;BYDAY=FR;…`; the last Friday of the month: `FREQ=MONTHLY;BYDAY=-1FR`;
-     the last workday: `FREQ=MONTHLY;BYDAY=MO,TU,WE,TH,FR;BYSETPOS=-1`; start, end, skips: `DTSTART:20261201T090000
-     RRULE:…;UNTIL=20261231T000000 EXDATE:20261224T090000` (or `COUNT=`). One-offs: `once 2026-11-02 9:00`. `off`: none.
-     Without DTSTART it counts from 2026-01-01 0:00: give one where it matters (every other week from next Friday).
-   - Event rules (`--on`): `all news`, `none`, or events split by commas
-     (`added`, `ready`, `failed`, `needs-you`, `merged`, `stalled`, `main-red`), each
-     with optional `space=<name>`, `branch=<glob>` and `title=<words>` filters: `merged branch=release/*, failed`.
-     An automation hears its own space's news unless a rule names another.
 
 ## Outputs
 
