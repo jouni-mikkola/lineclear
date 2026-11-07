@@ -41,8 +41,7 @@ that passed its tests, never main itself.
 
 ## Status
 
-Works now: the rules that start, review and merge steps by themselves, waits that name their cause, the stall ladder
-([stalls](docs/stalls.md)), the Inbox, and the web views (Home, the Dispatcher chat, the Inbox).
+Works now: the rules that start, review and merge steps by themselves, waits that name their cause, the Inbox, and the web views (Home, the Dispatcher chat, the Inbox).
 
 Not yet: the own fork (`server/` still follows herdr-projects 2.0) and the merge lane (the merge still runs through the
 board). The [roadmap](docs/ROADMAP.md) has both.

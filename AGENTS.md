@@ -23,7 +23,7 @@ What Lineclear is and why: [docs/idea.md](docs/idea.md). The order of work: [doc
 - `src/`: the CLI and its commands (`cli.ts` is the entry). `test/`: bun tests, one file per command.
 - `bin/lineclear`: the CLI. `install.sh`: the one-command install. `pi/extension.ts`: the pi extension.
 - `scripts/`: repo tools. `ui/brand/`: the mark, the wordmark and `tokens.css`. `ui/kit/`: the design system's parts
-  and `motion.ts`. `ui/web/`: the web pages `lineclear run` builds and serves. `ui/test/`: the UI bar's browser tests. `ui/shots/`: the screenshot run of `bun run shots`. `docs/`: idea, roadmap, backlog.
+  and `motion.ts`. `ui/web/`: the web pages `lineclear run` builds and serves. `ui/test/`: the UI bar's browser tests. `ui/shots/`: the screenshot run of `bun run shots`. `docs/`: idea, roadmap.
 
 ## Writing
 
@@ -31,7 +31,6 @@ What Lineclear is and why: [docs/idea.md](docs/idea.md). The order of work: [doc
   A why is a reason that holds for everyone. Goals stay goals, not claims.
 - Short: every sentence earns its place. Plain English, short sentences. No en or em dashes.
 - Facts about other tools (Lineclear, herdr, pi) only when anyone can check them, with a link.
-- New ideas go to `docs/backlog.md`, never into the roadmap or the code.
 
 ## Code
 

@@ -4,7 +4,7 @@
 reviewers, and shows you everything live. You only make the decisions.**
 
 It is for one developer with several projects, several AI subscriptions and one or more Linux machines. The order
-of work is in [ROADMAP.md](ROADMAP.md). Ideas for later are in [backlog.md](backlog.md).
+of work is in [ROADMAP.md](ROADMAP.md).
 
 ## The owner's direction
 
@@ -41,7 +41,7 @@ A rule is a goal until its check exists.
    Held today by: the rollback tests of the update (LIN-136, LIN-135). Open: the canary and the side-by-side build (LIN-186).
 3. **Every fault fixes itself, and the same fault never returns.** A known fault becomes an automatic fix and a test
    that plants it. A hand fix is itself a fault and is counted. Every stall is detected, and a new kind files its own
-   fix (LIN-158). Checked by: the stall rules (`docs/stalls.md`). Open: the hand-fix counter (LIN-185).
+   fix (LIN-158). Open: the hand-fix counter (LIN-185).
 4. **Parallel is the default.** A queue exists only for a real dependency. A lock guards one real resource and lasts
    only as long as it is needed. A step waits for another only if it needs that step's code. Open: a check that a lock is real and short, and splitting the `ui` lock.
    The roadmap check only needs a `locks` line today.
