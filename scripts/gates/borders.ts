@@ -1,28 +1,56 @@
-// Module borders: which module may import which. The modules and which may import which come from the table in
-// docs/architecture.md, so the doc and the check cannot differ.
+// Module borders: which module may import which. Each module states its border in the first lines of its folder's
+// README.md (see docs/architecture.md), so adding a module edits no central file.
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, normalize } from "node:path";
 import { trackedFiles } from "./tools.ts";
 
 interface Module {
   name: string;
+  readme: string;
   folders: string[];
   imports: string[];
+  lines: number;
 }
 
 const ARCHITECTURE = "docs/architecture.md";
 // the server's tsconfig paths
 const ALIASES: Record<string, string> = { "@shared/": "server/shared/" };
 const CODE = (s: string) => [...s.matchAll(/`([^`]+)`/g)].map((m) => m[1] ?? "");
+const SOURCE = /\.(ts|tsx|mts|js|mjs)$/;
+const KEY = /^(Module|Covers|Owns|May import|Lines):\s*(.*)$/;
 
-/** The rows of the modules table: | `name` | `folder/`, `file.ts` | owns | `a`, `b` or none | */
-function readModules(markdown: string): Module[] {
-  const modules: Module[] = [];
+/**
+ * The modules a README declares in its leading lines: blocks of `Key: value` lines (`Module`, `Covers`, `Owns`,
+ * `May import`, `Lines`) split by blank lines, after an optional `# title`. Reading stops at the first other line.
+ * `Module` defaults to the folder's name and `Covers` to the folder.
+ */
+function readModules(readme: string, markdown: string, faults: string[]): Module[] {
+  const folder = dirname(readme) === "." ? "" : `${dirname(readme)}/`;
+  const blocks: Record<string, string>[] = [];
+  let block: Record<string, string> = {};
+  const close = () => {
+    if (Object.keys(block).length > 0) blocks.push(block);
+    block = {};
+  };
   for (const line of markdown.split("\n")) {
-    const cells = line.split("|").map((c) => c.trim());
-    if (cells.length < 6 || !cells[1]?.startsWith("`")) continue;
-    const [name] = CODE(cells[1]);
-    if (name) modules.push({ name, folders: CODE(cells[2] ?? ""), imports: CODE(cells[4] ?? "") });
+    const m = KEY.exec(line.trim());
+    if (m) block[m[1] ?? ""] = m[2] ?? "";
+    else if (line.trim() === "" || line.startsWith("# ")) close();
+    else break;
+  }
+  close();
+  const modules: Module[] = [];
+  for (const b of blocks) {
+    const missing = ["Owns", "May import", "Lines"].filter((k) => b[k] === undefined);
+    if (missing.length > 0) {
+      faults.push(`${readme} lacks ${missing.join(", ")} in its first lines`);
+      continue;
+    }
+    const lines = Number(b.Lines);
+    if (!Number.isInteger(lines) || lines <= 0) faults.push(`${readme}: Lines must be a whole number above 0, not "${b.Lines}"`);
+    const name = CODE(b.Module ?? "")[0] ?? (folder.split("/").filter(Boolean).pop() || "root");
+    const covers = CODE(b.Covers ?? "");
+    modules.push({ name, readme, folders: covers.length > 0 ? covers : [folder], imports: CODE(b["May import"] ?? ""), lines });
   }
   return modules;
 }
@@ -79,6 +107,7 @@ interface Scan {
   modules: Module[];
   edges: { from: string; to: string; line: number; typeOnly: boolean }[];
   files: string[];
+  faults: string[];
 }
 
 const scans = new Map<string, Promise<Scan>>();
@@ -87,8 +116,9 @@ function scan(root: string): Promise<Scan> {
   let s = scans.get(root);
   if (!s) {
     s = (async () => {
-      const modules = readModules(readFileSync(join(root, ARCHITECTURE), "utf8"));
-      const files = trackedFiles(root);
+      const faults: string[] = [];
+      const modules = trackedFiles(root, /(^|\/)README\.md$/).flatMap((f) => readModules(f, readFileSync(join(root, f), "utf8"), faults));
+      const files = trackedFiles(root, SOURCE);
       const edges: Scan["edges"] = [];
       for (const from of files) {
         for (const imp of scanImports(readFileSync(join(root, from), "utf8"))) {
@@ -96,24 +126,41 @@ function scan(root: string): Promise<Scan> {
           if (to !== undefined) edges.push({ from, to, line: imp.line, typeOnly: imp.typeOnly });
         }
       }
-      return { modules, edges, files };
+      return { modules, edges, files, faults };
     })();
     scans.set(root, s);
   }
   return s;
 }
 
-export async function borders(root: string): Promise<string[]> {
-  const { modules, edges, files } = await scan(root);
-  const faults: string[] = [];
+function sizeFaults(root: string, files: string[], modules: Module[]): string[] {
+  const used = new Map<Module, number>();
   for (const file of files) {
-    if (!moduleOf(file, modules)) faults.push(`${file} is in no module of ${ARCHITECTURE}`);
+    const m = moduleOf(file, modules);
+    if (m) used.set(m, (used.get(m) ?? 0) + readFileSync(join(root, file), "utf8").split("\n").length);
+  }
+  return [...used].filter(([m, n]) => n > m.lines).map(([m, n]) => `${m.name} has ${n} lines, over the ${m.lines} that ${m.readme} allows`);
+}
+
+export async function borders(root: string): Promise<string[]> {
+  const { modules, edges, files, faults: declared } = await scan(root);
+  const faults = [...declared];
+  const names = new Set<string>();
+  for (const m of modules) {
+    if (names.has(m.name)) faults.push(`${m.readme}: module ${m.name} is declared twice`);
+    names.add(m.name);
+  }
+  for (const m of modules) {
+    for (const i of m.imports) if (!names.has(i)) faults.push(`${m.readme}: ${m.name} may import ${i}, which is no module`);
+  }
+  for (const file of files) {
+    if (!moduleOf(file, modules)) faults.push(`${file} is in no module: its folder needs a README.md with Owns, May import and Lines (${ARCHITECTURE})`);
   }
   for (const e of edges) {
     const a = moduleOf(e.from, modules);
     const b = moduleOf(e.to, modules);
     if (!a || !b || a === b || a.imports.includes(b.name)) continue;
-    faults.push(`${e.from}:${e.line} imports ${e.to}: ${a.name} may not import ${b.name} (${ARCHITECTURE})`);
+    faults.push(`${e.from}:${e.line} imports ${e.to}: ${a.name} may not import ${b.name} (${a.readme})`);
   }
-  return faults;
+  return [...faults, ...sizeFaults(root, files, modules)];
 }

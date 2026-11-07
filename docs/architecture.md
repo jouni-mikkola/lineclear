@@ -1,38 +1,38 @@
 # Architecture
 
 Lineclear is a CLI with a rules loop (`src/`), a web UI (`ui/`), a pi extension (`pi/`) and a server (`server/`, the
-fork of herdr-projects 2.0 that runs the agents). This page names each module, what it owns and which modules it may
-import. `bun run check` reads the table below (`scripts/gates/borders.ts`): an import that the table does not allow
-fails, and so does a source file in no module. A file belongs to the module with the longest folder that holds it.
+fork of herdr-projects 2.0 that runs the agents). Each module states its own border in the first lines of its
+folder's `README.md`, so a new module edits no shared page. This page keeps only the layer rules.
+
+## A module's border
+
+The first lines of a folder's `README.md` are blocks of `Key: value` lines, split by blank lines:
+
+```
+Module: `name`        (optional: the folder's name by default)
+Covers: `a/`, `b.ts`  (optional: files and folders from the repo root, the README's folder by default)
+Owns: what the module is for
+May import: `other`, `another` or none
+Lines: the most lines its source files may have together
+```
+
+`bun run check` reads them (`scripts/gates/borders.ts`). These fail: an import that `May import` does not allow, a
+source file in no module, a name in `May import` that is no module, a module over its `Lines`. A file belongs to the
+module with the longest folder or file that covers it. One README can hold several blocks, for single files that are
+modules of their own.
 
 An import cycle between files fails too: a file that imports, by any path, a file that imports it back. Type-only
 imports count for the borders but not for cycles, since they are gone when the code runs.
 
-## Modules
+## Layers
 
-| Module | Folder | Owns | May import |
-| --- | --- | --- | --- |
-| `brand` | `ui/brand/` | the mark, the wordmark and the colour tokens | none |
-| `pi` | `pi/` | the pi extension | none |
-| `cli` | `src/` | the CLI and its commands, the rules loop, config and data paths, the web API | `pi`, `check-line`, `registry`, `secrets`, `store` |
-| `bin` | `bin/` | the `lineclear` command | `cli` |
-| `kit` | `ui/kit/` | the design system's parts and motion | `brand`, `cli` |
-| `web` | `ui/web/` | the pages `lineclear run` serves | `kit`, `brand`, `cli`, `samples` |
-| `samples` | `ui/test/samples/` | the sample data of each `?state=` page, loaded only on such a page | `web`, `kit`, `cli` |
-| `ui-test` | `ui/test/`, `ui/budget/`, `playwright.config.ts`, `playwright.budget.config.ts` | the UI bar's browser tests and their fixture | `web`, `kit`, `brand`, `cli`, `pi`, `samples` |
-| `gates` | `scripts/gates/` | the check's gates | `check-line` |
-| `scripts` | `scripts/` | repo tools: the check, the smoke check, measurements | `cli`, `brand`, `gates`, `check-line` |
-| `tests` | `test/` | the bun tests, one file per command | `cli`, `pi`, `kit`, `web`, `brand`, `scripts`, `gates`, `ui-test`, `samples`, `check-line`, `registry`, `secrets` |
-| `shared` | `server/shared/` | types and pure helpers the server shares | none |
-| `server` | `server/server/` | the server: the live source, agents, chats, the engine and the merge lane | `shared`, `check-line`, `registry`, `secrets`, `project-models`, `store` |
-| `registry` | `src/models.ts` | the models every installed harness lists | none |
-| `store` | `server/server/store.ts` | how a `store.sqlite` is opened, with its transactions | none |
-| `secrets` | `server/server/live/secrets.ts` | the vault, and the `secrets` and `totp` words that read it | `cli`, `shared`, `check-line` |
-| `project-models` | `server/server/live/project-models.ts` | the model each role of a space starts on, read from and moved into the project's settings | `cli`, `shared` |
-| `check-line` | `src/machine-limits.ts`, `src/check-runs.ts`, `src/task-work.ts`, `src/decisions-store.ts`, `src/git.ts`, `src/ssh.ts`, `src/time.ts` | each machine's name and load limit, a branch's GitHub checks read with gh, the log of the work a task does on its machine, the decisions table, and the one git helper, the one SSH command builder and time constants | none |
-| `helper` | `server/helper/` | what runs on a remote machine | `shared` |
-| `server-scripts` | `server/scripts/` | the server's test runner and store scripts | `server`, `shared`, `server-tests` |
-| `server-tests` | `server/test/` | the server's tests | `server`, `shared`, `server-scripts`, `helper`, `check-line`, `registry`, `secrets`, `project-models`, `store` |
+From the bottom up. A module imports downward, never up, and the README of each says exactly which.
+
+1. Leaves that import nothing of ours: `brand`, `pi`, `shared`, `registry`, `store`, `check-line`.
+2. The CLI and the server on top of them: `cli`, `server`, `helper`, `secrets`, `project-models`.
+3. The web UI: `kit`, `web`, `samples`.
+4. Wiring and tools: `bin`, `scripts`, `gates`, `server-scripts`.
+5. Tests: `tests`, `ui-test`, `server-tests`. They import what they test, never the other way round.
 
 ## Rules of thumb
 
