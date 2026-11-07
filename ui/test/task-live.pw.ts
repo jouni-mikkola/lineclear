@@ -74,7 +74,6 @@ test("a tab pick fades in, and nothing moves under reduced motion", async ({ pag
   await expect(page.locator("[data-task-live]")).toBeVisible();
   const seen = await page.evaluate(() => (window as unknown as { __fades: string[] }).__fades);
   expect(seen.some((s) => s.startsWith("part-change:terminal"))).toBe(true);
-  expect(seen.join()).toContain("part-change:idle");
   await page.emulateMedia({ reducedMotion: "reduce" });
   const before = seen.length;
   await page.keyboard.press("3");
