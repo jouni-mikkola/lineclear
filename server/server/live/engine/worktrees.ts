@@ -181,7 +181,8 @@ export class Worktrees {
     if (space) await undone(this.h.closeWorkspace(space.workspace_id))
     await G.git(o.repo, 'worktree', 'prune')
     if (committedOnly) {
-      const err = await this.dropFolder(o.repo, wt, space)
+      // its space is closed above: herdr has nothing to remove for it
+      const err = await this.dropFolder(o.repo, wt, undefined)
       if (err) kept = [`${where} (${err})`]
     }
     if (branch && !kept.length) {
