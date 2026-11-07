@@ -261,6 +261,7 @@ function snapshotKeeper(env: Record<string, string | undefined>) {
 export function realWorld(env = process.env): World {
   const io = readers(run);
   const snapshot = snapshotKeeper(env);
+  snapshot.refresh();
   const refsOf = (repo: string) => io.memo(`main-refs:${repo}`, () => mainRefs(repo)); // up to five gits to find
   const tasksFile = join(lineclearDir(env), "tasks.json");
   const sessionsOf = (worktree: string) => sessionFolderPath(worktree, env);

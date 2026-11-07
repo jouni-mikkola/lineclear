@@ -12,7 +12,7 @@ import { secretsText } from "../server/server/live/secrets.ts";
 type Env = Record<string, string | undefined>;
 
 // A project's steps may run on other machines. There is one server and one task store: a machine's room is what the
-// server says of it (herdr's read, its tasks at work, its slots). A machine that cannot be reached is a text, never a throw.
+// server's snapshot says of it (its worker's own read, its tasks at work, its slots). A machine that cannot be reached is a text, never a throw.
 
 /** A machine with less memory free than this takes no new task. */
 const MIN_FREE_KB = 1024 * 1024;

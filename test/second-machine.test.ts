@@ -67,11 +67,7 @@ function setup(o: Opts) {
 const [cmd, sub, ...rest] = process.argv.slice(2);
 const read = (f) => JSON.parse(fs.readFileSync(f, "utf8"));
 const remote = read("${home}/tasks.json");
-if (cmd === "room") {
-  if (fs.existsSync("${home}/down")) { console.error("herdr could not reach farbox for workspace.list"); process.exit(1); }
-  const working = remote.filter((t) => t.status === "work").length;
-  console.log(JSON.stringify({ host: "farbox", load: 1, cores: 4, freeKb: ${o.freeKb ?? 8_000_000}, working, max: Number(fs.readFileSync("${home}/max", "utf8")) }));
-} else if (cmd === "task" && sub === "list") {
+if (cmd === "task" && sub === "list") {
   console.log(JSON.stringify([...read("${fake}/tasks.json"), ...remote.map((t) => ({ ...t, machine: "farbox" }))]));
 } else if (cmd === "task" && sub === "add") {
   const line = [cmd, sub, ...rest].join(" ");
