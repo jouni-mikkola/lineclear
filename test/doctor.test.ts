@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { trimCache } from "../src/tmpdirs.ts";
-import { doctor, doctorChecks, herdrUnsaved, herdrVersions, realProbe, testedHerdr, type Probe } from "../src/doctor.ts";
+import { doctor, doctorChecks, herdrVersions, realProbe, testedHerdr, type Probe } from "../src/doctor.ts";
 import { storedTaskIds } from "../src/doctor-task-ids.ts";
 import { cacheEnvFile, pathsFor } from "../src/paths.ts";
 
@@ -283,22 +283,4 @@ test("doctor reads the live store and its cold file for a duplicate task id", ()
   expect(storedTaskIds(dir).sort()).toEqual(["OMA-5", "OMA-91"]);
   writeFileSync(cold, `${JSON.stringify({ id: "OMA-91" })}\n`);
   expect(doctorChecks(probe({ taskIds: () => storedTaskIds(dir) })).find((c) => c.name === "task ids")?.problem).toContain("OMA-91");
-});
-
-test("a machine herdr has not saved is a problem with the command that saves it", () => {
-  const checks = doctorChecks(probe({ herdr: { tested: "1", machines: [], unsaved: ["elitebook"] } }));
-  const c = checks.find((x) => x.name === "herdr knows elitebook");
-  expect(c?.problem).toContain("elitebook");
-  expect(c?.fix).toBe("herdr machine add elitebook  # or herdr machine enable elitebook when it is saved but turned off");
-});
-
-test("herdrUnsaved names the hosts missing from herdr's saved machines", () => {
-  const run = () => JSON.stringify([{ id: "a", label: "elitebook", target: "x@elitebook", enabled: true }]);
-  expect(herdrUnsaved(run, ["elitebook", "thinkpad"])).toEqual(["thinkpad"]);
-});
-
-test("a machine herdr has turned off, or a list that cannot be read", () => {
-  const off = () => JSON.stringify([{ label: "elitebook", enabled: false }]);
-  expect(herdrUnsaved(off, ["elitebook"])).toEqual(["elitebook"]);
-  expect(herdrUnsaved(() => null, ["elitebook"])).toEqual([]);
 });

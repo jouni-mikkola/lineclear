@@ -3,11 +3,9 @@ import { dirname, join } from "node:path";
 import { browsers } from "./browsers.ts";
 import type { HomeData } from "./home-data.ts";
 import { type ProjectsFeed, projectsFeed, readProjects as readProjectsNow } from "./projects-feed.ts";
-import { machinesView } from "./machines.ts";
 import type { RoadmapRead } from "./roadmap-view.ts";
 import { type Aside, readAside } from "./read-aside.ts";
 import { type Pusher, realPush, watchInbox } from "./notify.ts";
-import { refreshRemotes } from "./remotes.ts";
 import { dispatcherChat, taskChatLinks } from "./chat.ts";
 import { taskTerminalLinks } from "./task-live.ts";
 import { apiAnswer, liveHub } from "./live.ts";
@@ -58,9 +56,8 @@ function keptAside<T>(read: () => Promise<T>, ms: number, now: () => number): Ke
  * `GET /api/detect?repo=<folder>` gives what `lineclear project add` finds in a folder and `POST /api/projects` with
  * `{repo, name, space, check, models}` saves it where the CLI does.
  * `GET /api/setup` gives the harnesses and accounts found and the model chosen per role, and `POST /api/setup` saves a choice where `lineclear setup` does.
- * `GET /api/settings` gives the machines and each project's settings with its secret names,
- * never their values. `POST /api/machines` with `{"add": host}` installs Lineclear on a machine over SSH in the
- * background, `{"remove": host}` forgets one, `{"fix": "local"}` fixes what this machine's doctor finds that has a safe fix, and `POST /api/projects/<name>` changes a project's commands, Running or Paused (`{"paused": true}`), or the
+ * `GET /api/settings` gives each project's settings with its secret names,
+ * never their values. `POST /api/projects/<name>` changes a project's commands, Running or Paused (`{"paused": true}`), or the
  * order of a role's models, in the files the CLI writes.
  * `GET /api/chat/events` streams the Dispatcher's chat as server-sent events, `POST /api/chat` with
  * `{"text": "...", "files": [ids], "cid": "..."}` sends it a message, `POST /api/chat/files` with `{"name": "...", "data": base64}` attaches a
@@ -107,7 +104,6 @@ export function webApi(
     if (!projects || t - projects.at > 1_000) projects = { at: t, data: readProjectsNow(env, t) };
     return projects.data;
   };
-  void refreshRemotes(env);
   const live = browsers(env, now);
   let chat: ReturnType<typeof dispatcherChat> | undefined;
   const dispatcher = () =>
@@ -119,9 +115,6 @@ export function webApi(
     ));
   const taskChats = taskChatLinks(env);
   const taskTerminals = taskTerminalLinks(env);
-  const machines = machinesView(env, now, () =>
-    (feed?.now() ?? projects?.data ?? []).reduce((n, p) => n + p.tasks.filter((t) => t.state === "work").length, 0),
-  );
 
   const ctx: Ctx = {
     env,
@@ -140,7 +133,6 @@ export function webApi(
     dispatcher,
     taskChats,
     taskTerminals,
-    machines,
   };
   return async (req: Request): Promise<Response> => {
     const url = new URL(req.url);

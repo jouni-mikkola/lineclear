@@ -70,7 +70,7 @@ const BOARD_COMMANDS = [
 ];
 /** Words both have: the board's job is told by its own arguments, the rest is Lineclear's (`doctor` and a bare `status` are Lineclear's alone). */
 const SHARED_WORDS: Record<string, (rest: string[]) => boolean> = {
-  status: (rest) => !rest.includes("--local") && ((!rest[0]?.startsWith("-") && rest.length >= 2) || rest.includes("--done") || rest.includes("--left")),
+  status: (rest) => (!rest[0]?.startsWith("-") && rest.length >= 2) || rest.includes("--done") || rest.includes("--left"),
   plan: (rest) => rest.some((a) => a === "--step" || a.startsWith("--step=")),
 };
 const OWN_LINES = /^ {2}lineclear (doctor|status)\b(?! <id>)/;

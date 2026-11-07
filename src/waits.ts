@@ -40,7 +40,6 @@ export interface Wait {
 const waitsDir = (env = process.env) => join(configDir(env), "waits");
 export const waitPath = (task: string, env = process.env) => join(waitsDir(env), `${task}.json`);
 
-export const limitOf = Q.limitOf;
 /** A machine's load limit: its machine.json's load per core (1 if unset) times its cores. */
 export const loadLimit = (env = process.env) => Q.machineLimits(env).loadLimit;
 

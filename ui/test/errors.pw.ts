@@ -125,8 +125,8 @@ const BAD = [
   "not json",
   "[null]",
   "[{}]",
-  '{"projects":[null],"steps":[null],"phases":[null],"machines":[null]}',
-  '{"projects":[{}],"steps":[{}],"phases":["P"],"machines":[{}]}',
+  '{"projects":[null],"steps":[null],"phases":[null]}',
+  '{"projects":[{}],"steps":[{}],"phases":["P"]}',
 ];
 
 for (const [i, body] of BAD.entries()) {

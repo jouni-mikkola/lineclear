@@ -3,9 +3,8 @@ import { readDecisionsSince } from "./stall-class.ts";
 import { HOUR_MS } from "./time.ts";
 // `lineclear status`: what stops each project and each task, short enough for a chat or a phone.
 import { IDLE_TEXT } from "./cards.ts";
-import { localProjects, type HomeProject } from "./home-data.ts";
+import { projectsData, type HomeProject } from "./home-data.ts";
 import { listProjectNames, readSettings } from "./project.ts";
-import type { Export } from "./remotes.ts";
 import { lineclearTasks } from "./roadmap-source.ts";
 import { readState } from "./rules.ts";
 import { notReached, silentMachines } from "./spread.ts";
@@ -56,7 +55,7 @@ const lanes = new WeakMap<object, HomeProject[]>();
 
 /** A head stuck on the merge line. The projects are read once per run, from this machine's files. */
 function laneLines(name: string, env: NodeJS.ProcessEnv): string[] {
-  const projects = lanes.get(env) ?? localProjects(env);
+  const projects = lanes.get(env) ?? projectsData(env);
   lanes.set(env, projects);
   const stuck = (projects.find((p) => p.name === name)?.tasks ?? []).filter((t) => t.lane?.startsWith("Stuck"));
   return stuck.map((t) => `merge line: ${t.id} ${t.lane?.replace(/^S/, "s")}`);
@@ -90,7 +89,7 @@ function printCapped(lines: string[], out: (l: string) => void) {
 }
 
 /** What stops each project and each task. With a project name, only that project and without the cap. */
-export function status(out: (l: string) => void, env = process.env, only?: string, remote: Export[] = []): number {
+export function status(out: (l: string) => void, env = process.env, only?: string): number {
   const all = listProjectNames(env);
   if (only !== undefined && !all.includes(only)) {
     out(`lineclear status: no project named '${only}'`);
@@ -116,7 +115,7 @@ export function status(out: (l: string) => void, env = process.env, only?: strin
   for (const [host, good] of silentMachines(env)) rest.push(clip(`-  ${notReached(host, good)}`));
   for (const w of readWaits(env).filter((w) => w.project === undefined || !all.includes(w.project))) rest.push(clip(`-  ${describeWait(w)}`));
   // The count comes first too: it is the same list as Home's headline and the Inbox badge.
-  const n = countWaiting(waitingForYou(env, remote));
+  const n = countWaiting(waitingForYou(env));
   if (n > 0) lines.push(`${n} ${n === 1 ? "thing waits" : "things wait"} for you`);
   // The healthy projects come first, so the cap never drops them.
   if (okNames.length > 0) lines.push(`ok: ${okNames.join(" ")}`);

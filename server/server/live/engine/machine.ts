@@ -11,7 +11,7 @@ const configDir = (env: Env) => env.LINECLEAR_CONFIG ?? join(homedir(), '.config
 const positive = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : undefined)
 
 /** A machine's load limit: its machine.json's load per core (1 if unset) times its cores. */
-export function limitOf(machine: unknown, cores: number): number {
+function limitOf(machine: unknown, cores: number): number {
   const per = positive((machine as { loadPerCore?: unknown } | null)?.loadPerCore)
   return Math.round((per ?? 1) * cores * 100) / 100
 }

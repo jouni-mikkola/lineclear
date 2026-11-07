@@ -1,7 +1,6 @@
 import { IDLE_TEXT, lineOf } from "./cards.ts";
 import { type HomeProject, projectsData } from "./home-data.ts";
 import { isOpen, type Item, readItems } from "./inbox.ts";
-import { type Export, remoteExports } from "./remotes.ts";
 import { readWaits, waitsForOwner } from "./waits.ts";
 
 /** An Inbox item, with the machine that holds it when that is not this one, and its task's title when Home knows it. */
@@ -25,11 +24,7 @@ export interface WaitingTask {
  * What waits for you, as one list: the open Inbox items (newest first), then each task that waits for you with no open
  * item, each task once. Home's headline, the Inbox badge and `lineclear status` count it.
  */
-export function waitingForYou(
-  env = process.env,
-  remote: Export[] = remoteExports(env),
-  projects: HomeProject[] = projectsData(env, Date.now(), remote),
-): { items: MachineItem[]; tasks: WaitingTask[] } {
+export function waitingForYou(env = process.env, projects: HomeProject[] = projectsData(env, Date.now())): { items: MachineItem[]; tasks: WaitingTask[] } {
   const titles = new Map(projects.flatMap((p) => p.tasks.map((t) => [t.id, t.title] as const)));
   const results = new Map(projects.flatMap((p) => p.tasks.flatMap((t) => (t.result ? [[t.id, t.result] as const] : []))));
   const titled = (i: MachineItem): MachineItem => ({
@@ -37,15 +32,7 @@ export function waitingForYou(
     ...(titles.has(i.task) ? { title: titles.get(i.task) } : {}),
     ...(results.has(i.task) ? { result: results.get(i.task) } : {}),
   });
-  const items: MachineItem[] = [
-    ...readItems(env).filter(isOpen).reverse(),
-    ...remote.flatMap((e) =>
-      e.inbox
-        .filter(isOpen)
-        .reverse()
-        .map((i) => ({ ...i, machine: e.host })),
-    ),
-  ].map(titled);
+  const items: MachineItem[] = [...readItems(env).filter(isOpen).reverse()].map(titled);
   const asked = new Set(items.map((i) => i.task));
   const tasks = new Map<string, WaitingTask>();
   // what an agent declared it waits for the owner for: its reason is the card's line

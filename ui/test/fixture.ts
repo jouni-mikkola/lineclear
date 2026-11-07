@@ -108,16 +108,7 @@ export function writeItem(
 }
 
 function clearFixture() {
-  for (const d of [
-    "lineclear",
-    "config/inbox",
-    "config/machines.json",
-    "config/machine.json",
-    "config/projects",
-    "browsers.json",
-    "browser-inputs.log",
-    "ssh.log",
-  ])
+  for (const d of ["lineclear", "config/inbox", "config/projects", "browsers.json", "browser-inputs.log"])
     rmSync(join(FIXTURE, d), { recursive: true, force: true });
   // the doctor of the run finds nothing, so no picture shows the host's own findings
   write(join(FIXTURE, "doctor.json"), []);
@@ -391,33 +382,15 @@ export const ROADMAP_LIVE: Partial<Record<Motion, { change: () => void; after: s
   },
 };
 
-// Settings: the machines in <config>/machines.json, each reached over ui/test/fake-ssh, and a project's settings.
-
-function writeMachines(machines: { host: string; state: "installing" | "ready" | "failed"; doctor?: string[] }[]) {
-  write(join(FIXTURE, "config", "machines.json"), { machines: machines.map((m) => ({ since: "2026-01-05T09:12:00.000Z", ...m })) });
-}
-
-export const sshLog = () => {
-  try {
-    return readFileSync(join(FIXTURE, "ssh.log"), "utf8");
-  } catch {
-    return "";
-  }
-};
-
-const MACHINES = [
-  { host: "build-box", state: "ready" as const, doctor: ["ok     git", "All well."] },
-  { host: "broken-box", state: "failed" as const, doctor: ["FAILED service: lineclear.service is not running"] },
-];
+// Settings: a project's settings.
 
 const SHOP_MODELS = { worker: ["vendor-a/model-mid", "vendor-b/model-code"], reviewer: ["vendor-b/model-code"], planner: ["vendor-a/model-top"] };
 
 export const shopSettings = () => JSON.parse(readFileSync(join(FIXTURE, "config", "projects", "web-shop", "settings.json"), "utf8"));
 
-/** The files every live test of Settings starts from: two machines besides this one, and one project. */
+/** The files every live test of Settings starts from: one project. */
 export function startSettings() {
   startFixture();
-  writeMachines(MACHINES);
   write(join(FIXTURE, "config", "projects", "web-shop", "settings.json"), {
     repo: "/nowhere/web-shop",
     space: "web-shop",

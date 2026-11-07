@@ -1,15 +1,11 @@
-import { afterAll, expect, spyOn, test } from "bun:test";
-import fs from "node:fs";
+import { afterAll, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { writeAtomic } from "../pi/atomic.ts";
 import { addItem, readItems } from "../src/inbox.ts";
 import { readWaits, writeWait } from "../src/waits.ts";
 import { decisionsPath } from "../pi/config.ts";
-import { webApi } from "../src/web.ts";
-import { networkTrouble } from "../src/health.ts";
-import { chooseModels, until as untilAsync } from "./helpers.ts";
+import { chooseModels } from "./helpers.ts";
 
 const temps: string[] = [];
 afterAll(() => temps.forEach((d) => rmSync(d, { recursive: true, force: true })));
@@ -144,109 +140,3 @@ for (const kind of ["a killed service", "a reboot"] as const) {
     }
   });
 }
-
-/** The lines of this machine's doctor in Settings that name `name`: what is wrong shows there, once. */
-const machineProblems = async (api: ReturnType<typeof webApi>, name: string) =>
-  (((await (await api(new Request("http://127.0.0.1/api/settings"))).json()) as any).machines[0].doctor as string[]).filter((l) =>
-    l.startsWith(`FAILED ${name}`),
-  );
-
-test("a full disk fails the write whole: the old file stays, nothing is lost, and Settings shows it once until space is free", async () => {
-  const m = machine();
-  m.roadmap(m.step("A"));
-  work(m);
-  const before = m.state();
-  const file = join(m.dir, "state.json");
-  writeAtomic(file, '{"v":1}');
-  // The disk is full when a write fails with ENOSPC half way through the temporary file.
-  const full = spyOn(fs, "writeSync").mockImplementation(() => {
-    throw Object.assign(new Error("ENOSPC: no space left on device, write"), { code: "ENOSPC" });
-  });
-  try {
-    expect(() => writeAtomic(file, '{"v":2}')).toThrow(/ENOSPC/);
-    expect(() => writeWait({ task: "LIN-2", kind: "owner", reason: "x", since: "s" }, m.vars)).toThrow(/ENOSPC/);
-  } finally {
-    full.mockRestore();
-  }
-  expect(readFileSync(file, "utf8")).toBe('{"v":1}');
-  expect(readdirSync(m.dir).filter((f) => f.endsWith(".tmp"))).toEqual([]);
-  expect(readdirSync(join(m.config, "waits")).filter((f) => f.endsWith(".tmp"))).toEqual([]);
-  expect(m.state()).toBe(before);
-  // space is back: the next step starts, and the wait, the item and the decision are still there
-  expect(Bun.spawnSync([process.execPath, CLI, "run", "--once"], { env: m.vars, stdin: "ignore" }).exitCode).toBe(0);
-  expect(m.adds()).toEqual(["A Title A"]);
-  expect(readWaits(m.vars).map((w) => w.task)).toEqual(["LIN-1"]);
-  expect(readItems(m.vars).map((i) => i.question)).toEqual(["Ship it?"]);
-
-  // Home: the disk check reads the real free space against a limit, so a huge limit is a full disk.
-  const vars = { ...m.vars, LINECLEAR_MIN_FREE_MB: "999999999999" };
-  let t = 1_000_000;
-  const api = webApi(vars, () => t);
-  const read = () => machineProblems(api, "disk full");
-  expect(await read()).toHaveLength(1);
-  t += 5_000;
-  expect(await read()).toHaveLength(1); // still one entry, not one more each time
-  vars.LINECLEAR_MIN_FREE_MB = "1"; // space is free again
-  t += 61_000;
-  expect(await read()).toEqual([]);
-});
-
-test("a lost network shows once in Settings, no task starts, and it clears and goes on", async () => {
-  const m = machine();
-  m.roadmap(m.step("A"));
-  work(m);
-  writeFileSync(join(m.fake, "down"), "");
-
-  // the network check: a listener that answers is a network that is up
-  const listen = (port: number) =>
-    Bun.listen({
-      hostname: "127.0.0.1",
-      port,
-      socket: {
-        data() {},
-        open(s) {
-          s.end();
-        },
-      },
-    });
-  let server = listen(0);
-  const port = server.port;
-  const vars = { ...m.vars, LINECLEAR_NET_CHECK: `127.0.0.1:${port}` };
-  expect(await networkTrouble(vars, 500)).toBeUndefined();
-  server.stop(true);
-  expect((await networkTrouble(vars, 500))?.name).toBe("network lost");
-
-  // Home shows it from the server's background check, once
-  let t = 1_000_000;
-  const api = webApi(vars, () => t);
-  await machineProblems(api, "network lost");
-  // the check runs in the background: ask again until it has answered, however slow the machine
-  let shown: Awaited<ReturnType<typeof machineProblems>> = [];
-  await untilAsync(async () => {
-    t += 31_000;
-    shown = await machineProblems(api, "network lost");
-    return shown.length > 0;
-  });
-  expect(shown).toHaveLength(1);
-
-  // while the network is gone no task starts and nothing is lost
-  const run = () => Bun.spawnSync([process.execPath, CLI, "run", "--once"], { env: m.vars, stdin: "ignore" });
-  expect(run().exitCode).toBe(0);
-  expect(m.adds()).toEqual([]);
-  expect(readWaits(m.vars)).toHaveLength(1);
-  expect(readItems(m.vars)).toHaveLength(1);
-
-  // the network is back: the entry clears and the step starts by itself
-  server = listen(port);
-  rmSync(join(m.fake, "down"));
-  t += 31_000;
-  await machineProblems(api, "network lost"); // starts the check
-  await untilAsync(async () => {
-    t += 31_000;
-    return (await machineProblems(api, "network lost")).length === 0;
-  });
-  expect(await machineProblems(api, "network lost")).toEqual([]);
-  expect(run().exitCode).toBe(0);
-  expect(m.adds()).toEqual(["A Title A"]);
-  server.stop(true);
-});

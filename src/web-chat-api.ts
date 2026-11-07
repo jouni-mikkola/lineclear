@@ -1,6 +1,5 @@
 import { type browsers, Busy, parseInput, SESSION_NAME } from "./browsers.ts";
 import { chatEvents, type dispatcherChat, MAX_FILE_BYTES, namedImageResponse, parseSend, sizeText } from "./chat.ts";
-import { remoteExports } from "./remotes.ts";
 import { type Env, json, ownPage } from "./web-guard.ts";
 
 type Chat = ReturnType<typeof dispatcherChat>;
@@ -67,11 +66,8 @@ export async function chatApi(req: Request, url: URL, chat: () => Chat, env: Env
 
 type Live = ReturnType<typeof browsers>;
 
-function listBrowsers(live: Live, url: URL, env: Env): Promise<Response> {
-  const remote = remoteExports(env).flatMap((e) =>
-    e.browsers.map((b) => ({ ...b, session: `${b.session}@${e.host}`, title: `${b.title} on ${e.host}`, machine: e.host })),
-  );
-  return live.list(url.searchParams.has("live")).then((mine) => json([...mine, ...remote]));
+function listBrowsers(live: Live, url: URL): Promise<Response> {
+  return live.list(url.searchParams.has("live")).then((mine) => json(mine));
 }
 
 async function drive(live: Live, name: string, action: string, body: { take?: unknown }): Promise<Response> {
@@ -89,7 +85,7 @@ async function drive(live: Live, name: string, action: string, body: { take?: un
 /** The Agent browsers view's data. A browser that cannot be read answers 502 with playwright-cli's own words. */
 export async function browserApi(req: Request, url: URL, live: Live, env: Env): Promise<Response> {
   try {
-    if (req.method === "GET" && url.pathname === "/api/browsers") return await listBrowsers(live, url, env);
+    if (req.method === "GET" && url.pathname === "/api/browsers") return await listBrowsers(live, url);
     const m = /^\/api\/browsers\/([^/]+)\/(picture|take|input)$/.exec(url.pathname);
     const name = m ? decodeURIComponent(m[1] ?? "") : "";
     if (!m || !SESSION_NAME.test(name)) return json({ error: "Not found" }, 404);

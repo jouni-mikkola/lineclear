@@ -11,7 +11,6 @@ import { planInputs, titledByStep } from "./task-steps.ts";
 import { keptBy, readJsonKept, readTasksKept, refsKey } from "./kept-read.ts";
 import { spaceStops, waitBlocker, waitingOf } from "./home-waits.ts";
 import { notReached, remoteTasks } from "./spread.ts";
-import { type Export, remoteExports } from "./remotes.ts";
 import { readWaits, type Wait, type WaitGroup, waitsForOwner } from "./waits.ts";
 import { type Move, readMoves } from "./full.ts";
 import { listProjectNames, readSettings } from "./project.ts";
@@ -443,16 +442,13 @@ export const looseTasks = (all: HomeProject[]): LooseTask[] =>
       p.tasks.filter((t) => t.state !== "done").map((t) => ({ ...t, space: p.name, ...(p.machine && !t.machine ? { machine: p.machine } : {}) })),
     );
 
-/** This machine's spaces with their tasks, from its own folder: every one, so other machines can tell which have work. */
-export const localProjects = (env: Env = process.env, now = Date.now()): HomeProject[] => machineSpaces(dataDir(env), env, now);
-
-/** Every space of this machine and what each other machine last said about its own; waiting tasks read all of them. */
-export function projectsData(env: Env = process.env, now = Date.now(), remote: Export[] = remoteExports(env, now)): HomeProject[] {
-  return [...machineSpaces(dataDir(env), env, now), ...remote.flatMap((e) => e.projects)];
+/** Every space of this machine with its tasks; waiting tasks read all of them. */
+export function projectsData(env: Env = process.env, now = Date.now()): HomeProject[] {
+  return machineSpaces(dataDir(env), env, now);
 }
 
-export function homeData(env: Env = process.env, now = Date.now(), remote?: Export[]): HomeData {
-  const all = projectsData(env, now, remote);
+export function homeData(env: Env = process.env, now = Date.now()): HomeData {
+  const all = projectsData(env, now);
   return {
     at: now,
     host: hostname(),

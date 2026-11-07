@@ -1,28 +1,23 @@
 // The UI bar on Settings (`/settings`), served by `lineclear run`. The pictures use the sample states (`?state=`);
-// the rest reads the machines and the project the fixture writes, each machine reached over ui/test/fake-ssh.
+// the rest reads the project the fixture writes.
 import { expect, type Page, test } from "@playwright/test";
 import { MOTIONS, type Motion } from "../kit/motion.ts";
-import { clickMidMotion, liveMotionTests, type Mid, press, reread, running, shotEveryState } from "./bar.ts";
-import { shopSettings, sshLog, startSettings } from "./fixture.ts";
+import { clickMidMotion, liveMotionTests, type Mid, press, running, shotEveryState } from "./bar.ts";
+import { shopSettings, startSettings } from "./fixture.ts";
 
 const order = (role: string) => `[...document.querySelectorAll('[data-models="${role}"] > li')].map((li) => li.dataset.model).join(" ")`;
 
-/** Opens one of Settings' four sections: a tap on its row on a phone, on its name at the left on a desktop. */
+/** Opens one of Settings' three sections: a tap on its row on a phone, on its name at the left on a desktop. */
 async function openSection(page: Page, name: string) {
   await page.locator(`[data-section="${name}"]`).click();
   await expect(page.locator(`[data-section-panel="${name}"]`)).toBeVisible();
-}
-
-async function openMachines(page: Page) {
-  await openSection(page, "Machines to add");
 }
 
 async function fresh(page: Page) {
   startSettings();
   await page.goto("/settings");
   await page.evaluate(() => document.fonts.ready);
-  await openMachines(page);
-  await page.waitForSelector('[data-machines] > [data-key="build-box"]');
+  await openSection(page, "Models");
   await page.waitForTimeout(300);
 }
 
@@ -36,11 +31,11 @@ test("Settings in every state, at this width", async ({ page }) => {
   await shotEveryState(page, "/settings", "settings");
 });
 
-test("Settings has four sections and no status: sections at the left on a desktop, 52 px rows on a phone", async ({ page }) => {
+test("Settings has three sections and no status: sections at the left on a desktop, 52 px rows on a phone", async ({ page }) => {
   await page.goto("/settings?state=filled");
-  await expect(page.locator("[data-section]")).toHaveCount(4);
+  await expect(page.locator("[data-section]")).toHaveCount(3);
   const names = await page.locator("[data-section]").allTextContents();
-  expect(names).toEqual(["Models", "Projects", "Machines to add", "Secrets"]);
+  expect(names).toEqual(["Models", "Projects", "Secrets"]);
   const narrow = (page.viewportSize()?.width ?? 1440) < 500;
   const nav = await page.locator('[data-section="Models"]').boundingBox();
   const panel = await page.locator("[data-section-panel]").boundingBox();
@@ -76,42 +71,6 @@ test("each model says why it is in use or not, and its arrows are 44 px to touch
   const narrow = (page.viewportSize()?.width ?? 1440) < 500;
   expect(box?.width ?? 0).toBeGreaterThanOrEqual(narrow ? 44 : 32);
   expect(box?.height ?? 0).toBeGreaterThanOrEqual(narrow ? 44 : 32);
-});
-
-test.describe("live", () => {
-  test.skip(({ viewport }) => viewport?.width !== 1440, "the live settings are checked once, at 1440 px");
-
-  test("each machine is a row with its host, this one first, and no state or load", async ({ page }) => {
-    await fresh(page);
-    const rows = page.locator("[data-machines] > [data-key]");
-    await expect(rows).toHaveCount(3);
-    await expect(rows.first()).toContainText("this machine");
-    await expect(page.locator("[data-machine], [role=meter]")).toHaveCount(0);
-  });
-
-  test("Add machine installs it over SSH with install.sh and Remove forgets it", async ({ page }) => {
-    await fresh(page);
-    await page.getByTestId("open-add-machine").click();
-    await page.getByRole("textbox", { name: /SSH host/ }).fill("me@fresh-box");
-    await page.getByTestId("add-machine").click();
-    const row = page.locator('[data-machine-row="me@fresh-box"]');
-    await expect(row).toBeVisible();
-    await expect.poll(sshLog, { timeout: 15_000 }).toMatch(/me@fresh-box env LINECLEAR_FOLLOWS='[^']*' sh -s < #!\/bin\/sh/);
-    await row.getByRole("button", { name: "Remove" }).click();
-    await expect(row).toHaveCount(0);
-    await reread(page);
-    await page.waitForTimeout(500);
-    await expect(row).toHaveCount(0);
-  });
-
-  test("a host that is not one is refused", async ({ page }) => {
-    await fresh(page);
-    await page.getByTestId("open-add-machine").click();
-    await page.getByRole("textbox", { name: /SSH host/ }).fill("-oProxyCommand=x");
-    await page.getByTestId("add-machine").click();
-    await expect(page.getByRole("status").first()).toContainText("Give an SSH host");
-    expect(sshLog()).not.toContain("ProxyCommand");
-  });
 });
 
 test.describe("live 2", () => {

@@ -264,6 +264,6 @@ function runScript(host: string, command: string, stdin: string, env: Env): stri
 }
 
 /** Clones a project's repo on a machine, or brings it up to date, with no task. Returns an error text, or undefined. */
-export function cloneOn(host: string, space: string, origin: string, env: Env = process.env): string | undefined {
+function cloneOn(host: string, space: string, origin: string, env: Env = process.env): string | undefined {
   return runScript(host, `sh -c ${quote(`set -e\n${REMOTE_PATH}\n${cloneScript(origin, cloneDir(space))}`)}`, "", env);
 }

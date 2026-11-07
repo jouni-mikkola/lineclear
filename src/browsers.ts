@@ -55,7 +55,7 @@ async function run(env: Env, args: string[], cwd: string, ms = 15_000): Promise<
 }
 
 /** The open sessions of every workspace, with the folder each one's commands must run in. */
-export async function openSessions(env: Env): Promise<{ name: string; cwd: string }[]> {
+async function openSessions(env: Env): Promise<{ name: string; cwd: string }[]> {
   const out = await run(env, ["list", "--all", "--json"], "/");
   const all = (JSON.parse(out).browsers ?? []) as { name?: unknown; workspace?: unknown; status?: unknown }[];
   return (
@@ -93,7 +93,7 @@ function tasks(env: Env): Map<string, { title: string; project?: string; done: b
 }
 
 /** The sessions as the view draws them, none of a task that is done: those waiting for a login or a code first, then by title. */
-export function describeSessions(names: string[], env: Env, pages: Map<string, { title: string; url: string }>, taken: Set<string>): BrowserSession[] {
+function describeSessions(names: string[], env: Env, pages: Map<string, { title: string; url: string }>, taken: Set<string>): BrowserSession[] {
   const known = tasks(env);
   const asks = readItems(env).filter((i) => isOpen(i) && i.kind === "login" && i.session);
   return names

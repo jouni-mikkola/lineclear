@@ -7,20 +7,16 @@ import { type HomeData, type HomeProject, looseTasks, withProject } from "./home
 import { undoApplied } from "./autoplan.ts";
 import { inboxMain } from "./inbox-answer.ts";
 import { projectDecisions, readItems } from "./inbox.ts";
-import { installMachine, type machinesView, removeMachine } from "./machines.ts";
-import { HOST, readMachines } from "./machine-list.ts";
 import { lineclearDir, worktreeCost } from "./measure.ts";
 import type { Pusher } from "./notify.ts";
 import type { Aside } from "./read-aside.ts";
 import { type AskBefore, changeSettings, listProjectNames, type Role, setupRoles } from "./project.ts";
 import { readRelease } from "./release.ts";
-import { remoteExports, staleRemotes } from "./remotes.ts";
 import { harnesses, readRegistry } from "./models.ts";
 import { planViews } from "./requests.ts";
 import { saveOffered, setupView } from "./setup.ts";
 import type { RoadmapRead } from "./roadmap-view.ts";
 import { searchAnswer } from "./search.ts";
-import { remoteLineclear } from "./ssh.ts";
 import { changesReply } from "./task-changes.ts";
 import { taskDetailReply } from "./task-detail.ts";
 import { taskLiveApi, type taskTerminalLinks } from "./task-live.ts";
@@ -46,7 +42,6 @@ export interface Ctx {
   dispatcher: () => ReturnType<typeof dispatcherChat>;
   taskChats: (id: string) => ReturnType<typeof dispatcherChat>;
   taskTerminals: ReturnType<typeof taskTerminalLinks>;
-  machines: ReturnType<typeof machinesView>;
 }
 
 type Route = (c: Ctx, req: Request, url: URL) => Response | Promise<Response> | undefined | Promise<Response | undefined>;
@@ -124,7 +119,6 @@ const addProjectRoute: Route = async (c, req, url) => {
 const settingsRoute: Route = (c, req, url) =>
   req.method === "GET" && url.pathname === "/api/settings"
     ? json({
-        machines: c.machines(),
         projects: projectSettings(c.env),
         accounts: accountSettings(c.env),
         showPaused: readPrefs(c.env as NodeJS.ProcessEnv).showPaused === true,
@@ -161,20 +155,6 @@ const prefsRoute: Route = async (c, req, url) => {
   if (!ownPage(req, url, c.env)) return json({ error: "This changes only from Lineclear's own pages." }, 403);
   const problem = setShowPaused((await asJson(req)).showPaused, c.env as NodeJS.ProcessEnv);
   return problem ? json({ error: `${sentence(problem)}.` }, 400) : json({ saved: true });
-};
-
-const machinesRoute: Route = async (c, req, url) => {
-  if (req.method !== "POST" || url.pathname !== "/api/machines") return undefined;
-  if (!ownPage(req, url, c.env)) return json({ error: "Machines change only from Lineclear's own pages." }, 403);
-  const body = await asJson(req);
-  if (typeof body.remove === "string")
-    return removeMachine(body.remove, c.env) ? json({ removed: body.remove }) : json({ error: `There is no machine ${body.remove}.` }, 404);
-  const host = typeof body.add === "string" ? body.add.trim() : "";
-  if (!HOST.test(host)) return json({ error: "Give an SSH host, such as build-box or me@10.0.0.5." }, 400);
-  if (readMachines(c.env).some((m) => m.host === host && m.state === "installing")) return json({ error: `${host} is being installed already.` }, 409);
-  // the install takes minutes: it runs on, and the machine's card shows how it goes
-  installMachine(host, c.env).catch((e) => console.error(`lineclear: installing ${host} failed: ${(e as Error).message}`));
-  return json({ adding: host }, 202);
 };
 
 const projectSettingsRoute: Route = async (c, req, url) => {
@@ -243,7 +223,7 @@ const plansRoute: Route = (c, req, url) => (req.method === "GET" && url.pathname
 
 const inboxRoute: Route = async (c, req, url) => {
   if (req.method !== "GET" || url.pathname !== "/api/inbox") return undefined;
-  const w = waitingForYou(c.env, remoteExports(c.env), await c.readProjects(c.now()));
+  const w = waitingForYou(c.env, await c.readProjects(c.now()));
   return json([...w.items.map((i) => inboxView(i, i.machine, i.title, i.result)), ...w.tasks.map((t) => waitingView(t))]);
 };
 
@@ -265,31 +245,18 @@ const undoRoute: Route = async (c, req, url) => {
   return json({ undone: item.n });
 };
 
-/** The answer to an Inbox item, where it lives: here, or on another machine by its own Lineclear. */
-async function answerItem(c: Ctx, n: string, machine: string | undefined, args: string[]): Promise<{ code: number; text: string } | Response> {
-  const said: string[] = [];
-  let code: number;
-  if (machine) {
-    if (!readMachines(c.env).some((m) => m.host === machine)) return json({ error: `There is no machine ${machine}.` }, 404);
-    const r = await remoteLineclear(machine, ["inbox", "answer", n, ...args], c.env);
-    said.push(...r.lines);
-    code = r.code === 0 ? 0 : r.code === 2 ? 2 : 1;
-    staleRemotes();
-  } else code = inboxMain(["answer", n, ...args], (l) => said.push(l), c.env);
-  return { code, text: said.join(" ").replace(/^lineclear inbox: /, "") };
-}
-
 const answerRoute: Route = async (c, req, url) => {
-  const answer = /^\/api\/inbox\/(\d+)(?:@(.+))?$/.exec(url.pathname);
+  const answer = /^\/api\/inbox\/(\d+)$/.exec(url.pathname);
   if (req.method !== "POST" || !answer) return undefined;
   if (!ownPage(req, url, c.env)) return json({ error: "Answers come only from Lineclear's own pages." }, 403);
   const { choice, note } = await asJson(req);
   if (typeof choice !== "string" || !choice) return json({ error: "No answer was given." }, 400);
   const reason = typeof note === "string" && note.trim() ? ["--note", note.trim()] : [];
-  const r = await answerItem(c, answer[1] ?? "", answer[2] ? decodeURIComponent(answer[2]) : undefined, [choice, ...reason]);
-  if (r instanceof Response) return r;
+  const said: string[] = [];
+  const code = inboxMain(["answer", answer[1] ?? "", choice, ...reason], (l) => said.push(l), c.env);
+  const text = said.join(" ");
   c.forgetProjects();
-  return r.code === 0 ? json({ said: r.text }) : json({ error: r.text }, r.code === 2 ? 400 : 409);
+  return code === 0 ? json({ said: text }) : json({ error: text }, code === 2 ? 400 : 409);
 };
 
 // Order matters only where a pattern is a prefix of another: the task chat and live routes come before the task detail.
@@ -308,7 +275,6 @@ const ROUTES: Route[] = [
   setupRoute,
   accountRoute,
   prefsRoute,
-  machinesRoute,
   projectSettingsRoute,
   roadmapRoute,
   stepRoute,
