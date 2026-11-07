@@ -275,3 +275,19 @@ test("doctor prints the model a new task would use", () => {
     setRegistry([]);
   }
 });
+
+test("doctor names each role whose model a settings migration lost", () => {
+  const dir = mkdtempSync(join(tmpdir(), "doctor-roles-"));
+  const env = { LINECLEAR_CONFIG: dir };
+  writeFileSync(join(dir, "settings.json"), JSON.stringify({ setup: {} }));
+  const lost: string[] = [];
+  const code = doctor(probe({ setup: realProbe(paths, env).setup }), (l) => lost.push(l));
+  expect(code).toBe(1);
+  for (const role of ["worker", "reviewer", "planner", "stepChecker"]) expect(lost).toContain(`FAILED ${role} model: no model chosen for the ${role}`);
+
+  const full = { worker: "a/x", reviewer: "b/y", planner: "c/z", stepChecker: "d/w" };
+  writeFileSync(join(dir, "settings.json"), JSON.stringify({ setup: full }));
+  const kept = doctorChecks(probe({ setup: realProbe(paths, env).setup }));
+  expect(kept.filter((c) => c.name.endsWith(" model") && c.problem)).toHaveLength(0);
+  rmSync(dir, { recursive: true, force: true });
+});

@@ -9,6 +9,7 @@ import { copiesProblem, runByNote } from "./store-copies.ts";
 import { cacheEnvFile, dataDir, extensionFile, INSTALL_URL, type Paths, SERVICE } from "./paths.ts";
 import { diskTrouble, freeBytes } from "./health.ts";
 import { firstModel, readModelFile } from "./models.ts";
+import { readSetup, type Setup, setupRoles } from "./project.ts";
 import { checkoutPointers } from "./install-paths.ts";
 import { buildNames, buildProblem, buildsDir, installReleaseCommand, type RunFrom, unitCommand } from "./builds.ts";
 import { publishedAddress, serveCommand } from "./published.ts";
@@ -30,6 +31,8 @@ export interface Check {
 /** What doctor asks of the machine, so a test can answer without one. */
 export interface Probe {
   paths: Paths;
+  /** The model chosen for each role. Without it the roles are not checked. */
+  setup?: Setup;
   /** Lineclear's data folder. */
   dataDir?: string;
   /** Whether Lineclear's own server runs now. */
@@ -70,6 +73,7 @@ export interface Probe {
 export function realProbe(paths: Paths, env: Record<string, string | undefined> = process.env): Probe {
   const probe: Probe = {
     paths,
+    setup: readSetup(env),
     dataDir: dataDir(env),
     running: () => {
       try {
@@ -299,6 +303,15 @@ function newTaskModel(): Check {
   return { name: "model", problem: "", fix: "", info: model ? `a new task with no model set starts on ${model}` : "pi lists no model yet" };
 }
 
+/** One check per role with no model: a lost setting fails every start of that role. */
+function roleModels(p: Probe): Check[] {
+  const { setup } = p;
+  if (!setup) return [];
+  return setupRoles
+    .filter((role) => !setup[role])
+    .map((role) => ({ name: `${role} model`, problem: `no model chosen for the ${role}`, fix: "lineclear setup" }));
+}
+
 /** The service and the command are the release build, or the problem and the install that fixes it. */
 function stableBuild(p: Probe): Check {
   const problem = p.runFrom ? buildProblem(p.runFrom, p.dataDir ?? dataDir()) : "";
@@ -347,6 +360,7 @@ export function doctorChecks(probe: Probe): Check[] {
     compileCache(p),
     stableBuild(p),
     newTaskModel(),
+    ...roleModels(p),
     lingering(p),
     disk(p),
     ...herdrPinned(p),
