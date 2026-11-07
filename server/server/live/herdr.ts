@@ -1,12 +1,10 @@
 import { LinkBackoff } from './recovery.ts'
 // herdr's socket API: newline-delimited JSON over a Unix socket. One request per connection (herdr closes it after
-// the reply); a subscription keeps its connection open and streams events. On another machine (box.ts) the same JSON
-// goes through herdr's own remote bridge (herdr --session <s> remote-api-bridge over SSH): one shared ssh for the calls,
-// one of its own for a subscription.
+// the reply); a subscription keeps its connection open and streams events.
 import { connect } from 'node:net'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { box, type BoxInfo, script, sshArgs } from './box.ts'
+import { box } from './box.ts'
 
 /** the herdr Lineclear is tested with, by test/herdr-contract.test.ts: an update of herdr raises it with that test green */
 export const HERDR_TESTED = { version: '0.9.5', protocol: 22 }
@@ -31,7 +29,7 @@ export class HerdrError extends Error {
 
 let n = 0
 
-/** a connection to herdr's API: its socket here, or a bridge to the other machine's */
+/** a connection to herdr's API socket */
 interface Conn {
   write(s: string): void
   destroy(): void
@@ -40,221 +38,15 @@ interface Conn {
   on(e: 'error' | 'close', f: (e?: Error) => void): void
 }
 
-/** Runs on the other machine, one per worker: reads a request per line and answers each from a herdr bridge of its own
- *  (herdr ends a bridge after one answer), so a call costs a fork there, never an ssh process here. */
-const MUX_PERL = `use strict; use IPC::Open2; use Fcntl qw(:flock); $| = 1; $SIG{CHLD} = 'IGNORE';
-while (my $l = <STDIN>) {
-  next unless $l =~ /\\S/;
-  my $kid = fork();
-  next if !defined $kid || $kid != 0;
-  my ($id) = $l =~ /"id":"([^"]*)"/;
-  my ($reply, $r, $w);
-  if (eval { open2($r, $w, @ARGV) }) {
-    print $w $l; $reply = <$r>;
-  }
-  $reply //= '{"id":"' . ($id // '') . '","error":{"code":"bridge","message":"herdr bridge gave no answer"}}' . "\\n";
-  flock(STDOUT, LOCK_EX); print STDOUT $reply; flock(STDOUT, LOCK_UN); exit 0;
-}`
-
-function emitter() {
-  const fns: Record<string, ((x?: unknown) => void)[]> = { connect: [], data: [], error: [], close: [] }
-  const fire = (e: string, x?: unknown) => {
-    for (const f of fns[e]) f(x)
-  }
-  return { fns, fire }
-}
-
-function wiredProcess(
-  p: { stdout: ReadableStream<Uint8Array>; stdin: { write(s: string): unknown; flush(): unknown }; exited: Promise<unknown>; kill(): void },
-  onData: (b: Buffer) => void,
-  onEnd: (e?: Error) => void,
-) {
-  ;(async () => {
-    try {
-      const r = p.stdout.getReader()
-      for (;;) {
-        const { done, value } = await r.read()
-        if (done) break
-        onData(Buffer.from(value))
-      }
-    } catch (e) {
-      onEnd(e as Error)
-    }
-    onEnd()
-  })()
-  p.exited.then(() => onEnd())
-}
-
-/** the one long-lived ssh to the other machine, shared by every call: replies find their caller by request id */
-type Bridge = { write(s: string): void; callers: Map<string, (line: string) => void>; kill(): void }
-const muxes = new Map<string, Bridge>()
-
-function sharedBridge(box: BoxInfo) {
-  const known = muxes.get(box.label)
-  if (known) return known
-  const p = Bun.spawn(sshArgs(box.target, script(box, ['perl', '-e', MUX_PERL, box.herdr, '--session', box.session, 'remote-api-bridge'])), {
-    stdin: 'pipe',
-    stdout: 'pipe',
-    stderr: 'ignore',
-  })
-  p.unref() // a worker ending is not held up by the bridge
-  const callers = new Map<string, (line: string) => void>()
-  const me = {
-    callers,
-    write: (s: string) => {
-      p.stdin.write(s)
-      p.stdin.flush()
-    },
-    kill: () => p.kill(),
-  }
-  muxes.set(box.label, me)
-  let ended = false
-  const onEnd = () => {
-    if (ended) return
-    ended = true
-    if (muxes.get(box.label) === me) muxes.delete(box.label)
-    for (const [, f] of callers) f('')
-    callers.clear()
-  }
-  wiredProcess(
-    p,
-    lineReader((line) => {
-      const id = /"id":"([^"]*)"/.exec(line)?.[1]
-      const f = id ? callers.get(id) : undefined
-      if (f) f(line)
-    }),
-    onEnd,
-  )
-  return me
-}
-
-/** a call's connection over the shared bridge */
-function muxConn(box: BoxInfo): Conn {
-  const { fns, fire } = emitter()
-  let id = ''
-  let answered = false
-  let bridge: Bridge | null = null
-  queueMicrotask(() => fire('connect'))
-  return {
-    write: (s) => {
-      try {
-        bridge = sharedBridge(box)
-        id = /"id":"([^"]*)"/.exec(s)?.[1] ?? ''
-        bridge.callers.set(id, (line) => {
-          answered = true
-          if (line) fire('data', Buffer.from(`${line}\n`))
-          else fire('close')
-        })
-        bridge.write(s)
-      } catch (e) {
-        fire('error', e as Error)
-      }
-    },
-    destroy: () => {
-      if (!bridge || !id) return
-      bridge.callers.delete(id)
-      // unanswered (timed out): the shared ssh may be hung, so end it and let the next call start a fresh one
-      if (!answered) bridge.kill()
-    },
-    on: (e: string, f: (x?: never) => void) => void fns[e].push(f as (x?: unknown) => void),
-  } as Conn
-}
-
-function open(path: string, own = false): Conn {
-  const b = box()
-  if (!b || b.socket || path !== socketPath()) return connect(path)
-  // a subscription stays open, so it has an ssh bridge of its own; every other call rides the shared one
-  if (!own) return muxConn(b)
-  const p = Bun.spawn(sshArgs(b.target, script(b, [b.herdr, '--session', b.session, 'remote-api-bridge']), { extra: ['-o', 'ControlPath=none'] }), {
-    stdin: 'pipe',
-    stdout: 'pipe',
-    stderr: 'ignore',
-  })
-  const { fns, fire } = emitter()
-  let closed = false
-  const close = () => {
-    if (closed) return
-    closed = true
-    fire('close')
-  }
-  queueMicrotask(() => fire('connect'))
-  wiredProcess(
-    p,
-    (b) => fire('data', b),
-    (e) => (e ? fire('error', e) : close()),
-  )
-  return {
-    write: (s) => {
-      try {
-        p.stdin.write(s)
-        p.stdin.flush()
-      } catch (e) {
-        fire('error', e as Error)
-      }
-    },
-    destroy: () => {
-      closed = true
-      try {
-        p.kill()
-      } catch {
-        /* gone already */
-      }
-    },
-    on: (e: string, f: (x?: never) => void) => void fns[e].push(f as (x?: unknown) => void),
-  } as Conn
+function open(path: string): Conn {
+  return connect(path)
 }
 
 /** herdr's socket refused the connection or is not there: herdr is down or restarting */
 const gone = (e: Error & { code?: string }) => ['ECONNREFUSED', 'ENOENT', 'ECONNRESET', 'EPIPE'].includes(e.code ?? '') || /ECONNREFUSED|ENOENT/.test(e.message)
 
-/** calls in flight to the other machine at once: the rest wait their turn, so a slow herdr there is not buried in forks */
-const MAX_REMOTE_CALLS = 6
-let remoteActive = 0
-const remoteWaiting: (() => void)[] = []
-
-/** hands a freed place to the next waiting call, or frees it */
-function releaseRemote() {
-  const next = remoteWaiting.shift()
-  if (next) next()
-  else remoteActive--
-}
-
-/** a place among the calls in flight; a call waits no longer for it than its own timeout */
-async function takeRemote(method: string, timeoutMs: number) {
-  if (remoteActive < MAX_REMOTE_CALLS) {
-    remoteActive++
-    return
-  }
-  let go = () => {}
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const turn = new Promise<void>((resolve) => {
-    go = resolve
-    remoteWaiting.push(go)
-  })
-  const expired = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new HerdrError('timeout', `herdr ${method} waited too long for a place`)), timeoutMs)
-  })
-  try {
-    await Promise.race([turn, expired])
-  } catch (e) {
-    const i = remoteWaiting.indexOf(go)
-    if (i >= 0) remoteWaiting.splice(i, 1)
-    else releaseRemote() // the place came as we expired
-    throw e
-  } finally {
-    clearTimeout(timer)
-  }
-}
-
-export async function rpc<T = unknown>(method: string, params: Record<string, unknown> = {}, timeoutMs = 10_000, path = socketPath()): Promise<T> {
-  const b = box()
-  if (!b || b.socket || path !== socketPath()) return send<T>(method, params, timeoutMs, path)
-  await takeRemote(method, timeoutMs)
-  try {
-    return await send<T>(method, params, timeoutMs, path)
-  } finally {
-    releaseRemote()
-  }
+export function rpc<T = unknown>(method: string, params: Record<string, unknown> = {}, timeoutMs = 10_000, path = socketPath()): Promise<T> {
+  return send<T>(method, params, timeoutMs, path)
 }
 
 /** feeds each whole line of the socket's stream to onLine, which gives false to stop reading the chunk */
@@ -271,18 +63,12 @@ function lineReader(onLine: (line: string) => unknown) {
   }
 }
 
-/** over an ssh bridge a close is a failed link, which the machine's own recovery handles */
-const bridged = () => {
-  const b = box()
-  return !!b && !b.socket
-}
-
 /** a closed socket means the request came late, not that herdr is down: ask once more, and fail plainly on a second close */
 async function send<T>(method: string, params: Record<string, unknown>, timeoutMs: number, path: string): Promise<T> {
   try {
     return await sendOnce<T>(method, params, timeoutMs, path)
   } catch (e) {
-    if (!(e instanceof HerdrError) || e.code !== 'closed' || bridged()) throw e
+    if (!(e instanceof HerdrError) || e.code !== 'closed') throw e
     return sendOnce<T>(method, params, timeoutMs, path)
   }
 }
@@ -503,7 +289,7 @@ export class Subscription {
   constructor(
     private onEvent: (e: HerdrEvent) => void,
     private onOpen: (planned: boolean) => void = () => undefined,
-    private connect: () => Conn = () => open(socketPath(), true),
+    private connect: () => Conn = () => open(socketPath()),
     private onDown: () => void = () => undefined,
   ) {}
   private planned = false
@@ -536,7 +322,6 @@ export class Subscription {
     let opened = false
     sock.on('connect', () => {
       sock.write(`${JSON.stringify({ id: `sub-${++n}`, method: 'events.subscribe', params: { subscriptions: this.wanted } })}\n`)
-      // SSH spawn is not a successful bridge connection; wait for an actual frame.
     })
     const read = lineReader((line) => {
       try {
