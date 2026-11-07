@@ -16,6 +16,7 @@ import type { StartRecord } from "./starts.ts";
 import { tickProject } from "./tick-project.ts";
 import { sweepOldTemp } from "./tmpdirs.ts";
 import { holdWorld } from "./hold.ts";
+import { nightWatch } from "./night-watch.ts";
 import { serviceWaits } from "./wait-service.ts";
 import { clearWait, loadLimit, readWaits } from "./waits.ts";
 import { ownMark, type World } from "./world.ts";
@@ -211,6 +212,9 @@ export async function runMain(args: string[], out: (l: string) => void, world: W
   const show = (ds: Decision[]) => ds.forEach((d) => out(`${d.project}  ${d.step ?? "-"}  ${d.kind}  ${d.reason}`));
   if (args.includes("--once")) {
     show(await (deps.tick ?? tick)(world, dryRun));
+    // a tick the caller replaced is a test's: it sends nothing to a real Dispatcher
+    const watched = dryRun || deps.tick ? undefined : await nightWatch(world.now());
+    if (watched) out(`-  -  wake  ${watched}`);
     return 0;
   }
   // a tick that is still running is not started again, and a stop waits for it

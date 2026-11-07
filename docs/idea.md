@@ -78,7 +78,8 @@ library under your code. It orchestrates agents. Each part has one job:
 - **The owner** talks to the Dispatcher and decides in the Inbox. All development happens there.
 - **The planner** keeps the roadmap. Each step has its own done-when.
 - **The rule loop** is plain code with no AI. It starts a ready step when its locks and a free slot allow, and it
-  handles stalls.
+  handles stalls. At night (22 to 7 by default; `LINECLEAR_NIGHT_WATCH=off` or a window like `23-6` changes it) it
+  sends the Dispatcher a checklist every two hours, so work keeps going without you.
 - **A worker** does one step in its own git worktree.
 - **A reviewer** is a model from another company. It reviews the change before the merge.
 - **The merge** happens only on green.
