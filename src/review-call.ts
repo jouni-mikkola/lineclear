@@ -24,9 +24,9 @@ export interface Finding {
 const RULE_FILES = ["AGENTS.md", "CLAUDE.md", "REVIEW.md"];
 const CONTEXT_LINES = 3;
 /** Generated files a reviewer cannot judge and that cost the most tokens. */
-const SKIP = [":(exclude)*.lock", ":(exclude)*lock.json", ":(exclude)*lockb", ":(exclude)pnpm-lock.yaml", ":(exclude)*.snap", ":(exclude)*.min.js"];
+const SKIP = [":(exclude)*.lock", ":(exclude)*lock.json", ":(exclude)*lockb", ":(exclude)*pnpm-lock.yaml", ":(exclude)*.min.js"];
 /** The diff and the rules are cut to this many characters each, so a huge change cannot overflow the model. */
-const PART_MAX = 40_000;
+const PART_MAX = 60_000;
 
 /** The repo's own rules, each file under its name. */
 function repoRules(repo: string): string {

@@ -10,10 +10,12 @@ function repoWithChange(): string {
   git(repo, "init", "-q", "-b", "main");
   writeFileSync(join(repo, "AGENTS.md"), "RULE: short names\n");
   writeFileSync(join(repo, "a.ts"), `${Array.from({ length: 60 }, (_, n) => `line ${n}`).join("\n")}\n`);
+  writeFileSync(join(repo, "yarn.lock"), "locked 1\n");
   git(repo, "add", ".");
   git(repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "base");
   git(repo, "checkout", "-qb", "work");
   writeFileSync(join(repo, "a.ts"), readFileSync(join(repo, "a.ts"), "utf8").replace("line 30", "changed 30"));
+  writeFileSync(join(repo, "yarn.lock"), "locked 2\n");
   return repo;
 }
 
@@ -39,6 +41,7 @@ test("a review is one tool-less call with the brief, the diff with 3 lines of co
   expect(call).not.toContain("WORKER PROCEDURE");
   expect(call).toContain("RULE: short names");
   expect(call).toContain("+brand new file");
+  expect(call).not.toContain("locked 2");
   expect(call).toContain("+changed 30");
   expect(call).toContain(" line 27\n"); // 3 lines before the change
   expect(call).not.toContain("\n line 26\n");
