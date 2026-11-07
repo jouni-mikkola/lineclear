@@ -65,15 +65,15 @@ No hubs: a CLI word is a file in `cli/words/`, a board word a file in `board/wor
 a file in `docs/numbers/`. Knip finds them by glob. Adding one is a new file, never an edit of a shared one.
 
 Line target for v0.2, by scope.md's rule: **non-test at most 40,000** (45,829 today: the open roadmap deletions
-L541 to L548, L567, L602 to L605 plan about 3,700, this plan about 900 with the second package and the fork docs;
-L789 cuts the rest by folder budget), and **tests at most 26,000** (30,644 today: lettered and step-named test
+L541 to L548, L567, L602 to L605 plan about 3,700, this plan about 300 with the second test runner and the two
+word tables; L789 cuts the last 1,800 by folder budget), and **tests at most 26,000** (30,644 today: lettered and step-named test
 files merge by module).
 
 ## What scope.md and roles.md mark gone
 
 | Gone | Step |
 | --- | --- |
-| The fork's own docs and guidance (`server/docs/`, `server/README.md`, `server/AGENTS.md`, `server/CLAUDE.md`), `server/server/live/runtime.ts` (D2) | L775 |
+| The fork's own docs and guidance (`server/docs/`, `server/README.md`, `server/AGENTS.md`, `server/CLAUDE.md`) | L775 |
 | The second package's tooling (`server/package.json`, `bun.lock`, `tsconfig.json`, `bunfig.toml`, `scripts/test.ts`) | L776 |
 | The `check-line` grab bag of architecture.md | L777 |
 | The planner, Inbox view and kinds, night watch as a role | L602 to L605, L608 (open); the `planner` and `inbox` icons of `ui/brand/roles.ts` go with L603 and L605 |
@@ -126,7 +126,7 @@ Result: A plan that applies adds or edits one file per step, in any repo, even o
 - done when: plan apply writes `docs/roadmap/<id>.md` per changed step and deletes the file of a dropped step; on a second small repo with no `docs/`, a plan creates the folder; a test applies two plans with disjoint steps and sees no conflict.
 - locks: plan-apply-files, file-src-plan-apply-ts
 - after: L762
-- files: src/plan-apply.ts, src/add-project.ts, test/plan-apply.test.ts
+- files: src/plan-apply.ts, src/add-project.ts, test/autoplan-apply.test.ts, test/plan.test.ts
 
 ### L764 Every roadmap is split
 Result: This repo and every registered project keep their steps as files, and the single-file reader is gone.
@@ -186,7 +186,7 @@ Result: A type change touches its domain's types file, not one shared catalog.
 
 ### L771 Source tests by module
 Result: The live source's tests are named by the module they test, so two steps rarely edit one test file.
-- why: 7 lettered files `source-b` to `source-g` plus `source-fixture.ts` collect tests by when they were written.
+- why: 6 lettered files `source-b` to `source-g` plus `source-fixture.ts` collect tests by when they were written.
 - done when: `ls server/test | grep -cE 'source-[b-g]\.test\.ts'` prints 0; each test file names one module; the test count is the same or lower with no case lost (a list of `test(` names before and after).
 - locks: source-tests
 - after: L544
@@ -195,7 +195,7 @@ Result: The live source's tests are named by the module they test, so two steps 
 ### L772 Engine tests by module
 Result: The engine's tests are named by module, so engine steps edit their own test file.
 - why: 8 lettered files (`engine-b`, `engine-merge-b` to `-d`, `engine-queue-b`, `-c`, `live-b`, `-c`) split tests by size.
-- done when: `ls server/test | grep -cE -- '-[b-h]\.test\.ts'` prints 0; no case lost (a list of `test(` names before and after).
+- done when: `ls server/test | grep -cE '^(engine|live).*-[b-h]\.test\.ts'` prints 0; no case lost (a list of `test(` names before and after).
 - locks: engine-tests
 - after: L521, L522, L523, L525
 - files: server/test/engine-b.test.ts, server/test/engine-c.test.ts, server/test/engine-merge-b.test.ts, server/test/engine-merge-c.test.ts, server/test/engine-merge-d.test.ts, server/test/engine-queue-b.test.ts, server/test/engine-queue-c.test.ts, server/test/live-b.test.ts, server/test/live-c.test.ts
@@ -217,12 +217,12 @@ Result: One command prints how many merged PRs hit a rebase conflict and which f
 - files: scripts/core-baseline.ts, test/core-baseline.test.ts
 
 ### L775 The fork's leftovers are gone
-Result: The repo has one set of docs and guidance; the fork's own docs and the dead runtime module are gone.
-- why: `server/docs/` (9 files, 593 lines), `server/README.md`, `server/AGENTS.md` and `server/CLAUDE.md` describe the fork, not Lineclear; `runtime.ts` is D2 of scope.md.
-- done when: `git ls-files server/docs server/README.md server/AGENTS.md server/CLAUDE.md server/server/live/runtime.ts` lists none; `server/LICENSE` and `server/NOTICE` stay; `git grep -n "server/docs"` lists none.
+Result: The repo has one set of docs and guidance; the fork's own docs are gone.
+- why: `server/docs/` (9 files, 593 lines), `server/README.md`, `server/AGENTS.md` and `server/CLAUDE.md` describe the fork, not Lineclear.
+- done when: `git ls-files server/docs server/README.md server/AGENTS.md server/CLAUDE.md` lists none; `server/LICENSE` and `server/NOTICE` stay; `git grep -n "server/docs"` lists none.
 - locks: fork-docs
 - after: none
-- files: server/docs/, server/README.md, server/AGENTS.md, server/CLAUDE.md, server/server/live/runtime.ts, server/test/runtime.test.ts
+- files: server/docs/, server/README.md, server/AGENTS.md, server/CLAUDE.md
 
 ### L776 One package, one lock file
 Result: The repo has one package, one lock file and one test runner.
@@ -237,7 +237,7 @@ Result: Code every domain needs lives in `src/base/`, which imports nothing else
 - why: the `check-line` module is a grab bag, and git, paths, time and the store sit in three places.
 - done when: `src/base/` holds `git`, `time`, `zone`, `paths`, `herdr`, `ssh`, `process-group`, `tmpdirs`, `main-branch`, `server/server/store.ts` and `server/shared/` helpers, with tests beside them; its README says `May import: none`; `check-line` is gone; gates green.
 - locks: layout-base
-- after: L761, L776, L582, L587
+- after: L582, L587, L761, L770, L776
 - files: src/base/, src/git.ts, src/time.ts, src/zone.ts, src/paths.ts, src/herdr.ts, src/ssh.ts, src/process-group.ts, src/tmpdirs.ts, src/main-branch.ts, server/server/store.ts, server/shared/
 
 ### L778 The plan folder
@@ -250,11 +250,11 @@ Result: The roadmap, plan apply and the step check live in `src/plan/` with thei
 
 ### L779 The loop folder
 Result: The rule loop's files live in `src/loop/` with their tests.
-- why: 17 loop files sit flat in `src/`; `rules.ts` and `tick-project.ts` were changed by 40 PRs together.
-- done when: `src/loop/` holds `rules`, `tick-project`, `starts`, `stalls`, `stall-class`, `waits*`, `waiting`, `world`, `real-world`, `task-steps`, `owner-steps`, `routine`, `hold`, `heal`, `night-watch`, `decision-dedupe`, `start-failures` and tests; owner `src/loop/loop.ts`; gates green.
+- why: 16 loop files sit flat in `src/`; `rules.ts` and `tick-project.ts` were changed by 40 PRs together.
+- done when: `src/loop/` holds `rules`, `tick-project`, `starts`, `stalls`, `stall-class`, `waits*`, `waiting`, `world`, `task-steps`, `owner-steps`, `routine`, `hold`, `heal`, `night-watch`, `decision-dedupe`, `start-failures` and tests; owner `src/loop/loop.ts`; gates green.
 - locks: layout-loop, slots, file-src-rules-ts, file-src-tick-project-ts
 - after: L545, L546, L547, L548, L561, L562, L563, L564, L567, L580, L581, L583, L608, L777
-- files: src/loop/, src/rules.ts, src/tick-project.ts, src/starts.ts, src/stalls.ts, src/stall-class.ts, src/waits.ts, src/wait-service.ts, src/waiting.ts, src/world.ts, src/real-world.ts, src/task-steps.ts, src/owner-steps.ts, src/routine.ts, src/hold.ts, src/heal.ts, src/night-watch.ts, src/decision-dedupe.ts, src/start-failures.ts
+- files: src/loop/, src/rules.ts, src/tick-project.ts, src/starts.ts, src/stalls.ts, src/stall-class.ts, src/waits.ts, src/wait-service.ts, src/waiting.ts, src/world.ts, src/task-steps.ts, src/owner-steps.ts, src/routine.ts, src/hold.ts, src/heal.ts, src/night-watch.ts, src/decision-dedupe.ts, src/start-failures.ts
 
 ### L780 Tick jobs one file each
 Result: A new loop job is one file in `src/loop/jobs/`; the tick only runs them in order.
@@ -300,7 +300,7 @@ Result: Workers, links, the room and placement live in `src/machines/`.
 Result: Settings, models, accounts and projects live in `src/settings/`.
 - why: settings are read in two packages (`settings-store.ts`, `src/project*.ts`, `src/models.ts`).
 - done when: `src/settings/` holds `settings-*`, `project-models`, `places`, `models`, `project*`, `setup`, `fill-setup`, `company`, `full`, `harness-pi`, `session-text`, `measure`, `task-work` and tests; owner `src/settings/settings.ts`; gates green.
-- locks: layout-settings, settings, cli-settings
+- locks: layout-settings, cli-settings
 - after: L543, L544, L545, L547, L549, L567, L609, L777
 - files: src/settings/, server/server/live/settings-store.ts, server/server/live/settings-catalog.ts, server/server/live/project-models.ts, server/server/live/places.ts, src/models.ts, src/project.ts, src/setup.ts, src/measure.ts, src/task-work.ts
 
