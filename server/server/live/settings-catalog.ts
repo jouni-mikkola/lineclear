@@ -58,7 +58,7 @@ export const CATALOG: Section[] = [
   {
     name: 'Agents',
     about:
-      "What each kind of agent starts with: its CLI and effort. The models of tasks, reviewers and the backup are Lineclear's Settings > Models. Default is the agent's own effort. Backup takes a task over when its agent can't go on. Chat choices need a chat log reader; other installed CLIs cannot show replies here. Headless review is separate.",
+      "What each kind of agent starts with: its CLI and effort. The models of tasks, reviewers and the backup are Lineclear's Settings > Models. Default is the agent's own effort. Backup takes a task over when its agent can't go on. Headless review is separate.",
     rows: [
       ...agentRows('Tasks', 'task', [...CLIS], 'default', 'default'),
       ...agentRows('Coordinators', 'coordinator', [...CLIS], 'default', 'default'),
