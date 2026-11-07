@@ -72,6 +72,20 @@ export function nudgePane(id: string, text: string, run: Run, dir: string | unde
 export interface StartRecord {
   taskSteps?: Record<string, string>;
   pendingStarts?: Record<string, string>;
+  /** When the rules last started a task for each step (ms), so a task list that lags cannot start the step again. */
+  startedAt?: Record<string, number>;
+}
+
+/** How long a start holds its step against another start, whatever the task lists show. */
+export const CLAIM_MS = 5 * 60_000;
+
+/** Why a step has an agent coming or a landed result already, or undefined when a start may go on. */
+export function whyHeld(state: StartRecord & { closedSteps?: Record<string, string> }, step: string, nowMs: number): string | undefined {
+  const closed = state.closedSteps?.[step];
+  if (closed !== undefined) return `it was closed with nothing to merge by ${closed}`;
+  const at = state.startedAt?.[step];
+  if (at !== undefined && nowMs - at < CLAIM_MS) return `a task for it started ${Math.round((nowMs - at) / 1000)} s ago, so it does not start twice`;
+  return undefined;
 }
 
 /** The rules asked for a task titled `title` for `step`. */

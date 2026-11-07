@@ -14,7 +14,7 @@ import { askMachines, type Candidate, mostRoom, type Room, roomLack } from "./sp
 import { routineWorker } from "./routine.ts";
 import { askKey, availability, climbStalls, revertLast, reviewerFor, serviceAccounts } from "./stalls.ts";
 import { THIS_MACHINE } from "./start-failures.ts";
-import { bindStarts, liveSteps, recordStart, lockWhy, reservedLocks, settleLockWaits } from "./starts.ts";
+import { bindStarts, liveSteps, recordStart, lockWhy, whyHeld, reservedLocks, settleLockWaits } from "./starts.ts";
 import type { Wait } from "./waits.ts";
 import type { World } from "./world.ts";
 
@@ -296,8 +296,11 @@ function whyStale(s: Starting, step: Step): string | undefined {
   if (!step.reopened && state.closedSteps?.[step.id] !== undefined) return `${state.closedSteps[step.id]} closed it with nothing to merge: it landed already`;
   if (Object.values(state.pendingStarts ?? {}).includes(step.id))
     return "a task was just added for this step and is not listed yet, so it does not start twice";
+  const held = whyHeld(state, step.id, world.now().getTime());
+  if (held) return held;
   const here = world.tasks(settings.space);
   if (typeof here === "string") return `its tasks cannot be read again: ${here}`;
+  bindStarts(state, here);
   const remote: Task[] = [];
   for (const host of settings.machines ?? []) {
     const r = world.room?.(host, settings.space);
@@ -356,6 +359,7 @@ function startStep(s: Starting, step: Step): boolean {
       return false;
     }
     state.models[step.id] = worker;
+    (state.startedAt ??= {})[step.id] = world.now().getTime();
     if (cheap) (state.cheap ??= []).push(step.id);
     if (host === undefined) recordStart(state, `${step.id} ${step.title}`, step.id);
     const same = company(reviewer) === company(worker) ? " (same company: no other company has room, a different model reviews with a fresh context)" : "";
