@@ -13,6 +13,7 @@ import { holdProjectTick, type StartRecord } from "./starts.ts";
 import { tickProject } from "./tick-project.ts";
 import { sweepDiskUse } from "./disk-use.ts";
 import { sweepOldTemp } from "./tmpdirs.ts";
+import { promoteGreen } from "./promote-loop.ts";
 import { holdWorld } from "./hold.ts";
 import { DISPATCHER } from "./chat.ts";
 import { lineclearServer, postAction, readSnapshot } from "./lineclear-client.ts";
@@ -72,6 +73,8 @@ export interface State extends StartRecord {
   closedSteps?: Record<string, string>;
   /** Owner-only steps with the Inbox item that asks the owner; the owner's Done answer ends the step. */
   ownerItems?: Record<string, number>;
+  /** The loop's last try to promote main (ms) and the commit it last promoted (see promote-loop.ts). */
+  promote?: { at: number; commit?: string };
 }
 const emptyState = (): State => ({ stopped: false, roadmapErrors: [], last: {}, ladder: {}, models: {}, handed: [], starts: {} });
 const statePath = (name: string, env = process.env) => join(projectsDir(env), name, "state.json");
@@ -187,6 +190,7 @@ export function tick(world: World, dryRun: boolean, env = process.env): Decision
         ...closeOver(name, settings, world, dryRun, env),
         ...serviceWaits(name, held, dryRun, env),
         ...tickProject(name, settings, held, state, dryRun, readWaits(env), loadLimit(env), env),
+        ...promoteGreen(name, settings, held, state, dryRun),
       ];
       if (dryRun) {
         all.push(...decisions);

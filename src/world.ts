@@ -32,6 +32,10 @@ export interface World {
   main(repo: string): { head: string; commits: { subject: string; body: string }[] } | string;
   /** How many commits on origin/main are newer than the one that added the roadmap line `line` (a step's `Reopened:` item), or undefined when none did. */
   commitsSince?(repo: string, line: string): number | undefined;
+  /** The newest `n` commit ids on origin/main, newest first. */
+  recentMain?(repo: string, n: number): string[];
+  /** Runs `scripts/promote.ts` for a commit: "promoted", "refused" when its check on main is not green, or an error text. */
+  promote?(repo: string, commit: string): string;
   /** Fetches, then fast-forwards the repo folder when it is clean and on main. */
   fetch(repo: string): void;
   /** The roadmap as origin/main has it, or undefined when it has none. */
@@ -115,6 +119,19 @@ export function taskStatus(showJson: string): string | undefined {
   }
 }
 
+/** Runs `bun scripts/promote.ts`: its exit 1 with "refused" on stderr is a commit whose check is not green. */
+function promoteCommit(repo: string, commit: string, env: NodeJS.ProcessEnv): string {
+  const p = Bun.spawnSync(["bun", join(import.meta.dir, "..", "scripts", "promote.ts"), commit], {
+    cwd: repo,
+    env,
+    stdin: "ignore",
+    timeout: HEALTH_TIMEOUT_MS,
+  });
+  if (p.exitCode === 0) return "promoted";
+  const err = p.stderr.toString().trim();
+  return err.startsWith("promote: refused") ? "refused" : err || `exit ${p.exitCode}`;
+}
+
 /** The text of a failed command, or undefined when it worked. */
 const failure = (r: ReturnType<Run>) => (r.code === 0 ? undefined : (r.err || r.out).trim() || `exit ${r.code}`);
 
@@ -137,7 +154,7 @@ type Readers = ReturnType<typeof readers<ReturnType<Run>>>;
 function gitWorld(
   refsOf: (repo: string) => [string, string],
   headOf: (repo: string) => ReturnType<typeof git>,
-): Pick<World, "main" | "fetch" | "commitsSince" | "roadmap" | "branchOf"> {
+): Pick<World, "main" | "recentMain" | "fetch" | "commitsSince" | "roadmap" | "branchOf"> {
   // What a log says of a head never changes: it is read again only when the ref points elsewhere.
   const logs = new Map<string, { head: string; read: Exclude<ReturnType<World["main"]>, string> }>();
   const since = new Map<string, number | undefined>();
@@ -160,6 +177,13 @@ function gitWorld(
       };
       logs.set(repo, { head: sha, read });
       return read;
+    },
+    recentMain(repo, n) {
+      const ref = headOf(repo);
+      if (!ref.ok) return [];
+      return git(repo, "rev-list", "-n", String(n), ref.out.trim())
+        .out.split("\n")
+        .filter((l) => l !== "");
     },
     fetch(repo) {
       // A fetch over https costs a git, a remote helper and two credential helpers: once in FETCH_EVERY_MS is enough.
@@ -312,6 +336,7 @@ export function realWorld(env = process.env): World {
       (repo) => refsOf(repo)[0],
       { store: openLeases(lineclearDir(env)), owner: `${hostname()}:${process.pid}` },
     ),
+    promote: (repo, commit) => promoteCommit(repo, commit, env),
     ...taskWorld(serverBin(env), io, env),
     stallCards: (space, repo) => io.memo(`stall\0${space}\0${repo}`, () => realStallCards(space, repo, env)),
     chatCards: (space, repo) => io.memo(`chat\0${space}\0${repo}`, () => realChatCards(space, repo, env)),

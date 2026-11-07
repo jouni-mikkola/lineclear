@@ -1,6 +1,6 @@
 import { freshDecisions } from "../src/decision-dedupe.ts";
 import { expect, spyOn, test } from "bun:test";
-import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { cpus } from "node:os";
 import { join } from "node:path";
 import { readItems } from "../src/inbox.ts";
@@ -525,4 +525,54 @@ test("a landed step starts no agent even when it reads ready", () => {
   writeFileSync(join(t.config, "projects", "demo", "state.json"), JSON.stringify({ closedSteps: { A: "LIN-1" } }));
   expect(t.doTick().some((x) => x.kind === "start")).toBe(false);
   expect(t.adds()).toEqual([]);
+});
+
+test("the loop promotes the newest green head of main only, at most every 30 minutes and never during a merge", () => {
+  const t = setup({ commits: ["one", "two", "three"] });
+  const [c3, c2, c1] = Bun.spawnSync(["git", "-C", t.repo, "rev-list", "HEAD"]).stdout.toString().trim().split("\n");
+  mkdirSync(join(t.repo, "scripts"));
+  writeFileSync(join(t.repo, "scripts", "promote.ts"), "");
+  const bin = join(t.dir, "gh-bin");
+  mkdirSync(bin);
+  const runs = {
+    [c3!]: '[{"status":"completed","conclusion":"failure"}]',
+    [c2!]: '[{"status":"in_progress","conclusion":""}]',
+    [c1!]: '[{"status":"completed","conclusion":"success"}]',
+  };
+  const cases = Object.entries(runs)
+    .map(([k, v]) => `*${k}*) echo '${v}';;`)
+    .join("\n");
+  const later = join(t.dir, "later-green");
+  writeFileSync(
+    join(bin, "gh"),
+    `#!/bin/sh\n[ -f '${later}' ] && case "$*" in *"$(cat '${later}')"*) echo '[{"status":"completed","conclusion":"success"}]'; exit;; esac\ncase "$*" in\n${cases}\nesac\n`,
+  );
+  chmodSync(join(bin, "gh"), 0o755);
+  const newGreenCommit = () => {
+    t.git("commit", "-q", "--allow-empty", "-m", "four");
+    t.git("update-ref", "refs/remotes/origin/main", "HEAD");
+    const id = Bun.spawnSync(["git", "-C", t.repo, "rev-parse", "HEAD"]).stdout.toString().trim();
+    writeFileSync(later, id);
+    return id;
+  };
+  const installed = join(t.dir, "installed");
+  writeFileSync(join(t.dir, "install.sh"), `echo "$LINECLEAR_REF" >> '${installed}'\n`);
+  Object.assign(t.env, { PATH: `${bin}:${process.env.PATH}`, LINECLEAR_INSTALL: join(t.dir, "install.sh") });
+  const refs = () => (existsSync(installed) ? readFileSync(installed, "utf8").trim().split("\n") : []);
+
+  writeFileSync(join(t.fake, "tasks.json"), JSON.stringify([{ id: "LIN-1", title: "T", status: "merging" }]));
+  t.doTick();
+  expect(refs()).toEqual([]);
+
+  writeFileSync(join(t.fake, "tasks.json"), "[]");
+  t.doTick();
+  expect(refs()).toEqual([c1!]);
+
+  const c4 = newGreenCommit();
+  t.now.at = new Date(t.now.at.getTime() + 10 * 60_000);
+  t.doTick();
+  expect(refs()).toEqual([c1!]);
+  t.now.at = new Date(t.now.at.getTime() + 21 * 60_000);
+  t.doTick();
+  expect(refs()).toEqual([c1!, c4]);
 });
