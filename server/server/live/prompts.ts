@@ -154,8 +154,7 @@ export function queuedLine(ids: string[], when: 'start' | 'later' | 'changed', i
   const them = ids.length === 1 ? 'it is' : 'they are'
   const rest = `Lineclear tells you "Go: … start now." once ${them} done. A go from the human or coordinator: run lineclear task queue ${id} --after none and start.`
   if (when === 'changed') return `You now wait for ${ids.join(', ')} instead. Don't start yet. ${rest}`
-  if (when === 'later')
-    return `Hold on: you are now queued after ${ids.join(', ')}. Stop at a clean point: reply in one line, and end your turn. ${rest}`
+  if (when === 'later') return `Hold on: you are now queued after ${ids.join(', ')}. Stop at a clean point: reply in one line, and end your turn. ${rest}`
   return `Queued: this task waits for ${ids.join(', ')} to be done. Don't start yet: reply in one line, and end your turn. ${rest}`
 }
 
@@ -165,11 +164,8 @@ export function goLine(ids: string[], notes: string[], cleared = false) {
 }
 
 export function prNewsLine(id: string, pr: { number: number; url: string }, news: string[]) {
-  return [`GitHub news on PR #${pr.number} (${pr.url}), since you reported ${id} ready:`, ...news, 'See the lineclear-agent skill.'].join(
-    '\n',
-  )
+  return [`GitHub news on PR #${pr.number} (${pr.url}), since you reported ${id} ready:`, ...news, 'See the lineclear-agent skill.'].join('\n')
 }
-
 
 export function privatePrompt(own: string, reviewer?: string): string {
   return [
