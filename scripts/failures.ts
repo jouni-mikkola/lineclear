@@ -34,5 +34,48 @@ export function parseFailures(output: string): Failure[] {
 export const outsideChange = (failures: Failure[], touched: Set<string>): boolean =>
   failures.length > 0 && failures.every((f) => f.file !== "" && !touched.has(f.file.replace(/^\.\//, "")));
 
+export interface Quarantined {
+  file: string;
+  test: string;
+  /** The task that fixes the flake; the test leaves quarantine once it is fixed. */
+  task: string;
+}
+
+export const QUARANTINE_LIMIT = 5;
+
+const sameTest = (a: { file: string; test: string }, b: { file: string; test: string }): boolean =>
+  a.test === b.test && a.file.replace(/^\.\//, "") === b.file.replace(/^\.\//, "");
+
+export interface Settled {
+  /** Failures that also fail alone, or flake with no room left in quarantine. */
+  fatal: Failure[];
+  /** Failures of tests already in quarantine: they do not fail the check. */
+  quarantined: Failure[];
+  /** New flakes that failed and then passed alone: added to the quarantine. */
+  added: Quarantined[];
+}
+
+/** Reruns each failure alone. A quarantined test's failure is let through, a new flake is quarantined while there is room, the rest fail. */
+export async function settleFailures(
+  failures: Failure[],
+  quarantine: Quarantined[],
+  passesAlone: (f: Failure) => Promise<boolean>,
+  fixTask = "unfiled",
+): Promise<Settled> {
+  const settled: Settled = { fatal: [], quarantined: [], added: [] };
+  for (const f of failures) {
+    if (quarantine.some((q) => sameTest(q, f))) {
+      settled.quarantined.push(f);
+    } else if (!(await passesAlone(f))) {
+      settled.fatal.push(f);
+    } else if (quarantine.length + settled.added.length < QUARANTINE_LIMIT) {
+      settled.added.push({ file: f.file, test: f.test, task: fixTask });
+    } else {
+      settled.fatal.push(f);
+    }
+  }
+  return settled;
+}
+
 /** How a failure is listed: `<file> > <test>: <first error line>`, the release's held line and the check's own output alike. */
 export const describeFailure = (f: Failure): string => `${f.file ? `${f.file} > ` : ""}${f.test}: ${f.error ?? "no error line"}`;

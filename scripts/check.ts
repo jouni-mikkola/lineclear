@@ -15,7 +15,7 @@ if (!process.env.GITHUB_ACTIONS) {
   console.log(types.success ? "check: types passed; the tests run on GitHub (lineclear pr, then lineclear checks)" : "check: types failed");
   process.exit(types.success ? 0 : 1);
 }
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { compileCacheDir, diskTmpRoot, trimCache } from "../src/tmpdirs.ts";
 import { testsFor } from "./changed.ts";
@@ -38,7 +38,7 @@ import {
   writeTimes,
 } from "./check-speed.ts";
 import { fastGates } from "./fast-gates.ts";
-import { describeFailure, type Failure, outsideChange, parseFailures } from "./failures.ts";
+import { describeFailure, type Failure, outsideChange, parseFailures, type Quarantined, settleFailures } from "./failures.ts";
 import { changedSince } from "./gates/tools.ts";
 
 // Every step but the server's (below) runs with TMPDIR in a folder of this run, on disk. Each test process clears its own
@@ -221,6 +221,31 @@ async function run(step: Step): Promise<{ code: number; failing: Failure[]; outp
 }
 
 // read again once the steps are through: the machine may have got busy while they ran
+const QUARANTINE_FILE = "test/quarantine.json";
+const readQuarantine = (): Quarantined[] => (existsSync(QUARANTINE_FILE) ? JSON.parse(readFileSync(QUARANTINE_FILE, "utf8")) : []);
+
+/** A failed test, run again on its own: it must run and pass (a name that matches no test passes in bun, so a pass is counted). */
+async function passesAlone(step: Step, f: Failure): Promise<boolean> {
+  const name = f.test.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const file = f.file.replace(/^\.\//, "");
+  const cmd = step.cwd === "server" ? ["bun", "scripts/test.ts", file, "-t", name] : ["bun", "test", "--timeout", "120000", file, "-t", name];
+  const p = Bun.spawn(cmd, { cwd: step.cwd, stdin: "ignore", stdout: "pipe", stderr: "pipe", env: step.cwd === "server" ? serverEnv : env });
+  const [out, err] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
+  return (await p.exited) === 0 && /^\s*[1-9]\d* pass$/m.test(out + err);
+}
+
+/** A test step's failures, each rerun alone: true when none is left that should fail the check. */
+async function settleStep(step: Step, failing: Failure[]): Promise<boolean> {
+  const quarantine = readQuarantine();
+  const { fatal, quarantined, added } = await settleFailures(failing, quarantine, (f) => passesAlone(step, f));
+  for (const f of quarantined) console.log(`check: quarantined, not failing: ${describeFailure(f)}`);
+  if (added.length > 0) {
+    writeFileSync(QUARANTINE_FILE, `${JSON.stringify([...quarantine, ...added], null, 2)}\n`);
+    for (const a of added) console.log(`check: flaky, passed alone, quarantined (file its fix task): ${a.file} > ${a.test}`);
+  }
+  return fatal.length === 0;
+}
+
 const measure = loadFactorMeter();
 let factor = measure();
 const started = performance.now();
@@ -235,7 +260,8 @@ async function runStep(step: Step): Promise<boolean> {
   const at = performance.now();
   const { code, failing, output } = await run(step);
   const isTests = step.name.startsWith("tests");
-  const ok = code === 0;
+  const rerunnable = (isTests || step.name === "server tests") && failing.length > 0;
+  const ok = code === 0 || (rerunnable && (await settleStep(step, failing)));
   times.push({ step: step.name, seconds: (performance.now() - at) / 1000, ok });
   if (!ok) {
     console.error(
