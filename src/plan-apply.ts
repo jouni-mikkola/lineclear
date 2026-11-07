@@ -48,13 +48,11 @@ function mergeTask(task: string, repo: string, env = process.env): { base: strin
   const subjects = new Set((ref ? gitAsLineclear(repo, "log", "--format=%s", `main..${ref}`).out.trim().split("\n") : []).filter(Boolean));
   const failure = isPlanId(task) ? mergePlanBranch(task, repo) : serverMerge(task, env);
   if (failure !== undefined) return failure;
-  const commit = tip(repo);
   // another task may have merged in between: keep only this task's own commits for an undo
-  const all = gitAsLineclear(repo, "rev-list", "--first-parent", `${base}..${commit}`).out.trim().split("\n").filter(Boolean);
-  const own = all.filter((c) => {
-    const subject = gitAsLineclear(repo, "log", "-1", "--format=%s", c).out.trim();
-    return subjects.has(subject) || subject.includes(task);
-  });
+  const log = gitAsLineclear(repo, "log", "--first-parent", "--format=%H%x09%s", `${base}..HEAD`).out.trim().split("\n").filter(Boolean);
+  const all = log.map((l) => ({ hash: l.slice(0, l.indexOf("\t")), subject: l.slice(l.indexOf("\t") + 1) }));
+  const commit = all[0]?.hash ?? base;
+  const own = all.filter((c) => subjects.has(c.subject) || c.subject.includes(task)).map((c) => c.hash);
   return own.length > 0 && own.length < all.length ? { base, commit, commits: own } : { base, commit };
 }
 

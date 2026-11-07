@@ -316,7 +316,7 @@ test("plan submit finds the running server in the data folder with no flag", asy
     }
     const lines: string[] = [];
     planMain(["submit"], (l) => lines.push(l), serverEnv(home, s.env), s.work);
-    expect(readFileSync(log, "utf8")).toContain('["task","list","--json"]');
+    expect(readFileSync(log, "utf8")).toContain('["ping"]');
     expect(lines.join("\n")).not.toContain("no Lineclear server");
   } finally {
     child.kill();
