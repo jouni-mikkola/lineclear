@@ -105,21 +105,20 @@ export function readAllItems(env = process.env): Item[] {
   return itemRows(tables(env).query("select item from inbox order by n").all());
 }
 
-/** The newest item number, how many wait for the owner and how many left the list: changes whenever the Inbox does. */
+/** The newest item number and the count of changes made to items: the pair changes whenever the Inbox does. */
 export function inboxStamp(env = process.env): string {
-  const r = tables(env)
-    .query("select coalesce(max(n), 0) as newest, coalesce(sum(open), 0) as open, coalesce(sum(shelved), 0) as shelved from inbox")
-    .get() as { newest: number; open: number; shelved: number };
-  return `${r.newest}:${r.open}:${r.shelved}`;
+  const r = tables(env).query("select coalesce(max(n), 0) as newest, coalesce(sum(rev), 0) as rev from inbox").get() as { newest: number; rev: number };
+  return `${r.newest}:${r.rev}`;
 }
 
 /** The number of the newest item, 0 for an empty Inbox. */
-export const newestItem = (env = process.env): number => Number.parseInt(inboxStamp(env), 10);
+export const newestItem = (env = process.env): number =>
+  (tables(env).query("select coalesce(max(n), 0) as newest from inbox").get() as { newest: number }).newest;
 
 /** Adds an item under the next number, which the store gives. The numbers never repeat, answered items stay. */
 export function addItem(item: Omit<Item, "n">, env = process.env): Item {
   const store = tables(env);
-  const { open, shelved } = inboxFlags({ ...item });
+  const { open, shelved } = inboxFlags(item);
   return store
     .transaction(() => {
       const { n } = store.query("insert into inbox (open, shelved, item) values (?, ?, '') returning n").get(open, shelved) as { n: number };
@@ -133,7 +132,7 @@ export function addItem(item: Omit<Item, "n">, env = process.env): Item {
 /** Writes an item's new state under its number. */
 export function saveItem(item: Item, env = process.env): void {
   const { open, shelved } = inboxFlags(item);
-  tables(env).query("update inbox set open = ?, shelved = ?, item = ? where n = ?").run(open, shelved, JSON.stringify(item), item.n);
+  tables(env).query("update inbox set open = ?, shelved = ?, item = ?, rev = rev + 1 where n = ?").run(open, shelved, JSON.stringify(item), item.n);
 }
 
 /** Answers a card of a space's coordinator chat in words, which closes it. Returns an error text, or undefined. */

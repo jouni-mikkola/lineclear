@@ -5,10 +5,10 @@ import { configDir } from "../pi/config.ts";
 import { openStore } from "../server/server/store.ts";
 
 // The Inbox, the waits and the plan requests are tables of one `store.sqlite` in the config folder. A row holds the
-// record as JSON, plus the few columns a query needs. Folders of JSON files from an older version are imported once.
+// record as JSON, plus the few columns a query needs. A folder of JSON files from an older version is imported when it is found, then renamed `*.imported-*`.
 
 const schema = `
-create table if not exists inbox (n integer primary key autoincrement, open integer not null, shelved integer not null, item text not null);
+create table if not exists inbox (n integer primary key autoincrement, open integer not null, shelved integer not null, rev integer not null default 0, item text not null);
 create table if not exists waits (task text primary key, wait text not null);
 create table if not exists requests (task text primary key, since text not null, request text not null);
 `;
@@ -33,18 +33,20 @@ export function tables(env: Record<string, string | undefined> = process.env): D
   return store;
 }
 
-/** Moves each old folder of JSON files into its table. The folder is renamed first, so one process alone imports it. */
+/**
+ * Moves each old folder of JSON files into its table, then renames the folder. The rows go in first and a row that is
+ * there wins, so a crash between the two steps loses nothing and an import run twice changes nothing.
+ */
 function importFolders(store: Database, config: string): void {
   for (const [name, load] of Object.entries(loaders)) {
     const dir = join(config, name);
     if (!existsSync(dir)) continue;
-    const taken = `${dir}.imported-${Date.now()}-${process.pid}`;
+    store.transaction(() => load(store, dir)).immediate();
     try {
-      renameSync(dir, taken);
+      renameSync(dir, `${dir}.imported-${Date.now()}-${process.pid}`);
     } catch {
-      continue; // another process took it
+      // another process renamed it first
     }
-    store.transaction(() => load(store, taken)).immediate();
   }
 }
 
@@ -70,7 +72,7 @@ export const inboxFlags = (i: { answer?: unknown; closed?: unknown; kind: string
 
 const loaders: Record<string, (store: Database, dir: string) => void> = {
   inbox(store, dir) {
-    const put = store.query("insert or replace into inbox (n, open, shelved, item) values (?, ?, ?, ?)");
+    const put = store.query("insert or ignore into inbox (n, open, shelved, item) values (?, ?, ?, ?)");
     for (const item of [...jsonFiles(dir), ...jsonFiles(join(dir, "closed"))] as { n: number; kind: string; closed?: unknown }[]) {
       const { open, shelved } = inboxFlags(item);
       const onShelf = existsSync(join(dir, "closed", `${item.n}.json`)) ? 1 : shelved;
@@ -78,11 +80,11 @@ const loaders: Record<string, (store: Database, dir: string) => void> = {
     }
   },
   waits(store, dir) {
-    const put = store.query("insert or replace into waits (task, wait) values (?, ?)");
+    const put = store.query("insert or ignore into waits (task, wait) values (?, ?)");
     for (const w of jsonFiles(dir) as { task: string }[]) put.run(w.task, JSON.stringify(w));
   },
   requests(store, dir) {
-    const put = store.query("insert or replace into requests (task, since, request) values (?, ?, ?)");
+    const put = store.query("insert or ignore into requests (task, since, request) values (?, ?, ?)");
     for (const r of jsonFiles(dir) as { task: string; since: string }[]) put.run(r.task, r.since, JSON.stringify(r));
   },
 };

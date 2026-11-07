@@ -33,7 +33,7 @@ test("50 items added from 5 processes get 50 distinct numbers", async () => {
     for (let i = 0; i < 10; i++) addItem({ kind: "outward", task: "T-1", question: "Go?", choices: ["Go", "No"], since: "2026-01-01T00:00:00Z" });`;
   const env = { ...process.env, LINECLEAR_CONFIG: config };
   const runs = Array.from({ length: 5 }, () => Bun.spawn([process.execPath, "-e", code], { env, stdout: "ignore", stderr: "pipe" }));
-  for (const r of runs) expect(await r.exited).toBe(0);
+  for (const r of runs) expect([await r.exited, await new Response(r.stderr).text()]).toEqual([0, ""]);
   const numbers = readItems({ LINECLEAR_CONFIG: config }).map((i) => i.n);
   expect(new Set(numbers).size).toBe(50);
   expect(numbers).toEqual(Array.from({ length: 50 }, (_, i) => i + 1));

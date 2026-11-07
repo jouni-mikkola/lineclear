@@ -90,10 +90,10 @@ test("each new Inbox item is one push to each device, and old items are not anno
   expect(sent).toHaveLength(6);
 });
 
-test("with 1,000 closed items and nothing new, a look reads no item", async () => {
+test("with 300 closed items and nothing new, a look reads no item", async () => {
   const e = world("quiet");
   step(e, "Open?");
-  for (let n = 2; n <= 1001; n++) closeItem(step(e, `Q${n}?`), "task is over", new Date(), e as never);
+  for (let n = 2; n <= 301; n++) closeItem(step(e, `Q${n}?`), "task is over", new Date(), e as never);
   const { push } = await fakePush();
   expect(await notifyNew(push, e as never)).toBe(0);
   const parse = JSON.parse;

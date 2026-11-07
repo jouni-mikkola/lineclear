@@ -37,7 +37,7 @@ export function alertOf(item: Item): Alert {
 
 /**
  * Sends one push for each open Inbox item newer than the last one told, and remembers the newest. The first look
- * only sets the mark: items from before are not announced. The file names say whether anything is newer, so when
+ * only sets the mark: items from before are not announced. The newest number says whether anything is newer, so when
  * nothing is, no item is read. Returns how many were sent.
  */
 export async function notifyNew(push: Pusher, env: NodeJS.ProcessEnv = process.env): Promise<number> {

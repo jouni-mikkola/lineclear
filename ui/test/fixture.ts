@@ -111,6 +111,8 @@ function clearFixture() {
   for (const d of [
     "lineclear",
     "config/inbox",
+    "config/waits",
+    "config/requests",
     "config/store.sqlite",
     "config/store.sqlite-wal",
     "config/store.sqlite-shm",

@@ -49,13 +49,28 @@ export class StoreError extends Error {
   }
 }
 
+/** Several processes opening a new file at once: SQLite answers "locked" to the WAL switch without waiting, so it is tried again. */
+function enterWal(handle: Database): void {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      handle.exec('PRAGMA journal_mode=WAL')
+      return
+    } catch (e) {
+      if (attempt >= 50 || !/locked|busy/i.test(String(e))) throw e
+      Bun.sleepSync(20)
+    }
+  }
+}
+
 /** Opens (and creates) the store file in WAL mode; a file that is not a healthy database throws a StoreError. */
 export function openStore(file = STORE_FILE): Database {
   let handle: Database | undefined
   try {
     mkdirSync(dirname(file), { recursive: true, mode: 0o700 })
     handle = new Database(file, { create: true })
-    handle.exec('PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;')
+    handle.exec('PRAGMA busy_timeout=5000')
+    enterWal(handle)
+    handle.exec('PRAGMA synchronous=NORMAL')
     const check = handle.query('PRAGMA quick_check').all() as { quick_check: string }[]
     if (check.length !== 1 || check[0]?.quick_check !== 'ok') throw new Error(check.map((r) => r.quick_check).join('; '))
     return handle
