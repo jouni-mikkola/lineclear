@@ -4,7 +4,7 @@ import { keepLinks, postAction, readSnapshot, lineclearServer, taskChatKey, watc
 
 type Env = Record<string, string | undefined>;
 
-export interface TerminalView {
+interface TerminalView {
   state: "loading" | "ready" | "offline" | "none";
   /** The recent lines as herdr draws them, with ANSI colours. */
   ansi: string;

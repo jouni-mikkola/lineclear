@@ -5,7 +5,7 @@ import { Part, type PartState } from "../kit/index.ts";
 import { get, sampleState } from "./data.ts";
 import type { PageState } from "./states.ts";
 
-// A task's changes, the tab next to its terminal: the branch's diff against its base and its pull request, read only.
+// A task's changes, the tab next to the chat: the branch's diff against its base and its pull request, read only.
 // `?state=` draws sample states instead.
 
 const SHOWN = 40;
