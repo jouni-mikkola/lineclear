@@ -10,7 +10,7 @@ setDefaultTimeout(30_000 * loadFactor());
 
 const { home, repo, state, app, git, install, passes } = await installFixture();
 
-// a file of its own, so the rollback tests run beside the install tests in another job
+// two files, so the rollback tests run beside the install tests and each other in other jobs
 beforeAll(() => passes(install()), 180_000);
 
 /** Commits a version that breaks the service the way BROKEN says, installs it, and puts the repository back. */
@@ -70,36 +70,3 @@ test("an update that pauses a Running project is rolled back too", () => {
   expect(items).toHaveLength(2);
   expect(items[1]?.question).toContain("p is Paused, it was Running");
 }, 180_000);
-
-test("an update that wipes the task store is rolled back and the tasks come back", () => {
-  const data = join(home, ".lineclear");
-  const tasks = JSON.stringify({ next: {}, tasks: [{ id: "T-1" }, { id: "T-2" }] });
-  writeFileSync(join(data, "tasks.json"), tasks);
-  writeFileSync(join(data, "tasks-cold.jsonl"), '{"id":"T-0"}\n');
-  const before = sh(["git", "-C", app, "rev-parse", "HEAD"]).out.trim();
-  const { r } = installBroken("wipe");
-  expect(r.code).not.toBe(0);
-  expect(sh(["git", "-C", app, "rev-parse", "HEAD"]).out.trim()).toBe(before); // the version is back
-  expect(readFileSync(join(data, "tasks.json"), "utf8")).toBe(tasks); // and so are the tasks
-  expect(readFileSync(join(data, "tasks-cold.jsonl"), "utf8")).toBe('{"id":"T-0"}\n');
-  const copies = join(app, "store-copies");
-  const made = readdirSync(copies)
-    .filter((n) => n.startsWith("update-"))
-    .sort();
-  const newest = made.at(-1) ?? "";
-  expect(readFileSync(join(copies, newest, "tasks.json"), "utf8")).toBe(tasks); // the copy aside was made first
-  expect(readFileSync(join(copies, newest, "source"), "utf8").trim()).toBe(data);
-  expect(inbox().at(-1)?.question).toContain("the task store holds 0 tasks, it held 3 before the update");
-}, 180_000);
-
-test("a version that works passes the smoke check and stays", () => {
-  writeFileSync(join(repo, "good.txt"), "good\n");
-  git("add", "-A");
-  git("commit", "-q", "-m", "good");
-  const r = install();
-  expect(r.code).toBe(0);
-  expect(r.out).toContain("the new version works");
-  expect(existsSync(join(app, "good.txt"))).toBe(true);
-  expect(install().code).toBe(0);
-  expect(existsSync(join(app, "good.txt"))).toBe(true);
-}, 240_000);
