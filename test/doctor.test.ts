@@ -7,6 +7,7 @@ import { trimCache } from "../src/tmpdirs.ts";
 import { doctor, doctorChecks, herdrVersions, realProbe, testedHerdr, type Probe } from "../src/doctor.ts";
 import { storedTaskIds } from "../src/doctor-task-ids.ts";
 import { cacheEnvFile, pathsFor } from "../src/paths.ts";
+import { setRegistry } from "../src/models.ts";
 
 const paths = pathsFor({ HOME: "/nonexistent-home" });
 const probe = (over: Partial<Probe> = {}): Probe => ({
@@ -264,4 +265,13 @@ test("doctor reads the live store and its cold file for a duplicate task id", ()
   expect(storedTaskIds(dir).sort()).toEqual(["OMA-5", "OMA-91"]);
   writeFileSync(cold, `${JSON.stringify({ id: "OMA-91" })}\n`);
   expect(doctorChecks(probe({ taskIds: () => storedTaskIds(dir) })).find((c) => c.name === "task ids")?.problem).toContain("OMA-91");
+});
+
+test("doctor prints the model a new task would use", () => {
+  setRegistry([{ harness: "pi", provider: "fakeco", name: "zeta-1" }]);
+  try {
+    expect(doctorChecks(probe()).find((c) => c.name === "model")?.info).toBe("a new task with no model set starts on fakeco/zeta-1");
+  } finally {
+    setRegistry([]);
+  }
 });

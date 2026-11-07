@@ -172,6 +172,31 @@ describe("a task's CLI, model and effort, continued", () => {
       src.settings.set('coordinator.model', null)
     }
   })
+  test("a task start with no model set takes pi's first listed model and notes it in the facts", async () => {
+    const seen: { name: string; kind: string; model?: string }[] = []
+    const { ensure } = src.agents
+    src.agents.ensure = (async (spec: { name: string; kind: string; model?: string }) => (seen.push(spec), null)) as never
+    try {
+      const dir = mkdtempSync(join(tmpdir(), 'shep-src-repo-'))
+      execSync('git init -q -b main && git config user.email t@t && git config user.name T && echo hi > README.md && git add -A && git commit -qm init', {
+        cwd: dir,
+        shell: '/bin/sh',
+      })
+      const place = placeId.space((await src.places.add(dir, 'first-model-source')).name)
+      setRegistry([{ harness: 'pi', provider: 'fakeco', name: 'zeta-1' }])
+      src.settings.set('task.agent', 'pi')
+      const out = (await src.cli(['task', 'add', 'No model', '--desc', 'x'], { chat: place })).out
+      const t = src.engine.task(out.match(/([A-Z]+-\d+)/)![1])!
+      const mine = () => seen.find((x) => x.name === `shep-${t.id.toLowerCase()}`)
+      await until(() => !!mine(), 'the start')
+      expect(mine()).toMatchObject({ kind: 'pi', model: 'fakeco/zeta-1' })
+      expect(t.facts).toContain('No model was set for pi: started on fakeco/zeta-1')
+    } finally {
+      src.agents.ensure = ensure
+      setRegistry([])
+      src.settings.set('task.agent', null)
+    }
+  })
   test('each CLI is started with its own flags for model and effort', () => {
     const rec = (kind: string, model?: string, effort?: string) => ({
       key: 'k',
