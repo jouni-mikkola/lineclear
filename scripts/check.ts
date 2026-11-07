@@ -15,7 +15,7 @@ if (!process.env.GITHUB_ACTIONS) {
   console.log(types.success ? "check: types passed; the tests run on GitHub (lineclear pr, then lineclear checks)" : "check: types failed");
   process.exit(types.success ? 0 : 1);
 }
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { compileCacheDir, diskTmpRoot, trimCache } from "../src/tmpdirs.ts";
 import { testsFor } from "./changed.ts";
@@ -38,7 +38,7 @@ import {
   writeTimes,
 } from "./check-speed.ts";
 import { fastGates } from "./fast-gates.ts";
-import { describeFailure, type Failure, outsideChange, parseFailures } from "./failures.ts";
+import { describeFailure, type Failure, outsideChange, parseFailures, readQuarantine, settle } from "./failures.ts";
 import { changedSince } from "./gates/tools.ts";
 
 // Every step but the server's (below) runs with TMPDIR in a folder of this run, on disk. Each test process clears its own
@@ -233,9 +233,10 @@ async function runStep(step: Step): Promise<boolean> {
   await null;
   for (const need of step.needs ?? []) if (!(await outcome.get(need))) return false;
   const at = performance.now();
-  const { code, failing, output } = await run(step);
+  const first = await run(step);
+  const { failing, output } = first;
   const isTests = step.name.startsWith("tests");
-  const ok = code === 0;
+  const ok = first.code === 0 || (await onlyFlakes(step, failing));
   times.push({ step: step.name, seconds: (performance.now() - at) / 1000, ok });
   if (!ok) {
     console.error(
@@ -252,6 +253,42 @@ async function runStep(step: Step): Promise<boolean> {
     );
   }
   return ok;
+}
+
+const QUARANTINE_FILE = "test/quarantine.json";
+const bareFile = (f: Failure) => f.file.replace(/^\.\//, "");
+
+/** Reruns one failed test by itself where it ran: a flake passes, a break fails again. */
+async function passesAlone(step: Step, f: Failure): Promise<boolean> {
+  const p = Bun.spawn(["bun", "test", "--timeout", "120000", bareFile(f), "-t", f.test.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")], {
+    cwd: step.cwd,
+    stdin: "ignore",
+    stdout: "ignore",
+    stderr: "ignore",
+    env: step.cwd === "server" ? serverEnv : env,
+  });
+  return (await p.exited) === 0;
+}
+
+/**
+ * True when a failed test step failed only on flakes: every failing test passes alone and is quarantined (or goes in now,
+ * while there is room). A step that failed for another reason, or a break, stays failed.
+ */
+async function onlyFlakes(step: Step, failing: Failure[]): Promise<boolean> {
+  if (!/^(server )?tests/.test(step.name) || failing.length === 0 || failing.some((f) => f.file === "")) return false;
+  const known = readQuarantine(QUARANTINE_FILE);
+  const fix = process.env.LINECLEAR_FIX_TASK ?? "unfiled";
+  const { broken, flaky, added } = await settle(
+    failing,
+    (f) => join(step.cwd ?? "", bareFile(f)),
+    (f) => passesAlone(step, f),
+    known,
+    fix,
+  );
+  if (added.length > 0) writeFileSync(QUARANTINE_FILE, `${JSON.stringify([...known, ...added], null, 2)}\n`);
+  for (const f of flaky)
+    console.error(`check: flaky, passed alone: ${describeFailure(f)}${added.some((a) => a.test === f.test) ? " (quarantined now, file its fix task)" : ""}`);
+  return broken.length === 0;
 }
 
 /** `--shard=i/n`: the steps that stay whole go to the job `shardLoads` gave them; every job runs its tests and its part of the server's. */
