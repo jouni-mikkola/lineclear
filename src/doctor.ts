@@ -357,7 +357,7 @@ export function doctorChecks(probe: Probe): Check[] {
     },
     taskIdsUnique(p),
     ...(p.newTaskModel
-      ? [{ name: "new task model", problem: "", fix: "", info: p.newTaskModel() ?? "pi lists no model, so a start waits until it does" }]
+      ? [{ name: "new task model", problem: "", fix: "", info: p.newTaskModel() ?? "pi lists no model, so pi starts on its own default" }]
       : []),
     ...(p.starts ?? []).map((m) => ({ name: "failed starts", problem: "", fix: "", info: startsLine(m).replace(/^failed starts /, "") })),
   ];

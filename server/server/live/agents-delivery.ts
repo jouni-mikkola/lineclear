@@ -289,8 +289,8 @@ export class AgentsDelivery extends AgentsState {
     const picked = unset ? firstModel(r.kind) : undefined
     if (picked) {
       r.model = picked
-      r.system =
-        `${r.system ?? ''}\n\nNo model was set for you, so Lineclear started you on ${picked}, the machine's first available one. Note this in your facts.`.trim()
+      const note = `No model was set for you, so Lineclear started you on ${picked}, the machine's first available one. Note this in your facts.`
+      if (!r.system?.includes(note)) r.system = `${r.system ?? ''}\n\n${note}`.trim()
       this.save()
     } else if (unset) throw new Error(unset)
     const pane = place ? await place() : await this.paneFor(r, was)
