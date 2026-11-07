@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite'
 import { db, importOnce } from '../store.ts'
-import { roleKind, type Role } from './settings-catalog.ts'
+import { LINECLEAR_MODELS, roleKind, type Role } from './settings-catalog.ts'
 import { KEYS, levelsOf, kindOfLevel, defaultOf } from './settings-sections.ts'
 import { refuse } from './settings-rules.ts'
 import type { Stored, Values, Level, LevelKind } from './settings-types.ts'
@@ -10,8 +10,9 @@ const MAKE = 'create table if not exists settings (level text not null, key text
 /** a level's name in the table: all, machine or space:<name> */
 const levelName = (l: Level) => (typeof l === 'object' ? `space:${l.space}` : l)
 
-/** only keys Lineclear knows, with values it takes */
-const kept = (v: unknown) => Object.entries((v ?? {}) as Values).filter(([k, x]) => KEYS.includes(k) && typeof x === 'string' && !refuse(k, x))
+/** only keys Lineclear knows (the model lists are the project's, not a setting), with values it takes */
+const kept = (v: unknown) =>
+  Object.entries((v ?? {}) as Values).filter(([k, x]) => KEYS.includes(k) && !LINECLEAR_MODELS.has(k) && typeof x === 'string' && !refuse(k, x))
 
 /** the defaults you set, one row per level and key: two processes setting different keys never lose each other's */
 export class SettingsStore {
