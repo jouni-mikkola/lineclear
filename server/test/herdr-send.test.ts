@@ -1,4 +1,4 @@
-// A herdr call whose socket closes before the reply is asked once more. A second close fails plainly.
+// A herdr read whose socket closes before the reply is asked once more. A second close fails plainly. A send is never repeated.
 import { afterAll, expect, test } from 'bun:test'
 import { mkdtempSync } from 'node:fs'
 import { createServer } from 'node:net'
@@ -30,17 +30,26 @@ const herdr = createServer((c) => {
 await new Promise<void>((r) => herdr.listen(path, r))
 afterAll(() => herdr.close())
 
+for (const method of ['pane.send_text', 'pane.send_keys', 'agent.prompt']) {
+  test(`${method} is never repeated`, async () => {
+    drops = 1
+    calls = 0
+    await expect(rpc(method)).rejects.toThrow('herdr closed the connection')
+    expect(calls).toBe(1)
+  })
+}
+
 test('one close is retried', async () => {
   drops = 1
   calls = 0
-  expect(await rpc('x')).toBe('ok')
+  expect(await rpc('pane.list')).toBe('ok')
   expect(calls).toBe(2)
 })
 
 test('a second close fails', async () => {
   drops = 2
   calls = 0
-  await expect(rpc('x')).rejects.toThrow('herdr closed the connection')
+  await expect(rpc('pane.list')).rejects.toThrow('herdr closed the connection')
   expect(calls).toBe(2)
 })
 
@@ -48,11 +57,11 @@ test('an early end is retried once, then fails', async () => {
   early = true
   drops = 1
   calls = 0
-  expect(await rpc('x')).toBe('ok')
+  expect(await rpc('pane.list')).toBe('ok')
   expect(calls).toBe(2)
   drops = 2
   calls = 0
-  await expect(rpc('x')).rejects.toThrow('herdr closed the connection')
+  await expect(rpc('pane.list')).rejects.toThrow('herdr closed the connection')
   expect(calls).toBe(2)
   early = false
 })

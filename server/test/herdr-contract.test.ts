@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { HERDR_TESTED, herdr, herdrCliSync, paneEvents, rpc, Subscription, type HerdrEvent } from '../server/live/herdr.ts'
+import { HERDR_TESTED, herdr, herdrCli, paneEvents, rpc, Subscription, type HerdrEvent } from '../server/live/herdr.ts'
 import { forwardArgs, herdrOn, room } from '../server/live/herdr-forward.ts'
 import { until } from './until.ts'
 
@@ -157,7 +157,7 @@ describe.skipIf(!bin)('herdr contract: the schema', () => {
           const args = forwardArgs(sent[0].method, sent[0].params as Record<string, unknown>)
           if (!args) out.push(`${name}: ${sent[0].method} has no herdr command for the forwarding`)
           else {
-            const help = herdrCliSync([...args.slice(0, 2), '--help'])
+            const help = await herdrCli([...args.slice(0, 2), '--help'])
             expect(help?.out, `${name}: herdr has no command ${args.slice(0, 2).join(' ')}`).toContain('Usage: herdr')
           }
           if (name === 'worktreeRemove') expect(args).toEqual(['worktree', 'remove', '--workspace', 'w2'])
@@ -300,7 +300,7 @@ describe.skipIf(!bin)('herdr contract: a herdr of its own', () => {
 
 // the forwarding: every call again, on a machine saved in herdr (`herdr machine list`), reached by `herdr --machine`
 const saved = bin
-  ? (JSON.parse(herdrCliSync(['machine', 'list', '--json'])?.out || '[]') as { label: string; enabled: boolean }[]).find((m) => m.enabled)
+  ? (JSON.parse((await herdrCli(['machine', 'list', '--json']))?.out || '[]') as { label: string; enabled: boolean }[]).find((m) => m.enabled)
   : undefined
 if (bin && !saved) console.info('herdr-contract: no machine is saved in herdr here, so the forwarding is skipped')
 

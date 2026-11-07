@@ -5,15 +5,27 @@ const FIELDS = ['agent', 'agent_status', 'agent_session', 'cwd', 'foreground_cwd
 
 /**
  * The agents herdr listed, after one event of its subscription: the new list, nothing when the event changes none, or
- * `read` when only herdr can say (a pane that is new, moved or ended, an agent found: its name comes with the session).
+ * `read` when only herdr can say (an event that lacks the pane's place).
  */
 export function listAfter(listed: AgentInfo[], e: HerdrEvent): AgentInfo[] | 'read' | undefined {
-  if (e.event === 'pane_created' || e.event === 'pane_agent_detected' || e.event === 'pane_exited' || e.event === 'pane_moved') return 'read'
   const pane = (e.data.pane ?? e.data) as Partial<AgentInfo>
-  const at = listed.findIndex((a) => a.pane_id === pane.pane_id)
+  const movedFrom =
+    e.event === 'pane_moved' ? (e.data.previous_pane_id ?? (e.data.pane as { previous_pane_id?: string } | undefined)?.previous_pane_id) : undefined
+  const at = listed.findIndex((a) => a.pane_id === pane.pane_id || a.pane_id === movedFrom)
+  // a new pane has no agent yet; the event of its agent follows
+  if (e.event === 'pane_created') return undefined
+  if (e.event === 'pane_agent_detected' && at < 0) {
+    if (!pane.pane_id || !pane.agent || !pane.tab_id || !pane.workspace_id) return 'read'
+    return [...listed, { agent_status: 'unknown', cwd: null, interactive_ready: false, ...pane } as AgentInfo]
+  }
   if (at < 0) return undefined
-  if (e.event === 'pane_closed') return listed.filter((_, i) => i !== at)
-  if (e.event !== 'pane_agent_status_changed' && e.event !== 'pane_updated') return undefined
+  if (e.event === 'pane_closed' || e.event === 'pane_exited') return listed.filter((_, i) => i !== at)
+  if (e.event === 'pane_moved') {
+    const { tab_id, workspace_id } = pane
+    if (!tab_id || !workspace_id) return 'read'
+    return listed.map((a, i) => (i === at ? { ...a, pane_id: pane.pane_id ?? a.pane_id, tab_id, workspace_id } : a))
+  }
+  if (e.event !== 'pane_agent_status_changed' && e.event !== 'pane_updated' && e.event !== 'pane_agent_detected') return undefined
   const was = listed[at]
   // readiness for input is not in an event: a CLI that was not ready is read again
   if (was.interactive_ready === false) return 'read'

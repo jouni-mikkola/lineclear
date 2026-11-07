@@ -63,12 +63,27 @@ function lineReader(onLine: (line: string) => unknown) {
   }
 }
 
-/** a closed socket means the request came late, not that herdr is down: ask once more, and fail plainly on a second close */
+/** the calls that only read: asking one again changes nothing. Any other call may have been done before its socket closed */
+const READS = new Set([
+  'ping',
+  'session.snapshot',
+  'agent.list',
+  'agent.get',
+  'workspace.list',
+  'tab.list',
+  'pane.list',
+  'pane.read',
+  'pane.layout',
+  'pane.process_info',
+])
+
+/** a closed socket means the request came late, not that herdr is down: a read is asked once more and fails plainly on a
+ *  second close; a send (`pane.send_*`, `agent.prompt`, a start) is never repeated, since it may have gone in */
 async function send<T>(method: string, params: Record<string, unknown>, timeoutMs: number, path: string): Promise<T> {
   try {
     return await sendOnce<T>(method, params, timeoutMs, path)
   } catch (e) {
-    if (!(e instanceof HerdrError) || e.code !== 'closed') throw e
+    if (!(e instanceof HerdrError) || e.code !== 'closed' || !READS.has(method)) throw e
     return sendOnce<T>(method, params, timeoutMs, path)
   }
 }
@@ -189,16 +204,6 @@ export async function herdrCli(args: string[], timeoutMs = 20_000): Promise<{ ou
   }
 }
 
-/** the same, waiting for it: for a read at start-up */
-export function herdrCliSync(args: string[], timeoutMs = 3000): { out: string; err: string } | undefined {
-  try {
-    const r = Bun.spawnSync(['herdr', ...args], { stdout: 'pipe', stderr: 'pipe', timeout: timeoutMs })
-    return { out: r.stdout.toString(), err: r.stderr.toString() }
-  } catch {
-    return undefined
-  }
-}
-
 export const herdr = adapter(rpc)
 
 export function adapter(rpc: Call) {
@@ -275,11 +280,11 @@ export const paneEvents = (agentPanes: string[]) => [
 ]
 
 /**
- * Keeps one subscription open and reopens it whenever it closes (herdr closes a subscriber that falls behind, with
- * `events_lost`). Callers re-read state from a snapshot after `onOpen`, so nothing missed in between stays missed;
- * `planned` tells an open that follows their own `set` (they read just before it) from one that follows a drop.
+ * One connection that streams the events it was asked for, rebuilt only when it drops (herdr closes a subscriber that
+ * falls behind, with `events_lost`) or when its list changes: herdr closes a connection that is asked a second time.
+ * `planned` tells the open that follows `set` (callers read just before it) from one that follows a drop.
  */
-export class Subscription {
+class Link {
   private sock: Conn | null = null
   private stopped = false
   private retry?: ReturnType<typeof setTimeout>
@@ -367,5 +372,55 @@ export class Subscription {
     if (this.retry) clearTimeout(this.retry)
     this.sock?.destroy()
     this.sock = null
+  }
+}
+
+/**
+ * The events of `paneEvents`: one held connection for the events of every pane, never rebuilt when a pane starts or
+ * ends, and one small connection for each agent pane's status, which herdr takes only for a named pane. A pane
+ * that starts adds its own connection; none else is touched. `onOpen(planned)` is as in `Link`; a pane's first open is
+ * planned, since its callers read just before the `set`.
+ */
+export class Subscription {
+  private main: Link
+  private panes = new Map<string, Link>()
+  private stopped = false
+  constructor(
+    private onEvent: (e: HerdrEvent) => void,
+    private onOpen: (planned: boolean) => void = () => undefined,
+    private connect: () => Conn = () => open(socketPath()),
+    private onDown: () => void = () => undefined,
+  ) {
+    this.main = this.link()
+  }
+
+  /** a pane's own connection that fails (herdr refuses a pane that is gone) does not mark all of herdr down: it tries
+   *  again by itself, and its open after a drop makes the callers read the session */
+  private link(pane = false) {
+    return new Link(this.onEvent, this.onOpen, this.connect, pane ? () => undefined : this.onDown)
+  }
+
+  set(subs: Record<string, unknown>[]) {
+    if (this.stopped) return
+    const scoped = new Map(subs.filter((s) => typeof s.pane_id === 'string').map((s) => [s.pane_id as string, s]))
+    this.main.set(subs.filter((s) => !scoped.has(s.pane_id as string)))
+    for (const [pane, link] of this.panes)
+      if (!scoped.has(pane)) {
+        link.stop()
+        this.panes.delete(pane)
+      }
+    for (const [pane, sub] of scoped) {
+      if (this.panes.has(pane)) continue
+      const link = this.link(true)
+      this.panes.set(pane, link)
+      link.set([sub])
+    }
+  }
+
+  stop() {
+    this.stopped = true
+    this.main.stop()
+    for (const link of this.panes.values()) link.stop()
+    this.panes.clear()
   }
 }
