@@ -27,12 +27,14 @@ test("a review is one tool-less call with the brief, the diff with 20 lines of c
   );
   chmodSync(pi, 0o755);
   const env = { ...process.env, LINECLEAR_HOME: home, PI_BIN: pi, PI_CODING_AGENT_DIR: join(home, "agent") };
+  writeFileSync(join(repo, "new.ts"), "brand new file\n");
   const r = review({ task: "T-1", repo, base: "main", brief: "BRIEF TEXT", reviewer: "x/y", worker: "z/w" }, env);
   expect(r.ok).toBe(true);
   const call = readFileSync(join(home, "call"), "utf8");
   expect(call).toContain("--no-tools");
   expect(call).toContain("BRIEF TEXT");
   expect(call).toContain("RULE: short names");
+  expect(call).toContain("+brand new file");
   expect(call).toContain("+changed 30");
   expect(call).toContain(" line 10\n"); // 20 lines before the change
   expect(call).not.toContain("\n line 9\n");

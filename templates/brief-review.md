@@ -4,8 +4,7 @@ The reviewer reads the change against the why and the done-when above. Review th
 critical and major finding. Review again only when a critical finding was fixed, for at most {{rounds}} rounds in all.
 The reviewer reads the diff and your `--changed` result; it does not run the full check. A finding still open after that makes
 this step stop: decide it yourself by the written rule (merge when only minor or trivial findings are left, and list them in your facts). The owner is never asked a step question.
-When a reviewer answers a usage or quota limit (429), never ask the owner: pick the next reviewer yourself (no one will
-message you about it): a model from another company that pi offers, or another model of your own company with a fresh context, and say so in the pull request.
-Start the reviewer's prompt with the line `LINECLEAR_CHAT="{{id}}/Reviewer"` and, on the next line, `review round N`.
+When the call answers a usage or quota limit (429), never ask the owner: run it again with another reviewer yourself (no one will
+message you about it), and say so in the pull request. Run it once per round.
 
 Writing: Commit messages, pull request titles and bodies, review comments and changelog lines: short plain English, one point per line, no en or em dashes, no semicolons, and none of these words: across, leverage, robust, seamless, delve, comprehensive, ensure.

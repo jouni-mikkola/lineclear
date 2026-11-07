@@ -5,7 +5,9 @@ import { askModel } from "./ask-model.ts";
 import { company } from "./company.ts";
 import { git, gitText } from "./git.ts";
 import { dataDir, serverBin } from "./paths.ts";
+import { readRegistry } from "./models.ts";
 import { pickReviewer } from "./stalls.ts";
+import { recordWork } from "./task-work.ts";
 
 // A review is one model call: the brief, the diff and the repo's rules in, tagged findings out. No tools, no files read.
 
@@ -37,6 +39,8 @@ function diffAgainst(repo: string, base: string): string | undefined {
   const ref = [`origin/${base}`, base].find((r) => git(repo, "rev-parse", "--verify", "--quiet", r).ok);
   const from = ref && gitText(repo, "merge-base", ref, "HEAD");
   if (!from) return undefined;
+  // intent-to-add makes a new file show in the diff; it stages no content
+  git(repo, "add", "--intent-to-add", "--all");
   return git(repo, "diff", `-U${CONTEXT_LINES}`, from).out;
 }
 
@@ -55,7 +59,7 @@ function reviewQuestion(brief: string, diff: string, rules: string): string {
     rules || "(none)",
     "",
     "DIFF",
-    diff.slice(0, PART_MAX),
+    diff.length > PART_MAX ? `${diff.slice(0, PART_MAX)}\n(the diff is cut here; say so if a finding depends on what follows)` : diff,
   ].join("\n");
 }
 
@@ -63,8 +67,8 @@ function reviewQuestion(brief: string, diff: string, rules: string): string {
 export function readFindings(text: string): Finding[] {
   const found: Finding[] = [];
   for (const l of text.split("\n")) {
-    const m = /^\s*FINDING\s+(critical|major|minor|trivial)\s*\|\s*([^|]*?)\s*\|\s*(\d*)\s*\|\s*(.+?)\s*$/i.exec(l);
-    if (m) found.push({ severity: m[1]?.toLowerCase() as Severity, file: m[2] as string, line: Number(m[3]) || 0, why: m[4] as string });
+    const m = /^\s*FINDING\s+(critical|major|minor|trivial)\s*\|\s*([^|]*?)\s*\|\s*([^|]*?)\s*\|\s*(.+?)\s*$/i.exec(l);
+    if (m) found.push({ severity: m[1]?.toLowerCase() as Severity, file: m[2] as string, line: Number.parseInt(m[3] as string, 10) || 0, why: m[4] as string });
   }
   return found;
 }
@@ -86,6 +90,13 @@ export interface ReviewInput {
   worker?: string;
 }
 
+/** The asked reviewer, or when it is of the worker's company the first model the harnesses offer from another one. */
+function otherCompany(worker: string | undefined, reviewer: string | undefined): string | undefined {
+  if (!worker || !reviewer || company(reviewer) !== company(worker)) return reviewer;
+  const offered = readRegistry().map((m) => `${m.provider}/${m.name}`);
+  return pickReviewer(worker, [reviewer, ...offered], undefined) ?? reviewer;
+}
+
 type Reviewed = { ok: true; findings: Finding[]; model: string | undefined; note?: string } | { ok: false; error: string };
 
 /** One review call. The findings are stored as JSON; the note says when the reviewer is of the worker's company. */
@@ -93,7 +104,7 @@ export function review(i: ReviewInput, env: NodeJS.ProcessEnv = process.env): Re
   const diff = diffAgainst(i.repo, i.base);
   if (diff === undefined) return { ok: false, error: `no base ${i.base} to compare with` };
   if (diff.trim() === "") return { ok: false, error: `${i.task} has no changes against ${i.base}` };
-  const model = i.worker && i.reviewer ? (pickReviewer(i.worker, [i.reviewer], undefined) ?? i.reviewer) : i.reviewer;
+  const model = otherCompany(i.worker, i.reviewer);
   const note = model && i.worker && company(model) === company(i.worker) ? `the reviewer ${model} is from the worker's company` : undefined;
   const run = askModel(reviewQuestion(i.brief, diff, repoRules(i.repo)), model, env.LINECLEAR_REVIEW, "LINECLEAR_REVIEW_MODEL", env);
   const text = run.stdout.toString().trim();
@@ -102,6 +113,7 @@ export function review(i: ReviewInput, env: NodeJS.ProcessEnv = process.env): Re
   const findings = readFindings(text);
   if (findings.length === 0 && !/^\s*NONE\s*$/im.test(text))
     return { ok: false, error: `the reviewer's answer had no findings in the form asked for: ${text.slice(0, 200)}` };
+  recordWork(i.task, "review", env);
   const path = reviewPath(i.task, env);
   mkdirSync(dirname(path), { recursive: true });
   writeAtomic(path, `${JSON.stringify({ task: i.task, model, time: new Date().toISOString(), findings }, null, 2)}\n`);
@@ -111,13 +123,15 @@ export function review(i: ReviewInput, env: NodeJS.ProcessEnv = process.env): Re
 /** `lineclear review <task>`: run in the task's worktree; the brief comes from the board. */
 export function reviewMain(rest: string[], out: (line: string) => void, env: NodeJS.ProcessEnv = process.env): number {
   const task = rest[0];
-  if (!task || task.startsWith("-")) return (out("usage: lineclear review <task>"), 2);
+  const at = rest.indexOf("--model");
+  const asked = at < 0 ? undefined : rest[at + 1];
+  if (!task || task.startsWith("-") || (at >= 0 && !asked)) return (out("usage: lineclear review <task> [--model <provider/model>]"), 2);
   const shown = Bun.spawnSync([serverBin(env), "task", "show", task, "--json"], { env, stdin: "ignore" });
   if (shown.exitCode !== 0) return (out(`lineclear review: ${shown.stderr.toString().trim() || shown.stdout.toString().trim()}`), 1);
   const t = JSON.parse(shown.stdout.toString()) as { desc?: string; base?: string };
   const brief = t.desc ?? "";
   const r = review(
-    { task, repo: process.cwd(), base: t.base ?? "main", brief, reviewer: briefModel(brief, "Reviewer"), worker: briefModel(brief, "Agent") },
+    { task, repo: process.cwd(), base: t.base ?? "main", brief, reviewer: asked ?? briefModel(brief, "Reviewer"), worker: briefModel(brief, "Agent") },
     env,
   );
   if (!r.ok) return (out(`lineclear review: ${r.error}`), 1);
