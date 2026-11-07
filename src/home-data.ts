@@ -1,15 +1,20 @@
 import { readJson } from "../pi/config.ts";
-import { IDLE_TEXT, questionIn } from "./cards.ts";
+import { IDLE_TEXT } from "./cards.ts";
+import { farTasks } from "./far-tasks.ts";
+import { IDLE_CARD, lastCards, stageSince, stepOf, taskStage, taskState } from "./home-stage.ts";
+import { laneNote } from "./lane-note.ts";
+import { readTasksKept } from "./tasks-kept.ts";
 import { dataDir } from "./paths.ts";
 import { existsSync, readdirSync } from "node:fs";
 import { hostname } from "node:os";
 import { join } from "node:path";
-import { type Blocker, countSteps, lineOf, readPlan, type RoadmapLine, type Where } from "./progress.ts";
+import { type Blocker, countSteps, readPlan, type Where } from "./progress.ts";
+import { lineOf, type RoadmapLine } from "./roadmap-line.ts";
 import { roadmapSource, lineclearAllTasks } from "./roadmap-source.ts";
 import { planInputs, titledByStep } from "./task-steps.ts";
-import { keptBy, readJsonKept, readTasksKept, refsKey } from "./kept-read.ts";
+import { keptBy, readJsonKept, refsKey } from "./kept-read.ts";
 import { spaceStops, waitBlocker, waitingOf } from "./home-waits.ts";
-import { notReached, remoteTasks } from "./spread.ts";
+import { remoteTasks } from "./spread.ts";
 import { readWaits, type Wait, type WaitGroup, waitsForOwner } from "./waits.ts";
 import { type Move, readMoves } from "./full.ts";
 import { listProjectNames, readSettings } from "./project.ts";
@@ -114,61 +119,6 @@ export interface LooseTask extends HomeTask {
 }
 
 export type Env = Record<string, string | undefined>;
-
-/**
- * The state of one Lineclear task: from `lineclear task list` (`listed` is its status there) where it can say, else from
- * what the task was last told. A chat card never decides it.
- */
-export function taskState(task: Raw, listed: string | undefined): TaskState | undefined {
-  if (task.closed && !task.merged) return undefined;
-  if (task.merged || task.told === "done" || listed === "done") return "done";
-  if (listed === "need" || listed === "work") return listed;
-  if (listed === undefined && (task.told === "work" || task.told === "merging")) return "work";
-  return "queued";
-}
-
-/** A roadmap step id at the start of a task's title, as the rules name the tasks they start: "U20 The line". */
-export const stepOf = (title: string) => /^([A-Z][A-Za-z]{0,3}\d+[a-z]?)\s/.exec(title)?.[1];
-
-/**
- * Where a task is on the line. Ready once it reported ready and is not merged; in review while its status line
- * says so; else its state.
- */
-export function taskStage(task: Raw, state: TaskState, line?: string): Stage {
-  if (state === "done") return "done";
-  if (state === "queued") return "queued";
-  if (task.reported === true) return "ready";
-  if (/\breview/i.test(line ?? task.report?.msg ?? "")) return "review";
-  return "work";
-}
-
-// when each task was first seen at its stage, as long as this process runs
-const seen = new Map<string, { stage: Stage; since: number }>();
-
-/** Since when a task is at its stage: its creation in line, its merge, else the first read that saw it there. */
-export function stageSince(task: Raw, stage: Stage, now: number): number {
-  const was = seen.get(task.id);
-  const since = was?.stage === stage ? was.since : stage === "queued" ? (task.created ?? now) : stage === "done" ? (task.doneAt ?? task.updated ?? now) : now;
-  seen.set(task.id, { stage, since });
-  return since;
-}
-
-/** The last card of each task, with its time, from Lineclear's chat files. */
-export function lastCards(files: Raw[]): Map<string, { at: number; text: string }> {
-  const last = new Map<string, { at: number; text: string }>();
-  for (const f of files) {
-    for (const p of f?.posted ?? []) {
-      const task = p?.card?.task;
-      if (typeof task !== "string" || typeof p.at !== "number" || typeof p.card.text !== "string") continue;
-      // a plain-text question of an agent shows as the card's line, not the status word
-      const asked = IDLE_CARD.test(p.card.text) ? questionIn(String(p.card.ask?.reply?.text ?? "")) : undefined;
-      if ((last.get(task)?.at ?? -1) <= p.at) last.set(task, { at: p.at, text: asked ?? p.card.text });
-    }
-  }
-  return last;
-}
-
-const IDLE_CARD = /^(?:needs you:\s*)?Waits for your reply$/i;
 
 /** The head of main in a folder, or undefined when it has none. */
 const mainHead = (repo: string) => {
@@ -279,43 +229,6 @@ interface SpaceContext {
   retired: Record<string, { merged: number; closed: number }>;
   env: Env;
   now: number;
-}
-
-/** A remote task's state line without the "on <machine>" tail the spread adds (`parseRoom` in spread.ts). */
-const withoutTail = (sub: string | undefined) => sub?.replace(/(?: · )?on [^ ]+$/, "") || undefined;
-
-/** Tasks that run on the project's other machines show beside the local ones. */
-function farTasks(space: Raw, env: Env, now: number): HomeTask[] {
-  return remoteTasks(space.name, env)
-    .filter((t) => t.id && (t.status === "work" || t.status === "need" || t.status === "queued"))
-    .map((t): HomeTask => {
-      // a silent machine's task is only what it said last: it is not waiting for you now
-      const state = (t.silentSince !== undefined && t.status === "need" ? "work" : t.status) as TaskState;
-      const step = stepOf(t.title);
-      const line = withoutTail(t.sub);
-      const stage = taskStage({}, state, line);
-      const since = stageSince({ id: String(t.id) }, stage, now);
-      return {
-        id: String(t.id),
-        title: t.title,
-        state,
-        stage,
-        ...(state === "need" && line ? { text: line } : {}),
-        ...(step ? { step } : {}),
-        machine: String(t.id).split("@")[1],
-        since,
-        at: since,
-        ...(t.silentSince !== undefined
-          ? {
-              silentSince: t.silentSince,
-              last: {
-                text: notReached(String(t.id).split("@")[1] ?? "", t.silentSince),
-                at: t.silentSince,
-              },
-            }
-          : {}),
-      };
-    });
 }
 
 type Roadmap = ReturnType<typeof roadmapProgress>;
@@ -468,29 +381,3 @@ export function homeData(env: Env = process.env, now = Date.now()): HomeData {
 }
 
 if (import.meta.main) console.log(JSON.stringify(homeData(), null, 2));
-
-// The merge lane's stall as the owner reads it: a head that hangs, and a task the lane let go.
-/** The lane lets a head go after this long without progress (server/server/live/engine/lane-watch.ts). */
-const LANE_IDLE_MS = 15 * 60_000;
-
-/** Steps a head only passes through: a check may run long, these do not. */
-const SHORT_STEPS: Record<string, string> = { rebase: "Rebasing", merge: "Merging" };
-
-const minutes = (ms: number) => Math.max(1, Math.round(ms / 60_000));
-
-/**
- * What the lane says of one task: "Stuck in <step> for <n> min" for a head hanging in a short step, or
- * "Released from the merge line: <reason>" once the lane let it go, until it joins the line again or merges.
- */
-function laneNote(task: { landing?: { step?: string; at?: number }; mergeStopped?: string; merged?: boolean }, now: number): string | undefined {
-  if (task.merged) return undefined;
-  const { landing } = task;
-  if (landing) {
-    const step = SHORT_STEPS[landing.step ?? ""];
-    const quiet = typeof landing.at === "number" ? now - landing.at : 0;
-    return step && quiet >= LANE_IDLE_MS ? `Stuck in "${step}" for ${minutes(quiet)} min` : undefined;
-  }
-  const released = /^Your merge hung in (.*?),? so the merge lane released it/.exec(task.mergeStopped ?? "");
-  if (released?.[1]) return `Released from the merge line: hung in ${released[1]}`;
-  return task.mergeStopped ? `Merge stopped: ${task.mergeStopped}` : undefined;
-}

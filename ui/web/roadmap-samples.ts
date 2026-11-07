@@ -1,5 +1,6 @@
 import type { RoadmapData, RoadmapStep } from "../../src/roadmap-view.ts";
-import { roadmapLine, whereTo } from "../../src/progress.ts";
+import { whereTo } from "../../src/progress.ts";
+import { roadmapLine } from "../../src/roadmap-line.ts";
 import type { StepRecord } from "../../src/step-page.ts";
 import type { PageState } from "./samples.ts";
 

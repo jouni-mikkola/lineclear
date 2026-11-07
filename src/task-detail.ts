@@ -4,7 +4,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { prChecks } from "./check-runs.ts";
-import { readTasksKept } from "./kept-read.ts";
+import { readTasksKept } from "./tasks-kept.ts";
 import { dataDir } from "./paths.ts";
 import { gitText, gitWith } from "./git.ts";
 

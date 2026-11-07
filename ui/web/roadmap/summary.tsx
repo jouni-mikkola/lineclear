@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { RoadmapLine } from "../../../src/progress.ts";
+import type { RoadmapLine } from "../../../src/roadmap-line.ts";
 import { sampleState, send } from "../data.ts";
 import { roadmapPath } from "../routes.ts";
 
