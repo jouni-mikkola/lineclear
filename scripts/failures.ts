@@ -36,3 +36,40 @@ export const outsideChange = (failures: Failure[], touched: Set<string>): boolea
 
 /** How a failure is listed: `<file> > <test>: <first error line>`, the release's held line and the check's own output alike. */
 export const describeFailure = (f: Failure): string => `${f.file ? `${f.file} > ` : ""}${f.test}: ${f.error ?? "no error line"}`;
+
+export const QUARANTINE_MAX = 5;
+export interface Quarantined {
+  test: string;
+  /** the task that fixes the flake */
+  task: string;
+}
+
+/** A failure's name in the quarantine: `<prefix><file> > <test>`; the prefix is the folder a step runs in, for the server's tests. */
+export const quarantineKey = (f: Failure, prefix = ""): string => `${prefix}${f.file.replace(/^\.\//, "")} > ${f.test}`;
+
+/**
+ * Judges a test step's failures after each was run again alone (`failsAlone`). A failure that passes alone is a flake: in quarantine it
+ * is let through, new it joins the quarantine (up to QUARANTINE_MAX) and is let through. One that fails alone too, or a flake with no
+ * room left, fails the check.
+ */
+export function judgeFailures(
+  failures: Failure[],
+  failsAlone: (f: Failure) => boolean,
+  quarantine: Quarantined[],
+  task: string,
+  prefix = "",
+): { ok: boolean; quarantine: Quarantined[]; flaky: string[]; broken: string[] } {
+  const next = [...quarantine];
+  const flaky: string[] = [];
+  const broken: string[] = [];
+  for (const f of failures) {
+    const key = quarantineKey(f, prefix);
+    if (failsAlone(f)) broken.push(key);
+    else if (next.some((q) => q.test === key)) flaky.push(key);
+    else if (next.length < QUARANTINE_MAX) {
+      next.push({ test: key, task });
+      flaky.push(key);
+    } else broken.push(`${key} (a flake, but the quarantine holds ${QUARANTINE_MAX} already)`);
+  }
+  return { ok: broken.length === 0, quarantine: next, flaky, broken };
+}

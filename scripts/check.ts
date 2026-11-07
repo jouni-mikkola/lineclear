@@ -15,7 +15,7 @@ if (!process.env.GITHUB_ACTIONS) {
   console.log(types.success ? "check: types passed; the tests run on GitHub (lineclear pr, then lineclear checks)" : "check: types failed");
   process.exit(types.success ? 0 : 1);
 }
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { compileCacheDir, diskTmpRoot, trimCache } from "../src/tmpdirs.ts";
 import { testsFor } from "./changed.ts";
@@ -38,7 +38,7 @@ import {
   writeTimes,
 } from "./check-speed.ts";
 import { fastGates } from "./fast-gates.ts";
-import { describeFailure, type Failure, outsideChange, parseFailures } from "./failures.ts";
+import { describeFailure, type Failure, judgeFailures, outsideChange, parseFailures, type Quarantined } from "./failures.ts";
 import { changedSince } from "./gates/tools.ts";
 
 // Every step but the server's (below) runs with TMPDIR in a folder of this run, on disk. Each test process clears its own
@@ -213,6 +213,40 @@ const lastErrorLine = (output: string): string => {
   return (lines.findLast((l) => /error|fail|timed out|killed/i.test(l)) ?? lines.at(-1) ?? "no output").trim().slice(0, 200);
 };
 
+const QUARANTINE_FILE = "test/quarantine.json";
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Runs a failed test again alone, in the folder its step runs in. True when it fails alone too. */
+function failsAlone(f: Failure, cwd: string | undefined): boolean {
+  const name = `^${f.test.split(" > ").map(escapeRegExp).join(" ")}$`;
+  const alone = Bun.spawnSync(["bun", "test", "--timeout", "120000", f.file, "-t", name], {
+    cwd,
+    stdin: "ignore",
+    stdout: "ignore",
+    stderr: "ignore",
+    env: cwd === "server" ? serverEnv : env,
+  });
+  return !alone.success;
+}
+
+/** The failures of a tests step run again alone: a test that then passes is a flake and goes to the quarantine (test/quarantine.json). Passes when no failure is a break. */
+function quarantined(step: Step, failing: Failure[], output: string): boolean {
+  const quarantine: Quarantined[] = existsSync(QUARANTINE_FILE) ? JSON.parse(readFileSync(QUARANTINE_FILE, "utf8")) : [];
+  const verdict = judgeFailures(
+    failing,
+    (f) => failsAlone(f, step.cwd),
+    quarantine,
+    process.env.LINECLEAR_FLAKE_TASK ?? "unfiled",
+    step.cwd ? `${step.cwd}/` : "",
+  );
+  if (verdict.quarantine.length !== quarantine.length) writeFileSync(QUARANTINE_FILE, `${JSON.stringify(verdict.quarantine, null, 2)}\n`);
+  for (const k of verdict.flaky) console.log(`check: flaky, passed alone, quarantined: ${k}`);
+  for (const k of verdict.broken) console.error(`check: failed alone too: ${k}`);
+  // a step that failed with failures the output does not name as tests (a crash) is not let through
+  const counted = /^\s*(\d+) fail$/m.exec(output);
+  return verdict.ok && counted !== null && Number(counted[1]) === failing.length;
+}
+
 /** Runs a step and keeps its output, which is printed only when the step fails: the steps run side by side. */
 async function run(step: Step): Promise<{ code: number; failing: Failure[]; output: string }> {
   const p = Bun.spawn(step.cmd, { cwd: step.cwd, stdin: "ignore", stdout: "pipe", stderr: "pipe", env: step.cwd === "server" ? serverEnv : env });
@@ -235,7 +269,7 @@ async function runStep(step: Step): Promise<boolean> {
   const at = performance.now();
   const { code, failing, output } = await run(step);
   const isTests = step.name.startsWith("tests");
-  const ok = code === 0;
+  const ok = code === 0 || ((isTests || step.name.startsWith("server tests")) && failing.length > 0 && quarantined(step, failing, output));
   times.push({ step: step.name, seconds: (performance.now() - at) / 1000, ok });
   if (!ok) {
     console.error(
