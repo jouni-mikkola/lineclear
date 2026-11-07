@@ -2,17 +2,11 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { RoadmapStep } from "../../../src/roadmap-view.ts";
 import { play, playKey } from "../../kit/index.ts";
 import { roadmapPath } from "../routes.ts";
+import { Bar, doneCount, type Phase } from "./bar.tsx";
 import { Chevron, isOpen, plural, StepPic, stateWord } from "./common.tsx";
 
 // The line of one project: its phases as segments of one bar, and the open phase drawn station by station.
 // The track runs down the page, so a phase of any size never scrolls sideways.
-
-export interface Phase {
-  name: string;
-  steps: RoadmapStep[];
-}
-
-const doneCount = (p: Phase) => p.steps.filter((s) => s.state === "done").length;
 
 /**
  * The open phase in order, as groups of steps that can run side by side: a step goes one group after the last
@@ -28,46 +22,6 @@ function parallelGroups(steps: RoadmapStep[]): RoadmapStep[][] {
     else groups[d] = [s];
   }
   return groups.filter(Boolean);
-}
-
-function Fill({ share }: { share: number }) {
-  return (
-    <span className="block h-2 w-full overflow-hidden rounded-full bg-line2">
-      <span className="block h-full rounded-full bg-clear" style={{ width: `${share}%` }} />
-    </span>
-  );
-}
-
-/** The bar: a rounded track per phase, as wide as its steps, filled green by what is done; the open phase is the bright one. */
-function Bar({ phases, open, onPick }: { phases: Phase[]; open: string; onPick?: (name: string) => void }) {
-  return (
-    <div className="flex gap-2" data-bar aria-hidden={onPick ? undefined : "true"}>
-      {phases.map((p) => {
-        const share = (doneCount(p) / p.steps.length) * 100;
-        const shade = p.name === open ? "" : "opacity-50";
-        const grow = { flexGrow: p.steps.length, flexBasis: 0 };
-        return onPick ? (
-          <button
-            key={p.name}
-            type="button"
-            style={grow}
-            title={p.name}
-            aria-label={`${p.name}, ${doneCount(p)} of ${p.steps.length} done`}
-            aria-pressed={p.name === open}
-            onClick={() => onPick(p.name)}
-            className={`flex min-h-6 min-w-2 cursor-pointer items-center rounded-full hover:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${shade}`}
-            data-segment={p.name}
-          >
-            <Fill share={share} />
-          </button>
-        ) : (
-          <span key={p.name} style={grow} className={`min-w-2 ${shade}`}>
-            <Fill share={share} />
-          </span>
-        );
-      })}
-    </div>
-  );
 }
 
 /** One station: its picture on the track, its title, and a link to the step's own address. */

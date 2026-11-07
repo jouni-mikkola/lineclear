@@ -4,7 +4,7 @@ import { type ReactNode, type RefObject, useLayoutEffect, useRef } from "react";
 import { count as formatCount, MONTHS } from "./format.ts";
 import { useLayoutOnResize } from "./hooks.ts";
 import { countTo, flip, LAY_FRAMES, layoutOf, loop, type Motion, play, reducedMotion, type Spot, stop } from "./motion.ts";
-import { NowList, type Waiting } from "./line-parts.tsx";
+import { NowList, type Waiting } from "./project-words.tsx";
 import { RunSwitch } from "./run-switch.tsx";
 import { EmptyTrack } from "./rail.tsx";
 import { Lamp, Shape, Stop, type TaskState, type Tone, type ProjectFacts, type TrainFacts, type RowFacts } from "./shapes.tsx";
