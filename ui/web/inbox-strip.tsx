@@ -1,6 +1,4 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useAnswer, useInbox } from "./data.ts";
-import type { PageState } from "./states.ts";
 import { ago, Button, exact, InboxChecks, type InboxItem, ReasonForm, reveal, SignalPic, Toast } from "../kit/index.ts";
 
 // The strip at the top of Home: the first ask that waits for the owner, who asks, in which project and step, its
@@ -336,82 +334,6 @@ export function AskInRow({ item, onChoose }: { item: InboxItem; onChoose: (item:
       <div className="flex flex-wrap gap-2">
         <Answers item={item} onChoose={onChoose} />
       </div>
-    </section>
-  );
-}
-
-/** Asks drawn at once in the Inbox list; the rest are a page away. */
-const WINDOW = 40;
-
-const byNewest = (a: InboxItem, b: InboxItem) => (b.since ? Date.parse(b.since) : 0) - (a.since ? Date.parse(a.since) : 0);
-
-/** Every ask, the newest first, WINDOW rows at a time. The ask an address names goes first. */
-function InboxList({
-  open,
-  ask,
-  errors,
-  onChoose,
-}: {
-  open: InboxItem[];
-  ask?: string;
-  errors: Record<string, string>;
-  onChoose: (item: InboxItem, choice: string, note?: string) => void;
-}) {
-  const [page, setPage] = useState(0);
-  const sorted = [...open].sort(byNewest);
-  const named = sorted.find((i) => i.id === ask || i.task === ask);
-  const all = named ? [named, ...sorted.filter((i) => i !== named)] : sorted;
-  const pages = Math.max(1, Math.ceil(all.length / WINDOW));
-  const at = Math.min(page, pages - 1);
-  const shown = all.slice(at * WINDOW, (at + 1) * WINDOW);
-  if (all.length === 0) return null;
-  return (
-    <>
-      <ul className="grid gap-3 rounded-lg border border-caution/50 bg-raised p-4" data-inbox-list>
-        {shown.map((a) => (
-          <AskRow key={a.id} item={a} onChoose={onChoose} marked={a === named} error={errors[a.id]} />
-        ))}
-      </ul>
-      {pages > 1 && (
-        <nav className="mt-3 flex items-center gap-3 text-sm text-fg2" aria-label="Pages of asks" data-inbox-pages>
-          <button type="button" className={`${BUTTON} disabled:opacity-40`} disabled={at === 0} onClick={() => setPage(at - 1)}>
-            Newer
-          </button>
-          <span className="tabular-nums" data-inbox-range>
-            {at * WINDOW + 1} to {at * WINDOW + shown.length} of {all.length}
-          </span>
-          <button type="button" className={`${BUTTON} disabled:opacity-40`} disabled={at === pages - 1} onClick={() => setPage(at + 1)}>
-            Older
-          </button>
-        </nav>
-      )}
-    </>
-  );
-}
-
-/** The Inbox view at `/inbox`: what waits for the owner, or a line saying nothing does. */
-export function InboxView({ sample, ask }: { sample: PageState | undefined; ask?: string }) {
-  const items = useInbox(sample);
-  const { gone, errors, answer } = useAnswer(sample);
-  const { open, held, choose, undo } = useHeldAnswers(
-    items.status === "ok" ? items.data.filter((i) => !gone.has(i.id)) : [],
-    (item, choice, note) => void answer(item, choice, note),
-  );
-  return (
-    <section aria-label="Inbox" data-view="inbox">
-      <h1 className="mb-4 text-xl font-semibold text-fg">Inbox</h1>
-      {items.status === "error" && (
-        <p className="rounded-md border border-dashed border-line px-4 py-8 text-center text-fg2" data-inbox-error>
-          The Inbox could not be read.
-        </p>
-      )}
-      {items.status === "ok" && open.length === 0 && !held && (
-        <p className="rounded-md border border-dashed border-line px-4 py-8 text-center text-fg2" data-inbox-empty>
-          Nothing waits for you.
-        </p>
-      )}
-      <InboxList open={open} ask={ask} errors={errors} onChoose={choose} />
-      {held && <Toast message={`Sent: ${held.choice}`} onUndo={undo} />}
     </section>
   );
 }

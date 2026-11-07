@@ -242,10 +242,10 @@ export function App() {
 
   const panelState = panelStateOf(chat);
 
-  // an old /inbox address is Home
+  // an old /inbox address is the chat; `ask` keeps the card it named
   useEffect(() => {
-    if (view === "home" && path === "/inbox") history.replaceState(history.state, "", `/${location.search}`);
-  }, [view, path]);
+    if (path.startsWith("/inbox")) history.replaceState(history.state, "", `/chat${location.search}`);
+  }, [path]);
   // Home is the one page for the chat too
   const shown = view === "chat" ? "home" : view;
   const page: PageProps = {

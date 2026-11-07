@@ -8,7 +8,7 @@ import { App } from "./app.tsx";
 import { isAppPath } from "./routes.ts";
 import { queryClient } from "./data.ts";
 
-// Home at `/`, the Inbox at `/inbox`, a project's roadmap at `/<project>/roadmap`, the agents' browsers at
+// Home at `/`, a project's roadmap at `/<project>/roadmap`, the agents' browsers at
 // `/browsers`, the Dispatcher's chat at `/chat`, Settings at `/settings`.
 const path = location.pathname.replace(/\/+$/, "") || "/";
 showPresses();

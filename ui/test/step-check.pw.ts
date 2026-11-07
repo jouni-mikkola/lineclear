@@ -27,11 +27,3 @@ test("a step's page has the check in its history, a no-go there with what is mis
   await expect(history).toContainText("who gets the mail is not said");
   await expect(page).toHaveScreenshot("step-check-page.png", { fullPage: true });
 });
-
-for (const state of ["long", "many"]) {
-  test(`the Inbox in the ${state} state keeps cards with a check inside the width`, async ({ page }) => {
-    await page.goto(`/inbox${state === "long" ? "/ilp" : ""}?state=${state}`);
-    if (state === "long") await expect(page.locator("[data-inbox-checks]")).toHaveCount(1);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
-  });
-}

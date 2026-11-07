@@ -15,15 +15,13 @@ import { play } from "../kit/motion.ts";
 import { SAMPLE_OFFLINE } from "./data.ts";
 import { useTrouble } from "./health.ts";
 import type { PageState } from "./states.ts";
-import { useInbox } from "./data.ts";
-import { InboxView } from "./inbox-strip.tsx";
-import { PATHS, placeOf, roadmapPath, type View, viewOf } from "./routes.ts";
+import { PATHS, roadmapPath, type View, viewOf } from "./routes.ts";
 
 /** The wordmark as index.html has it before the script runs: vite.config.ts puts it in. */
 declare const __WORDMARK__: string;
 
 // The frame every view sits in. From 1024 px a rail on the left holds the mark, the views and a row per project;
-// under it a bar at the bottom leads Home, the Inbox, Browsers and Settings, and Settings is a gear at the top right too.
+// under it a bar at the bottom leads Home, Browsers and Settings, and Settings is a gear at the top right too.
 // Content runs up to `--lc-content-w` on 12 columns, centred in the room right of the rail. The rail and the bar are
 // links, the view you are on marked with `aria-current`. Home is one page that fills the window: its own columns hold the line, the table and the chat.
 
@@ -45,7 +43,6 @@ const icon = (paths: string) => (
 
 const BAR: { id: Exclude<View, "roadmap" | "task" | "setup" | "chat" | "usage">; label: string; icon: React.ReactNode }[] = [
   { id: "home", label: "Home", icon: icon("M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10") },
-  { id: "inbox", label: "Inbox", icon: icon("M3 13l3-8h12l3 8M3 13v6h18v-6M3 13h5a4 4 0 0 0 8 0h5") },
   { id: "browsers", label: "Browsers", icon: icon("M3 5h18v14H3zM3 9h18M7 7h.01") },
   {
     id: "settings",
@@ -132,9 +129,7 @@ export function Frame({
   children: React.ReactNode;
 }) {
   const trouble = useTrouble(sample === "offline" && view === "home" ? { kind: "stale", since: SAMPLE_OFFLINE } : undefined);
-  const inbox = useInbox(sample);
-  const waiting = inbox.status === "ok" ? inbox.data.length : 0;
-  const bar: NavItem[] = BAR.map((v) => ({ ...v, href: PATHS[v.id], count: v.id === "inbox" ? waiting : undefined }));
+  const bar: NavItem[] = BAR.map((v) => ({ ...v, href: PATHS[v.id] }));
   // a roadmap is a page under its project's row
   const wide = useWideRoom();
   const showPanel = !!panel && hasPanel(view) && (panelOpen || wide);
@@ -148,7 +143,6 @@ export function Frame({
   // the address names the view you are on: Usage and the chat are drawn on Home, but their link is the one marked. A task is no view, so it marks none
   const at = viewOf(location.pathname);
   const current = view === "roadmap" ? `project:${project}` : at === "task" ? "" : at === "usage" || at === "chat" ? "home" : at;
-  const shown = view === "inbox" ? <InboxView sample={sample} ask={placeOf(location.pathname).ask} /> : children;
   return (
     <div className={`min-h-dvh lg:pl-(--lc-rail-w) ${showPanel ? "lg:pr-[400px]" : ""}`} data-frame>
       <div className="fixed inset-y-0 left-0 z-20 hidden lg:block">
@@ -231,7 +225,7 @@ export function Frame({
         </aside>
       )}
       <Content view={view} trouble={trouble}>
-        {shown}
+        {children}
       </Content>
       <div className="fixed inset-x-0 bottom-0 z-30 bg-base pb-[env(safe-area-inset-bottom,0px)] lg:hidden" data-bar>
         <BottomBar items={bar} current={current} />
