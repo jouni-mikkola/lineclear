@@ -4,7 +4,7 @@ import { doneNewestFirst, type RestartInfo } from '../../shared/types.ts'
 import { one, summaryOpts, type Parsed } from './args.ts'
 import { checkTitle } from './engine/engine.ts'
 import { ended } from './engine/engine-helpers.ts'
-import { commitsOf, stepIdOfTitle, whyStepRefused } from './engine/step-once.ts'
+import { commitsOf, StepClaims, stepIdOfTitle, whyStepRefused } from './engine/step-once.ts'
 import { validateBase } from './engine/github.ts'
 import { checkResult } from './engine/result.ts'
 import { BOX, machineRef, noTasks, runOn } from './box.ts'
@@ -15,6 +15,8 @@ import { fit, harnessOf, reviewerOf } from './task-options.ts'
 import { LiveSourceSecrets } from './source-secrets.ts'
 
 export class LiveSourceTaskWords extends LiveSourceSecrets {
+  private stepClaims = new StepClaims()
+
   protected async taskCommand(sub: string | undefined, rest: string[], p: Parsed, ctx: { chat?: string; cwd?: string }) {
     if (sub === 'add') {
       if (!rest[0]?.trim()) throw new Error('lineclear task add "<title>" --desc "<the whole brief>"')
@@ -87,34 +89,46 @@ export class LiveSourceTaskWords extends LiveSourceSecrets {
         }
       }
       const pr = named && this.places.space(named) ? this.places.space(named)! : this.projectFor(p, ctx)
-      await validateBase(pr.path, one(p, 'base') ?? pr.base)
-      const open = this.engine.tasks.filter((x) => x.project === placeId.space(pr.name) && !x.archived && !ended(x))
-      const refused = whyStepRefused(
-        title,
-        open,
-        stepIdOfTitle(title) && one(p, 'reopened') !== 'true' ? await commitsOf(pr.path, one(p, 'base') ?? pr.base) : [],
-      )
-      if (refused) throw new Error(refused)
-      const after = p.opts.after ?? []
-      const agent = harnessOf(p, this.settings)
-      const reviewer = reviewerOf(p, this.settings)
-      const where = one(p, 'on')
-      if (where && !this.engine.machines.has(where)) throw new Error(`No machine called ${where}: \`lineclear machine list\` names them.`)
-      const t = this.engine.add({
-        project: pr.name,
-        machine: where,
-        base: one(p, 'base'),
-        title,
-        result,
-        desc: one(p, 'brief') ?? one(p, 'desc'),
-        by: this.byWho(ctx),
-        requester: this.requestedNews.known(ctx.chat),
-        after,
-        later: p.flags.has('later'),
-        agent,
-        reviewer,
-        set,
-      })
+      // claimed before the first await: a second add of the step on this board meets the claim, not a gap
+      const stepId = stepIdOfTitle(title)
+      const repo = pr.github ?? pr.path
+      const first = stepId ? this.stepClaims.take(repo, stepId, this.byWho(ctx)) : undefined
+      if (first !== undefined) throw new Error(`Step ${stepId} is being started by ${first} already: one agent per step.`)
+      let t: ReturnType<typeof this.engine.add>
+      try {
+        await validateBase(pr.path, one(p, 'base') ?? pr.base)
+        const commits = stepId && one(p, 'reopened') !== 'true' ? await commitsOf(pr.path, one(p, 'base') ?? pr.base) : []
+        const open = this.engine.tasks.filter((x) => x.project === placeId.space(pr.name) && !x.archived && !ended(x))
+        const elsewhere = (this.peers?.list() ?? []).flatMap((l) =>
+          (l.snap?.tasks ?? [])
+            .filter((x) => x.status !== 'done' && !x.archived && x.place === placeId.space(pr.name))
+            .map((x) => ({ id: `${l.rec.machine}:${x.id}`, title: x.name })),
+        )
+        const refused = whyStepRefused(title, [...open, ...elsewhere], commits)
+        if (refused) throw new Error(refused)
+        const after = p.opts.after ?? []
+        const agent = harnessOf(p, this.settings)
+        const reviewer = reviewerOf(p, this.settings)
+        const where = one(p, 'on')
+        if (where && !this.engine.machines.has(where)) throw new Error(`No machine called ${where}: \`lineclear machine list\` names them.`)
+        t = this.engine.add({
+          project: pr.name,
+          machine: where,
+          base: one(p, 'base'),
+          title,
+          result,
+          desc: one(p, 'brief') ?? one(p, 'desc'),
+          by: this.byWho(ctx),
+          requester: this.requestedNews.known(ctx.chat),
+          after,
+          later: p.flags.has('later'),
+          agent,
+          reviewer,
+          set,
+        })
+      } finally {
+        if (stepId) this.stepClaims.release(repo, stepId)
+      }
       const on = [CLI_NAME[t.agent!.kind] ?? t.agent!.kind, t.agent!.model, t.agent!.effort && `${t.agent!.effort} effort`].filter(Boolean).join(', ')
       if (t.after?.length)
         return `Added ${t.id}: ${t.title}, queued after ${t.after.join(', ')}. Its agent (${on}) reads the brief now and waits; Lineclear tells it to go once ${t.after.length === 1 ? 'that task is' : 'they are all'} done.`
@@ -122,7 +136,7 @@ export class LiveSourceTaskWords extends LiveSourceSecrets {
         return `Added ${t.id}: ${t.title}, for later. Its agent (${on}) reads the brief now and waits for a go (lineclear task tell ${t.id} "go").`
       if (t.held)
         return `Added ${t.id}: ${t.title}, held: ${t.held.why === 'slots' ? `all ${this.settings.machine().max} slots are taken` : 'the machine is busy'} (${this.workingLine()}). It shows as Queued and its agent (${on}) starts by itself when there's room, oldest first.`
-      return `Added ${t.id}: ${t.title}. Its agent (${on}) starts on the brief now.${after.length ? ' What it would wait for is done already.' : ''}`
+      return `Added ${t.id}: ${t.title}. Its agent (${on}) starts on the brief now.${p.opts.after?.length ? ' What it would wait for is done already.' : ''}`
     }
     if (sub === 'list' || !sub) {
       const pr = one(p, 'space') ? this.projectFor(p, ctx) : null

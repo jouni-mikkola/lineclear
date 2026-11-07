@@ -40,4 +40,29 @@ test('the same step added twice starts once and is refused once; a landed step s
   expect(again.code).toBe(0)
 })
 
+test('one step added at the same instant from 2 machines starts once; 20 races start none twice', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'shep-race-repo-'))
+  execSync('git init -q -b main && git config user.email t@t && git config user.name T && echo hi > README.md && git add -A && git commit -qm init', {
+    cwd: dir,
+    shell: '/bin/sh',
+  })
+  const place = placeId.space((await src.places.add(dir, 'race-source')).name)
+  const before = src.engine.tasks.length
+  let twice = 0
+  for (let i = 0; i < 20; i++) {
+    const title = `L${900 + i} Raced step`
+    const n = src.engine.tasks.length
+    const results = await Promise.all([
+      src.cli(['task', 'add', title, '--desc', 'x'], { chat: place }),
+      src.cli(['task', 'add', title, '--desc', 'x'], { chat: place }),
+    ])
+    if (src.engine.tasks.length - n !== 1) twice++
+    const refused = results.filter((r) => r.code === 1)
+    expect(refused.length).toBe(1)
+    expect(refused[0]?.out).toMatch(/already/)
+  }
+  expect(twice).toBe(0)
+  expect(src.engine.tasks.length).toBe(before + 20)
+})
+
 afterAll(stopSource)
