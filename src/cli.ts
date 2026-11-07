@@ -17,6 +17,7 @@ import { type Ask, setupGate } from "./project.ts";
 import { setupMain } from "./setup.ts";
 import { project } from "./project-cli.ts";
 import { roadmapMain } from "./roadmap-cli.ts";
+import { releaseMain } from "./release-cli.ts";
 import { runMain } from "./rules.ts";
 import { secrets, totp } from "../server/server/live/secrets.ts";
 import { topMain } from "./top-cmd.ts";
@@ -31,6 +32,7 @@ export const commands: Record<string, string> = {
   doctor: "Check each part and name the command that fixes a problem (--here checks only this machine)",
   project: "Add, list, change, remove and check projects",
   roadmap: "Check or show the roadmap (roadmap show <id> prints one step)",
+  release: "Where the next release stands: its parts, its checks, the steps now and next, each machine's room: release [<project>]",
   setup: "Choose a model for the worker, reviewer and step checker from the logged-in harnesses (the reviewer from another company than the worker)",
   run: "Run Lineclear's one server: the same as serve. One tick of the rules: --once (--dry-run shows it)",
   serve: "Run Lineclear's one server: the rule loop, the web pages and the board on one port: serve --port <port>",
@@ -165,6 +167,7 @@ function inboxCommand(rest: string[], out: Out): number | Promise<number> {
 const COMMANDS: Record<string, (rest: string[], out: Out) => number | Promise<number>> = {
   top: (_rest, out) => topMain(out),
   roadmap: roadmapMain,
+  release: releaseMain,
   run: (rest, out) =>
     rest.includes("--once") || rest.includes("--dry-run")
       ? runMain(rest, out)

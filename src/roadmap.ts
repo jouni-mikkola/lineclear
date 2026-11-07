@@ -247,7 +247,7 @@ export function closedSteps(steps: Step[], tasks: Task[], taskSteps?: Record<str
 const FROZEN_PHASE = "Frozen by the owner";
 
 /** A step under the owner's freeze: open and kept, but the rule loop skips it. */
-export const isFrozen = (s: Step): boolean => s.phase.startsWith(FROZEN_PHASE);
+export const isFrozen = (s: Pick<Step, "phase">): boolean => s.phase.startsWith(FROZEN_PHASE);
 
 /**
  * Gives each step one of the six states. Assumes the roadmap passed the check. `unproven` is the checker's record:
@@ -311,12 +311,12 @@ export function resultOf(s: Step): string {
   return r ? [r.value, ...r.more.map((l) => l.trim())].join(" ").trim() : "";
 }
 
-/** A title cut to TITLE_MAX at the end of a word, so no word shows half; one long word is cut where it must be. */
-export function fitTitle(title: string): string {
+/** A title cut to `max` at the end of a word, so no word shows half; one long word is cut where it must be. */
+export function fitTitle(title: string, max = TITLE_MAX): string {
   const t = title.trim();
-  if (t.length <= TITLE_MAX) return t;
-  const cut = t.slice(0, TITLE_MAX + 1).lastIndexOf(" ");
-  return (cut > 0 ? t.slice(0, cut) : t.slice(0, TITLE_MAX)).replace(/[\s,:;.-]+$/, "");
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max + 1).lastIndexOf(" ");
+  return (cut > 0 ? t.slice(0, cut) : t.slice(0, max)).replace(/[\s,:;.-]+$/, "");
 }
 
 /** The `done when` items of a step: its bullets, each with its wrapped lines, else its text as one item. A `Reopened:` item is not one to prove. */

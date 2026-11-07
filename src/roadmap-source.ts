@@ -21,7 +21,20 @@ export function lineclearTasks(space: string, env: Env = process.env): Task[] | 
   return "tasks" in r ? [...r.tasks, ...machineTasksShown(env, space)] : `task list failed: ${r.why}`;
 }
 
-type Source = { text: string; commits: { commit: string; at: number; subject: string; body: string }[] };
+type Source = {
+  text: string;
+  commits: { commit: string; at: number; subject: string; body: string }[];
+  /** docs/release.md from the same place, when the repo has one. */
+  release?: string;
+};
+
+/** A file of docs/ from origin/main, else the folder's own. */
+function docOf(repo: string, origin: string, name: string): string | undefined {
+  const shown = git(repo, "show", `${origin}:docs/${name}`);
+  if (shown.ok) return shown.out;
+  const file = join(repo, "docs", name);
+  return existsSync(file) ? readFileSync(file, "utf8") : undefined;
+}
 
 /** A roadmap file and the commits that mark its steps done: from origin/main, else the folder's own file and main.
  *  Read again only when main, origin/main or the file changed. */
@@ -31,14 +44,12 @@ export function roadmapSource(repo: string): Source | undefined {
 }
 
 function readSource(repo: string): Source | undefined {
-  const file = join(repo, "docs", "ROADMAP.md");
   const [origin, main] = mainRefs(repo);
-  const shown = git(repo, "show", `${origin}:docs/ROADMAP.md`);
-  const text = shown.ok ? shown.out : existsSync(file) ? readFileSync(file, "utf8") : undefined;
+  const text = docOf(repo, origin, "ROADMAP.md");
   if (text === undefined) return undefined;
   const format = "--format=%H%x01%ct%x01%s%x01%b";
   const fromOrigin = git(repo, "log", origin, "-z", format);
-  const log = shown.ok || fromOrigin.ok ? fromOrigin : git(repo, "log", main, "-z", format);
+  const log = fromOrigin.ok ? fromOrigin : git(repo, "log", main, "-z", format);
   const commits = log.ok
     ? log.out
         .split("\0")
@@ -48,5 +59,6 @@ function readSource(repo: string): Source | undefined {
           return { commit: commit.trim(), at: Number(at) * 1000, subject: subject.trim(), body };
         })
     : [];
-  return { text, commits };
+  const release = docOf(repo, origin, "release.md");
+  return { text, commits, ...(release === undefined ? {} : { release }) };
 }

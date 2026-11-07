@@ -1,3 +1,4 @@
+import type { ReleaseView } from "../../../src/release-view.ts";
 import type { RoadmapData, RoadmapStep } from "../../../src/roadmap-view.ts";
 import { whereTo } from "../../../src/progress.ts";
 import { roadmapLine } from "../../../src/roadmap-line.ts";
@@ -148,11 +149,34 @@ function chainRoadmap(project: string, length: number, fork = false): RoadmapDat
   return build(project, [["Phase 0: The chain", seeds]]);
 }
 
+/** A release with a part in each state: done, part done, none started, and checks that hold, fail and wait for a meter. */
+function sampleRelease(d: RoadmapData, long: boolean): ReleaseView {
+  const step = (id: string) => d.steps.find((s) => s.id === id) as RoadmapStep;
+  const must = (s: string) => (long ? `${s}, ${LONG.toLowerCase()}` : s);
+  return {
+    version: "v1.0",
+    parts: [
+      { rank: "P1", name: "the base works", done: 3, total: 3 },
+      { rank: "P2", name: long ? "checkout that takes every card and keeps the cart through a reload" : "checkout", done: 1, total: 6 },
+      { rank: "P3", name: "growth", done: 0, total: 4 },
+    ],
+    unranked: { done: 0, total: 0 },
+    checks: [
+      { id: "R1", part: "the base works", must: must("A page opens in 1 s or less at p90"), state: "holds", today: "0.6 s" },
+      { id: "R2", part: "checkout", must: must("9 in 10 checkouts end in an order"), state: "fails", today: "7 in 10" },
+      { id: "R3", part: "growth", must: must("A review shows within a minute"), state: "unmeasured" },
+    ],
+    now: [step("W3"), step("W5")],
+    next: [step("W7"), step("W8"), step("W6")],
+  };
+}
+
 export function roadmapSample(state: PageState, project: string): RoadmapData {
   const chain = /^chain-(\d+|fork)$/.exec(project);
   if (chain) return chainRoadmap(project, chain[1] === "fork" ? 4 : Number(chain[1]), chain[1] === "fork");
   if (state === "many" || state === "real") return generatedRoadmap(project);
-  return filled(project, state === "long");
+  const d = filled(project, state === "long");
+  return { ...d, release: sampleRelease(d, state === "long") };
 }
 
 /** What a sample step's page adds: a checklist ticked by state, what holds it up, and a history where a task exists. */

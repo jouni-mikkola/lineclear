@@ -7,10 +7,10 @@ export interface Phase {
 
 export const doneCount = (p: Phase) => p.steps.filter((s) => s.state === "done").length;
 
-function Fill({ share }: { share: number }) {
+export function Fill({ share }: { share: number }) {
   return (
     <span className="block h-2 w-full overflow-hidden rounded-full bg-line2">
-      <span className="block h-full rounded-full bg-clear" style={{ width: `${share}%` }} />
+      <span className="block h-full rounded-full bg-clear transition-[width] duration-300 motion-reduce:transition-none" style={{ width: `${share}%` }} />
     </span>
   );
 }

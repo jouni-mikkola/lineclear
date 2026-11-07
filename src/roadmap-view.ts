@@ -4,6 +4,7 @@ import { readSettings } from "./project.ts";
 import { stepParts } from "./parts.ts";
 import { countSteps, currentPhase, type Plan, readPlan } from "./progress.ts";
 import { lineOf, type RoadmapLine } from "./roadmap-line.ts";
+import { releaseView, type ReleaseView } from "./release-view.ts";
 import { roadmapSource, lineclearTasks } from "./roadmap-source.ts";
 import { checkRoadmap, doneIds, resultOf, type State, type Task } from "./roadmap.ts";
 import { planInputs, statusesOf, taskOfStep, titledByStep } from "./task-steps.ts";
@@ -33,6 +34,8 @@ export interface RoadmapData {
   tasksError?: string;
   /** Paused: the rules start none of the project's steps. Absent means Running. */
   paused?: boolean;
+  /** Where the next release stands, when the repo has a docs/release.md with checks. */
+  release?: ReleaseView;
 }
 
 export interface RoadmapStep {
@@ -192,6 +195,7 @@ export function roadmapData(
     .slice(0, HISTORY);
   const inputs = planInputs(text, commits, settings.repo, env);
   const plan = readPlan(text, commits, inputs.unproven, inputs.merged);
+  const release = source.release === undefined ? undefined : releaseView(source.release, steps);
   return {
     ok: {
       project,
@@ -205,6 +209,7 @@ export function roadmapData(
       rounds: settings.reviewRounds ?? 2,
       ...(typeof read === "string" ? { tasksError: read } : {}),
       ...(settings.paused ? { paused: true } : {}),
+      ...(release ? { release } : {}),
     },
   };
 }
