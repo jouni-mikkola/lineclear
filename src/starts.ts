@@ -77,7 +77,7 @@ export interface StartRecord {
 }
 
 /** How long a start holds its step against another start, whatever the task lists show. */
-export const CLAIM_MS = 5 * 60_000;
+const CLAIM_MS = 5 * 60_000;
 
 /** Why a step has an agent coming or a landed result already, or undefined when a start may go on. */
 export function whyHeld(state: StartRecord & { closedSteps?: Record<string, string> }, step: string, nowMs: number): string | undefined {
