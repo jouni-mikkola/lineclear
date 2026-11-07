@@ -1,4 +1,3 @@
-import { Database } from "bun:sqlite";
 import { beforeAll, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, readdirSync, readlinkSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -30,21 +29,6 @@ function installBroken(how: string) {
   git("reset", "-q", "--hard", good);
   return { r, good, after };
 }
-// The Inbox items in the store (read here, not through src/inbox.ts: importing that module early changes other test files)
-const inbox = (): { kind: string; question: string }[] => {
-  const file = join(home, ".config/lineclear/store.sqlite");
-  if (!existsSync(file)) return [];
-  const db = new Database(file);
-  try {
-    return db
-      .query("select item from inbox order by n")
-      .all()
-      .map((row) => JSON.parse((row as { item: string }).item));
-  } finally {
-    db.close();
-  }
-};
-
 test("an update that wipes the task store is rolled back and the tasks come back", () => {
   const data = join(home, ".lineclear");
   const tasks = JSON.stringify({ next: {}, tasks: [{ id: "T-1" }, { id: "T-2" }] });
@@ -63,7 +47,7 @@ test("an update that wipes the task store is rolled back and the tasks come back
   const newest = made.at(-1) ?? "";
   expect(readFileSync(join(copies, newest, "tasks.json"), "utf8")).toBe(tasks); // the copy aside was made first
   expect(readFileSync(join(copies, newest, "source"), "utf8").trim()).toBe(data);
-  expect(inbox().at(-1)?.question).toContain("the task store holds 0 tasks, it held 3 before the update");
+  expect(r.out).toContain("the task store holds 0 tasks, it held 3 before the update");
 }, 180_000);
 
 test("a version that works passes the smoke check and stays", () => {
