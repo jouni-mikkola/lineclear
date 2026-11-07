@@ -8,7 +8,7 @@ import { failureTail } from "../server/server/live/secrets.ts";
 import { copiesProblem, runByNote } from "./store-copies.ts";
 import { cacheEnvFile, dataDir, extensionFile, INSTALL_URL, type Paths, SERVICE } from "./paths.ts";
 import { diskTrouble, freeBytes } from "./health.ts";
-import { readModelFile } from "./models.ts";
+import { firstModel, readModelFile } from "./models.ts";
 import { checkoutPointers } from "./install-paths.ts";
 import { buildNames, buildProblem, buildsDir, installReleaseCommand, type RunFrom, unitCommand } from "./builds.ts";
 import { publishedAddress, serveCommand } from "./published.ts";
@@ -61,6 +61,8 @@ export interface Probe {
   runFrom?: RunFrom;
   /** Every id and alias in the live task store. Without it the ids are not checked. */
   taskIds?: () => string[];
+  /** The model a task starts on when none is set: the machine's first available one. */
+  taskModel?: string;
   /** A CI runner: its checkout has no origin main to read. */
   ci?: boolean;
   /** The failed starts of the last 24 hours, one entry per machine. */
@@ -86,6 +88,7 @@ export function realProbe(paths: Paths, env: Record<string, string | undefined> 
     store: copiesProblem(env),
     runFrom: runFrom(paths, env),
     taskIds: () => storedTaskIds(dataDir(env)),
+    taskModel: firstModel("pi"),
     ci: env.CI === "true",
     user: env.USER ?? userInfo().username,
     free: freeBytes,
@@ -314,6 +317,7 @@ export function doctorChecks(probe: Probe): Check[] {
     tool(p, "herdr", "curl -fsSL https://herdr.dev/install.sh | sh"),
     tool(p, "pi", "curl -fsSL https://pi.dev/install.sh | sh"),
     { name: "models.json", problem: readModelFile(p.dataDir ?? dataDir()).problem, fix: "fix or delete models.json in the data folder" },
+    { name: "task model", problem: "", fix: "", info: p.taskModel ? `${p.taskModel} when none is set` : undefined, skip: !p.taskModel },
     {
       name: "lineclear files",
       problem: existsSync(`${paths.app}/bin/lineclear`) ? "" : `Lineclear is not installed in ${paths.app}`,

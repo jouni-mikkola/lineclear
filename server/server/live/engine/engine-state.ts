@@ -1,5 +1,6 @@
 import { answersTo, renameLater, type TaskIds } from '../task-ids.ts'
 import { trustWorktree } from '../trust.ts'
+import { firstModel } from '../../../../src/models.ts'
 import { existsSync } from '../mfs.ts'
 import { agentEnv, onMachine, type BoxInfo } from '../box.ts'
 import type { Task, TaskStatus } from '../../../shared/types.ts'
@@ -422,7 +423,14 @@ export abstract class EngineState extends Emitter<Events> {
     }
     const env = this.env(key)
     // a task from before tasks kept their own CLI starts on Settings'
-    const h = t.agent ?? this.settings.harness('task', this.nameOf(t))
+    const set = t.agent ?? this.settings.harness('task', this.nameOf(t))
+    // pi lists models and starts on none by itself: a start with none set takes the machine's first
+    const chosen = !as && !rec ? firstModel(set.kind, set.model) : undefined
+    const h = chosen ? { ...set, model: chosen } : set
+    if (chosen) {
+      t.facts = [t.facts, `No model was set for ${set.kind}: started on ${chosen}, the machine's first available model.`].filter(Boolean).join('\n')
+      this.save()
+    }
     trustWorktree(t.worktree!, as?.kind ?? rec?.kind ?? h.kind, env)
     const spec: Spec = {
       access: 'full',
