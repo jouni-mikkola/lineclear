@@ -46,7 +46,13 @@ export abstract class EngineState extends Emitter<Events> {
   private cold = new ColdLog<TaskRec>()
   private briefs = new Briefs()
   protected data = this.briefs.loaded(
-    withCold(this.cold, readJson<{ next: Record<string, number>; tasks: TaskRec[]; red?: Record<string, string>; redLet?: Record<string, string> }>('tasks.json', { next: {}, tasks: [] })),
+    withCold(
+      this.cold,
+      readJson<{ next: Record<string, number>; tasks: TaskRec[]; red?: Record<string, string>; redLet?: Record<string, string> }>('tasks.json', {
+        next: {},
+        tasks: [],
+      }),
+    ),
   )
   taskIds!: TaskIds
   protected starting = new Set<string>()
