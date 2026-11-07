@@ -73,11 +73,11 @@ Tasks (coordinators add them, only when the human asks)
                                                  flags below.
                                                  --later: its agent reads the brief and waits for a go (To do); the go
                                                  is a message to it that says so (task tell).
-                                                 --agent, --model and --effort pick the CLI (claude, codex, pi, …),
+                                                 --agent, --model and --effort pick the CLI (claude, pi, …),
                                                  model and effort for this task instead of Settings': only what
                                                  that CLI and model take (lineclear models), or default.
                                                  --reviewer, --reviewer-model and --reviewer-effort pick who reviews
-                                                 its change (codex, claude, pi), named in its brief's Review line.
+                                                 its change (claude, pi), named in its brief's Review line.
                                                  --after queues it: its agent reads the brief and waits, and Lineclear
                                                  tells it to go once those tasks are all done (merged, or nothing to
                                                  merge); vm-str:SHE-12 is another machine's.

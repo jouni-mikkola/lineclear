@@ -98,7 +98,7 @@ describe('visible launch settings and supported restart choices', () => {
   })
   test('launch metadata matches CLI flags, including unsupported and rounded effort', () => {
     expect(launchHarness({ kind: 'gemini', model: 'saved-only', effort: 'high' })).toEqual({ kind: 'gemini' })
-    expect(launchHarness({ kind: 'codex', model: 'gpt-6-luna', effort: 'ultra' })).toEqual({ kind: 'codex', model: 'gpt-6-luna', effort: 'max' })
+    expect(launchHarness({ kind: 'claude', model: 'Haiku 5.5', effort: 'ultra' })).toEqual({ kind: 'claude', model: 'claude-haiku-5-5', effort: 'max' })
     expect(launchHarness({ kind: 'claude', model: 'default', effort: 'default' })).toEqual({ kind: 'claude' })
   })
   test('recognized older launch models remain selectable with their own effort defaults', () => {

@@ -83,7 +83,7 @@ describe('settings', () => {
     expect(s.set('task.effort', 'extreme').ok).toBe(false)
     expect(s.set('watcher.agent', 'Claude Code').error).toBe('No setting watcher.agent')
     // a reviewer needs a headless run review.sh knows
-    expect(s.set('reviewer.agent', 'Qwen').error).toBe('Pick one of: Codex · Claude Code · pi.')
+    expect(s.set('reviewer.agent', 'Qwen').error).toBe('Pick one of: Claude Code · pi.')
     // a model or effort level the CLI (and its model) doesn't take, with what it does
     expect(s.set('coordinator.model', 'opus 9').error).toBe(
       'Claude Code has no model opus 9. Pick one of: default · Fable 5.1 · Opus 5.5 · Sonnet 5.5 · Haiku 5.5.',
@@ -95,8 +95,8 @@ describe('settings', () => {
     for (const k of ['coordinator.model', 'reviewer.effort']) s.set(k, null)
     // any agent herdr can start may be chosen, by its name or its kind; it is kept by its name
     expect(s.set('task.agent', 'Qwen').ok).toBe(true)
-    expect(s.set('coordinator.agent', 'codex').ok).toBe(true)
-    expect(s.get('coordinator.agent')).toBe('Codex')
+    expect(s.set('coordinator.agent', 'pi').ok).toBe(true)
+    expect(s.get('coordinator.agent')).toBe('pi')
     s.set('task.agent', null)
     s.set('coordinator.agent', null)
   })
@@ -110,11 +110,9 @@ describe('settings', () => {
     expect(s.harness('task').kind).toBe('claude')
     for (const k of ['coordinator.agent', 'coordinator.model', 'coordinator.effort']) s.set(k, null)
   })
-  test("a task's change is reviewed by Codex on its own model and effort, unless Settings say another", () => {
+  test("a task's change is reviewed by Claude Code on its own model and effort, unless Settings say another", () => {
     const s = new Settings()
-    expect(s.harness('reviewer')).toEqual({ kind: 'codex', model: undefined, effort: undefined })
-    expect(s.set('reviewer.agent', 'claude code').ok).toBe(true)
-    expect(s.get('reviewer.agent')).toBe('Claude Code')
+    expect(s.harness('reviewer')).toEqual({ kind: 'claude', model: undefined, effort: undefined })
     s.set('reviewer.effort', 'high')
     expect(s.harness('reviewer')).toEqual({ kind: 'claude', model: undefined, effort: 'high' })
     expect(s.sections([], [], null).find((x) => x.name === 'How tasks work')!.note).toContain(
@@ -126,9 +124,6 @@ describe('settings', () => {
     expect(effortFor('claude', 'lowest')).toBe('low')
     expect(effortFor('claude', 'Max')).toBe('max')
     expect(effortFor('claude', 'ultra', 'Opus 5.5')).toBe('max')
-    expect(effortFor('codex', 'ultra', 'gpt-6-sol')).toBe('ultra')
-    expect(effortFor('codex', 'ultra', 'gpt-6-luna')).toBe('max')
-    expect(effortFor('codex', 'minimal')).toBe('low')
     expect(effortFor('pi', 'lowest')).toBe('minimal')
     expect(effortFor('pi', 'default')).toBeUndefined()
     expect(effortFor('gemini', 'high')).toBeUndefined()
@@ -146,9 +141,9 @@ describe('settings', () => {
     expect(row('Tasks', 'Model').options).toEqual(['default', 'Fable 5.1', 'Opus 5.5', 'Sonnet 5.5', 'Haiku 5.5'])
     expect(row('Tasks', 'Effort').options).toEqual(['default', 'low', 'medium', 'high', 'xhigh', 'max'])
     expect(row('Reviewer', 'Effort').options).toContain('ultra')
-    // Opus on Codex: Codex has no such model, so it starts on its own; ultra on Claude Code is its max
+    // Opus on pi: pi has no such model, so it starts on its own; ultra on Claude Code is its max
     s.set('task.model', 'Opus 5.5')
-    s.set('task.agent', 'Codex')
+    s.set('task.agent', 'pi')
     expect(row('Tasks', 'Model').value).toBe('default')
     s.set('task.effort', 'ultra')
     s.set('task.agent', 'Claude Code')
@@ -261,7 +256,7 @@ describe('settings', () => {
   test('the Settings screen shows what every new brief ends with, as it is now', () => {
     const s = new Settings()
     const note = () => s.sections([], [], null).find((x) => x.name === 'How tasks work')!.note!
-    expect(note()).toContain('- Reviewer: a headless Codex or a Codex subagent (its default model and effort).')
+    expect(note()).toContain('- Reviewer: a headless Claude Code or a Claude Code subagent (its default model and effort).')
     // planning, what to fix and what proof to show are the agent's judgment, not settings
     const section = () => s.sections([], [], null).find((x) => x.name === 'How tasks work')!
     expect(section().rows.map((r) => r.key)).toEqual([

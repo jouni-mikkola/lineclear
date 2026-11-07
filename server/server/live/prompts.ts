@@ -39,9 +39,9 @@ interface Reviewer {
   effort?: string
 }
 
-const REVIEWER_NAME: Record<string, string> = { claude: 'Claude Code', codex: 'Codex', pi: 'pi' }
+const REVIEWER_NAME: Record<string, string> = { claude: 'Claude Code', pi: 'pi' }
 
-/** "a headless Codex or a Codex subagent (its default model and effort)", "… Claude Code … (model opus, high effort)" */
+/** "a headless pi or a pi subagent (its default model and effort)", "… Claude Code … (model opus, high effort)" */
 function reviewerWords(r: Reviewer) {
   const name = REVIEWER_NAME[r.kind] ?? r.kind
   const who = `a headless ${name} or a ${name} subagent`
@@ -66,7 +66,7 @@ export interface Told {
 
 const plural = (xs: string[]) => (xs.length === 1 ? xs[0] : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}`)
 
-/** "Claude Code (its default model and effort)", "Codex (model model-code-5, high effort)" */
+/** "Claude Code (its default model and effort)", "pi (model model-code-5, high effort)" */
 function onWords(r: Reviewer) {
   const name = REVIEWER_NAME[r.kind] ?? r.kind
   if (!r.model && !r.effort) return `${name} (its default model and effort)`

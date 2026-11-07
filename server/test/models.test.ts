@@ -1,6 +1,6 @@
 // Each CLI's models and effort levels, as read from the CLI itself (models.ts): what its output looks like here
 import { describe, expect, test } from 'bun:test'
-import { chooseModel, findModel, modelsOf, nearest, parseClaude, parseCodex, setRegistry, setRegistryReader } from '../server/live/models.ts'
+import { chooseModel, findModel, modelsOf, nearest, parseClaude, setRegistry, setRegistryReader } from '../server/live/models.ts'
 import { seedModels } from './model-fixture.ts'
 
 describe('reading what each CLI takes', () => {
@@ -35,25 +35,6 @@ describe('reading what each CLI takes', () => {
     expect(c.others!.map((m) => [m.id, m.efforts])).toEqual([['claude-haiku-4-5', []]])
     expect('default' in c).toBe(false)
     expect(parseClaude('', help)).toBeUndefined()
-  })
-  test("Codex's catalog: the models its picker lists, hidden ones still taken, levels lowest first", () => {
-    const json = JSON.stringify({
-      models: [
-        {
-          slug: 'gpt-6-sol',
-          display_name: 'GPT-6-Sol',
-          visibility: 'list',
-          default_reasoning_level: 'medium',
-          supported_reasoning_levels: [{ effort: 'ultra' }, { effort: 'low' }, { effort: 'high' }],
-        },
-        { slug: 'auto-review', display_name: 'Auto Review', visibility: 'hide', supported_reasoning_levels: [{ effort: 'low' }] },
-      ],
-    })
-    const c = parseCodex(json)!
-    expect(c.models).toEqual([{ id: 'gpt-6-sol', label: 'GPT-6-Sol', efforts: ['low', 'high', 'ultra'] }])
-    expect(c.others!.map((m) => m.id)).toEqual(['auto-review'])
-    expect(c.efforts).toEqual(['low', 'high', 'ultra'])
-    expect(parseCodex('not json')).toBeUndefined()
   })
   test('the registry lists a model no table knows, and a start with no model set is refused', () => {
     setRegistry([{ harness: 'pi', provider: 'fakeco', name: 'zeta-1' }])

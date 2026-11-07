@@ -10,7 +10,6 @@ import { OWN_ZONE, validZone } from './trigger.ts'
 const FALLBACK_KINDS = [
   'pi',
   'claude',
-  'codex',
   'gemini',
   'cursor',
   'devin',
@@ -18,7 +17,6 @@ const FALLBACK_KINDS = [
   'cline',
   'omp',
   'mastracode',
-  'opencode',
   'copilot',
   'kimi',
   'kiro',
@@ -52,9 +50,7 @@ function herdrKinds(): string[] {
 // GitHub Copilot by its full name, not to be taken for the Copilot mode
 const NAMES: Record<string, string> = {
   claude: 'Claude Code',
-  codex: 'Codex',
   pi: 'pi',
-  opencode: 'OpenCode',
   qodercli: 'Qoder',
   agy: 'Antigravity',
   omp: 'Oh My Pi',
@@ -71,7 +67,7 @@ const CHAT_CLIS = ORDER.filter((kind) => CHAT_KINDS.includes(kind)).map(nameOf)
 export const KIND: Record<string, string> = Object.fromEntries(ORDER.map((k) => [nameOf(k), k]))
 export const CLI_NAME: Record<string, string> = Object.fromEntries(ORDER.map((k) => [k, nameOf(k)]))
 
-/** a CLI by its name or its herdr kind, any case ("Codex", "codex"): its kind */
+/** a CLI by its name or its herdr kind, any case ("Claude Code", "claude"): its kind */
 export function kindOf(cli: string): string | undefined {
   const c = cli.trim().toLowerCase()
   return ORDER.find((k) => k === c || nameOf(k).toLowerCase() === c)
@@ -82,7 +78,7 @@ export function kindOf(cli: string): string | undefined {
 const EFFORTS = ['default', ...LEVELS]
 
 /** the CLIs a brief's Review line may suggest for a task's review */
-export const REVIEWERS = ['Codex', 'Claude Code', 'pi']
+export const REVIEWERS = ['Claude Code', 'pi']
 
 /** the agents Settings picks a CLI, model and effort for */
 export type Role = 'task' | 'coordinator' | 'reviewer' | 'backup'

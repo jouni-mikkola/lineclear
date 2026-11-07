@@ -122,7 +122,7 @@ export interface Reported {
   pausedAt?: number
 }
 
-/** how an agent starts: its herdr kind (claude, codex, pi, …), model and effort; nothing for the CLI's own default */
+/** how an agent starts: its herdr kind (claude, pi, …), model and effort; nothing for the CLI's own default */
 export interface Harness {
   kind: string
   model?: string
