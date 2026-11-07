@@ -104,9 +104,60 @@ export function beatDuringCalls(
   });
 }
 
+/** A tool result longer than this many lines or characters is cut once the model has read it. */
+export const MAX_RESULT_LINES = 100;
+const MAX_RESULT_CHARS = 8000;
+/** Lines kept from the start and from the end of a cut tool result. */
+const KEPT_LINES = 40;
+const KEPT_CHARS = 3000;
+
+type Block = { type?: string; text?: string };
+type Message = { role?: string; content?: unknown };
+
+/** The result with its middle cut when it is long; the same block when it is short. */
+export function cutLongResult(block: Block): Block {
+  if (block?.type !== "text" || typeof block.text !== "string") return block;
+  const text = block.text;
+  const lines = text.split("\n");
+  const note = (what: string) => `[${what} cut to save tokens: rerun with offset, grep or tail for the part you need]`;
+  if (lines.length > MAX_RESULT_LINES) {
+    const cut = lines.length - 2 * KEPT_LINES;
+    return { ...block, text: [...lines.slice(0, KEPT_LINES), note(`${cut} lines`), ...lines.slice(-KEPT_LINES)].join("\n") };
+  }
+  if (text.length <= MAX_RESULT_CHARS) return block;
+  const cut = text.length - 2 * KEPT_CHARS;
+  return { ...block, text: `${text.slice(0, KEPT_CHARS)}\n${note(`${cut} characters`)}\n${text.slice(-KEPT_CHARS)}` };
+}
+
+/**
+ * Cuts the long tool results a task agent has already read, before each call: the model sees a result whole once, and
+ * the cache does not re-send it on every later turn.
+ */
+export function cutLongResults(pi: Pi, env: Env = process.env): void {
+  pi.on("context", (event) => {
+    try {
+      if (!taskAgent(env) || !Array.isArray(event?.messages)) return undefined;
+      const messages: Message[] = event.messages;
+      const seen = messages.findLastIndex((m) => m?.role === "assistant");
+      let changed = false;
+      const cut = messages.map((m, at) => {
+        if (at > seen || m?.role !== "toolResult" || !Array.isArray(m.content)) return m;
+        const content = (m.content as Block[]).map(cutLongResult);
+        if (content.every((b, i) => b === (m.content as Block[])[i])) return m;
+        changed = true;
+        return { ...m, content };
+      });
+      return changed ? { messages: cut } : undefined;
+    } catch {
+      return undefined; // cutting must never get in the way of a call
+    }
+  });
+}
+
 export default async function lineclearExtension(pi: Pi): Promise<void> {
   nudgeQuietTurns(pi);
   beatDuringCalls(pi);
+  cutLongResults(pi);
   freshDispatcher(pi);
   compactChats(pi);
   accountFallback(pi);
