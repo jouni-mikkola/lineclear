@@ -2,7 +2,7 @@ import { existsSync } from '../mfs.ts'
 import type { Question } from '../../../shared/types.ts'
 import { hidden } from '../agents.ts'
 import type { Space } from '../places.ts'
-import { restartLine, resumedLine, taskFirst } from '../prompts.ts'
+import { restartLine, resumedLine, splitBrief, taskFirst } from '../prompts.ts'
 import { CLI_NAME } from '../settings.ts'
 import { fitHarness, harnessWords, recentChat } from '../restart.ts'
 import * as G from './git.ts'
@@ -10,7 +10,7 @@ import * as GH from './github.ts'
 import { unmerged } from './branch-work.ts'
 import * as Lane from './lane.ts'
 import { fitStatus } from './status-line.ts'
-import { type TaskRec, type Harness, ended, labelOf, CHECKS_EVERY, CHECKS_SHOW, failKey, ghNow } from './engine-helpers.ts'
+import { type TaskRec, type Harness, ended, labelOf, CHECKS_EVERY, CHECKS_SHOW, LATER, failKey, ghNow } from './engine-helpers.ts'
 import { EngineLaunch } from './engine-launch.ts'
 
 export class EngineHandoff extends EngineLaunch {
@@ -274,9 +274,22 @@ export class EngineHandoff extends EngineLaunch {
     return null
   }
 
-  /** the pull request's words: the agent's summary */
+  /**
+   * The pull request's words: what changed (the agent's summary), why (the brief's first paragraph, without the
+   * Settings block Lineclear adds) and the proof (the facts line, one bullet per fact).
+   */
   protected prBody(t: TaskRec) {
-    return t.said || 'Work in progress: the summary comes when the task is done.'
+    if (!t.said) return 'Work in progress: the summary comes when the task is done.'
+    const why = splitBrief(t.desc ?? '')[0]
+      .replace(LATER, '')
+      .trim()
+      .split(/\n\s*\n/)[0]
+    const proof = (t.facts ?? '')
+      .split(' · ')
+      .map((f) => f.trim())
+      .filter(Boolean)
+      .map((f) => `- ${f}`)
+    return [`## What\n${t.said}`, why && `## Why\n${why}`, proof.length && `## Proof\n${proof.join('\n')}`].filter(Boolean).join('\n\n')
   }
 
   /** its pull request as GitHub has it now: the one recorded, else the branch's own (one opened by hand) */

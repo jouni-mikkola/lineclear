@@ -298,7 +298,7 @@ describe('on GitHub: news, checks and the default way in', () => {
     expect(r.text).toContain('Pushed to PR #1')
     expect(g.gh().prs).toHaveLength(1)
     expect(g.gh().prs[0]).toMatchObject({ isDraft: false })
-    expect(g.gh().prs[0].body.startsWith('Added a and b.')).toBe(true)
+    expect(g.gh().prs[0].body.startsWith('## What\nAdded a and b.')).toBe(true)
     expect(sh(`git rev-parse refs/heads/${t.branch}`, g.bare)).toBe(sh('git rev-parse HEAD', t.worktree!))
     g.set({ mergeError: 'Pull request #1 is not mergeable: the merge commit cannot be cleanly created.' })
     const m = await w.engine.merge(t.id, { self: true })
