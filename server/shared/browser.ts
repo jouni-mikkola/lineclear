@@ -88,7 +88,6 @@ export type BrowserUp =
   /** fit the page to the panel, or back to agent-browser's own size */
   | { type: 'viewport'; w: number; h: number }
   | { type: 'start' }
-/** the panel takes frames straight from the task's machine (on), or through the server again (off) */
 
 /** what you type in the URL bar, as an address: a bare host gets https (http for this machine) */
 export function toUrl(s: string): string {

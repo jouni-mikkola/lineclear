@@ -48,10 +48,9 @@ when the load stays over 1.5× the cores for 2 minutes, memory or a disk is over
 
 ## Recovering a dropped link
 
-Workers retry failed herdr reads, event subscriptions, log mirrors and the helper's return tunnel without restarting
+Workers retry failed herdr reads, event subscriptions, and the helper's return tunnel without restarting
 remote herdr or its agents. Retries start after 3 seconds and double to a 30-second cap; the herdr polling clock can
 add up to 2 seconds. A minute of successful reads or an established subscription/tunnel resets the delay.
-Log mirrors count success from received file data; a quiet mirror can retain its previous retry delay.
 SSH's keepalive detects silent transport
 loss after roughly a minute (15-second probes, four missed replies); connection setup has a 10-second timeout.
 Herdr bridges use fresh SSH connections instead of reusing a potentially stuck ControlMaster. Commands and file
