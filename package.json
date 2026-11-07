@@ -1,0 +1,40 @@
+{
+  "name": "lineclear",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "lineclear": "bin/lineclear"
+  },
+  "scripts": {
+    "web:build": "bunx --bun vite build --config ui/web/vite.config.ts",
+    "ui:test": "bun install --frozen-lockfile --silent && bun run web:build && playwright test",
+    "ui:changed": "bun scripts/changed.ts ui",
+    "types": "tsc --noEmit",
+    "test": "bun test ./test",
+    "dispatcher:eval": "bun test/dispatcher-eval/run.ts",
+    "gates": "bun scripts/gates/run.ts",
+    "check": "bun scripts/check.ts",
+    "release": "bun scripts/release-tag.ts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.4",
+    "@playwright/test": "1.64.1",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/bun": "latest",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "knip": "6.44.1",
+    "axe-core": "^4.14.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.6.0",
+    "vite": "^8.3.5"
+  },
+  "dependencies": {
+    "@base-ui/react": "^1.9.0",
+    "@tanstack/react-query": "^5.105.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  }
+}
