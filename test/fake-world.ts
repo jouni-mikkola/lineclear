@@ -32,6 +32,7 @@ export function demoEnv(dir: string): NodeJS.ProcessEnv {
     LINECLEAR_HOME: at("home"),
     LINECLEAR_STORE_COPIES: at("copies"),
     XDG_CACHE_HOME: at("cache"),
+    PI_CODING_AGENT_DIR: at("pi"),
   };
 }
 

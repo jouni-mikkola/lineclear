@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, readdirSync, truncateSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tick, type World } from "../src/rules.ts";
-import { diskTmpRoot, staleFolders, sweepOldTemp } from "../src/tmpdirs.ts";
+import { diskTmpRoot, removeGoneSessions, staleFolders, sweepOldTemp } from "../src/tmpdirs.ts";
 import { tmp } from "./helpers.ts";
 
 test("the loop removes temp folders of finished runs older than 2 h and keeps newer ones", () => {
@@ -25,7 +25,7 @@ test("the loop removes temp folders of finished runs older than 2 h and keeps ne
   const other = plant(tmpRoot, "not-ours", 9);
   // live state of the pi extension: its folder's own time does not move when a task writes inside it
   const live = plant(tmpRoot, "lineclear-notes-1000", 9);
-  const env = { ...process.env, LINECLEAR_CONFIG: join(dir, "config"), TMPDIR: tmpRoot, XDG_CACHE_HOME: cache };
+  const env = { ...process.env, LINECLEAR_CONFIG: join(dir, "config"), TMPDIR: tmpRoot, XDG_CACHE_HOME: cache, PI_CODING_AGENT_DIR: join(dir, "pi") };
   const world = { now: () => new Date() } as World;
   const decisions = tick(world, false, env);
   expect(decisions.map((d) => d.reason)).toEqual(["removed 2 temp folders of finished runs older than 2 h"]);
@@ -33,6 +33,27 @@ test("the loop removes temp folders of finished runs older than 2 h and keeps ne
   expect(existsSync(fresh) && existsSync(other) && existsSync(live)).toBe(true);
   // the next tick does not look again
   expect(tick(world, false, env)).toEqual([]);
+});
+
+test("the sweep removes a session folder only when its worktree is gone and its newest file is over 7 days old", () => {
+  const dir = tmp("sessions");
+  const live = join(dir, "wt-live");
+  mkdirSync(live);
+  const plant = (name: string, cwd: string, daysOld: number) => {
+    const folder = join(dir, "sessions", name);
+    mkdirSync(folder, { recursive: true });
+    const file = join(folder, "a.jsonl");
+    writeFileSync(file, `${JSON.stringify({ type: "session", cwd })}\n{}\n`);
+    const at = Date.now() / 1000 - daysOld * 86400;
+    utimesSync(file, at, at);
+    return folder;
+  };
+  const kept = plant("live", live, 30);
+  const goneNew = plant("gone-new", join(dir, "wt-gone-1"), 2);
+  const goneOld = plant("gone-old", join(dir, "wt-gone-2"), 8);
+  expect(removeGoneSessions(join(dir, "sessions"), Date.now())).toBe(1);
+  expect(existsSync(kept) && existsSync(goneNew)).toBe(true);
+  expect(existsSync(goneOld)).toBe(false);
 });
 
 test("the sweep ends a server left running from a test folder it removes", async () => {
@@ -48,7 +69,13 @@ test("the sweep ends a server left running from a test folder it removes", async
   try {
     const at = Date.now() / 1000 - 3 * 3600;
     utimesSync(left, at, at);
-    const settings = { ...process.env, LINECLEAR_CONFIG: join(dir, "config"), TMPDIR: tmpRoot, XDG_CACHE_HOME: join(dir, "cache") };
+    const settings = {
+      ...process.env,
+      LINECLEAR_CONFIG: join(dir, "config"),
+      TMPDIR: tmpRoot,
+      XDG_CACHE_HOME: join(dir, "cache"),
+      PI_CODING_AGENT_DIR: join(dir, "pi"),
+    };
     tick({ now: () => new Date() } as World, false, settings);
     for (const server of servers) expect(await Promise.race([server.exited, Bun.sleep(3000).then(() => "alive")])).not.toBe("alive");
     expect(existsSync(left)).toBe(false);
@@ -107,7 +134,7 @@ test("the sweep removes /tmp's compile cache and trims the disk cache to its cap
     truncateSync(join(disk, name), 300 * 1024 ** 2);
     utimesSync(join(disk, name), 1000 + i, 1000 + i);
   }
-  const env = { ...process.env, TMPDIR: tmpRoot, XDG_CACHE_HOME: cache };
+  const env = { ...process.env, TMPDIR: tmpRoot, XDG_CACHE_HOME: cache, PI_CODING_AGENT_DIR: join(tmpRoot, "pi") };
   const lines = sweepOldTemp(new Date(), env);
   expect(existsSync(join(tmpRoot, "node-compile-cache"))).toBe(false);
   expect(existsSync(join(disk, "old"))).toBe(false);

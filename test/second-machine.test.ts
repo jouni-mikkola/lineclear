@@ -121,6 +121,7 @@ else if (cmd === "room") console.log(JSON.stringify({ max: ${o.localMax ?? 0} })
     LINECLEAR_SSH: ssh,
     TMPDIR: join(dir, "tmp"),
     XDG_CACHE_HOME: join(dir, "cache"),
+    PI_CODING_AGENT_DIR: join(dir, "pi"),
   };
   const doTick = (dryRun = false, world: Partial<World> = {}) =>
     tick({ ...realWorld(vars), room: (host, space) => readRoom(host, space, snapshot(), vars), load: () => 0, ...world }, dryRun, vars);

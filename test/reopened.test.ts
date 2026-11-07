@@ -45,6 +45,7 @@ function setup(commitsSince: number, text = roadmap(true)) {
     LINECLEAR_HOME: join(dir, "home"),
     LINECLEAR_STORE_COPIES: join(dir, "copies"),
     XDG_CACHE_HOME: join(dir, "cache"),
+    PI_CODING_AGENT_DIR: join(dir, "pi"),
   };
   const f = fakeWorld(run, [], text, [{ subject: "LIN-9: A Alpha", body: "" }]);
   f.world.commitsSince = () => commitsSince;

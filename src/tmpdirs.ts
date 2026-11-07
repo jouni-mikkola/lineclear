@@ -1,6 +1,7 @@
-import { mkdirSync, readdirSync, readFileSync, readlinkSync, rmSync, statSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readSync, readdirSync, readFileSync, readlinkSync, rmSync, statSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
+import { piDir } from "./paths.ts";
 import { DAY } from "./time.ts";
 
 type Env = Record<string, string | undefined>;
@@ -89,9 +90,56 @@ export function sweepOldTemp(now: Date, env: Env = process.env): string[] {
     // none, or not removable
   }
   if (ramCache) lines.push("removed the compile cache from the temp folder");
+  const gone = removeGoneSessions(join(piDir(env), "sessions"), now.getTime());
+  if (gone > 0) lines.push(`removed ${gone} session folder${gone === 1 ? "" : "s"} of gone worktrees older than 7 days`);
   const freed = trimCache(compileCacheDir(env));
   if (freed > 0) lines.push(`trimmed ${Math.ceil(freed / 1024 ** 2)} MB from the compile cache`);
   return lines;
+}
+
+const GONE_SESSION_MS = 7 * DAY;
+
+/** The working folder a pi session folder was made for, from the header line of its first session file. */
+function sessionCwd(dir: string, file: string): string | undefined {
+  const fd = openSync(join(dir, file), "r");
+  try {
+    const buf = Buffer.alloc(4096);
+    const head = buf.toString("utf8", 0, readSync(fd, buf, 0, buf.length, 0)).split("\n")[0] ?? "";
+    const cwd = (JSON.parse(head) as { cwd?: unknown }).cwd;
+    return typeof cwd === "string" ? cwd : undefined;
+  } catch {
+    return undefined;
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/** Removes pi session folders whose working folder is gone and whose newest file is over 7 days old. A folder whose working folder cannot be read stays. Returns how many went. */
+export function removeGoneSessions(root: string, now: number): number {
+  let removed = 0;
+  let names: string[] = [];
+  try {
+    names = readdirSync(root);
+  } catch {
+    return 0;
+  }
+  for (const n of names) {
+    try {
+      const dir = join(root, n);
+      const all = readdirSync(dir);
+      const first = all.find((f) => f.endsWith(".jsonl"));
+      if (first === undefined) continue;
+      const cwd = sessionCwd(dir, first);
+      if (cwd === undefined || existsSync(cwd)) continue;
+      const newest = Math.max(...all.map((f) => statSync(join(dir, f)).mtimeMs));
+      if (now - newest <= GONE_SESSION_MS) continue;
+      rmSync(dir, { recursive: true, force: true });
+      removed++;
+    } catch {
+      // gone while we looked, or not a folder
+    }
+  }
+  return removed;
 }
 
 /** Test folders in `dir` last touched more than `olderThan` ms ago (every one with 0). */
