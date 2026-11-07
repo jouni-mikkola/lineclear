@@ -1,3 +1,4 @@
+import type { Engine } from './engine.ts'
 import { exists } from '../mfs.ts'
 import type { Question } from '../../../shared/types.ts'
 import { hidden } from '../agents.ts'
@@ -9,19 +10,20 @@ import { unmerged } from './branch-work.ts'
 import * as Lane from './lane.ts'
 import { fitStatus } from './status-line.ts'
 import { type TaskRec, type Harness, ended, ghNow } from './engine-helpers.ts'
-import { EnginePr } from './engine-pr.ts'
 import { move } from './phase.ts'
 
-export class EngineHandoff extends EnginePr {
+export class EngineHandoff {
+  constructor(private readonly e: Engine) {}
+
   /** writing to a task whose agent stopped starts it again, with its memory */
   resume(id: string) {
-    const t = this.task(id)
+    const t = this.e.task(id)
     if (t?.stuck && !t.worktree && !ended(t)) {
-      this.startTask(t).catch((e) => this.troubled(t, e))
+      this.e.launchPart.startTask(t).catch((e) => this.e.launchPart.troubled(t, e))
       return Promise.resolve(null)
     }
     if (!t?.worktree) return Promise.resolve(null)
-    return this.launch(t)
+    return this.e.launch(t)
   }
 
   /**
@@ -31,49 +33,49 @@ export class EngineHandoff extends EnginePr {
    * stay as they are; a card in its chat marks it.
    */
   async restart(id: string, to: Harness) {
-    const t = this.req(id)
-    if (ended(t)) throw new Error(this.overWords(t))
+    const t = this.e.req(id)
+    if (ended(t)) throw new Error(this.e.overWords(t))
     if (!t.worktree) throw new Error(`${t.id} hasn't started yet: it starts on what its brief says.`)
-    if (this.inPhase(t, 'handing')) throw new Error(`${t.id}'s agent is starting again already.`)
-    if (!this.installed(to.kind)) throw new Error(`${CLI_NAME[to.kind] ?? to.kind} isn't installed on this machine.`)
-    const key = this.key(t)
+    if (this.e.inPhase(t, 'handing')) throw new Error(`${t.id}'s agent is starting again already.`)
+    if (!this.e.installed(to.kind)) throw new Error(`${CLI_NAME[to.kind] ?? to.kind} isn't installed on this machine.`)
+    const key = this.e.key(t)
     const h = fitHarness(to)
-    const from = this.agents.record(key)?.kind ?? t.agent?.kind ?? ''
+    const from = this.e.agents.record(key)?.kind ?? t.agent?.kind ?? ''
     const name = (k: string) => CLI_NAME[k] ?? k
     const words = harnessWords(h)
     if (!move(t, 'handoff')) throw new Error(`${t.id} is busy: try again in a moment`)
     try {
       // what it is told, read once its turn has stopped: what it did meanwhile counts
       const first = async () => {
-        await this.agents.stopTurn(key)
+        await this.e.agents.stopTurn(key)
         if (from === h.kind) return hidden(resumedLine(words), 'restart')
         return hidden(`${taskFirst(t)}\n\n${restartLine({ from: name(from), to: words, ...(await this.soFar(t, key, name(from))) })}`, 'restart')
       }
-      await this.launch(t, undefined, undefined, { ...h, model: h.model ?? '', effort: h.effort ?? '' }, first)
+      await this.e.launch(t, undefined, undefined, { ...h, model: h.model ?? '', effort: h.effort ?? '' }, first)
       // a pause or a stop is over: it carries on
       t.stopped = undefined
       t.paused = undefined
       t.agent = h
       const card = `restart:${t.id}:${Date.now()}`
-      this.chats.post(key, { id: card, card: { id: card, restart: true, text: `Restarted on ${words}` } })
+      this.e.chats.post(key, { id: card, card: { id: card, restart: true, text: `Restarted on ${words}` } })
     } finally {
       move(t, 'over')
-      this.save()
-      this.settle(t)
+      this.e.save()
+      this.e.settle(t)
     }
     return words
   }
 
   /** something went in to an agent: its brief, maybe, which it may already be at work on */
   sent(key: string) {
-    const t = this.task(key.split('/')[0])
-    if (!t || !this.inPhase(t, 'briefing')) return
-    this.begun(t)
-    this.settle(t)
+    const t = this.e.task(key.split('/')[0])
+    if (!t || !this.e.inPhase(t, 'briefing')) return
+    this.e.launchPart.begun(t)
+    this.e.settle(t)
   }
 
   /** what a backup agent is told was done: the branch's commits, what lies uncommitted, the chat's last messages */
-  protected async soFar(t: TaskRec, key: string, them: string) {
+  async soFar(t: TaskRec, key: string, them: string) {
     const out = async (...args: string[]) => {
       const r = await G.git(t.worktree!, ...args)
       return r.ok ? r.out.split('\n').filter(Boolean).slice(0, 20).join('\n') : ''
@@ -81,7 +83,7 @@ export class EngineHandoff extends EnginePr {
     return {
       commits: await out('log', '--oneline', `${t.base}..HEAD`),
       changes: await out('status', '--short'),
-      chat: recentChat(this.chats.chat(key).messages, them, taskFirst(t).trim()),
+      chat: recentChat(this.e.chats.chat(key).messages, them, taskFirst(t).trim()),
     }
   }
 
@@ -89,7 +91,7 @@ export class EngineHandoff extends EnginePr {
 
   /** the agent's plan: a card in its chat; your answer goes back to it as a chat line */
   async plan(id: string, steps: string[]) {
-    const t = this.req(id)
+    const t = this.e.req(id)
     t.plan = steps
     const q: Question = {
       id: `plan:${t.id}:${Date.now()}`,
@@ -100,26 +102,26 @@ export class EngineHandoff extends EnginePr {
       noteRequiredFor: 1,
       to: `${t.id} agent`,
     }
-    this.chats.post(this.key(t), { id: q.id, question: q })
-    this.save()
+    this.e.chats.post(this.e.key(t), { id: q.id, question: q })
+    this.e.save()
   }
 
   /** the agent's own progress (lineclear status): its line, how far through the task, the minutes left if it said */
   report(id: string, msg: string, progress: number, left?: number) {
-    const t = this.req(id)
+    const t = this.e.req(id)
     if (ended(t)) throw new Error(`${t.id} is Done already (${t.closed ? 'nothing to merge' : 'merged'})`)
     // reported done: nothing shows, and a line kept now would come back stale once it works again
     if (t.reported) throw new Error(`${t.id} is Ready: no progress shows until it works again.`)
     const at = Date.now()
-    this.heard.set(t.id, at)
-    t.report = { msg: fitStatus(msg), progress, left, at, pausedAt: this.statusOf(t) === 'need' ? at : undefined }
-    this.save()
+    this.e.heard.set(t.id, at)
+    t.report = { msg: fitStatus(msg), progress, left, at, pausedAt: this.e.statusOf(t) === 'need' ? at : undefined }
+    this.e.save()
     return t.report
   }
 
   /** a heartbeat from the extension while the agent's tool call runs: a sign of life, nothing more */
   alive(id: string, at = Date.now()) {
-    this.beat.set(this.req(id).id, at)
+    this.e.beat.set(this.e.req(id).id, at)
   }
 
   /**
@@ -127,7 +129,7 @@ export class EngineHandoff extends EnginePr {
    * answer) has nothing to merge: it is closed, Done at once, and put away once the agent's turn ends.
    */
   async done(id: string, summary: string, facts?: string): Promise<'ready' | 'closed' | 'ended'> {
-    const t = this.req(id)
+    const t = this.e.req(id)
     if (ended(t)) return 'ended'
     // the gates that run no test would fail the merge check: the agent hears them now, not after a turn in the lane
     const gates = t.worktree && t.base && (await exists(t.worktree)) ? await Lane.fastGatesFailure(t.worktree, t.base) : undefined
@@ -148,18 +150,18 @@ export class EngineHandoff extends EnginePr {
     t.report = undefined
     if (t.worktree && t.base && (await exists(t.worktree)) && !(await G.dirty(t.worktree)) && (await G.aheadCount(t.worktree, t.base)) === 0) {
       this.markClosed(t, 'done')
-      if (this.agents.status(this.key(t)) !== 'working') await this.cleanup(t)
+      if (this.e.agents.status(this.e.key(t)) !== 'working') await this.cleanup(t)
       return 'closed'
     }
-    this.save()
+    this.e.save()
     // told once its turn ends: an agent that merges right after never shows as waiting
-    this.settle(t)
+    this.e.settle(t)
     // its pull request gets the summary and is ready for review; GitHub away changes nothing here
-    if (t.pr && !t.merged) this.readyForReview(t).catch((e) => this.troubled(t, e))
+    if (t.pr && !t.merged) this.e.prPart.readyForReview(t).catch((e) => this.e.launchPart.troubled(t, e))
     return 'ready'
   }
 
-  protected markClosed(t: TaskRec, by: 'done' | 'close') {
+  markClosed(t: TaskRec, by: 'done' | 'close') {
     Object.assign(t, {
       closed: true,
       closedBy: by,
@@ -170,14 +172,14 @@ export class EngineHandoff extends EnginePr {
       stopped: undefined,
       todo: undefined,
     })
-    this.settle(t)
+    this.e.settle(t)
     this.dropEndedOutbox()
   }
 
   /** whether this agent's task is done or closed */
   endedKey(key: string) {
-    const t = this.task(key.split('/')[0])
-    return !!t && key === this.key(t) && ended(t)
+    const t = this.e.task(key.split('/')[0])
+    return !!t && key === this.e.key(t) && ended(t)
   }
 
   /** the refusal for a message to a task that is over, naming its state */
@@ -187,7 +189,7 @@ export class EngineHandoff extends EnginePr {
 
   /** what waited for an agent of a task that is over is dropped: it would be retried for ever */
   dropEndedOutbox() {
-    this.agents.dropOutboxWhere?.((key) => this.endedKey(key))
+    this.e.agents.dropOutboxWhere?.((key) => this.endedKey(key))
   }
 
   /**
@@ -196,18 +198,18 @@ export class EngineHandoff extends EnginePr {
    * kept and said so. A branch with commits main lacks is refused (and its agent told) unless the human chose to discard.
    */
   async close(id: string, summary?: string, facts?: string, discard = false): Promise<{ kept: string[] }> {
-    const t = this.req(id)
+    const t = this.e.req(id)
     if (ended(t)) throw new Error(`${t.id} is Done already (${t.closed ? 'nothing to merge' : 'merged'})`)
-    const key = this.key(t)
+    const key = this.e.key(t)
     // a branch with commits only here is no "nothing to merge": the task goes back to its agent
-    const p = this.places.space(t.project) && this.proj(t)
-    const left = !discard && p && t.branch ? await this.onMachineOf(t, () => unmerged(p.path, t.branch!, t.base ?? p.base, t.id)) : 0
+    const p = this.e.places.space(t.project) && this.e.proj(t)
+    const left = !discard && p && t.branch ? await this.e.onMachineOf(t, () => unmerged(p.path, t.branch!, t.base ?? p.base, t.id)) : 0
     if (left) {
       const why = `${t.branch} has ${left} commit${left === 1 ? '' : 's'} ${t.base ?? p?.base} lacks, so ${t.id} is not Done with nothing to merge: finish it with ready, and merge it.`
-      await this.agents.send(key, why, { ensure: () => this.launch(t) }).catch((e) => this.troubled(t, e))
+      await this.e.agents.send(key, why, { ensure: () => this.e.launch(t) }).catch((e) => this.e.launchPart.troubled(t, e))
       throw new Error(why)
     }
-    if (this.agents.status(key) === 'working') await this.agents.interrupt(key)
+    if (this.e.agents.status(key) === 'working') await this.e.agents.interrupt(key)
     if (summary) t.said = summary
     if (facts) t.facts = facts
     this.markClosed(t, 'close')
@@ -217,11 +219,11 @@ export class EngineHandoff extends EnginePr {
 
   /** what a task's worktree and branch hold that its base lacks, in words ("~/x (uncommitted changes)"); none: nothing is lost */
   async holds(t: TaskRec): Promise<string[]> {
-    if (!this.places.space(t.project)) return []
-    const p = this.proj(t)
+    if (!this.e.places.space(t.project)) return []
+    const p = this.e.proj(t)
     const on = t.base ?? p.base
-    return this.onMachineOf(t, async () =>
-      this.wtOf(t).holds({ repo: p.path, wt: t.worktree, branch: t.branch, base: on, squashes: await this.squashes(t, p.path, on) }),
+    return this.e.onMachineOf(t, async () =>
+      this.e.wtOf(t).holds({ repo: p.path, wt: t.worktree, branch: t.branch, base: on, squashes: await this.squashes(t, p.path, on) }),
     )
   }
 
@@ -230,13 +232,13 @@ export class EngineHandoff extends EnginePr {
    * with lineclear todo, until something is written to it. Its work, worktree and chat stay.
    */
   async pause(id: string) {
-    const t = this.req(id)
-    if (this.statusOf(t) !== 'work') throw new Error(`${t.id} isn't working: only a working task is paused`)
+    const t = this.e.req(id)
+    if (this.e.statusOf(t) !== 'work') throw new Error(`${t.id} isn't working: only a working task is paused`)
     // To do first: the turn the interrupt ends is no question for you
     t.todo = true
-    t.paused = this.agents.status(this.key(t)) === 'working' ? 'sent' : 'idle'
-    await this.agents.interrupt(this.key(t))
-    this.settle(t)
+    t.paused = this.e.agents.status(this.e.key(t)) === 'working' ? 'sent' : 'idle'
+    await this.e.agents.interrupt(this.e.key(t))
+    this.e.settle(t)
     return t
   }
 
@@ -245,17 +247,17 @@ export class EngineHandoff extends EnginePr {
    * work (said in news, and in lineclear status). Marked cleaned only once done, so one cut short (a restart) or put
    * off (something still runs in its space) is tried again.
    */
-  protected async cleanup(t: TaskRec, quiet = false) {
-    const p = this.places.space(t.project)
+  async cleanup(t: TaskRec, quiet = false) {
+    const p = this.e.places.space(t.project)
     if (!p || !move(t, 'clean')) return
     try {
       const r = await this.putAway(t, p.path, p.base)
       const news = r.kept.length && JSON.stringify(r.kept) !== JSON.stringify(t.kept)
       t.kept = r.kept.length ? r.kept : undefined
       t.cleaned = true
-      this.save()
+      this.e.save()
       if (news && !quiet)
-        this.emit('news', t.project, `${t.id} ${t.closed ? 'is done, nothing to merge' : 'was merged'}; kept ${r.kept.join(', ')}`, 'done', {
+        this.e.emit('news', t.project, `${t.id} ${t.closed ? 'is done, nothing to merge' : 'was merged'}; kept ${r.kept.join(', ')}`, 'done', {
           task: t.id,
           event: t.closed ? 'closed' : 'merged',
         })
@@ -267,22 +269,22 @@ export class EngineHandoff extends EnginePr {
 
   /** a merged task's branch is checked against its squash merge: the one recorded, else (merged before one was) the
    *  commits its subject names */
-  protected async putAway(t: TaskRec, repo: string, base: string) {
-    const key = this.key(t)
+  async putAway(t: TaskRec, repo: string, base: string) {
+    const key = this.e.key(t)
     const on = t.base ?? base
-    return this.onMachineOf(t, async () =>
-      this.wtOf(t).putAway({
+    return this.e.onMachineOf(t, async () =>
+      this.e.wtOf(t).putAway({
         repo,
         wt: t.worktree,
         branch: t.branch,
         base: on,
         squashes: await this.squashes(t, repo, on),
-        closeAgent: () => this.agents.finish(key),
+        closeAgent: () => this.e.agents.finish(key),
       }),
     )
   }
 
-  protected async squashes(t: TaskRec, repo: string, on: string) {
+  async squashes(t: TaskRec, repo: string, on: string) {
     return !t.merged ? [] : t.squash ? [t.squash] : G.squashesOf(repo, on, t.id)
   }
 }

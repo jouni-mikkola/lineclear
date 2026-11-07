@@ -1,13 +1,14 @@
 // What GitHub says of a repo, read once for every task in it: callers during a read share it, and one younger than they
 // ask for is reused, so waiting for checks costs no calls of its own.
 import * as GH from './github.ts'
+import * as News from './github-news.ts'
 
 /** ok; down: gh could not read the repo (outage, bad answer); unauthenticated: gh is not logged in to it */
 export type RepoState = { state: 'ok' | 'down' | 'unauthenticated'; since: number; said?: string }
 
 interface Read {
   at: number
-  prs: Map<number, GH.OpenPr>
+  prs: Map<number, News.OpenPr>
 }
 
 export class RepoWatch {
@@ -32,7 +33,7 @@ export class RepoWatch {
     this.reads.set(key, e)
     if (e.done && Date.now() - e.done.at <= maxAge) return e.done
     if (!e.going) {
-      e.going = GH.openPrs(g, cwd)
+      e.going = News.openPrs(g, cwd)
         .then((list) => {
           const done = { at: Date.now(), prs: new Map(list.map((o) => [o.pr.number, o])) }
           e.done = done

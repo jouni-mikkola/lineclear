@@ -1,26 +1,27 @@
+import type { Engine } from './engine.ts'
 import type { Space } from '../places.ts'
 import { splitBrief } from '../settings-block.ts'
 import * as G from './git.ts'
 import * as GH from './github.ts'
+import * as News from './github-news.ts'
 import { type TaskRec, ended, CHECKS_EVERY, CHECKS_SHOW, LATER, failKey, ghNow } from './engine-helpers.ts'
 import type * as Lane from './lane.ts'
-import { EngineLaunch } from './engine-launch.ts'
-import { RepoWatch } from './repo-watch.ts'
 
 /** a task's pull request on GitHub: opening it, its words and GitHub's checks */
-export class EnginePr extends EngineLaunch {
+export class EnginePr {
+  constructor(private readonly e: Engine) {}
+
   /** GitHub's word on each repo, read once for all its tasks (watching them, waiting for their checks) */
-  protected repos = new RepoWatch()
 
   /**
    * The project's GitHub repo when gh is logged in to its host, read live: a repo may gain its remote after it was
    * added. Each form of origin is tried (as git rewrites it, as written) for one gh is logged in to. None: the task
    * merges here. Logged in but GitHub not answering throws: that never falls back to merging here.
    */
-  protected async hub(p: Space): Promise<GH.GitHub | null> {
+  async hub(p: Space): Promise<GH.GitHub | null> {
     const was = p.github
-    await this.places.recheckGithub(p)
-    if (p.github !== was) this.emit('changed')
+    await this.e.places.recheckGithub(p)
+    if (p.github !== was) this.e.emit('changed')
     let down: string | undefined
     for (const g of await GH.githubs(p.path)) {
       const l = await GH.ghLogin(g, p.path)
@@ -35,7 +36,7 @@ export class EnginePr extends EngineLaunch {
    * The pull request's words: what changed (the agent's summary), why (the brief's first paragraph, without the
    * Settings block Lineclear adds) and the proof (the facts line, one bullet per fact).
    */
-  protected prBody(t: TaskRec) {
+  prBody(t: TaskRec) {
     if (!t.said) return 'Work in progress: the summary comes when the task is done.'
     const why = splitBrief(t.desc ?? '')[0]
       .replace(LATER, '')
@@ -50,19 +51,19 @@ export class EnginePr extends EngineLaunch {
   }
 
   /** its pull request as GitHub has it now: the one recorded, else the branch's own (one opened by hand) */
-  protected async prOf(t: TaskRec, g: GH.GitHub, cwd: string) {
+  async prOf(t: TaskRec, g: GH.GitHub, cwd: string) {
     const known = t.pr ? await GH.viewPr(g, cwd, t.pr.number) : null
     // one closed on GitHub is no longer its pull request: the branch may have another
     const pr = known && known.state !== 'CLOSED' ? known : await GH.findPr(g, cwd, t.branch!)
     if ((pr?.number ?? null) !== (t.pr?.number ?? null) && (pr || known?.state === 'CLOSED')) {
       t.pr = pr ? { number: pr.number, url: pr.url } : undefined
-      this.save()
+      this.e.save()
     }
     return pr
   }
 
-  protected async readyForReview(t: TaskRec, hub?: GH.GitHub) {
-    const p = this.proj(t)
+  async readyForReview(t: TaskRec, hub?: GH.GitHub) {
+    const p = this.e.proj(t)
     const g = hub ?? (await this.hub(p))
     if (!g || !t.pr) return
     await GH.editPr(g, p.path, t.pr.number, this.prBody(t))
@@ -70,18 +71,18 @@ export class EnginePr extends EngineLaunch {
   }
 
   /** push the task's branch as it is committed, to GitHub: forced, since it is rebased on main and only its agent's */
-  protected async push(t: TaskRec) {
+  async push(t: TaskRec) {
     const sha = (await G.git(t.worktree!, 'rev-parse', 'HEAD')).out
     const r = await G.git(t.worktree!, 'push', '--quiet', '--force', 'origin', `HEAD:refs/heads/${t.branch}`)
     if (r.ok) {
       t.pushed = { sha, at: Date.now() }
-      this.save()
+      this.e.save()
     }
     return r
   }
 
   /** a GitHub step that could not reach GitHub says so, and did nothing */
-  protected async onGitHub<T extends { ok: boolean }>(f: () => Promise<T>, failed: (why: string) => T): Promise<T> {
+  async onGitHub<T extends { ok: boolean }>(f: () => Promise<T>, failed: (why: string) => T): Promise<T> {
     try {
       return await f()
     } catch (e) {
@@ -95,15 +96,15 @@ export class EnginePr extends EngineLaunch {
    */
   openPr(id: string): Promise<{ ok: boolean; text: string }> {
     return this.onGitHub(
-      () => this.openPrNow(this.req(id)),
+      () => this.openPrNow(this.e.req(id)),
       (text) => ({ ok: false, text }),
     )
   }
 
-  protected async openPrNow(t: TaskRec): Promise<{ ok: boolean; text: string }> {
+  async openPrNow(t: TaskRec): Promise<{ ok: boolean; text: string }> {
     if (ended(t)) return { ok: false, text: `${t.id} is Done already (${t.closed ? 'nothing to merge' : 'merged'}).` }
     if (!t.worktree || !t.branch || !t.base) return { ok: false, text: `${t.id} has no branch yet.` }
-    const p = this.proj(t)
+    const p = this.e.proj(t)
     const g = await this.hub(p)
     if (!g)
       return {
@@ -113,7 +114,7 @@ export class EnginePr extends EngineLaunch {
     if ((await G.aheadCount(t.worktree, t.base)) === 0)
       return { ok: false, text: `${t.id} has no commits yet: commit your work, then run lineclear pr ${t.id} again.` }
     const dirty = await G.dirty(t.worktree)
-    const pushed = await this.push(t)
+    const pushed = await this.e.push(t)
     if (!pushed.ok) return { ok: false, text: `Could not push ${t.branch} to GitHub: ${(pushed.err || pushed.out).split('\n')[0]}` }
     const pr = await this.prOf(t, g, t.worktree)
     if (pr && pr.baseRefName !== t.base)
@@ -125,13 +126,13 @@ export class EnginePr extends EngineLaunch {
       const o = await GH.openPr(g, t.worktree, { branch: t.branch, base: t.base, title: t.title, body: this.prBody(t), draft: !t.reported })
       if ('error' in o) return { ok: false, text: `Pushed ${t.branch}, but GitHub did not open a pull request: ${o.error}` }
       t.pr = { number: o.number, url: o.url }
-      this.save()
+      this.e.save()
       opened = true
     } else if (t.reported) await this.readyForReview(t, g)
     const head = (await G.git(t.worktree, 'rev-parse', '--short', 'HEAD')).out
     return {
       ok: true,
-      text: `${opened ? `Opened PR #${t.pr!.number}${t.reported ? '' : ' as a draft'}` : `Pushed to PR #${t.pr!.number}`} at ${head}: ${t.pr!.url}${dirty ? '\nUncommitted changes are not in it: commit them and run lineclear pr again.' : ''}\n${(t.waitChecks ?? this.settings.ways(p.name).waitChecks) ? `Next: lineclear checks ${t.id} waits for GitHub's checks (run it with a long timeout, up to 10 minutes).` : `Merging doesn't wait for GitHub's checks (lineclear checks ${t.id} waits for any that run on it, if you want to see them).`}`,
+      text: `${opened ? `Opened PR #${t.pr!.number}${t.reported ? '' : ' as a draft'}` : `Pushed to PR #${t.pr!.number}`} at ${head}: ${t.pr!.url}${dirty ? '\nUncommitted changes are not in it: commit them and run lineclear pr again.' : ''}\n${(t.waitChecks ?? this.e.settings.ways(p.name).waitChecks) ? `Next: lineclear checks ${t.id} waits for GitHub's checks (run it with a long timeout, up to 10 minutes).` : `Merging doesn't wait for GitHub's checks (lineclear checks ${t.id} waits for any that run on it, if you want to see them).`}`,
     }
   }
 
@@ -141,7 +142,7 @@ export class EnginePr extends EngineLaunch {
    * it, none is none: the repo's workflows may not run on pull requests). GitHub not answering three times running
    * is said, not waited on.
    */
-  protected async checksOf(t: TaskRec, g: GH.GitHub, n: number, waitMs: number): Promise<GH.PrChecks> {
+  async checksOf(t: TaskRec, g: GH.GitHub, n: number, waitMs: number): Promise<GH.PrChecks> {
     const t0 = Date.now()
     const head = (await G.git(t.worktree!, 'rev-parse', 'HEAD')).out
     const expect = await GH.hasPrWorkflows(t.worktree!)
@@ -162,7 +163,7 @@ export class EnginePr extends EngineLaunch {
   /** the checks as the repo's one read has them; asked of gh for this pull request alone when that read can't tell */
   private async sharedChecks(g: GH.GitHub, cwd: string, n: number, head: string, maxAge: number) {
     try {
-      const shared = await this.repos.checks(g, cwd, n, head, maxAge)
+      const shared = await this.e.repos.checks(g, cwd, n, head, maxAge)
       if (shared) return shared
     } catch (e) {
       if (!(e instanceof GH.GhDown)) throw e
@@ -173,44 +174,45 @@ export class EnginePr extends EngineLaunch {
   /** failed checks with the names of the tests their job logs show as failed */
   private async withTests(g: GH.GitHub, cwd: string, c: GH.PrChecks): Promise<GH.PrChecks> {
     if (c.state !== 'fail') return c
-    const failed = await Promise.all(c.failed.map(async (f) => (f.link ? { ...f, tests: await GH.failedTestNames(g, cwd, f.link) } : f)))
+    const failed = await Promise.all(c.failed.map(async (f) => (f.link ? { ...f, tests: await News.failedTestNames(g, cwd, f.link) } : f)))
     return { ...c, failed }
   }
 
   /** a ready task's next step into main (Merging), or none: Ready again, or back at work */
-  protected land(t: TaskRec, step?: Lane.Landing['step'], due?: number) {
+  land(t: TaskRec, step?: Lane.Landing['step'], due?: number) {
     // a merge the lane released goes no further
     if (step && G.stepSignal.getStore()?.aborted) throw new Error(`${t.id}'s merge was released by the lane`)
     if (!t.reported || ended(t)) return
     t.landing = step ? { step, at: Date.now(), due } : undefined
-    this.save()
-    this.settle(t)
+    this.e.save()
+    this.e.settle(t)
   }
 
   /** when GitHub's checks at `head` should be through: from when it was pushed, as long as they took lately */
-  protected async checksDue(t: TaskRec, p: Space, g: GH.GitHub, head: string) {
-    let took = this.took.get(p.path)
+  async checksDue(t: TaskRec, p: Space, g: GH.GitHub, head: string) {
+    let took = this.e.took.get(p.path)
     if (!took || Date.now() - took.at > 30 * 60_000) {
       took = { ms: await GH.checksTook(g, p.path).catch(() => undefined), at: Date.now() }
-      this.took.set(p.path, took)
+      this.e.took.set(p.path, took)
     }
     if (took.ms === undefined) return undefined
     return (t.pushed?.sha === head ? t.pushed.at : Date.now()) + took.ms
   }
 
   /** which of GitHub's checks failed, and where to see why */
-  protected checksFailed(n: number, c: GH.PrChecks) {
+  checksFailed(n: number, c: GH.PrChecks) {
     const link = c.failed.find((f) => f.link)?.link
     const tests = [...new Set(c.failed.flatMap((f) => f.tests ?? []))]
     return `GitHub's checks failed on PR #${n}: ${c.failed.map((f) => f.name).join(', ')}.${tests.length ? ` Failing tests: ${tests.join(', ')}.` : ''}${link ? ` See ${link} (gh run view --log-failed shows why).` : ''}`
   }
 
-  protected fixIt = (t: TaskRec) =>
-    `Fix it, commit, push with lineclear pr ${t.id}, wait with lineclear checks ${t.id}, then run lineclear merge ${t.id} again.`
+  fixIt(t: TaskRec) {
+    return `Fix it, commit, push with lineclear pr ${t.id}, wait with lineclear checks ${t.id}, then run lineclear merge ${t.id} again.`
+  }
 
-  protected async checksNow(t: TaskRec, waitMs: number): Promise<{ ok: boolean; text: string }> {
+  async checksNow(t: TaskRec, waitMs: number): Promise<{ ok: boolean; text: string }> {
     if (!t.worktree || !t.branch) return { ok: false, text: `${t.id} has no branch yet.` }
-    const p = this.proj(t)
+    const p = this.e.proj(t)
     const g = await this.hub(p)
     if (!g) return { ok: true, text: `No GitHub checks: ${p.name} has no GitHub remote, or gh isn't logged in to it. Run the project's own checks here.` }
     const pr = await this.prOf(t, g, t.worktree)
@@ -235,8 +237,8 @@ export class EnginePr extends EngineLaunch {
   }
 
   /** checks that failed at a commit were told to the agent (lineclear checks, merge): watching won't tell it again */
-  protected toldFailed(t: TaskRec, head: string, c: GH.PrChecks) {
+  toldFailed(t: TaskRec, head: string, c: GH.PrChecks) {
     t.watch = { ...t.watch, since: t.watch?.since ?? ghNow(), failed: failKey(head, c) }
-    this.save()
+    this.e.save()
   }
 }

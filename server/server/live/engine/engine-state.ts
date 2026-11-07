@@ -6,54 +6,57 @@ import type { Agents } from '../agents.ts'
 import type { Chats } from '../chats.ts'
 import { HOST, type Places, type Space } from '../places.ts'
 import type { Settings } from '../settings.ts'
+import { RepoWatch } from './repo-watch.ts'
 import { TaskRows } from './task-rows.ts'
 import { join } from 'node:path'
 import type { Worktrees } from './worktrees.ts'
 import { type Phase, move } from './phase.ts'
 import { type TaskRec, ended, type PeerTask, splitRef, MERGE_DEADLINE, type Events } from './engine-helpers.ts'
 
-export abstract class EngineState extends Emitter<Events> {
+export abstract class Core extends Emitter<Events> {
   constructor(
-    protected agents: Agents,
-    protected chats: Chats,
-    protected places: Places,
-    protected settings: Settings,
+    readonly agents: Agents,
+    readonly chats: Chats,
+    readonly places: Places,
+    readonly settings: Settings,
   ) {
     super()
   }
 
-  protected store = new TaskRows<TaskRec>()
-  protected data = this.store.load()
+  store = new TaskRows<TaskRec>()
+  data = this.store.load()
   taskIds!: TaskIds
-  protected wrote = new Map<string, number>()
+  /** what GitHub said about each repo lately, read once per repo */
+  readonly repos = new RepoWatch()
+  wrote = new Map<string, number>()
   /** tasks written to whose agent has not yet said agent_start or agent_settled: they read as work until it does */
-  protected answering = new Set<string>()
+  answering = new Set<string>()
   /** when its agent last reported its progress (lineclear status) */
-  protected heard = new Map<string, number>()
+  heard = new Map<string, number>()
   /** the last heartbeat of an agent in a tool call (lineclear alive): pi writes its log only when a call ends */
-  protected beat = new Map<string, number>()
+  beat = new Map<string, number>()
   /** one merge at a time per repo: each one's main checkout is shared */
-  protected merging = new Map<string, Promise<unknown>>()
+  merging = new Map<string, Promise<unknown>>()
   /** merges past the deadline: their caller may be gone, so an error not sent back yet goes to the chat */
-  protected callerLeft = new Set<string>()
+  callerLeft = new Set<string>()
   /** merges released in a row, per task: the second restarts its agent */
-  protected released = new Map<string, number>()
+  released = new Map<string, number>()
   /** the way to end the merge of a task that holds its lane */
-  protected frees = new Map<string, (r: { ok: false; error: string; freed: true }) => void>()
+  frees = new Map<string, (r: { ok: false; error: string; freed: true }) => void>()
   /** per repo, the commit its main is red at in the required check, kept by the main watch */
-  protected heldRed = new Map<string, string>()
+  heldRed = new Map<string, string>()
   /** how long a merge may hold its repo's line before the lane releases it; none: the project's turn limit (tests shorten it) */
   headLimitMs?: number
   /** each task's merge while it runs */
-  protected landings = new Map<string, Promise<{ ok: boolean; error?: string; note?: string }>>()
+  landings = new Map<string, Promise<{ ok: boolean; error?: string; note?: string }>>()
   /** how long a stopping Lineclear waits for the merges on their way, and after which a merge's caller may be gone
    *  (tests shorten it) */
   mergeDeadline = MERGE_DEADLINE
   /** stopping: no merge starts */
-  protected closing = false
+  closing = false
   /** how long GitHub's checks took lately, per repo, and when that was asked */
-  protected took = new Map<string, { ms?: number; at: number }>()
-  protected wt!: Worktrees
+  took = new Map<string, { ms?: number; at: number }>()
+  wt!: Worktrees
   /** other machines' tasks, for a task queued after one (the main copy only: it is the one that sees them) */
   peerTask?: PeerTask
   /** a CLI is installed here (a test says) */
@@ -62,19 +65,19 @@ export abstract class EngineState extends Emitter<Events> {
    *  measured, which holds nothing by load */
   machine?: (machine?: string) => { busy?: 'cpu' | 'memory'; herdr: boolean } | undefined
   /** when a held task last started while load decided */
-  protected lastStart = 0
-  protected releasing = false
-  protected checking = false
+  lastStart = 0
+  releasing = false
+  checking = false
   /** the look at done tasks' pull requests that is under way */
-  protected watching: Promise<void> | undefined
-  protected watchingMain = false
+  watching: Promise<void> | undefined
+  watchingMain = false
 
   get tasks() {
     return this.data.tasks
   }
 
   /** ids other machines hold, so a new id skips them */
-  protected foreignIds = new Set<string>()
+  foreignIds = new Set<string>()
 
   /** by id or alias; "this-machine:ID" names this machine's own task */
   task(id: string) {
@@ -98,7 +101,7 @@ export abstract class EngineState extends Emitter<Events> {
   }
 
   /** writes the rows of the tasks that changed */
-  protected save() {
+  save() {
     this.store.save(this.data)
     this.emit('changed')
   }
@@ -106,7 +109,7 @@ export abstract class EngineState extends Emitter<Events> {
   /** the machines tasks run on besides the server's own, by label */
   readonly machines = new Map<string, BoxInfo>()
   /** a machine's own worktree keeper, when its herdr is not the one the server's is reached through (tests) */
-  protected readonly machineWt = new Map<string, Worktrees>()
+  readonly machineWt = new Map<string, Worktrees>()
 
   /** names a machine tasks may run on; `wt` is its herdr's worktree keeper when it differs from the server's */
   addMachine(box: BoxInfo, wt?: Worktrees) {
@@ -122,18 +125,18 @@ export abstract class EngineState extends Emitter<Events> {
   }
 
   /** the worktree keeper for the task's machine */
-  protected wtOf(t: Pick<TaskRec, 'machine'>): Worktrees {
+  wtOf(t: Pick<TaskRec, 'machine'>): Worktrees {
     return (t.machine && this.machineWt.get(t.machine)) || this.wt
   }
 
   /** runs `fn` for the task's machine: its commands, files and herdr calls go there, as on the server's own */
-  protected onMachineOf<T>(t: Pick<TaskRec, 'machine'>, fn: () => T): T {
+  onMachineOf<T>(t: Pick<TaskRec, 'machine'>, fn: () => T): T {
     const box = t.machine ? this.machines.get(t.machine) : undefined
     return t.machine ? onMachine(box ?? null, fn) : fn()
   }
 
   /** the task's project, its folder as that machine has it (`~/` is that machine's home) */
-  protected proj(t: TaskRec): Space {
+  proj(t: TaskRec): Space {
     const p = this.places.space(t.project)
     if (!p) throw new Error(`${t.id}: its project is gone`)
     if (!t.machine) return p
@@ -142,17 +145,17 @@ export abstract class EngineState extends Emitter<Events> {
     return { ...p, path: home && at.startsWith('~/') ? join(home, at.slice(2)) : at }
   }
 
-  protected inPhase(t: TaskRec, phase: Phase) {
+  inPhase(t: TaskRec, phase: Phase) {
     return (t.phase ?? 'idle') === phase
   }
 
   /** once the engine is up: a start, a handoff or a clean-up it was in the middle of is gone, so its phase is too.
    *  A brief phase stays: its agent may still take the brief up, and resumeQueue arms its timer again */
-  protected endPhases() {
+  endPhases() {
     for (const t of this.tasks) if (!this.inPhase(t, 'briefing')) move(t, 'interrupted')
   }
 
-  protected key(t: TaskRec) {
+  key(t: TaskRec) {
     return `${t.id}/Agent`
   }
 
@@ -164,7 +167,7 @@ export abstract class EngineState extends Emitter<Events> {
 
   abstract statusOf(t: TaskRec): TaskStatus
   /** lets go of a merge that held its line past its limit (engine-tidy) */
-  declare protected releaseHead: (t: TaskRec, ctl: AbortController, limitMs: number) => Promise<void>
+  abstract get releaseHead(): (t: TaskRec, ctl: AbortController, limitMs: number) => Promise<void>
   abstract subOf(t: TaskRec, status?: TaskStatus): string
 
   /** a task's agent may be written to: not stopped, paused, waiting for a go, archived or
@@ -175,12 +178,12 @@ export abstract class EngineState extends Emitter<Events> {
   }
 
   /** it asks you something: a choice card or the CLI's own question still open (facts, never a guess from its words) */
-  protected asks(key: string) {
+  asks(key: string) {
     return !!(this.chats.openCard(key) || this.chats.openQuestion(key))
   }
 
   /** tell coordinators and the screen when the status changed; a card when it now waits on you or is done */
-  protected settleOne(t: TaskRec) {
+  settleOne(t: TaskRec) {
     const status = this.statusOf(t)
     this.pace(t, status)
     if (status === t.told) return this.emit('changed')
@@ -223,7 +226,7 @@ export abstract class EngineState extends Emitter<Events> {
   }
 
   /** its report follows its status: its clock stops while it waits on you, and the report goes once its job is over */
-  protected pace(t: TaskRec, status: TaskStatus) {
+  pace(t: TaskRec, status: TaskStatus) {
     const r = t.report
     if (!r) return
     if (status === 'need') r.pausedAt ??= Date.now()
@@ -235,13 +238,13 @@ export abstract class EngineState extends Emitter<Events> {
   }
 
   /** what it shows now is taken as told and posted: nothing about it is news */
-  protected quiet(t: TaskRec, status = this.statusOf(t)) {
+  quiet(t: TaskRec, status = this.statusOf(t)) {
     t.told = status
     t.posted = `${status}|${this.subOf(t, status)}`
     this.save()
   }
 
-  protected req(id: string) {
+  req(id: string) {
     const t = this.task(id)
     if (!t) throw new Error(`No task ${id}`)
     return t
@@ -258,7 +261,7 @@ export abstract class EngineState extends Emitter<Events> {
   }
 
   /** a task's project's name, for its defaults */
-  protected nameOf(t: TaskRec) {
+  nameOf(t: TaskRec) {
     return this.places.space(t.project)?.name
   }
 }
