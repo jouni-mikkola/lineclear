@@ -44,8 +44,21 @@ const { Resumes } = await import('../server/live/agent-resume.ts')
 const until = async (ok: () => boolean, ms = 5000) => {
   for (const end = Date.now() + ms; !ok(); await Bun.sleep(20)) if (Date.now() > end) throw new Error('timed out')
 }
-const lines = (file: string) => (Bun.file(file).size ? Bun.file(file).text().then((t) => t.split('\n').filter(Boolean)) : Promise.resolve([]))
-const spec = (key: string) => ({ key, name: `shep-${key.split('/')[0].toLowerCase()}`, kind: 'pi' as const, cwd: join(dir, 'wt'), workspace: key, model: 'default', rpc: true })
+const lines = (file: string) =>
+  Bun.file(file).size
+    ? Bun.file(file)
+        .text()
+        .then((t) => t.split('\n').filter(Boolean))
+    : Promise.resolve([])
+const spec = (key: string) => ({
+  key,
+  name: `shep-${key.split('/')[0].toLowerCase()}`,
+  kind: 'pi' as const,
+  cwd: join(dir, 'wt'),
+  workspace: key,
+  model: 'default',
+  rpc: true,
+})
 
 describe('agents resume after a restart', () => {
   test('5 live agents start again within 10 s with their session; only a cut turn is told to carry on', async () => {
