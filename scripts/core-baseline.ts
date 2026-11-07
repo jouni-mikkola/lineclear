@@ -103,7 +103,11 @@ function start(n: number): void {
 function reviewCallTokens(task: string): number | undefined {
   const file = join(BOARD, "reviews", `${task}.json`);
   if (!existsSync(file)) return undefined;
-  return (JSON.parse(readFileSync(file, "utf8")) as { inputTokens?: number }).inputTokens;
+  try {
+    return (JSON.parse(readFileSync(file, "utf8")) as { inputTokens?: number }).inputTokens;
+  } catch {
+    return undefined;
+  }
 }
 
 function tokens(n: number): void {

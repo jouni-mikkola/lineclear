@@ -123,10 +123,12 @@ export function review(i: ReviewInput, env: NodeJS.ProcessEnv = process.env): Re
     return { ok: false, error: `the reviewer's answer had no findings in the form asked for: ${text.slice(0, 200)}` };
   recordWork(i.task, "review", env);
   const path = reviewPath(i.task, env);
+  // a second round overwrites the file, so its size adds to the first round's
+  const before = existsSync(path) ? ((JSON.parse(readFileSync(path, "utf8")) as { inputTokens?: number }).inputTokens ?? 0) : 0;
   mkdirSync(dirname(path), { recursive: true });
   writeAtomic(
     path,
-    `${JSON.stringify({ task: i.task, model, time: new Date().toISOString(), inputTokens: Math.ceil(question.length / 4), findings }, null, 2)}\n`,
+    `${JSON.stringify({ task: i.task, model, time: new Date().toISOString(), inputTokens: before + Math.ceil(question.length / 4), findings }, null, 2)}\n`,
   );
   return { ok: true, findings, model, note };
 }
