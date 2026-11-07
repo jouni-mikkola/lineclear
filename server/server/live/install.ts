@@ -21,7 +21,7 @@ export interface Saved {
   enabled: boolean
 }
 
-async function herdrJson<T>(args: string[], fallback: T): Promise<T> {
+async function herdrJson<T, F>(args: string[], fallback: F): Promise<T | F> {
   try {
     return JSON.parse((await herdrCli(args))?.out ?? '') as T
   } catch {
@@ -29,12 +29,15 @@ async function herdrJson<T>(args: string[], fallback: T): Promise<T> {
   }
 }
 
-/** every machine saved in herdr's Remote that is turned on */
-export const savedMachines = async () => (await herdrJson<Saved[]>(['machine', 'list', '--json'], [])).filter((m) => m.enabled !== false && m.label)
+/** every machine saved in herdr's Remote that is turned on; null when herdr could not be read (not an empty list) */
+export const savedMachines = async () =>
+  (await herdrJson<Saved[], null>(['machine', 'list', '--json'], null))?.filter((m) => m.enabled !== false && m.label) ?? null
 
 /** whether herdr reaches each: "reachable", or what is wrong */
 export const machineStatus = async () =>
-  Object.fromEntries((await herdrJson<{ label: string; status: string; error: string | null }[]>(['machine', 'status', '--json'], [])).map((m) => [m.label, m]))
+  Object.fromEntries(
+    (await herdrJson<{ label: string; status: string; error: string | null }[], never[]>(['machine', 'status', '--json'], [])).map((m) => [m.label, m]),
+  )
 
 /** a command on a machine over the shared SSH connection, before a worker for it runs */
 async function onMachine(target: string, script: string, o: { stdin?: Uint8Array | string; timeoutMs?: number } = {}) {
