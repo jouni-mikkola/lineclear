@@ -8,7 +8,6 @@ import { clean, isAppPath, placeOf, type View, viewOf } from "./routes.ts";
 
 // the views the first screen does not need load when they are opened, so the first script stays small
 const TaskView = lazy(() => import("./task.tsx").then((m) => ({ default: m.TaskView })));
-const Search = lazy(() => import("./search.tsx").then((m) => ({ default: m.Search })));
 const Chat = lazy(() => import("./chat-view.tsx").then((m) => ({ default: m.Chat })));
 const Browsers = lazy(() => import("./browsers.tsx").then((m) => ({ default: m.Browsers })));
 const Roadmap = lazy(() => import("./roadmap/index.tsx").then((m) => ({ default: m.Roadmap })));
@@ -53,22 +52,6 @@ function useHold(loading: boolean) {
     return () => clearTimeout(t);
   }, []);
   return loading && !late;
-}
-
-/** `/` opens the search, unless a field has the keys. The search code loads on the first one, not with the page. */
-function useSearchKey() {
-  const [searching, setSearching] = useState(false);
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey || t?.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t?.tagName ?? "")) return;
-      e.preventDefault();
-      setSearching(true);
-    };
-    addEventListener("keydown", key);
-    return () => removeEventListener("keydown", key);
-  }, []);
-  return [searching, setSearching] as const;
 }
 
 /** Links and history: a link followed changes the view in place, back and forward keep each entry's scroll place. */
@@ -218,7 +201,6 @@ export function App() {
   const view = viewOf(path);
   const { project, step, ask, session, task } = placeOf(path);
   const [usageOpen, setUsageOpen] = useState(false);
-  const [searching, setSearching] = useSearchKey();
   const { scroll, from, back, go } = useNavigation(setPath);
   // the chat keeps its own place: the newest message
   useLayoutEffect(() => {
@@ -290,11 +272,6 @@ export function App() {
   };
   return (
     <div className="contents" style={hold ? { visibility: "hidden" } : undefined}>
-      {searching && (
-        <Suspense fallback={null}>
-          <Search go={go} onClose={() => setSearching(false)} />
-        </Suspense>
-      )}
       <Frame
         view={shown}
         project={project}

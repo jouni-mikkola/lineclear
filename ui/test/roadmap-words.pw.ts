@@ -1,4 +1,4 @@
-// Plain words on every Roadmap page (the one page, the line, a step, the chain, since you last looked): a step id is
+// Plain words on every Roadmap page (the one page, the line, a step, the chain): a step id is
 // never bare, it stands before its title, and no lock, slot, quota, check tier or task id shows. The words are those of
 // docs/brand.md ("Words").
 import { expect, test } from "@playwright/test";
