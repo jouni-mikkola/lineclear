@@ -89,7 +89,7 @@ export class LiveSourceTaskWords extends LiveSourceSecrets {
         }
       }
       const pr = named && this.places.space(named) ? this.places.space(named)! : this.projectFor(p, ctx)
-      // claimed before the first await: a second add of the step, from any machine, meets the claim and not a gap
+      // claimed before the first await: a second add of the step on this board meets the claim, not a gap
       const stepId = stepIdOfTitle(title)
       const repo = pr.github ?? pr.path
       const first = stepId ? this.stepClaims.take(repo, stepId, this.byWho(ctx)) : undefined
@@ -99,7 +99,12 @@ export class LiveSourceTaskWords extends LiveSourceSecrets {
         await validateBase(pr.path, one(p, 'base') ?? pr.base)
         const commits = stepId && one(p, 'reopened') !== 'true' ? await commitsOf(pr.path, one(p, 'base') ?? pr.base) : []
         const open = this.engine.tasks.filter((x) => x.project === placeId.space(pr.name) && !x.archived && !ended(x))
-        const refused = whyStepRefused(title, open, commits)
+        const elsewhere = (this.peers?.list() ?? []).flatMap((l) =>
+          (l.snap?.tasks ?? [])
+            .filter((x) => x.status !== 'done' && !x.archived && x.place === placeId.space(pr.name))
+            .map((x) => ({ id: `${l.rec.machine}:${x.id}`, title: x.name })),
+        )
+        const refused = whyStepRefused(title, [...open, ...elsewhere], commits)
         if (refused) throw new Error(refused)
         const after = p.opts.after ?? []
         const agent = harnessOf(p, this.settings)
