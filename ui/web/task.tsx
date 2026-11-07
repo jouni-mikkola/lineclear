@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { useFadeIn } from "../kit/hooks.ts";
+import type { Task } from "../kit/parts.tsx";
+import { TaskHead, TaskNotFound } from "../kit/task-head.tsx";
 import { Chat } from "./chat-view.tsx";
 import { chatState, useChat } from "./chat.tsx";
+import { sampleState, useHome } from "./data.ts";
 import { ChangesTab } from "./task-changes.tsx";
 import { TerminalTab } from "./task-live.tsx";
 
@@ -20,6 +23,25 @@ const tabOf = (): Tab => {
   const t = new URLSearchParams(location.search).get("tab");
   return TABS.some(([k]) => k === t) ? (t as Tab) : "chat";
 };
+
+// The sample states know one task; any other id is one nothing has.
+const SAMPLE_TASK: Task = {
+  id: "WEB-3",
+  title: "W3 Totals follow the removed line",
+  state: "work",
+  stage: "review",
+  step: "W3",
+  model: "vendor-b/model-review",
+};
+
+/** The task as the board lists it: undefined while the board loads, null when it does not have it. */
+function useTaskFacts(id: string): Task | null | undefined {
+  const sample = sampleState();
+  const home = useHome(sample);
+  if (sample) return sample === "loading" ? undefined : id === SAMPLE_TASK.id ? SAMPLE_TASK : null;
+  if (home.status !== "ok") return undefined;
+  return [...home.data.projects.flatMap((p) => p.tasks), ...(home.data.loose ?? [])].find((t) => t.id === id) ?? null;
+}
 
 export function TaskView({ id }: { id: string }) {
   const chat = useChat(chatState(), true, `/api/task/${encodeURIComponent(id)}/chat`);
@@ -42,23 +64,28 @@ export function TaskView({ id }: { id: string }) {
     addEventListener("keydown", key);
     return () => removeEventListener("keydown", key);
   });
+  const task = useTaskFacts(id);
+  // a task the board lacks and whose chat is missing too is no task here; one with a chat is only older than the board's list
+  if (task === null && (sampleState() || chat.view?.state === "none")) return <TaskNotFound id={id} />;
   return (
-    <>
-      <nav className="mx-auto flex max-w-3xl gap-1 px-4 pt-3" aria-label={`${id} views`} data-task-tabs>
-        {TABS.map(([k, label]) => (
-          <button
-            key={k}
-            type="button"
-            aria-current={tab === k ? "page" : undefined}
-            onClick={() => pick(k)}
-            className={`min-h-9 rounded-sm px-3 text-sm focus-visible:outline-2 focus-visible:outline-accent ${tab === k ? "bg-raised3 text-fg" : "text-fg3 hover:text-fg"}`}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
+    <div className="mx-auto w-full max-w-[760px]">
+      <TaskHead id={id} task={task ?? undefined}>
+        <nav className="-mx-3 mt-3 flex gap-1" aria-label={`${id} views`} data-task-tabs>
+          {TABS.map(([k, label]) => (
+            <button
+              key={k}
+              type="button"
+              aria-current={tab === k ? "page" : undefined}
+              onClick={() => pick(k)}
+              className={`min-h-9 rounded-sm px-3 text-sm focus-visible:outline-2 focus-visible:outline-accent ${tab === k ? "bg-raised3 text-fg" : "text-fg3 hover:text-fg"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+      </TaskHead>
       {tab === "chat" ? <Chat chat={chat} task={id} /> : <LiveTab key={tab} tab={tab} id={id} />}
-    </>
+    </div>
   );
 }
 
@@ -66,7 +93,7 @@ export function TaskView({ id }: { id: string }) {
 function LiveTab({ tab, id }: { tab: Exclude<Tab, "chat">; id: string }) {
   const box = useFadeIn<HTMLDivElement>();
   return (
-    <div ref={box} className="mx-auto max-w-3xl px-4 py-4" data-task-live={tab}>
+    <div ref={box} className="py-4" data-task-live={tab}>
       {tab === "terminal" ? <TerminalTab id={id} /> : <ChangesTab id={id} />}
     </div>
   );
