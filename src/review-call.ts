@@ -131,7 +131,14 @@ export function reviewMain(rest: string[], out: (line: string) => void, env: Nod
   const t = JSON.parse(shown.stdout.toString()) as { desc?: string; base?: string };
   const brief = t.desc ?? "";
   const r = review(
-    { task, repo: process.cwd(), base: t.base ?? "main", brief, reviewer: asked ?? briefModel(brief, "Reviewer"), worker: briefModel(brief, "Agent") },
+    {
+      task,
+      repo: process.cwd(),
+      base: t.base ?? "main",
+      brief,
+      reviewer: asked ?? briefModel(brief, "Reviewer"),
+      worker: asked ? undefined : briefModel(brief, "Agent"),
+    },
     env,
   );
   if (!r.ok) return (out(`lineclear review: ${r.error}`), 1);
