@@ -137,9 +137,9 @@ function extensionProblem(paths: Paths): string {
 
 function service(p: Probe): Check {
   const name = "service";
-  // install.sh writes no unit where systemd has no user services, and says to run `lineclear run --board` instead
+  // install.sh writes no unit where systemd has no user services, and says to run `lineclear run` instead
   if (p.run(["systemctl", "--user", "show-environment"]) === null)
-    return { name: "service: none on this machine, `lineclear run --board` starts it", problem: "", fix: "" };
+    return { name: "service: none on this machine, `lineclear run` starts it", problem: "", fix: "" };
   if (!existsSync(p.paths.unit)) {
     return { name, problem: `the ${SERVICE} unit file is missing`, fix: INSTALL_AGAIN };
   }
@@ -175,7 +175,7 @@ function compileCache(p: Probe): Check {
   };
 }
 
-/** Two board units on one store start every step twice and make server.json flip between them. */
+/** The service is the one server. A board unit beside it (an older install's) starts every step twice and makes server.json flip between them. */
 function oneServer(p: Probe): Check {
   const out = p.run(["systemctl", "--user", "list-units", "--state=active", "--plain", "--no-legend", "lineclear-serve-*.service"]) ?? "";
   const units = out
@@ -184,8 +184,8 @@ function oneServer(p: Probe): Check {
     .filter((u) => u.startsWith("lineclear-serve-"));
   return {
     name: "one server",
-    problem: units.length > 1 ? `${units.length} servers share this store: ${units.join(", ")}` : "",
-    fix: `systemctl --user stop ${units.slice(1).join(" ")}`,
+    problem: units.length > 0 ? `a board unit runs beside the service on this store: ${units.join(", ")}` : "",
+    fix: `systemctl --user disable --now ${units.join(" ")}`,
   };
 }
 

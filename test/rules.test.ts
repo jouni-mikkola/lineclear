@@ -570,7 +570,9 @@ test("run ticks every 30 s by default, and the user service runs `lineclear run`
     spy.mockRestore();
     clear.mockRestore();
   }
-  expect(readFileSync(join(import.meta.dir, "..", "install.sh"), "utf8")).toContain('write_unit "$unit" Lineclear "$(command -v bun) $code/bin/lineclear run"');
+  expect(readFileSync(join(import.meta.dir, "..", "install.sh"), "utf8")).toContain(
+    'write_unit "$unit" Lineclear "$(command -v bun) $code/bin/lineclear run --port $(board_port)"',
+  );
 });
 
 test("locks: a task whose worktree is gone and whose agent is dead holds none, so a step with the same lock starts", () => {

@@ -9,7 +9,7 @@ describe("the parallel-safe gate", () => {
     expect(faults("server.listen(8080)")[0]).toContain("fixed port");
   });
   test("passes port 0 and a configured port", () => {
-    expect(faults("Bun.serve({ port: 0, fetch })", "expect(webAddress({})).toEqual({ port: 7420 })")).toEqual([]);
+    expect(faults("Bun.serve({ port: 0, fetch })", "expect(webAddress({})).toEqual({ port: 7421 })")).toEqual([]);
   });
   test("fails a write outside the temp folder", () => {
     expect(faults('writeFileSync("/etc/x", "a")')[0]).toContain("outside its temp folder");

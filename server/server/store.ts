@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, w
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 
-/** where the server listens unless LINECLEAR_PORT says otherwise (7420 is the board's web pages) */
+/** where the server listens unless LINECLEAR_PORT says otherwise (the web pages and the rule loop run in the same process) */
 export const DEFAULT_PORT = 7421
 
 export const HOME = process.env.LINECLEAR_HOME || (process.env.NODE_ENV === 'test' ? testHome() : join(homedir(), '.lineclear'))

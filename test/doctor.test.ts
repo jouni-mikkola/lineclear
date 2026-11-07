@@ -61,7 +61,7 @@ test("a machine with no systemd user services needs no unit: the loop runs with 
   const own = pathsFor({ HOME: dir });
   const svc = doctorChecks(probe({ paths: own, run: () => null })).find((c) => c.name.startsWith("service"));
   expect(svc?.problem).toBe("");
-  expect(svc?.name).toContain("lineclear run --board");
+  expect(svc?.name).toContain("`lineclear run`");
   rmSync(dir, { recursive: true });
 });
 
@@ -197,14 +197,12 @@ test("doctor fails on an installed file or pi setting that points into a git che
   rmSync(dir, { recursive: true, force: true });
 });
 
-test("two board units on one store fail the one-server check", () => {
-  const units = "lineclear-serve-7421.service loaded active running a\nlineclear-serve-7787.service loaded active running b\n";
-  const two = doctorChecks(probe({ run: (c) => (c.includes("lineclear-serve-*.service") ? units : null) })).find((c) => c.name === "one server");
-  expect(two?.problem).toContain("lineclear-serve-7787.service");
-  expect(two?.fix).toBe("systemctl --user stop lineclear-serve-7787.service");
-  const one = doctorChecks(probe({ run: (c) => (c.includes("lineclear-serve-*.service") ? units.split("\n").slice(0, 1).join("") : null) })).find(
-    (c) => c.name === "one server",
-  );
+test("a board unit beside the service fails the one-server check", () => {
+  const unit = "lineclear-serve-7421.service loaded active running a\n";
+  const two = doctorChecks(probe({ run: (c) => (c.includes("lineclear-serve-*.service") ? unit : null) })).find((c) => c.name === "one server");
+  expect(two?.problem).toContain("lineclear-serve-7421.service");
+  expect(two?.fix).toBe("systemctl --user disable --now lineclear-serve-7421.service");
+  const one = doctorChecks(probe({ run: () => null })).find((c) => c.name === "one server");
   expect(one?.problem).toBe("");
 });
 

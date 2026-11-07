@@ -6,6 +6,12 @@ import { holderPort, lockStore } from './lock.ts'
 import { Push } from './push.ts'
 import { DEFAULT_PORT, HOME, writeJson } from './store.ts'
 
+interface Mounted {
+  fetch: (req: Request) => Promise<Response | undefined>
+  /** ends the web pages and the loop, which finishes its tick first */
+  stop: () => Promise<void>
+}
+
 const port = Number(process.env.LINECLEAR_PORT ?? DEFAULT_PORT)
 
 const holder = lockStore(HOME)
@@ -25,7 +31,10 @@ if (push && 'devices' in source && 'pushWarnings' in source) {
 }
 // a worker for another machine (machines.ts) serves only its main machine, which pushes alerts itself
 const worker = !!process.env.LINECLEAR_BOX
-const server = startApp({ source, push: worker ? undefined : push, port })
+// the web pages and the rule loop of Lineclear's CLI (src/serve.ts) run in this process, on this port; a worker has none
+const mounted =
+  !worker && process.env.LINECLEAR_MOUNT ? await ((await import(process.env.LINECLEAR_MOUNT)) as { mount: () => Promise<Mounted> }).mount() : undefined
+const server = startApp({ source, push: worker ? undefined : push, port, mounted: mounted?.fetch })
 // a worker says which code it runs: the main server keeps it across its own restart while that is the same
 writeJson('server.json', { port: server.port, pid: process.pid, code: worker ? (await import('./live/machines.ts')).codeVersion() : undefined })
 let tunnel: { stop(): void } | undefined
@@ -63,6 +72,7 @@ for (const sig of ['SIGINT', 'SIGTERM'] as const)
     stopping = true
     if (await source.drain?.()) await Bun.sleep(500)
     tunnel?.stop()
+    await mounted?.stop()
     source.stop?.()
     server.stop()
     process.exit(0)

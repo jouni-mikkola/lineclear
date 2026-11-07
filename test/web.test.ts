@@ -55,7 +55,7 @@ test("nothing outside the folder is read", async () => {
 });
 
 test("the address comes from LINECLEAR_HOST and LINECLEAR_PORT", () => {
-  expect(webAddress({})).toEqual({ hostname: "127.0.0.1", port: 7420 });
+  expect(webAddress({})).toEqual({ hostname: "127.0.0.1", port: 7421 });
   expect(webAddress({ LINECLEAR_HOST: "0.0.0.0", LINECLEAR_PORT: "8000" })).toEqual({ hostname: "0.0.0.0", port: 8000 });
   expect(() => webAddress({ LINECLEAR_PORT: "web" })).toThrow("not a port");
 });

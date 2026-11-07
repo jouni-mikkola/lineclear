@@ -95,7 +95,7 @@ test("the repo's bin/lineclear refuses the stable config and data folders and ch
   const [plain, stableEnv, port, noData, ok, version] = await Promise.all([
     run({}, "project", "list"),
     run({ LINECLEAR_CONFIG: stableConfig }, "project", "list"),
-    run({ ...config, LINECLEAR_HOME: join(own, "data"), LINECLEAR_PORT: "7420" }, "project", "list"),
+    run({ ...config, LINECLEAR_HOME: join(own, "data"), LINECLEAR_PORT: "7421" }, "project", "list"),
     run(config, "project", "list"),
     run({ ...config, LINECLEAR_HOME: join(own, "data") }, "project", "list"),
     run({}, "--version"),
@@ -105,7 +105,7 @@ test("the repo's bin/lineclear refuses the stable config and data folders and ch
     expect(p.stderr).toContain("stable config folder");
     expect(p.stderr).toContain("LINECLEAR_CONFIG");
   }
-  expect(port.stderr).toContain("stable port 7420");
+  expect(port.stderr).toContain("stable port 7421");
   expect(noData.stderr).toContain("stable data folder");
   expect(ok.exitCode).toBe(0);
   expect(version.exitCode).toBe(0);
@@ -117,15 +117,15 @@ test("the repo's bin/lineclear refuses the stable config and data folders and ch
 test("a serving command with no port of its own is refused as the stable port", () => {
   const own = { HOME: "/tmp/own", LINECLEAR_CONFIG: "/tmp/own/config", LINECLEAR_HOME: "/tmp/own/data" };
   const stable = "/home/stable";
-  expect(stableRefusal(process.cwd(), ["run"], own, stable)).toContain("stable port 7420");
-  expect(stableRefusal(process.cwd(), ["serve", "--port", "7420"], own, stable)).toContain("stable port 7420");
+  expect(stableRefusal(process.cwd(), ["run"], own, stable)).toContain("stable port 7421");
+  expect(stableRefusal(process.cwd(), ["serve", "--port", "7421"], own, stable)).toContain("stable port 7421");
   expect(stableRefusal(process.cwd(), ["serve", "--port", "9123"], own, stable)).toBe("");
   expect(stableRefusal(process.cwd(), ["project", "list"], own, stable)).toBe("");
 });
 
 test("roadmap check runs from a checkout on the stable folders, status does not", () => {
   const stable = "/home/stable";
-  const onStable = { HOME: stable, LINECLEAR_PORT: "7420" };
+  const onStable = { HOME: stable, LINECLEAR_PORT: "7421" };
   expect(stableRefusal(process.cwd(), ["roadmap", "check", "."], onStable, stable)).toBe("");
   expect(stableRefusal(process.cwd(), ["roadmap", "status", ".", "--space", "x"], onStable, stable)).toContain("stable");
 });

@@ -4,8 +4,8 @@ Every view of Lineclear is built from the parts here, so each part is built once
 U1's chosen Home direction, The line ([brand.md](brand.md)): projects as tracks that fill green, tasks as state
 shapes, one answer first.
 
-`lineclear run` serves the web pages at `http://127.0.0.1:7420/` (`LINECLEAR_HOST` and `LINECLEAR_PORT` change
-it). Its data answers only to an address, `localhost` or a name listed in `LINECLEAR_HOSTS` (comma separated), so
+`lineclear run` (or `lineclear serve`) is one process on one port: the rule loop, the web pages at
+`http://127.0.0.1:7421/` and the board's API (`LINECLEAR_PORT` changes the port). Its data answers only to an address, `localhost` or a name listed in `LINECLEAR_HOSTS` (comma separated), so
 a web page cannot point its own name at this machine to read it.
 
 ## The views as they are

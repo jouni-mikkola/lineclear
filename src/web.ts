@@ -166,8 +166,8 @@ function watchInboxFolder(env: Env, onChange: () => void): () => void {
   return () => clearInterval(timer);
 }
 
-/** Serves the built pages and their data. */
-export function serveWeb(dir: string, address = webAddress(), env: Env = process.env, push?: Promise<Pusher>, feed?: ProjectsFeed) {
+/** The built pages and their data as a handler, with what it watches. `stop` ends the feed and the watchers. */
+export function webHandler(dir: string, env: Env = process.env, push?: Promise<Pusher>, feed?: ProjectsFeed) {
   // a test run (it sets LINECLEAR_DOCTOR_FILE) serves fixed data and never changes the machine it runs on
   const real = env.LINECLEAR_DOCTOR_FILE === undefined;
   const projects = feed ?? (real ? projectsFeed(env) : undefined);
@@ -185,54 +185,42 @@ export function serveWeb(dir: string, address = webAddress(), env: Env = process
     (p) => (unwatch = watchInbox(p, env as NodeJS.ProcessEnv)),
     (e) => console.error(`lineclear: no push: ${(e as Error).message}`),
   );
+  return {
+    fetch: async (req: Request): Promise<Response> => {
+      const url = new URL(req.url);
+      if (url.pathname.startsWith("/api/")) {
+        return apiAnswer(live, api, req, url, knownHost(url.hostname, env));
+      }
+      // a name this server does not know gets no page and no token
+      if (!knownHost(url.hostname, env)) return json({ error: `${url.hostname} is not a name of this server. Add it to LINECLEAR_HOSTS.` }, 403);
+      const res = webResponse(dir, req.url, req.headers.get("accept-encoding") ?? "");
+      if (res.headers.get("content-type")?.startsWith("text/html")) res.headers.append("set-cookie", `${TOKEN_COOKIE}=${PAGE_TOKEN}; Path=/; SameSite=Strict`);
+      return res;
+    },
+    stop() {
+      unwatch?.();
+      unwatchFolder();
+      clearTimeout(changed);
+      projects?.stop();
+    },
+  };
+}
+
+/** Serves the built pages and their data on a port of their own: the demo and tests. The real server mounts `webHandler` in the board's. */
+export function serveWeb(dir: string, address = webAddress(), env: Env = process.env, push?: Promise<Pusher>, feed?: ProjectsFeed) {
+  const web = webHandler(dir, env, push, feed);
   let server: ReturnType<typeof Bun.serve>;
   try {
-    server = Bun.serve({
-      ...address,
-      fetch: async (req) => {
-        const url = new URL(req.url);
-        if (url.pathname.startsWith("/api/")) {
-          return apiAnswer(live, api, req, url, knownHost(url.hostname, env));
-        }
-        // a name this server does not know gets no page and no token
-        if (!knownHost(url.hostname, env)) return json({ error: `${url.hostname} is not a name of this server. Add it to LINECLEAR_HOSTS.` }, 403);
-        const res = webResponse(dir, req.url, req.headers.get("accept-encoding") ?? "");
-        if (res.headers.get("content-type")?.startsWith("text/html"))
-          res.headers.append("set-cookie", `${TOKEN_COOKIE}=${PAGE_TOKEN}; Path=/; SameSite=Strict`);
-        return res;
-      },
-    });
+    server = Bun.serve({ ...address, fetch: web.fetch });
   } catch (e) {
     // a port in use must not leave the feed's thread reading
-    projects?.stop();
+    web.stop();
     throw e;
   }
   const stop = server.stop.bind(server);
   server.stop = (force?: boolean) => {
-    unwatch?.();
-    unwatchFolder();
-    clearTimeout(changed);
-    projects?.stop();
+    web.stop();
     return stop(force);
   };
   return server;
-}
-
-/** Serves the built web pages beside the loop. Without them it says how to build them and the rules run on. */
-export async function startWeb(out: (l: string) => void) {
-  if (!existsSync(join(WEB_DIST, "index.html"))) {
-    console.error(`lineclear run: no web pages: they are not built. Run: cd ${dirname(dirname(WEB_ROOT))} && bun run web:build`);
-    return undefined;
-  }
-  try {
-    // the push code is loaded first: while it loads, LINECLEAR_HOME is set, and nothing that copies the environment may start before that ends
-    const push = realPush();
-    await push.catch(() => undefined);
-    const server = serveWeb(WEB_DIST, undefined, process.env, push);
-    out(`lineclear run: web pages at http://${server.hostname}:${server.port}/`);
-    return { stop: () => void server.stop(true) };
-  } catch (e) {
-    console.error(`lineclear run: no web pages: ${e instanceof Error ? e.message : e}`);
-    return undefined;
-  }
 }

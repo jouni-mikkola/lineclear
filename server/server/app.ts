@@ -16,9 +16,11 @@ export interface AppOptions {
   push?: Push
   port: number
   host?: string
+  /** Answers what the board does not own (the web pages and their data); undefined leaves the request to the board's 404 */
+  mounted?: (req: Request) => Promise<Response | undefined>
 }
 
-export function startApp({ source, push, port, host = '127.0.0.1' }: AppOptions) {
+export function startApp({ source, push, port, host = '127.0.0.1', mounted }: AppOptions) {
   const live = new Set<ServerWebSocket<Sock>>()
   const send = (ws: ServerWebSocket<Sock>, e: ServerEvent) => ws.send(JSON.stringify(e))
 
@@ -84,13 +86,16 @@ export function startApp({ source, push, port, host = '127.0.0.1' }: AppOptions)
       const path = at >= 0 ? url.pathname.slice(at) : url.pathname
       const q = url.searchParams
       // only this app's own pages may act: another website in your browser can't (no cross-site requests)
-      if (path.startsWith('/api/') && !sameSite(req, path)) return new Response('forbidden', { status: 403 })
+      // the mounted web pages send their own token header, which a cross-site request can't add without a preflight; they check it themselves
+      const webPage = mounted !== undefined && req.headers.has('x-lineclear-token')
+      if (path.startsWith('/api/') && !webPage && !sameSite(req, path)) return new Response('forbidden', { status: 403 })
 
       if (path === '/api/ws')
         return srv.upgrade(req, { data: { chats: [], term: null, visible: false, push: null } }) ? undefined : new Response('upgrade failed', { status: 400 })
 
       try {
-        if (path === '/api/chat') {
+        // the web's chat of the Dispatcher shares the path; the board's has a chat key
+        if (path === '/api/chat' && q.has('chat')) {
           const key = q.get('chat') ?? ''
           return json({ chat: source.chat(key) ?? null, status: source.chatStatus?.(key) })
         }
@@ -166,20 +171,22 @@ export function startApp({ source, push, port, host = '127.0.0.1' }: AppOptions)
             }),
           )
         }
-        if (path === '/api/push/key') return json({ key: push?.publicKey ?? null })
+        // the mounted web pages keep their own push (their devices and key); the board's is for a server with none
+        if (path === '/api/push/key' && !mounted) return json({ key: push?.publicKey ?? null })
         // what waits on you: the service worker sets the app icon's count with it after a notification button answers
         if (path === '/api/waiting') return json(waiting(source.snapshot()))
-        if (path === '/api/push/subscribe' && req.method === 'POST') {
+        if (path === '/api/push/subscribe' && req.method === 'POST' && !mounted) {
           const b = await req.json()
           push?.subscribe(b.sub, b.device)
           source.emit('snapshot')
           return json({ ok: true })
         }
+        const web = await mounted?.(req)
+        if (web) return web
         if (path.startsWith('/api/')) return json({ error: 'Not found' }, 404)
       } catch (e) {
         return json({ error: (e as Error).message }, 500)
       }
-      // no page is served: the new UI and the CLI use the API alone
       return new Response('Not found', { status: 404 })
     },
     websocket: {
