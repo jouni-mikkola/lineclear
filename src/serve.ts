@@ -1,11 +1,9 @@
-import { EventEmitter } from "node:events";
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { writeAtomic } from "../pi/atomic.ts";
 import { startHerdr } from "./board.ts";
 import { dataDir, serverBin } from "./paths.ts";
 import { realPush } from "./notify.ts";
-import { runMain } from "./rules.ts";
 import { WEB_DIST } from "./web-files.ts";
 import { webHandler } from "./web.ts";
 
@@ -40,22 +38,43 @@ export async function mount(env: NodeJS.ProcessEnv = process.env) {
   const push = real ? realPush() : undefined;
   await push?.catch(() => undefined);
   const web = built ? webHandler(dir, env, push) : undefined;
-  // the loop's stop signals come from here; a stray error is survived as the loop always did, not left to end the board
-  const stopper = new EventEmitter();
-  const signals = {
-    once: (e: string, f: (...a: any[]) => void) => stopper.once(e, f),
-    on: (e: string, f: (...a: any[]) => void) => (e === "uncaughtException" || e === "unhandledRejection" ? process.on(e, f) : stopper.on(e, f)),
-  };
-  const loop = real ? runMain([], console.log, undefined, { signals }) : Promise.resolve(0);
-  let stopping = false;
-  void loop.then((code) => stopping || console.error(`lineclear: the rule loop ended (${code}), the server runs on without it`));
+  const loop = real ? superviseLoop() : undefined;
   return {
     fetch: async (req: Request) => web?.fetch(req),
     async stop() {
-      stopping = true;
       web?.stop();
-      stopper.emit("SIGTERM");
-      await loop;
+      await loop?.stop();
+    },
+  };
+}
+
+const RESTART_MS = 5_000;
+
+/** Runs the rule loop as one process of its own, so its commands never hold up the web server, and starts it again when it crashes. */
+function superviseLoop(): { stop(): Promise<void> } {
+  let stopping = false;
+  let child: ReturnType<typeof Bun.spawn> | undefined;
+  let restart: ReturnType<typeof setTimeout> | undefined;
+  const start = () => {
+    child = Bun.spawn([process.execPath, join(import.meta.dir, "..", "bin", "lineclear"), "run"], {
+      env: process.env,
+      stdin: "ignore",
+      stdout: "inherit",
+      stderr: "inherit",
+    });
+    void child.exited.then((code) => {
+      if (stopping) return;
+      console.error(`lineclear: the rule loop ended (${code}), starting it again in ${RESTART_MS / 1000} s`);
+      restart = setTimeout(start, RESTART_MS);
+    });
+  };
+  start();
+  return {
+    async stop() {
+      stopping = true;
+      clearTimeout(restart);
+      child?.kill("SIGTERM");
+      await child?.exited;
     },
   };
 }
