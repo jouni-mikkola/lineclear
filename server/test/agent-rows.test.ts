@@ -54,3 +54,12 @@ test('what went in is kept across a restart, with the news already delivered', (
   expect(again.since('k', Date.now() + 1)).toEqual([])
   expect(readFileSync(join(dir, 'sent.jsonl'), 'utf8')).toContain('"receipt"')
 })
+
+test('receipts of the older file move into the log and the older files go', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sent-'))
+  writeFileSync(join(dir, 'requested-news-receipts.json'), JSON.stringify(['requested-news:old']))
+  writeFileSync(join(dir, 'typed.json'), '[]')
+  expect(new SentLog(dir).received('requested-news:old')).toBe(true)
+  expect(existsSync(join(dir, 'typed.json'))).toBe(false)
+  expect(new SentLog(dir).received('requested-news:old')).toBe(true)
+})

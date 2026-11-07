@@ -17,6 +17,7 @@ export class AgentsState extends Emitter<Events> {
   records: Record<string, AgentRecord> = this.rows.read()
   // news held in an older version's outbox is dropped too (quiet.ts)
   outbox: OutItem[] = readJson<OutItem[]>('outbox.json', []).filter((o) => !machineNews(o.text))
+  private outboxWritten = JSON.stringify(this.outbox)
   live = new Map<string, AgentInfo>()
   /** the agents that run as a child of this server, by chat key: herdr knows nothing of them */
   rpcs = new Map<string, RpcAgent>()
@@ -64,6 +65,10 @@ export class AgentsState extends Emitter<Events> {
 
   save() {
     this.rows.write(this.records)
+    // a save for a record change leaves the outbox file as it is
+    const waiting = JSON.stringify(this.outbox)
+    if (waiting === this.outboxWritten) return
+    this.outboxWritten = waiting
     writeJson('outbox.json', this.outbox)
   }
 

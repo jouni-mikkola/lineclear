@@ -68,7 +68,7 @@ export class ColdLog<T extends object> {
     return [...cold, ...hot]
   }
 
-  /** Appends what changed among the cold records and returns the rest, for the whole file. */
+  /** Appends what changed among the records `isCold` picks and returns the rest, for the whole file. */
   save(tasks: T[], isCold: (t: T) => boolean, out: (t: T) => T = (t) => t): T[] {
     const hot: T[] = []
     const lines: string[] = []
@@ -143,6 +143,7 @@ export function readAgentRows<T extends AgentLine>(dir = HOME): Record<string, T
 export class AgentRows<T extends AgentLine = AgentLine> {
   private rows: ColdLog<T>
   private older: string
+  private olderGone = false
 
   constructor(dir = HOME) {
     this.rows = new ColdLog<T>(COLD_AGENTS, 'key', dir)
@@ -156,6 +157,8 @@ export class AgentRows<T extends AgentLine = AgentLine> {
   write(records: Record<string, T>) {
     this.rows.save(Object.values(records), () => true)
     // rows from an older agents.json are in the log now; left, it would win over later rows at the next start
+    if (this.olderGone) return
     rmSync(this.older, { force: true })
+    this.olderGone = true
   }
 }

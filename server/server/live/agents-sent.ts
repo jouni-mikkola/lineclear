@@ -1,6 +1,7 @@
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { HOME } from '../store.ts'
+import { durableWrite } from './engine/task-store.ts'
 import type { OutItem } from './agents-helpers.ts'
 
 /** internal news carries a cid of this form and is never a screen's message */
@@ -15,21 +16,36 @@ type Line = { item: OutItem } | { receipt: string }
  *  screen's id is given back for) and the ids of internal news already delivered. A log of lines, one appended per delivery. */
 export class SentLog {
   private file: string
+  private receiptsFile: string
+  private typedFile: string
   private items: OutItem[] = []
   private receipts = new Set<string>()
   private lines = 0
 
   constructor(dir = HOME) {
     this.file = join(dir, 'sent.jsonl')
+    this.receiptsFile = join(dir, 'requested-news-receipts.json')
+    this.typedFile = join(dir, 'typed.json')
     this.load()
   }
 
+  /** the receipts of the older requested-news-receipts.json; its files are gone once they are in the log */
+  private takeOlder(receipts: string[]) {
+    try {
+      if (existsSync(this.receiptsFile)) receipts.unshift(...(JSON.parse(readFileSync(this.receiptsFile, 'utf8')) as string[]))
+    } catch {
+      // a file cut short has nothing to give
+    }
+    for (const f of [this.receiptsFile, this.typedFile]) rmSync(f, { force: true })
+  }
+
   private load() {
-    if (!existsSync(this.file)) return
     const now = Date.now()
     const items: OutItem[] = []
     const receipts: string[] = []
-    for (const text of readFileSync(this.file, 'utf8').split('\n')) {
+    this.takeOlder(receipts)
+    if (!existsSync(this.file) && !receipts.length) return
+    for (const text of existsSync(this.file) ? readFileSync(this.file, 'utf8').split('\n') : []) {
       try {
         const line = JSON.parse(text) as Line
         if ('item' in line && now - line.item.at < LATELY) items.push(line.item)
@@ -45,7 +61,7 @@ export class SentLog {
 
   private rewrite() {
     const lines: Line[] = [...[...this.receipts].map((receipt) => ({ receipt })), ...this.items.map((item) => ({ item }))]
-    writeFileSync(this.file, lines.map((l) => `${JSON.stringify(l)}\n`).join(''))
+    durableWrite(this.file, lines.map((l) => `${JSON.stringify(l)}\n`).join(''))
     this.lines = lines.length
   }
 
@@ -62,6 +78,7 @@ export class SentLog {
     this.append({ item: entry })
     if (item.cid && isNews(item.cid) && !this.receipts.has(item.cid)) {
       this.receipts.add(item.cid)
+      if (this.receipts.size > KEPT_RECEIPTS) this.receipts.delete(this.receipts.values().next().value as string)
       this.append({ receipt: item.cid })
     }
     // a log many times what it holds is written again from memory
