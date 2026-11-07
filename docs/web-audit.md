@@ -112,3 +112,123 @@ Result: the demo states (`?state=` on the pages `lineclear run` serves) have a c
 - locks: none
 - after: none
 - files: ui/web/samples.ts, ui/test
+
+## Round 2
+
+Survey only, no code changed. Method: `playwright-cli` on the pages `lineclear serve` serves from a fresh config, with the `?state=` samples (`many`, `tasks200`, `title`, `filled`, `task`), at 1440 and 390 px, on Home, `/inbox`, `/task/<id>`, `/settings`, `/<project>/roadmap`, `/browsers`, `/usage` and the Dispatcher panel. Motion was read from the code (`ui/kit/kit.css`, `ui/kit/motion.ts`), not measured in a trace. Severity as in round 1.
+
+W1 to W10 still hold, with these exceptions: W1 (F23), W3 (F24), W6 (F27), W7 (F28). W4, W5 and W10 hold.
+
+| # | Page | What happens | What should happen | How bad |
+| --- | --- | --- | --- | --- |
+| F23 | Home, 1440, `many` | The line's region ends after four projects: docs-site's track is cut in half at the region's bottom edge, above the table. | The line shows every project, or scrolls with a visible edge; no track is cut mid-row. | wrong |
+| F24 | Home, fresh config, 1440 and 390 | The Dispatcher panel still opens on the same "Its agent stopped…" sentence 6 times. At 200 messages the panel draws all of them with no window. | Repeated notices collapse into one with a count; a long chat is windowed. | wrong |
+| F25 | Home, 1440, `many` | The table cuts facts: "Waits for your ans…", "vendor-b/model…", "Wrote the retry …". Time reads "7 days" for a task at work. | A cut value can be read in full (title or wrap); Time is how long the task has run. | ugly |
+| F26 | Home, 390, `many` | The table head is three grey boxes (State, Time, Model) that look like buttons and sit under the line; the first row starts below the fold, 900 px down. | The head is a sort control that says so, and the first row of what needs me is above the fold. | ugly |
+| F27 | `/browsers` and `/task/NOPE-9`, 390 | `/browsers` with no sessions draws Home (repo picker, Dispatcher) under a Browsers tab; the not-found task page marks Inbox as the current view. | `/browsers` has its own empty state; a not-found page marks no view as current. | wrong |
+| F28 | Task page, 1440 and 390 | The page opens on the tabs and the chat only: no title, state, step or model, and at 1440 the tabs start 12 px left of the chat column. F13 and F15 are only half fixed. | One header with title, state, step and model; tabs on the content edge. | wrong |
+| F29 | `/web-shop/roadmap` on a project with no roadmap file, 1440 | The page is a black screen: the API answers 404 and the view draws nothing, with no frame, no message, no way back. | A not-found or error state with the frame and a link Home. | broken |
+| F30 | Inbox, 390 and 1440, `many` | 200 asks show as one card and "+199 more asks"; the page has no list, no filter, no way to reach ask 2 except that link. The header count reads "99+". | The Inbox lists the asks (windowed at 200), newest first, and the count is the real number. | wrong |
+| F31 | Settings, 1440, sample states | Models shows a ghost bar and an empty grey box that never resolve; no loading, empty or error text; "Tell this device about new Inbox items" floats under the card as a bare underlined link. | Loading, empty and error are each drawn and named; the notify link is a row of the Secrets or Notifications tab. | wrong |
+| F32 | `/usage`, 1440 | The page has no frame (no rail, no bar) and a Close button that shows an orange focus ring on load, the colour reserved for broken. With no use it draws "$0.00" and an empty chart. | Usage sits in the frame; focus is not moved on load; no use has an empty state in words. | wrong |
+| F33 | Roadmap, 1440 and 390 | The status line is one 200-character sentence ("Done about 23 Jan at the pace of the last 7 days, not sooner: 7 steps use the same part…"); every step card repeats "A customer can X and it just works." and fills the first screen. | A short status (done, at work, left, date) with the reason in Details; a card shows its result only when it differs. | ugly |
+| F34 | All views | Reduced motion is handled only in `ui/kit` (`kit.css`, `motion.ts`). Route changes, tab switches, list additions and the panel opening in `ui/web` have no named motion; only one transition sits in the web CSS. | Each state change has a named motion in the kit and none under `prefers-reduced-motion`; a trace shows 60 fps. | wrong |
+| F35 | Task page, Terminal and Changes tabs | Loading, error and long-output states of the tabs are not drawn in a sample (`?state=task` only fills Chat and Changes). | A sample for each state, shot at both widths. | wrong |
+
+Not audited: `/setup`, `/chat` as a page, Terminal tab with output, motion in a performance trace.
+
+### W11 A missing page says so
+Result: A roadmap, task or view that cannot load shows its state inside the frame with a way back, never a black screen or another page.
+- why: F27, F29: a 404 roadmap is blank, `/browsers` draws Home, and the not-found task marks Inbox.
+- done when: `/<project>/roadmap` for an unknown project, a failed API call and `/browsers` with no session each show a named state in the frame at 1440 and 390 px; the not-found page marks no view as current; a test covers each.
+- locks: routes
+- after: none
+- files: ui/web/app.tsx, ui/web/routes.ts, ui/web/frame.tsx, ui/test/errors.pw.ts
+
+### W12 The line never cuts a project
+Result: Home's line shows every project whole, however many there are.
+- why: F23: the fifth project's track is cut in half at the region's edge.
+- done when: With `?state=many` and `?state=tasks200` no track is cut by its region at 1440 and 390 px; a region that scrolls has a visible edge; screenshots at both widths.
+- locks: line
+- after: none
+- files: ui/web/home.tsx, ui/kit, ui/test/home-line.pw.ts
+
+### W13 The table says what it cuts
+Result: A cut value in the table can be read in full, and Time is how long the task has run.
+- why: F25: ellipsised state, model and last line with no way to read them; "7 days" for a running task.
+- done when: Each cut cell has the full text in its title and in the row's detail; Time is the run time of the task; a test with a 200-character `Last` reads it in full.
+- locks: task-row
+- after: none
+- files: ui/web/home-table.tsx, ui/web/home-rows.ts, ui/test/home.pw.ts
+
+### W14 The table head sorts and the first row shows
+Result: At 390 px the table head is a labelled sort control and the first row of what needs me is above the fold.
+- why: F26: three unlabelled grey boxes and a table 900 px down.
+- done when: The head says "Sort by" with the current key; with `?state=many` at 390 px the first table row starts above 700 px; screenshot at 390 px.
+- locks: table-head
+- after: W12, W13
+- files: ui/web/home-table.tsx, ui/web/home.tsx, ui/test/home.pw.ts
+
+### W15 The Dispatcher chat folds repeats and windows
+Result: The Dispatcher panel shows one line with a count for a repeated notice and stays fast at 200 messages.
+- why: F24: the same sentence six times on a fresh install, and every message drawn at 200.
+- done when: Six equal notices in a row show as one with "x6"; 200 messages draw at most 40 nodes and scroll to the newest; a test on an empty config fails on repeats.
+- locks: chat
+- after: none
+- files: ui/web/chat.tsx, ui/web/chat-view.tsx, ui/web/chat-samples.ts, ui/test/chat-panel.pw.ts
+
+### W16 The task page header
+Result: A task page opens on one header with title, state, step and model, with the tabs on the content edge.
+- why: F28: only tabs and chat show, and the tabs sit 12 px off the column.
+- done when: The header shows the four facts at 1440 and 390 px; the tabs share the chat column's left edge; screenshots at both widths and with a 200-character title.
+- locks: task-page
+- after: none
+- files: ui/web/task.tsx, ui/web/task-live.tsx, ui/test/task.pw.ts
+
+### W17 The task tabs draw every state
+Result: Terminal and Changes each have a drawn loading, empty, error and long state.
+- why: F35: only Chat and Changes are sampled, and only filled.
+- done when: A sample per tab and state exists (`?state=` on the task page); each is shot at 1440 and 390 px; none shows raw error text.
+- locks: task-tabs
+- after: none
+- files: ui/web/task-changes.tsx, ui/web/samples.ts, ui/web/lazy-samples.ts, ui/test/demo-states.pw.ts
+
+### W18 The Inbox lists the asks
+Result: The Inbox view lists every ask, windowed at 200, with the real count.
+- why: F30: one card and a link for 199 asks, and a "99+" count.
+- done when: `/inbox?state=many` shows a list with the newest first and at most 40 nodes drawn; the count in the rail and bar shows the number up to 999; screenshots at both widths.
+- locks: inbox
+- after: W11
+- files: ui/web/inbox-strip.tsx, ui/web/frame.tsx, ui/test/home-inbox.pw.ts
+
+### W19 Settings draws loading, empty and error
+Result: Each Settings tab shows named loading, empty and error states, and the notify link is a row inside a tab.
+- why: F31: a ghost bar that never resolves, and a bare link under the card.
+- done when: Each tab has a shot of each state at 1440 and 390 px; the notify link is in the Secrets tab; no ghost bar stays after the data loaded.
+- locks: settings
+- after: none
+- files: ui/web/settings.tsx, ui/web/settings-models.tsx, ui/web/settings-account.ts, ui/test/settings.pw.ts
+
+### W20 Usage sits in the frame
+Result: Usage shows inside the frame, without a focus ring on load, and says so when there is no use.
+- why: F32: no rail or bar, an orange ring on Close, and "$0.00" over an empty chart.
+- done when: `/usage` shows the rail at 1440 and the bar at 390 px; no element has focus on load; zero use shows one sentence; screenshots at both widths.
+- locks: usage
+- after: none
+- files: ui/web/usage-sheet.tsx, ui/web/usage-mark.tsx, ui/test/usage-inbox.pw.ts
+
+### W21 The roadmap's first screen is short
+Result: The roadmap opens on a short status and at most a few steps, not a run-on sentence and repeated card text.
+- why: F33: a 200-character status and "A customer can X and it just works." on every card.
+- done when: The status is under 80 characters with the reason in Details; a card shows its result only when it differs from its title; screenshots at 1440 and 390 px.
+- locks: roadmap
+- after: none
+- files: ui/web/roadmap, ui/test/roadmap.pw.ts
+
+### W22 State changes have named motion
+Result: Route changes, tab switches, list additions and the Dispatcher panel each play a named motion from the kit, and none under reduced motion.
+- why: F34: only the kit handles reduced motion, and the web pages have almost no motion.
+- done when: Each of the four has a motion id in `ui/kit/motion.ts`; a test with `prefers-reduced-motion: reduce` sees none play; a performance trace of each stays at 60 fps and a recording of each is stored.
+- locks: motion
+- after: W11, W16, W18
+- files: ui/kit/motion.ts, ui/kit/kit.css, ui/web/app.tsx, ui/test/kit.pw.ts
