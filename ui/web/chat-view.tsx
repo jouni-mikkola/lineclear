@@ -130,7 +130,7 @@ export function Chat({
   const online = chat.online && !chat.lost;
   const items = useMemo(
     () => (view ? rows(view, pending, chat.retry, chat, !!task) : []),
-    [view, pending, chat.retry, chat.plans, chat.planErrors, chat.choose, chat.answerPlan, chat.setReplyTo, task],
+    [view, pending, chat.retry, chat.plans, chat.planErrors, chat.choose, chat.answerPlan, chat.undoPlan, chat.setReplyTo, task],
   );
   const onImage = useCallback((src: string, alt: string) => setImage({ src, alt }), []);
   const writing = !!view?.writing && view.state === "ready";

@@ -3,7 +3,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, wr
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DISPATCHER_MODEL, dispatcherDir, dispatcherMain, moveMain } from "../src/dispatcher.ts";
-import { readItems } from "../src/inbox.ts";
+import { readAllItems, readItems } from "../src/inbox.ts";
 import { inboxMain } from "../src/inbox-answer.ts";
 import { planMain } from "../src/plan.ts";
 import { status } from "../src/status.ts";
@@ -70,7 +70,7 @@ test("move applies by itself, records the change, and one undo reverts it", () =
     "### B Title B\n- why: because B\n- done when:\n  - first B\n- locks: none\n- after: A, C\n",
   );
   expect(git(t.repos.demo!, "log", "-1", "--format=%s")).toBe("Lineclear: move B after A, C\n");
-  const [item] = readItems(t.env);
+  const [item] = readAllItems(t.env);
   expect(item).toMatchObject({ kind: "choice", auto: true, answer: "Approve", move: { step: "B", after: ["A", "C"] } });
   expect(item!.diff).toContain("+ after: A, C");
   expect(t.calls().some((c) => c[0] === "alert")).toBe(false);

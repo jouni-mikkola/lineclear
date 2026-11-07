@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { readItems, type Item } from "./inbox.ts";
+import { readAllItems, type Item } from "./inbox.ts";
 import { listProjectNames, readSettings } from "./project.ts";
 import { nearest } from "./resolve.ts";
 import { roadmapData } from "./roadmap-view.ts";
@@ -53,7 +53,7 @@ export function addedSteps(diff: string) {
 }
 
 /** Where one request stands, from its plan's Inbox items. */
-function planView(r: PlanRequest, items: Item[] = readItems(process.env)): PlanView {
+function planView(r: PlanRequest, items: Item[] = readAllItems(process.env)): PlanView {
   const item = items
     .filter((i) => i.auto && i.task === r.task && !i.move)
     .sort((a, b) => a.n - b.n)
@@ -65,7 +65,7 @@ function planView(r: PlanRequest, items: Item[] = readItems(process.env)): PlanV
 
 /** Every request with where it stands, newest first. */
 export const planViews = (env: Env = process.env) => {
-  const items = readItems(env as NodeJS.ProcessEnv);
+  const items = readAllItems(env as NodeJS.ProcessEnv);
   return readRequests(env)
     .map((r) => planView(r, items))
     .reverse();

@@ -5,7 +5,7 @@ import { type HomeData, type HomeProject, looseTasks, withProject } from "./home
 import type { Ctx } from "./web-ctx.ts";
 import { undoApplied } from "./plan-apply.ts";
 import { inboxMain } from "./inbox-answer.ts";
-import { projectDecisions, readItems } from "./inbox.ts";
+import { projectDecisions, readAllItems } from "./inbox.ts";
 import { lineclearDir, worktreeCost } from "./measure.ts";
 import { changeSettings } from "./project-change.ts";
 import { type AskBefore, listProjectNames, type Role, setupRoles } from "./project.ts";
@@ -159,7 +159,7 @@ const ROUTES: Route[] = [
   }),
   get(new RegExp(`^/api/applied/(${PROJECT})$`), (c, { m }) => json(appliedChanges(m[1] ?? "", c.env))),
   post(/^\/api\/inbox\/(\d+)\/undo$/, "Plans are undone", (c, { m }) => {
-    const item = readItems(proc(c)).find((i) => i.n === Number(m[1]));
+    const item = readAllItems(proc(c)).find((i) => i.n === Number(m[1]));
     if (!item) return fail(`There is no item ${m[1]}.`, 404);
     const problem = undoApplied(item, new Date(), proc(c));
     if (problem) return problemReply(problem, 409);

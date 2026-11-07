@@ -63,6 +63,7 @@ export const commands: Record<string, string> = {
   dispatcher: "Make the Dispatcher chat: dispatcher setup; dispatcher projects lists what it picks a project from",
   ask: "Put a question with choices in the project's chat, and wait for the answer (--kind login|outward); a card in a chat is card",
   card: 'Ask the chat a question with choices: card "<question>" --choice "<label>" ... (the board\'s old ask)',
+  undo: "Undo a plan or roadmap change that applied by itself: undo <n>",
   inbox: "List open items of every machine (--all adds closed ones of this one), or answer one: inbox answer <n> <choice>",
   resume: "End this task's declared wait",
   check: "Run the project's check (or the command given) in its turn: one full check at a time per machine; --changed runs only what the branch changed",
@@ -182,6 +183,7 @@ const COMMANDS: Record<string, (rest: string[], out: Out) => number | Promise<nu
   dispatcher: dispatcherMain,
   ask: askMain,
   inbox: inboxCommand,
+  undo: (rest, out) => inboxMain(["undo", ...rest], out),
 };
 
 async function installCommand(name: "doctor" | "uninstall", rest: string[], out: (line: string) => void): Promise<number> {

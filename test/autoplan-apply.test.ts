@@ -3,7 +3,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { applyPlan, undoApplied } from "../src/plan-apply.ts";
-import { readItems } from "../src/inbox.ts";
+import { readAllItems as readItems } from "../src/inbox.ts";
 
 // An applied change on a temp git repo: merged by a fake server, then undone with a revert.
 const temps: string[] = [];

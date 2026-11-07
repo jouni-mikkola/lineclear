@@ -47,7 +47,17 @@ function usePlanCards(sample: ChatState | undefined, on: boolean, api: string) {
     },
     [sample, client],
   );
-  return { plans, planErrors, answerPlan };
+  const undoPlan = useCallback(
+    async (p: PlanCard) => {
+      if (sample || !p.applied) return;
+      setPlanErrors((e) => ({ ...e, [p.task]: undefined }));
+      const r = await post<{ undone: number }>(`/api/inbox/${p.applied.id}/undo`, {});
+      setPlanErrors((e) => ({ ...e, [p.task]: r.ok ? undefined : r.error }));
+      await client.invalidateQueries({ queryKey: ["plans"] });
+    },
+    [sample, client],
+  );
+  return { plans, planErrors, answerPlan, undoPlan };
 }
 
 /** The Dispatcher's chat, live, with what you sent and attached on its way. */
@@ -133,7 +143,7 @@ export function useChat(sample: ChatState | undefined, on: boolean, api = "/api/
     if (p) void go(p);
   }, []);
 
-  const { plans, planErrors, answerPlan } = usePlanCards(sample, on, api);
+  const { plans, planErrors, answerPlan, undoPlan } = usePlanCards(sample, on, api);
   /** Answers a card the Dispatcher asked with. */
   const choose = useCallback(
     async (question: string, choice: number): Promise<string | undefined> => {
@@ -143,5 +153,5 @@ export function useChat(sample: ChatState | undefined, on: boolean, api = "/api/
     },
     [sample, api],
   );
-  return { view, pending, attached, online, lost, attach, remove, send, retry, plans, planErrors, answerPlan, choose, replyTo, setReplyTo };
+  return { view, pending, attached, online, lost, attach, remove, send, retry, plans, planErrors, answerPlan, undoPlan, choose, replyTo, setReplyTo };
 }

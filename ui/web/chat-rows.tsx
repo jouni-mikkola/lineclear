@@ -9,13 +9,23 @@ import type { Pending, useChat } from "./chat.tsx";
 const PLAN_SAID: Record<PlanCard["state"], string> = {
   planning: "The planner writes the steps again, with your note.",
   approve: "",
-  approved: "Approved. The steps are in the roadmap, and each starts when the steps before it are merged.",
+  approved: "Applied. The steps are in the roadmap, and each starts when the steps before it are merged.",
   rejected: "Rejected. The roadmap stays as it was.",
   closed: "Closed. The roadmap stays as it was.",
 };
 
 /** A plan you asked for, in the chat: to approve while it waits, then what came of it, with its live link. */
-function PlanInChat({ plan, error, onAnswer }: { plan: PlanCard; error?: string; onAnswer: (choice: string, note?: string) => void }) {
+function PlanInChat({
+  plan,
+  error,
+  onAnswer,
+  onUndo,
+}: {
+  plan: PlanCard;
+  error?: string;
+  onAnswer: (choice: string, note?: string) => void;
+  onUndo: () => void;
+}) {
   const steps = plan.steps.length ? `${plan.steps.length === 1 ? "1 step" : `${plan.steps.length} steps`}: ${plan.steps.join(", ")}. ` : "";
   return (
     <div className="grid gap-2" data-plan={plan.task} data-plan-state={plan.state}>
@@ -26,6 +36,22 @@ function PlanInChat({ plan, error, onAnswer }: { plan: PlanCard; error?: string;
           {steps}
           {PLAN_SAID[plan.state]}
         </p>
+      )}
+      {plan.applied && (
+        <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm" data-plan-applied={plan.applied.id}>
+          {plan.applied.undone ? (
+            <span className="text-fg3">Undone. The roadmap is as it was.</span>
+          ) : (
+            <button type="button" className="min-h-9 rounded-sm border border-line px-3 text-fg2 hover:text-fg" onClick={onUndo}>
+              Undo
+            </button>
+          )}
+          {error && (
+            <span className="break-words text-caution" role="status">
+              {error}
+            </span>
+          )}
+        </div>
       )}
       <Handoff project={plan.project} href={plan.live}>
         See {plan.goal.length > 48 ? "the steps" : `"${plan.goal}"`} live in <span className="font-medium text-fg">{plan.project}</span>
@@ -46,7 +72,7 @@ export function rows(
   view: ChatView,
   pending: Pending[],
   retry: (cid: string) => void,
-  chat: Pick<ReturnType<typeof useChat>, "plans" | "planErrors" | "answerPlan" | "choose" | "setReplyTo">,
+  chat: Pick<ReturnType<typeof useChat>, "plans" | "planErrors" | "answerPlan" | "undoPlan" | "choose" | "setReplyTo">,
   rich: boolean,
 ): ThreadItem[] {
   const out: ThreadItem[] = view.messages.map((m) => ({
@@ -65,7 +91,9 @@ export function rows(
     .map((p, order) => ({ p, order, at: planPlace(view.messages, Date.parse(p.since)) }))
     .sort((a, b) => b.at - a.at || a.order - b.order);
   for (const { p, at } of placed) {
-    const card = <PlanInChat plan={p} error={chat.planErrors[p.task]} onAnswer={(c, note) => void chat.answerPlan(p, c, note)} />;
+    const card = (
+      <PlanInChat plan={p} error={chat.planErrors[p.task]} onAnswer={(c, note) => void chat.answerPlan(p, c, note)} onUndo={() => void chat.undoPlan(p)} />
+    );
     out.splice(at, 0, { key: `plan-${p.task}`, who: "dispatcher", card });
   }
   for (const p of pending) {

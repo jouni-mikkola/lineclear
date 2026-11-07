@@ -70,12 +70,12 @@ function itemRows(rows: unknown[], env: NodeJS.ProcessEnv): Item[] {
   });
 }
 
-/** The items of the Inbox, never the ones that left the list when they closed. */
+/** The items of the Inbox, never the ones that left the list when they closed or applied by themselves. */
 export function readItems(env = process.env): Item[] {
   return itemRows(tables(env).query("select item from inbox where shelved = 0 order by n").all(), env);
 }
 
-/** Every item, the closed ones too: for the CLI's `--all` and for an answer to a closed item. */
+/** Every item, the closed and applied ones too: for the CLI's `--all`, an answer to a closed item and an undo. */
 export function readAllItems(env = process.env): Item[] {
   return itemRows(tables(env).query("select item from inbox order by n").all(), env);
 }
