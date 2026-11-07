@@ -11,7 +11,7 @@ Collisions, measured over the merged pull requests of the last 3 days (295, all 
 - 49 PRs were rebased (79 force pushes, read from GitHub's `HeadRefForcePushedEvent`). Replaying each rebase with
   `git merge-tree --write-tree <new base> <old head>`: 29 PRs (9.8 per 100) hit a conflict, on 120 files.
 - 46 of the 120 conflicted files are gone from main: a delete step raced steps that edited the same files
-  (`server/server/demo/*` 16, `server/docs/plugins.md` 4, `server/plugins.json` 3).
+  (`server/server/demo/*` 16, the fork's plugins page 4, `server/plugins.json` 3).
 - 10 "Fix main red" commits and 25 steps merged more than once (39 extra merges) in the same window.
 
 The hubs: files that most changes edit, whatever their job.
@@ -36,7 +36,7 @@ The tree: `src/` holds 125 files in one flat folder, `server/server/live/` 79, `
 Tests sit in a second tree, so a step edits two folders. The architecture's `check-line` module is a grab bag
 (machine names, GitHub checks, the work log, git, time): there is no lower layer. `server/` is a second package with
 its own `package.json`, `bun.lock`, `tsconfig.json`, test runner (`server/scripts/test.ts`, 215 lines) and 9 docs of
-the fork (`server/docs/`, 593 lines). Lines today (scope.md's rule): 45,829 non-test; 30,644 in the test folders.
+the fork (its docs folder, 593 lines). Lines today (scope.md's rule): 45,829 non-test; 30,644 in the test folders.
 
 ## Target design
 
@@ -73,7 +73,7 @@ files merge by module).
 
 | Gone | Step |
 | --- | --- |
-| The fork's own docs and guidance (`server/docs/`, `server/README.md`, `server/AGENTS.md`, `server/CLAUDE.md`) | L775 |
+| The fork's own docs and guidance (its docs folder, `server/README.md`, `server/AGENTS.md`, `server/CLAUDE.md`) | L775 |
 | The second package's tooling (`server/package.json`, `bun.lock`, `tsconfig.json`, `bunfig.toml`, `scripts/test.ts`) | L776 |
 | The `check-line` grab bag of architecture.md | L777 |
 | The planner, Inbox view and kinds, night watch as a role | L602 to L605, L608 (open); the `planner` and `inbox` icons of `ui/brand/roles.ts` go with L603 and L605 |
