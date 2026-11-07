@@ -1,5 +1,5 @@
-// The agent browsers' server side. `/browsers` opens Home, so the pages have no view of their own: the server's rule
-// about input is checked from Home, with the sessions ui/test/fake-playwright-cli lists.
+// The agent browsers' server side. The server's rule
+// about input is checked from any page, with the sessions ui/test/fake-playwright-cli lists.
 import { expect, test } from "@playwright/test";
 import { browserInputs, startBrowsers } from "./fixture.ts";
 

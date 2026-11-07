@@ -143,3 +143,47 @@ for (const [i, body] of BAD.entries()) {
     }
   });
 }
+
+// W11: a page that cannot load says so inside the frame, with a way back, and marks no view as current.
+test.describe("a missing page says so", () => {
+  const frame = async (page: Page) => {
+    await expect(page.locator("[data-frame]")).toBeVisible();
+    await expect(page.locator('[data-view] a[data-back], [data-view] a[href="/"], [data-view] a[href="/browsers"]').first()).toBeVisible();
+  };
+
+  test("a roadmap of an unknown project names it", async ({ page }) => {
+    await open(page, "/nope/roadmap");
+    await expect(page.locator("[data-missing=nope]")).toContainText("No roadmap for nope.");
+    await expect(page.locator("[data-part-state=empty]")).toHaveCount(1);
+    await frame(page);
+  });
+
+  test("a failed API call shows the error state with a retry", async ({ page }) => {
+    await page.route("**/api/roadmap/web-shop", (r) => r.fulfill({ status: 500, json: { error: "The roadmap could not be read." } }));
+    await open(page, "/web-shop/roadmap");
+    await expect(page.locator("[data-part-state=error]")).toContainText("The roadmap cannot be read.");
+    await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+    await frame(page);
+  });
+
+  test("/browsers with no session names the empty state in its own view", async ({ page }) => {
+    await page.route("**/api/browsers**", (r) => r.fulfill({ json: [] }));
+    await open(page, "/browsers");
+    await expect(page.locator('[data-view="browsers"]')).toBeVisible();
+    await expect(page.locator("[data-part-state=empty]")).toContainText("No browser is open.");
+    await expect(page.locator('nav[aria-label="Views"]:visible [aria-current="page"]')).toHaveText(/^Browsers/);
+  });
+
+  test("a browser session that is not open says so", async ({ page }) => {
+    await open(page, "/browsers/nope");
+    await frame(page);
+    await expect(page.locator("[data-part-state=empty]")).toContainText("The browser nope is not open.");
+    await expect(page.getByRole("link", { name: "All browsers" })).toBeVisible();
+  });
+
+  test("a task nothing has marks no view as current", async ({ page }) => {
+    await page.goto("/task/NOPE-9?state=filled");
+    await expect(page.locator("[data-task-missing=NOPE-9]")).toBeVisible();
+    await expect(page.locator('nav[aria-label="Views"] [aria-current]')).toHaveCount(0);
+  });
+});

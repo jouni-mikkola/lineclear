@@ -161,12 +161,13 @@ type PageProps = {
   plan: ReturnType<typeof usePlan>["plan"];
   planNote: string | undefined;
   step: string | undefined;
+  project: string | undefined;
   settings: ReturnType<typeof useSettings>;
   task: string | undefined;
   session: string | undefined;
 };
 
-/** The view the address names. Home is the page for usage, the chat and the browsers too. */
+/** The view the address names. Home is the page for usage and the chat too. */
 function Page(p: PageProps) {
   const { view, state } = p;
   if (p.shown === "home") {
@@ -188,7 +189,7 @@ function Page(p: PageProps) {
       />
     );
   }
-  if (view === "roadmap") return <Roadmap load={p.roadmap} record={p.stepRecord} plan={p.plan} planNote={p.planNote} step={p.step} />;
+  if (view === "roadmap") return <Roadmap load={p.roadmap} project={p.project ?? ""} record={p.stepRecord} plan={p.plan} planNote={p.planNote} step={p.step} />;
   if (view === "settings") return <Settings load={p.settings} sample={!!state} />;
   if (view === "setup") return <Setup />;
   if (view === "task" && p.task) return <TaskView key={p.task} id={p.task} />;
@@ -245,7 +246,7 @@ export function App() {
   }, [view, path]);
   // /usage is Home with its usage sheet open
   // Home is the one page for these: they open it, the usage one with its sheet
-  const shown = view === "usage" || view === "chat" || view === "browsers" ? "home" : view;
+  const shown = view === "usage" || view === "chat" ? "home" : view;
   const page: PageProps = {
     view,
     shown,
@@ -267,6 +268,7 @@ export function App() {
     plan,
     planNote,
     step,
+    project,
     settings,
     task,
     session,

@@ -13,6 +13,7 @@ export class ApiError extends Error {
     readonly kind: "lost" | "stopped" | "broken" | "stale",
     readonly file?: string,
     readonly lines?: string[],
+    readonly status?: number,
   ) {
     super(message);
   }

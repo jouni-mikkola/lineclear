@@ -20,17 +20,20 @@ const TRACK = "track";
 
 export function Roadmap({
   load,
+  project,
   record,
   plan,
   planNote,
   step,
 }: {
   load: Load<RoadmapData>;
+  project: string;
   record: Load<StepRecord>;
   plan?: PlanCard;
   planNote?: string;
   step?: string;
 }) {
+  if (load.status === "error" && load.missing) return <NoProject project={project} error={load.error} />;
   if (step !== undefined && step !== TRACK) {
     if (load.status === "error") return <Part main state="error" label="The step" empty={{ text: "" }} error={load.error} onRetry={load.retry} />;
     return load.status === "ok" ? (
@@ -44,6 +47,18 @@ export function Roadmap({
       <BackLink href="/">Home</BackLink>
       <div className="mt-6">
         <Page load={load} plan={plan} planNote={planNote} />
+      </div>
+    </>
+  );
+}
+
+/** An address whose project or roadmap file does not exist: the state is named, and Home is the way back. */
+function NoProject({ project, error }: { project: string; error: string }) {
+  return (
+    <>
+      <BackLink href="/">Home</BackLink>
+      <div className="mt-6" data-missing={project}>
+        <Part main state="empty" label="The roadmap" empty={{ text: `No roadmap for ${project}.`, hint: error }} />
       </div>
     </>
   );
