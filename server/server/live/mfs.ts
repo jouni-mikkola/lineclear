@@ -16,37 +16,13 @@ function fail(p: string, err: string): never {
   throw e
 }
 
-interface Stat {
-  size: number
-  mtimeMs: number
-  ino: number
-  dev: number
-  isDirectory(): boolean
-  isFile(): boolean
-  isSymbolicLink(): boolean
-}
-
-// perl: on every Linux and macOS, with one way to stat a file on both
-const STAT = `perl -e '@s = $ARGV[1] ? lstat($ARGV[0]) : stat($ARGV[0]); exit 1 unless @s; print join(" ", $s[7], $s[9], $s[1], $s[0], (-d _ ? 1 : 0), (-f _ ? 1 : 0), (-l $ARGV[0] ? 1 : 0))'`
-
-function remoteStat(p: string, link: boolean): Stat {
-  const r = sh(`${STAT} ${q(p)} ${link ? 1 : 0}`)
-  if (r.code) fail(p, 'No such file or directory')
-  const [size, mtime, ino, dev, d, f, l] = r.out.toString().trim().split(' ').map(Number)
-  return { size, mtimeMs: mtime * 1000, ino, dev, isDirectory: () => d === 1, isFile: () => f === 1, isSymbolicLink: () => l === 1 }
-}
-
 export function existsSync(p: string) {
   return local(p) ? fs.existsSync(p) : sh(`test -e ${q(p)}`).code === 0
 }
 
-export function statSync(p: string): Stat {
-  return local(p) ? fs.statSync(p) : remoteStat(p, false)
-}
+export const statSync = fs.statSync
 
-export function lstatSync(p: string): Stat {
-  return local(p) ? fs.lstatSync(p) : remoteStat(p, true)
-}
+export const lstatSync = fs.lstatSync
 
 export function readFileSync(p: string): Buffer
 export function readFileSync(p: string, enc: 'utf8'): string
@@ -110,12 +86,7 @@ export function readdirSync(p: string): string[] {
   return r.out.toString().split('\n').filter(Boolean)
 }
 
-export function realpathSync(p: string): string {
-  if (local(p)) return fs.realpathSync(p)
-  const r = sh(`perl -MCwd=abs_path -e 'my $r = abs_path($ARGV[0]); exit 1 unless defined $r && -e $r; print $r' ${q(p)}`)
-  if (r.code) fail(p, 'No such file or directory')
-  return r.out.toString()
-}
+export const realpathSync = fs.realpathSync
 
 /** cp -R, links kept as links */
 export function cpSync(from: string, to: string) {

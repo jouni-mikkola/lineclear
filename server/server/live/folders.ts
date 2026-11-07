@@ -1,7 +1,7 @@
 // Adding a project from the sidebar: the human browses this machine's folders and picks a repo, or makes a new one.
 // Only folders inside the human's home are listed or made: a path is resolved (~, .., links) and refused if it leads
 // anywhere else. Folder names only; nothing inside a file is read.
-import { BOX, boxHome, q, runSync } from './box.ts'
+import { BOX, boxHome } from './box.ts'
 import { existsSync, lstatSync, mkdirSync, readdirSync, realpathSync, statSync } from './mfs.ts'
 import { basename, dirname, join, resolve, sep } from 'node:path'
 import type { FolderEntry, Folders } from '../../shared/types.ts'
@@ -84,27 +84,7 @@ function touched(repo: string) {
   return t
 }
 
-/** another machine's folders, read in one go: name, real path, whether it is a repo, when it was last worked in */
-const REMOTE_LIST = `perl -e 'my $d = $ARGV[0]; opendir(my $h, $d) or exit 1; use Cwd "abs_path"; for my $n (sort readdir $h) { next if $n eq "." || $n eq ".."; my $p = "$d/$n"; next unless -d $p; my $r = abs_path($p) // next; my $t = 0; for my $f (".git/index", ".git/HEAD", ".git") { my @s = stat("$p/$f"); $t = $s[9] if @s && $s[9] > $t } print join("\\t", $n, $r, (-e "$p/.git" ? 1 : 0), $t * 1000), "\\n" }'`
-
 function subfolders(abs: string, h: string, added: Set<string>): (FolderEntry & { at: number })[] {
-  if (BOX) {
-    const r = runSync(['/bin/sh', '-c', `${REMOTE_LIST} ${q(abs)}`])
-    if (r.code) return []
-    return r.out
-      .toString()
-      .split('\n')
-      .filter(Boolean)
-      .map((l) => l.split('\t'))
-      .filter(([, real]) => inside(real, h))
-      .map(([name, real, repo, at]) => ({
-        name,
-        path: tilde(join(abs, name), h),
-        repo: repo === '1',
-        added: added.has(real) || added.has(join(abs, name)) || undefined,
-        at: repo === '1' ? Number(at) : 0,
-      }))
-  }
   let names: string[]
   try {
     names = readdirSync(abs)

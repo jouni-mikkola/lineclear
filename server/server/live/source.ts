@@ -2,6 +2,7 @@ import { mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Source } from '../source.ts'
 import { HOME } from '../store.ts'
+import { BOX } from './box.ts'
 import { followCommand } from './commands.ts'
 import { HOME_SPACE, placeId } from './places.ts'
 import { carryOn } from './retry.ts'
@@ -24,10 +25,7 @@ export class LiveSource extends LiveSourceUpkeep implements Source {
     mkdirSync(HOME, { recursive: true })
     // what the Watcher kept, from before agents reported their own progress
     for (const f of ['watcher.json', 'watcher-call.json']) rmSync(join(HOME, f), { force: true })
-    if (this.mirror) {
-      this.followLogs()
-      this.mirror.start()
-      this.timers.push(setInterval(() => held('rule follow logs', () => this.followLogs()), 5000))
+    if (BOX) {
       // the Everywhere defaults: the main machine's, read from its settings as they change
       this.adoptEverywhere()
       this.timers.push(setInterval(() => held('rule adopt everywhere', () => this.adoptEverywhere()), 3000))

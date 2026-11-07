@@ -1,10 +1,8 @@
-import { join } from 'node:path'
 import { toUrl, type BrowserDown, type BrowserPick, type BrowserUp, type FrameMeta } from '../../shared/browser.ts'
 import { ROOT } from '../root.ts'
-import { randomBytes } from 'node:crypto'
-import { BOX, forward, helperDir, run as onBox, script, sshArgs } from './box.ts'
+import { BOX, forward, run as onBox } from './box.ts'
 import { boxOf, describe } from './pick.ts'
-import { type BrowserClient, type BrowsersOpts, type Run, CLASH, BEHIND, type Hub, Cdp, readLine } from './browser-helpers.ts'
+import { type BrowserClient, type BrowsersOpts, type Run, CLASH, BEHIND, type Hub, Cdp } from './browser-helpers.ts'
 
 export class BrowsersHubs {
   constructor(protected o: BrowsersOpts) {}
@@ -102,7 +100,6 @@ export class BrowsersHubs {
         own: 0,
         ownUntil: 0,
         hovering: false,
-        direct: new Set(),
         seenAt: 0,
       }
       this.hubs.set(task, h)
@@ -135,7 +132,6 @@ export class BrowsersHubs {
         h.fwd?.close()
         h.fwd = await forward(BOX, port)
         this.connect(h, h.fwd.port)
-        void this.share(h, port)
         return
       }
       this.connect(h, port)
@@ -170,7 +166,7 @@ export class BrowsersHubs {
         case 'frame':
           h.frame = s
           h.meta = m.metadata as FrameMeta
-          for (const c of h.clients) if (!h.direct.has(c) && (c.buffered?.() ?? 0) < BEHIND) c.send(s)
+          for (const c of h.clients) if ((c.buffered?.() ?? 0) < BEHIND) c.send(s)
           return
         case 'url':
           h.url = String(m.url ?? '')
@@ -205,61 +201,8 @@ export class BrowsersHubs {
     }
   }
 
-  /**
-   * Another machine's stream, straight to the screens: the helper's relay.pl there passes connections on to
-   * agent-browser's port (which takes only pages of that machine), and tailscale serve shares it on the tailnet under
-   * a path no one can guess. The main machine only hands out the link. Where tailscale serve can't run there, frames
-   * keep coming through the main machine.
-   */
-  protected async share(h: Hub, port: number) {
-    if (!BOX || h.share || h.sharing) return
-    h.sharing = true
-    try {
-      const b = BOX
-      const p = Bun.spawn(sshArgs(b.target, script(b, ['perl', join(helperDir(b.home), 'relay.pl'), String(port)]), { extra: ['-o', 'ControlPath=none'] }), {
-        stdin: 'pipe',
-        stdout: 'pipe',
-        stderr: 'ignore',
-      })
-      const first = await Promise.race([readLine(p.stdout), Bun.sleep(15_000).then(() => '')])
-      const relay = Number(first)
-      if (!relay) throw new Error('no relay')
-      const token = randomBytes(16).toString('hex')
-      const at = `/lineclear-browser/${token}`
-      const on = await onBox(['tailscale', 'serve', '--bg', '--set-path', at, `http://127.0.0.1:${relay}`], { timeoutMs: 20_000 })
-      const st = on.code === 0 ? await onBox(['tailscale', 'status', '--json'], { timeoutMs: 10_000 }) : null
-      const dns = st?.code === 0 ? String(JSON.parse(st.out).Self?.DNSName ?? '').replace(/\.$/, '') : ''
-      if (!dns) {
-        p.kill()
-        return
-      }
-      h.share = {
-        // held: its stdin open is what keeps the relay there running
-        proc: p,
-        url: `wss://${dns}${at}/?maxFps=15`,
-        stop: () => {
-          p.kill()
-          void onBox(['tailscale', 'serve', '--https=443', '--set-path', at, 'off'], { timeoutMs: 20_000 })
-        },
-      }
-      if (h.up && !h.gone) this.stateSoon(h)
-      else this.unshare(h)
-    } catch {
-      /* frames come through the main machine */
-    } finally {
-      h.sharing = false
-    }
-  }
-
-  protected unshare(h: Hub) {
-    h.share?.stop()
-    h.share = undefined
-    h.direct.clear()
-  }
-
   protected disconnect(h: Hub) {
     if (h.clients.size) return
-    this.unshare(h)
     const up = h.up
     h.up = undefined
     up?.close()
@@ -280,7 +223,6 @@ export class BrowsersHubs {
       connected: h.connected && !!h.up,
       viewport: h.viewport,
       agentAgo: h.agentAt ? Date.now() - h.agentAt : undefined,
-      direct: h.share?.url,
     }
   }
 
@@ -315,12 +257,6 @@ export class BrowsersHubs {
         return this.handBack(h)
       case 'start':
         if (!h.up) await this.start(h)
-        return
-      case 'direct':
-        if (m.on && h.share) h.direct.add(c)
-        else h.direct.delete(c)
-        // back through the server: the last frame at once
-        if (!m.on && h.frame) c.send(h.frame)
         return
       case 'pick':
         try {

@@ -55,9 +55,6 @@ export type BrowserDown =
       viewport: { w: number; h: number }
       /** ms since the agent last ran an agent-browser command, if it has */
       agentAgo?: number
-      /** on another machine: its stream, shared on the tailnet straight from there (wss://…); the panel takes frames
-       *  and its input that way when it can reach it, else through the server as before */
-      direct?: string
     }
   | { type: 'picked'; id: number; pick?: BrowserPick; error?: string }
   | { type: 'hover'; box: BrowserPick['box'] | null }
@@ -91,8 +88,7 @@ export type BrowserUp =
   /** fit the page to the panel, or back to agent-browser's own size */
   | { type: 'viewport'; w: number; h: number }
   | { type: 'start' }
-  /** the panel takes frames straight from the task's machine (on), or through the server again (off) */
-  | { type: 'direct'; on: boolean }
+/** the panel takes frames straight from the task's machine (on), or through the server again (off) */
 
 /** what you type in the URL bar, as an address: a bare host gets https (http for this machine) */
 export function toUrl(s: string): string {

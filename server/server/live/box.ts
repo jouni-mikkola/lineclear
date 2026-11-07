@@ -212,11 +212,6 @@ export function runSync(
   return { code: r.exitCode ?? 1, out: r.stdout ?? Buffer.alloc(0), err: r.stderr?.toString() ?? '' }
 }
 
-/** a long-running command on the box (a log mirror, a tunnel): its process */
-export function spawnOn(b: BoxInfo, argv: string[], o: { extra?: string[]; stdin?: 'pipe' | 'ignore' } = {}) {
-  return Bun.spawn(sshArgs(b.target, script(b, argv), { extra: o.extra }), { stdin: o.stdin ?? 'ignore', stdout: 'pipe', stderr: 'pipe' })
-}
-
 /** the stable build's bin: an agent of any project, the Lineclear repo's included, runs this `lineclear`, never its own checkout's */
 const stableBin = (data: string) => (existsSync(join(data, 'builds', 'current', 'bin', 'lineclear')) ? join(data, 'builds', 'current', 'bin') : '')
 
