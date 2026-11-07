@@ -153,6 +153,8 @@ export class EngineLand extends EngineHandoff {
         (error) => ({ ok: false, error: `Can't merge ${t.id}: ${error}` }),
       ),
     )
+    // a released run ends on its own later, its error is nobody's
+    work.catch(() => undefined)
     try {
       const r = await Promise.race([work, freed])
       if (!('freed' in r)) this.released.delete(t.id)
