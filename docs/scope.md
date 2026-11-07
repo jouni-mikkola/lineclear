@@ -36,19 +36,22 @@ tracked `.ts`, `.tsx`, `.css`, `.sh` and `.pl` file and the `bin` scripts outsid
 | D8 | Search and "since you last looked" | gone |
 | D9 | The second secrets command | gone |
 
-The open areas hold about 650 lines (D2: the readers, `trust.ts`, `streaming.ts`, `runtime.ts`; D3: done) of 47311.
+The open areas hold about 650 lines (D2: the readers, `trust.ts`, `streaming.ts`, `runtime.ts`; D3: done) of 45993.
 D1, D4 to D9 are met: no demo switch, automation, artifact, plugin or search code is left. The `?state=` sample pages are
 not the demo world; their data still ships in the bundle (L470).
 
 ## The line target
 
-**Non-test code: at most 40,000 lines**, from 47,311 on main today (the count of the rule above, which also counts
-css, shell, perl and the `bin` scripts; counted by `.ts` and `.tsx` alone it is about 46,000).
+**Non-test code: at most 40,000 lines**, from 45,993 on main at the L486 recount (the count of the rule above, which also counts
+css, shell, perl and the `bin` scripts): server 17,094, `src/` 14,725, `ui/` 11,083, `scripts/` 1,874, `pi/` 623,
+`install.sh` 537, `playwright*.ts` 44, `bin/` 13.
 
 - Why 40,000: one reader should hold the whole core in mind. L470 to L485 cut about 5,200 lines of named files with no
   feature lost: sample data moves out of the bundle, a duplicate helper becomes one, a module two readers share
   becomes one. The helper of L95 takes about 1,000 more (`server/helper/`, `box.ts`, `install.ts`, `tunnel.ts`). That
-  reaches about 41,000; L486 recounts and plans the rest of the way to 40,000.
+  was meant to reach about 41,000. L486 recounted 45,993: the named cuts are not all merged and fell short of their
+  estimate. The open steps of ROADMAP.md (L475 to L485, L496, L497) plan about 3,000 more, L498 to L501 about 1,500,
+  and L95 about 1,000. That leaves about 40,500: recount again once they are merged and cut the rest then.
 - Why not lower now: below that the cuts reach pages and checks the owner designed (the UI bar of U2, motion
   and the states). Those are cut only by a decision of the owner.
 - No module is cut by its age: every file was touched in the last 30 days, and `knip` reports no unused file or
@@ -56,7 +59,7 @@ css, shell, perl and the `bin` scripts; counted by `.ts` and `.tsx` alone it is 
 - Tests that test a deleted feature go with it: each cut step deletes its tests, and the number of tests files is
   not a target.
 
-## The server (`server/`), 17486 lines
+## The server (`server/`), 17094 lines
 
 | Module | Core job | Lines | Verdict | Why |
 | --- | --- | ---: | --- | --- |
@@ -121,7 +124,7 @@ css, shell, perl and the `bin` scripts; counted by `.ts` and `.tsx` alone it is 
 | `server/shared/` | Run | 749 | keep | types and helpers the server shares |
 | `server/shared/alerts.ts` | Inbox | 214 | keep | what a push says |
 
-## The CLI and rule loop (`src/`, `pi/`, `bin/`, `install.sh`), 15708 lines
+## The CLI and rule loop (`src/`, `pi/`, `bin/`, `install.sh`), 15898 lines
 
 | Module | Core job | Lines | Verdict | Why |
 | --- | --- | ---: | --- | --- |
@@ -218,7 +221,7 @@ css, shell, perl and the `bin` scripts; counted by `.ts` and `.tsx` alone it is 
 | `src/world.ts` | Rules | 248 | keep | what a tick needs from outside, and the real world |
 | `src/zone.ts` | Run | 21 | keep | time zones |
 
-## The web UI (`ui/`), 12300 lines
+## The web UI (`ui/`), 11083 lines
 
 | Module | Core job | Lines | Verdict | Why |
 | --- | --- | ---: | --- | --- |
@@ -240,7 +243,7 @@ css, shell, perl and the `bin` scripts; counted by `.ts` and `.tsx` alone it is 
 | `ui/web/settings*` | Models | 529 | keep | Settings |
 | `ui/web/setup.tsx` | Models | 149 | keep | first run |
 
-## Repo tools (`scripts/`), 1817 lines
+## Repo tools (`scripts/`), 1918 lines
 
 | Module | Core job | Lines | Verdict | Why |
 | --- | --- | ---: | --- | --- |
