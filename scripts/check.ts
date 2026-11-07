@@ -103,6 +103,7 @@ const TEST_SHARDS = 4;
 // a GitHub runner has 4 cores: each job runs its share of the test files in this many processes
 const SHARD_PROCESSES = 2;
 // install.sh builds the web pages with vite for real: a run on GitHub, never in a worker's loop
+const BUILD_WEIGHT_S = 45;
 const BUILDING_TESTS = ["test/install.test.ts", "test/install-update.test.ts", "test/install-update-store.test.ts", "test/install-release.test.ts"];
 
 // the tests the change reaches: a failure in any other file is not the change's
@@ -157,7 +158,8 @@ function testSteps(): Step[] {
     Object.assign(env, { LINECLEAR_LOAD_MAP: loadDir, LINECLEAR_LOAD_ROOT: process.cwd() });
   }
   // an install test is far slower than its size says: the committed baseline of slow files weighs it, the last run's times override
-  const weights = { ...readSlowBaseline(), ...readTimes() };
+  // a build takes every core of a runner: it gets a job to itself, so what shares the job never lengthens it
+  const weights = { ...readSlowBaseline(), ...readTimes(), ...Object.fromEntries(BUILDING_TESTS.map((f) => [f, BUILD_WEIGHT_S])) };
   // bun test with no file runs every test it finds, the server's too: a share with no file runs no process
   const runs = (
     shard
