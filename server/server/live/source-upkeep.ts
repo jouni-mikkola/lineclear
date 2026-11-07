@@ -7,12 +7,21 @@ import { BOX } from './box.ts'
 import { HOST, placeId } from './places.ts'
 import { relaunchedLine } from './prompts.ts'
 import type { Wrong } from './revive.ts'
+import { Resumes } from './agent-resume.ts'
 import { OVERVIEW_MAX, REPLY_AFTER_CARD } from './source-helpers.ts'
 import { LiveSourceCli } from './source-cli.ts'
 
 export class LiveSourceUpkeep extends LiveSourceCli {
   private reviveAt = Infinity
   private reviveTimer?: ReturnType<typeof setTimeout>
+  /** task agents are RPC children of this server: they end with it and start again from their session */
+  protected resumes = new Resumes({
+    resumable: (key) => this.rpcKey(key) && !this.agents.rpcs.has(key) && this.keepsRunning(key) && !this.reviving.has(key),
+    wasWorking: (key) => this.agents.wasWorking(key),
+    start: (key) => this.agents.relaunch(key, false, () => this.resumeTaskAgent(key)),
+    carryOn: (key) => this.agents.send(key, hidden(relaunchedLine(), 'restart')),
+    gaveUp: (key) => void this.gaveUp(key, 'gone'),
+  })
 
   constructor() {
     super()
@@ -53,6 +62,11 @@ export class LiveSourceUpkeep extends LiveSourceCli {
       .finally(() => this.reseating.delete(key))
   }
 
+  /** a task's agent, which runs as a pi RPC child of this server (agents-delivery.ts launches it so) */
+  protected rpcKey(key: string) {
+    return key.includes('/') && !BOX && this.agents.record(key)?.kind === 'pi'
+  }
+
   /** an agent Lineclear keeps running: a space's coordinator it started, or a task's agent while its task goes on */
   protected keepsRunning(key: string) {
     const r = this.agents.record(key)
@@ -66,10 +80,12 @@ export class LiveSourceUpkeep extends LiveSourceCli {
    * an older command after it restarted): started again, resuming their session, a few times at most (revive.ts)
    */
   async revive(now = Date.now()) {
+    // an RPC agent has no pane: herdr being away does not matter to it
+    await this.resumes.all(Object.keys(this.agents.records))
     if (!this.agents.reachable) return
     let next = this.agents.suspects ? 5000 : Infinity
     for (const key of Object.keys(this.agents.records)) {
-      if (this.reviving.has(key)) continue
+      if (this.reviving.has(key) || this.rpcKey(key)) continue
       if (!this.keepsRunning(key)) {
         this.revivals.skip(key)
         continue

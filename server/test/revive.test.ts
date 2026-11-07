@@ -1,68 +1,121 @@
-// An agent that stopped is started again: tries are spaced out and end, so a start that keeps failing never loops.
+// A server restart ends its RPC agents: each live one starts again from its own session, a cut turn gets one "carry on",
+// and a start that keeps failing stops with a card instead of looping.
 import { describe, expect, test } from 'bun:test'
-import { Revivals } from '../server/live/revive.ts'
+import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
-describe('tries at starting it again', () => {
-  const times = { grace: 20, gaps: [0, 60, 300], steady: 600 }
+const dir = mkdtempSync(join(tmpdir(), 'shep-resume-'))
+process.env.LINECLEAR_HOME = join(dir, 'home')
+mkdirSync(join(dir, 'bin'))
+mkdirSync(join(dir, 'wt'))
+const told = join(dir, 'told.txt')
+const spawned = join(dir, 'spawned.txt')
+// a stand-in pi: logs how it was started and what it was told, works a moment on each prompt
+writeFileSync(
+  join(dir, 'bin', 'pi'),
+  `#!/usr/bin/env bun
+import { appendFileSync } from 'node:fs'
+appendFileSync('${spawned}', process.argv.slice(2).join(' ') + '\\n')
+const send = (o) => process.stdout.write(JSON.stringify(o) + '\\n')
+let buf = ''
+process.stdin.on('data', (d) => {
+  buf += d
+  for (let i = buf.indexOf('\\n'); i >= 0; i = buf.indexOf('\\n')) {
+    const c = JSON.parse(buf.slice(0, i))
+    buf = buf.slice(i + 1)
+    if (c.type === 'get_state') send({ id: c.id, type: 'response', command: 'get_state', success: true, data: {} })
+    if (c.type === 'prompt') {
+      appendFileSync('${told}', c.message + '\\n')
+      send({ id: c.id, type: 'response', command: 'prompt', success: true, data: { disposition: 'started' } })
+      send({ type: 'agent_start' })
+      setTimeout(() => send({ type: 'agent_settled' }), 100)
+    }
+  }
+})
+`,
+)
+chmodSync(join(dir, 'bin', 'pi'), 0o755)
+process.env.PATH = `${join(dir, 'bin')}:${process.env.PATH}`
 
-  test('only once it was seen wrong a while, then further apart, then given up once', () => {
-    const r = new Revivals(times)
-    expect(r.seen('a', 0)).toBeUndefined()
-    expect(r.seen('a', 20)).toBe('go')
-    // judged again only after its grace, and the next try after its gap
-    expect(r.seen('a', 30)).toBeUndefined()
-    expect(r.seen('a', 50)).toBeUndefined()
-    expect(r.seen('a', 80)).toBe('go')
-    expect(r.seen('a', 100)).toBeUndefined()
-    expect(r.seen('a', 200)).toBeUndefined()
-    expect(r.seen('a', 380)).toBe('go')
-    expect(r.seen('a', 400)).toBeUndefined()
-    expect(r.seen('a', 420)).toBe('give-up')
-    for (const t of [500, 1000, 5000]) expect(r.seen('a', t)).toBeUndefined()
+const { Agents } = await import('../server/live/agents.ts')
+const { Resumes } = await import('../server/live/agent-resume.ts')
+
+const until = async (ok: () => boolean, ms = 5000) => {
+  for (const end = Date.now() + ms; !ok(); await Bun.sleep(20)) if (Date.now() > end) throw new Error('timed out')
+}
+const lines = (file: string) =>
+  Bun.file(file).size
+    ? Bun.file(file)
+        .text()
+        .then((t) => t.split('\n').filter(Boolean))
+    : Promise.resolve([])
+const spec = (key: string) => ({
+  key,
+  name: `shep-${key.split('/')[0].toLowerCase()}`,
+  kind: 'pi' as const,
+  cwd: join(dir, 'wt'),
+  workspace: key,
+  model: 'default',
+  rpc: true,
+})
+
+describe('agents resume after a restart', () => {
+  test('5 live agents start again within 10 s with their session; only a cut turn is told to carry on', async () => {
+    const keys = Array.from({ length: 5 }, (_, i) => `R-${i}/Agent`)
+    const before = new Agents()
+    for (const k of keys) await before.ensure({ ...spec(k), first: 'Do the task.' })
+    await until(() => keys.every((k) => before.status(k) === 'idle'))
+    const sessions = Object.fromEntries(keys.map((k) => [k, before.record(k)?.sessionId]))
+    before.stop()
+    for (const k of keys) await before.finish(k)
+    writeFileSync(spawned, '')
+    writeFileSync(told, '')
+
+    // the new server: its records are read from disk; one agent was mid-turn when the old server ended
+    const after = new Agents()
+    after.records[keys[0]].working = true
+    const begun = Date.now()
+    const resumes = new Resumes({
+      resumable: (k) => !after.rpcs.has(k),
+      wasWorking: (k) => after.wasWorking(k),
+      start: (k) => after.relaunch(k, false, () => after.ensure(spec(k))),
+      carryOn: (k) => after.send(k, 'Carry on.'),
+      gaveUp: () => undefined,
+    })
+    await resumes.all(keys)
+    expect(Date.now() - begun).toBeLessThan(10_000)
+    const starts = await lines(spawned)
+    expect(starts).toHaveLength(5)
+    for (const k of keys) expect(starts.some((s) => s.includes(`--session-id ${sessions[k]}`))).toBe(true)
+    await until(() => Bun.file(told).size > 0)
+    await Bun.sleep(300)
+    expect(await lines(told)).toEqual(['Carry on.'])
+    after.stop()
   })
 
-  test('running well a while without a break counts from none again; a moment of it does not', () => {
-    const r = new Revivals(times)
-    r.seen('a', 0)
-    expect(r.seen('a', 20)).toBe('go')
-    // up for a moment after its start, then down again: still its second try, after the gap
-    r.fine('a', 25)
-    r.seen('a', 30)
-    expect(r.seen('a', 50)).toBeUndefined()
-    expect(r.seen('a', 80)).toBe('go')
-    // well for a while, but with a break: still its third try, after the gap
-    r.fine('a', 400)
-    r.seen('a', 900)
-    r.fine('a', 920)
-    r.fine('a', 1500)
-    r.seen('a', 1510)
-    expect(r.seen('a', 1530)).toBe('go')
-    // well without a break as long as steady: from none again
-    r.fine('a', 1540)
-    r.fine('a', 2140)
-    r.seen('a', 2150)
-    expect(r.seen('a', 2170)).toBe('go')
-    r.seen('a', 2180)
-    expect(r.seen('a', 2200)).toBeUndefined()
-  })
-
-  test('given up, it starts again only once it ran well for a while (the human restarted it)', () => {
-    const r = new Revivals({ grace: 0, gaps: [0], steady: 100 })
-    expect(r.seen('a', 0)).toBe('go')
-    expect(r.seen('a', 1)).toBe('give-up')
-    r.fine('a', 50)
-    expect(r.seen('a', 60)).toBeUndefined()
-    r.fine('a', 100)
-    r.fine('a', 200)
-    expect(r.seen('a', 210)).toBe('go')
-  })
-
-  test('remembers whether it was at work when it stopped', () => {
-    const r = new Revivals(times)
-    r.status('a', 'working')
-    r.status('a', 'gone')
-    expect(r.wasWorking('a')).toBe(true)
-    r.status('a', 'idle')
-    expect(r.wasWorking('a')).toBe(false)
+  test('3 failed starts in an hour stop with a card, and it is not tried again', async () => {
+    const asked: string[] = []
+    let tries = 0
+    const resumes = new Resumes(
+      {
+        resumable: () => true,
+        wasWorking: () => false,
+        start: async () => {
+          tries++
+          throw new Error('no pi')
+        },
+        carryOn: async () => undefined,
+        gaveUp: (k) => asked.push(k),
+      },
+      { gaps: [0, 0, 0], window: 3_600_000 },
+    )
+    await resumes.all(['X-1/Agent'])
+    expect(tries).toBe(3)
+    expect(asked).toEqual(['X-1/Agent'])
+    await resumes.all(['X-1/Agent'])
+    expect(tries).toBe(3)
+    // the hour passed: it may try again
+    expect(resumes.stopped('X-1/Agent', Date.now() + 3_600_001)).toBe(false)
   })
 })

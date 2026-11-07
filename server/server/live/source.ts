@@ -87,6 +87,8 @@ export class LiveSource extends LiveSourceUpkeep implements Source {
     })
     this.engine.on('news', (project, text, kind, about, card) => this.news(project, text, kind, about, card))
     this.agents.start()
+    // the agents of the server before this one start again at once
+    this.reviveIn(0)
     // the space the machine's and All machines' coordinators shared is the home space's now; their agents close
     void this.agents.space(HOME_SPACE.label, HOME_SPACE.was).catch(() => undefined)
     // watched chats: read new log lines once a second
