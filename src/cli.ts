@@ -44,7 +44,7 @@ export const commands: Record<string, string> = {
   pack: "List the token pack's parts, or turn one on or off (pack on <part>, pack off <part>)",
   machine: "Add a machine by its SSH host (installs Lineclear there and runs its doctor), list, remove or update machines",
   project: "Add, list, change, remove and check projects",
-  roadmap: "Check, show or import the roadmap (roadmap show <id> prints one step)",
+  roadmap: "Check or show the roadmap (roadmap show <id> prints one step)",
   setup: "Choose a model for the worker, reviewer, planner and step checker from the logged-in harnesses (the reviewer from another company than the worker)",
   run: "Run the rule loop and serve the web pages (--once, --dry-run; --board <port> also starts herdr and the board where no service does), or only serve them on fixed demo data (--demo)",
   serve: "Serve the board (the web server): serve --port <port>",

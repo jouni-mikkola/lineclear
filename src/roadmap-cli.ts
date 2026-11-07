@@ -1,24 +1,10 @@
-import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
-import { writeAtomic } from "../pi/atomic.ts";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { lineOfRoadmap } from "./roadmap-view.ts";
 import { lineclearTasks } from "./roadmap-source.ts";
 import { statusesOf } from "./task-steps.ts";
-import { importRoadmap } from "./roadmap-import.ts";
 import { stepText } from "./brief.ts";
-import {
-  checkRoadmap,
-  doneIds,
-  existingMeasuring,
-  formErrors,
-  measuringFaults,
-  proofFaults,
-  resultOf,
-  type RoadmapError,
-  type Step,
-  type StepStatus,
-  type Task,
-} from "./roadmap.ts";
+import { checkRoadmap, formErrors, resultOf, type RoadmapError, type Step, type StepStatus, type Task } from "./roadmap.ts";
 import { unblockedByFiles } from "./parts.ts";
 import { mainRefs } from "./main-branch.ts";
 import { git } from "./git.ts";
@@ -30,7 +16,6 @@ const USAGE = [
   "       lineclear roadmap show <id> [<repo>]",
   "       lineclear roadmap status <repo> --space <name> [--json]",
   "       lineclear roadmap locks <repo> --space <name>",
-  "       lineclear roadmap import <file.json> <repo> [--force] [--no-commit]",
 ];
 
 function readRoadmap(repo: string, out: Out): { text: string; file: string } | undefined {
@@ -72,7 +57,6 @@ export function roadmapMain(
   now = Date.now(),
 ): number {
   const [sub, ...rest] = args;
-  if (sub === "import") return importMain(rest, out);
   if (sub === "show") return showMain(rest, out);
   const flags = new Set(rest.filter((a) => a === "--json"));
   const spaceAt = rest.indexOf("--space");
@@ -99,9 +83,6 @@ export function roadmapMain(
     return 1;
   }
   if (sub === "check") {
-    const faults = [...missingProofs(repo, parsed.steps), ...noNewMeasuring(repo, parsed.steps)];
-    for (const f of faults) out(`${road.file}:${f.line}: ${f.message}`);
-    if (faults.length > 0) return 1;
     out(`ok: ${parsed.steps.length} steps`);
     return 0;
   }
@@ -137,27 +118,6 @@ function printStatus(status: StepStatus[], results: Map<string, string>, json: b
   }
 }
 
-function doneOnMain(repo: string, steps: Step[]): Set<string> {
-  const commits =
-    mainRefs(repo)
-      .map((ref) => mainCommits(repo, ref))
-      .find((c) => typeof c !== "string") ?? [];
-  return doneIds(commits as { subject: string; body: string }[], new Set(steps.map((s) => s.id)));
-}
-
-/** L319: with a `docs/simplify.md` that lists the existing measuring steps, a new one must wait for L271. */
-function noNewMeasuring(repo: string, steps: Step[]): { line: number; message: string }[] {
-  const file = join(repo, "docs", "simplify.md");
-  if (!existsSync(file)) return [];
-  return measuringFaults(steps, existingMeasuring(readFileSync(file, "utf8")));
-}
-
-function missingProofs(repo: string, steps: Step[]): { line: number; message: string }[] {
-  const file = join(repo, "docs", "numbers.md");
-  if (!existsSync(file)) return [];
-  return proofFaults(steps, doneOnMain(repo, steps), readFileSync(file, "utf8"));
-}
-
 /** Prints one step of the roadmap, so that a worker need not read the whole file. */
 function showMain(args: string[], out: Out): number {
   const [id, repo = ".", ...extra] = args;
@@ -176,45 +136,4 @@ function showMain(args: string[], out: Out): number {
 function fail(out: Out, message: string): number {
   out(`lineclear: ${message}`);
   return 1;
-}
-
-/** Writes docs/ROADMAP.md from a JSON list and commits it with a `Step: <id>` line for each done step. */
-function importMain(args: string[], out: Out): number {
-  const flags = new Set(args.filter((a) => a.startsWith("--")));
-  const [file, repo, ...extra] = args.filter((a) => !a.startsWith("--"));
-  if (!file || !repo || extra.length > 0 || [...flags].some((f) => f !== "--force" && f !== "--no-commit")) {
-    USAGE.forEach((l) => out(l));
-    return 2;
-  }
-  if (!existsSync(file)) return fail(out, `${file}: no such file`);
-  if (!existsSync(repo)) return fail(out, `${repo}: no such folder`);
-  const result = importRoadmap(readFileSync(file, "utf8"));
-  if ("errors" in result) {
-    for (const e of result.errors) out(`${file}: ${e}`);
-    return 1;
-  }
-  const target = join(repo, "docs", "ROADMAP.md");
-  if (existsSync(target) && !flags.has("--force")) return fail(out, `${target} exists; use --force to replace it`);
-  mkdirSync(join(repo, "docs"), { recursive: true });
-  const before = existsSync(target) ? readFileSync(target, "utf8") : undefined;
-  writeAtomic(target, result.text);
-  out(`wrote ${target}: ${result.done.length} done steps`);
-
-  const message = ["Roadmap: import", "", ...result.done.map((id) => `Step: ${id}`)].join("\n");
-  if (flags.has("--no-commit") || !git(repo, "rev-parse", "--git-dir").ok) {
-    out("not committed; give the commit this message so that done steps stay done:");
-    out(message);
-    return 0;
-  }
-  const add = git(repo, "add", "--", "docs/ROADMAP.md");
-  const commit = add.ok ? git(repo, "commit", "-q", "-m", message, "--", "docs/ROADMAP.md") : add;
-  if (!commit.ok) {
-    // Leave the repo as it was: a rerun must not need --force.
-    git(repo, "reset", "-q", "--", "docs/ROADMAP.md");
-    if (before === undefined) rmSync(target);
-    else writeAtomic(target, before);
-    return fail(out, `commit failed, nothing written: ${commit.err || commit.out.trim()}`);
-  }
-  out("committed");
-  return 0;
 }

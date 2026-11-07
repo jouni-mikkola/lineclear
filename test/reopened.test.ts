@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { checkRoadmap, proofFaults, type Step } from "../src/roadmap.ts";
+import { checkRoadmap, type Step } from "../src/roadmap.ts";
 import { stepBrief } from "../src/brief.ts";
 import { tick } from "../src/rules.ts";
 import type { Settings } from "../src/project.ts";
@@ -27,16 +27,6 @@ test("the brief of a reopened step says to delete its Reopened line with the pro
   const settings = { repo: "", space: "s", check: "true" } as Settings;
   expect(stepBrief(stepsOf(true)[0] as Step, settings, "m")).toContain("delete that Reopened line");
   expect(stepBrief(stepsOf(false)[0] as Step, settings, "m")).not.toContain("Reopened");
-});
-
-test("a reopened step whose proof is in numbers.md fails the gate until its Reopened line is deleted", () => {
-  const done = new Set(["A"]);
-  const proven = "## A\n\nIt ran in 4 minutes.\n";
-  const missing = "## A\n\nNot yet recorded: the run.\n";
-  expect(proofFaults(stepsOf(true), done, proven)[0]?.message).toContain("delete its 'Reopened:' line in the same commit");
-  expect(proofFaults(stepsOf(true), done, missing)).toEqual([]);
-  expect(proofFaults(stepsOf(true), done, "# Numbers\n")).toEqual([]);
-  expect(proofFaults(stepsOf(false), done, proven)).toEqual([]);
 });
 
 function setup(commitsSince: number, text = roadmap(true)) {

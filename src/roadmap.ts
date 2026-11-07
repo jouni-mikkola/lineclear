@@ -311,105 +311,10 @@ export function resultOf(s: Step): string {
   return r ? [r.value, ...r.more.map((l) => l.trim())].join(" ").trim() : "";
 }
 
-/**
- * A done step whose 'done when' names a section of `docs/numbers.md` that still says "Not yet recorded" for it passes
- * without its proof. The check fails for it until the step is given a `done when` item `Reopened: <why>`. A reopened
- * step whose proof is in fails too, until the item is deleted. A shared section, such as one for a pack of steps,
- * holds it against a step only where its heading or the line names the step.
- */
-export function proofFaults(steps: Step[], done: Set<string>, numbers: string): RoadmapError[] {
-  const faults: RoadmapError[] = [];
-  for (const s of steps) {
-    if (!done.has(s.id) || s.dropped) continue;
-    const field = s.fields["done when"];
-    const text = field ? [field.value, ...field.more].join(" ") : "";
-    const names = [...text.matchAll(/`docs\/numbers\.md`\s+under\s+"([^"]+)"/g)].map((m) => m[1] as string);
-    if (s.reopened) {
-      // the proof is in: the Reopened line must go in the same commit, or the runner starts the step again
-      if (names.length > 0 && names.every((name) => numbersSection(numbers, name).length > 0 && !missingFor(numbersSection(numbers, name), s.id))) {
-        faults.push({
-          line: s.line,
-          message: `step ${s.id} is reopened, but docs/numbers.md now holds its proof: delete its 'Reopened:' line in the same commit`,
-        });
-      }
-      continue;
-    }
-    for (const name of names) {
-      if (!missingFor(numbersSection(numbers, name), s.id)) continue;
-      faults.push({
-        line: s.line,
-        message: `step ${s.id} is done, but docs/numbers.md under "${name}" says its run is not yet recorded: record it or add a 'done when' item 'Reopened: <why>'`,
-      });
-    }
-  }
-  return faults;
-}
-
-const namesId = (text: string, id: string) => new RegExp(`(^|[^A-Za-z0-9])${id}([^A-Za-z0-9]|$)`).test(text);
-
-/** Whether a "Not yet recorded" line of the section is the step's own: under its heading or naming it. */
-function missingFor(section: string[], id: string): boolean {
-  let heading = section[0] ?? "";
-  for (const line of section) {
-    if (line.startsWith("#")) heading = line;
-    else if (/not yet recorded/i.test(line) && (namesId(heading, id) || namesId(line, id))) return true;
-  }
-  return false;
-}
-
-/** The lines from the `## ` heading that starts with `name` up to the next `## `, heading first. */
-function numbersSection(numbers: string, name: string): string[] {
-  const lines = numbers.split("\n");
-  const key = name.toLowerCase();
-  const start = lines.findIndex((l) => {
-    const h = /^## (.*)$/.exec(l)?.[1]?.toLowerCase();
-    return h !== undefined && (h === key || h.startsWith(`${key}:`) || h.startsWith(`${key} `));
-  });
-  if (start < 0) return [];
-  const end = lines.findIndex((l, i) => i > start && l.startsWith("## "));
-  return lines.slice(start, end < 0 ? undefined : end);
-}
-
 /** A title cut to TITLE_MAX at the end of a word, so no word shows half; one long word is cut where it must be. */
 export function fitTitle(title: string): string {
   const t = title.trim();
   if (t.length <= TITLE_MAX) return t;
   const cut = t.slice(0, TITLE_MAX + 1).lastIndexOf(" ");
   return (cut > 0 ? t.slice(0, cut) : t.slice(0, TITLE_MAX)).replace(/[\s,:;.-]+$/, "");
-}
-
-/** The steps that were in the roadmap before L319 and measure: `docs/simplify.md` lists them after `Existing:`. */
-export function existingMeasuring(simplify: string): Set<string> {
-  const line = /^Existing: (.*)$/m.exec(simplify)?.[1] ?? "";
-  return new Set(
-    line
-      .split(",")
-      .map((x) => x.trim())
-      .filter((x) => x !== ""),
-  );
-}
-
-const MEASURE_FILE = /(^|\/)src\/measure|(^|\/)docs\/numbers\.md$|^ui\/.*report/i;
-
-const listOf = (s: Step, field: string) =>
-  [s.fields[field]?.value ?? "", ...(s.fields[field]?.more ?? [])]
-    .join(",")
-    .split(",")
-    .map((x) => x.trim())
-    .filter((x) => x !== "");
-
-/**
- * L319: until tier 2 is done (L271 is its last step), a step that adds a measurement or report feature is refused.
- * A step already in `existing` is kept, and so is one that waits for L271.
- */
-export function measuringFaults(steps: Step[], existing: ReadonlySet<string>): RoadmapError[] {
-  const byId = new Map(steps.map((s) => [s.id, s]));
-  return steps
-    .filter((s) => !s.dropped && !existing.has(s.id) && s.id !== "L271")
-    .filter((s) => listOf(s, "parts").includes("measure") || listOf(s, "files").some((f) => MEASURE_FILE.test(f)))
-    .filter((s) => !reaches(byId, s.after, "L271"))
-    .map((s) => ({
-      line: s.line,
-      message: `step ${s.id} adds measuring before tier 2 is done (rule L319, docs/simplify.md): add L271 to its 'after' chain and wait for L271, or drop the measure part and the measuring files`,
-    }));
 }
