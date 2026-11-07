@@ -104,6 +104,7 @@ if (verb === "status") {
 if (verb === "inbox" && rest.length === 0)
   say("1: Approve this roadmap change for budget? (Approve / Reject) from task LIN-90", "2: Merge LIN-85? (Merge / Not yet) from task LIN-85");
 if (verb === "inbox") fail("only the owner answers the Inbox", 2);
+if (verb === "task" && rest[0] === "tell") say("told the task");
 if (verb === "plan") {
   if (rest.length !== 2) console.log('usage: lineclear plan <project> "<goal>"'), process.exit(2);
   const p = project(rest[0]!);

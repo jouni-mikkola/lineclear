@@ -115,7 +115,8 @@ export function coordinatorPrompt(place: { role: 'space' | 'home' | 'main'; name
       : place.role === 'home'
         ? `\n\nThis is ${place.machine}'s home space: you also look after the machine and add spaces on it (lineclear space add).`
         : `\n\nThis is the home space of the main machine, ${place.machine}: you also look after this machine and you keep the overview of every machine, which alerts reach the phone.`
-  return `${base(who, 'lineclear-coordinator')}\n\n${commandLine(place.chat ?? place.name)}${duties}`
+  const needs = `\n\nAnswer a task's question from the roadmap and the docs. Only four things need the owner: a login, money, an outward act and a choice they do not make.`
+  return `${base(who, 'lineclear-coordinator')}\n\n${commandLine(place.chat ?? place.name)}${needs}${duties}`
 }
 
 export function taskPrompt(t: { id: string; branch: string; base: string }, times = '') {

@@ -31,6 +31,7 @@ export function toCall(r: Ran): Call | string | undefined {
   const [verb, ...rest] = r.args;
   if (r.args.includes("--help") || r.args.includes("-h")) return undefined;
   if (verb === "ask") return { c: "ask" };
+  if (verb === "task" && rest[0] === "tell" && rest[1]) return { c: "tell", task: rest[1].toUpperCase() };
   if (verb === "card") return { c: "ask" };
   if (verb === "dispatcher" && rest[0] === "projects") return undefined;
   if (verb === "status" && rest[0] === "--plan") return { c: "status-plan", ...(rest[1] ? { task: rest[1].toUpperCase() } : {}) };
@@ -62,6 +63,7 @@ function matches(got: Call, want: Call): boolean {
   switch (want.c) {
     case "status":
       return (got as typeof want).project === want.project;
+    case "tell":
     case "status-plan":
       return want.task === undefined || (got as typeof want).task === want.task;
     case "plan": {
@@ -125,6 +127,8 @@ function describe(calls: Call[]): string {
           return `plan ${c.project} "${c.goal.join(" ")}"`;
         case "move":
           return `move ${c.project} ${c.step} --after ${c.after.join(",")}`;
+        case "tell":
+          return `task tell${c.task ? ` ${c.task}` : ""}`;
         case "ask":
           return "lineclear ask";
       }
