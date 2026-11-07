@@ -137,6 +137,7 @@ export class EngineHandoff extends EnginePr {
     if (summary) t.said = summary
     if (facts) t.facts = facts
     t.reported = true
+    t.landCard = t.landTriedAt = undefined
     t.reportedAt ??= Date.now()
     t.landing = undefined
     t.going = undefined

@@ -20,7 +20,7 @@ describe('the engine lands a ready task', () => {
     const dir = repo()
     const t = await ready(w, dir, 'land-green', 'green.txt', 'green\n')
     await w.engine.landReady()
-    expect(t.merged).toBe(true)
+    await until(() => !!t.merged)
     expect(existsSync(join(dir, 'green.txt'))).toBe(true)
   })
 
@@ -31,7 +31,7 @@ describe('the engine lands a ready task', () => {
     writeFileSync(join(dir, 'other.txt'), 'other\n')
     sh('git add -A && git commit -qm other', dir)
     await w.engine.landReady()
-    expect(t.merged).toBe(true)
+    await until(() => !!t.merged)
     expect(existsSync(join(dir, 'mine.txt')) && existsSync(join(dir, 'other.txt'))).toBe(true)
   })
 
@@ -41,12 +41,16 @@ describe('the engine lands a ready task', () => {
     const t = await ready(w, dir, 'land-clash', 'README.md', 'theirs\n')
     writeFileSync(join(dir, 'README.md'), 'mine\n')
     sh('git commit -qam mine', dir)
-    await w.engine.landReady()
-    expect(t.merged).toBeFalsy()
     const cards = () => w.posted.filter((p) => p.id === `land:${t.id}`)
-    expect(cards().length).toBe(1)
-    expect(cards()[0].card?.text).toContain('README.md')
     await w.engine.landReady()
+    await until(() => cards().length === 1)
+    expect(t.merged).toBeFalsy()
+    expect(cards()[0].card?.text).toContain('README.md')
+    // refused: not tried again at the next look
+    t.landTriedAt = undefined
+    t.landCard = true
+    await w.engine.landReady()
+    await Bun.sleep(300)
     expect(cards().length).toBe(1)
   })
 
@@ -56,6 +60,7 @@ describe('the engine lands a ready task', () => {
     w.settings.set('brief.merge', 'ask me first')
     try {
       await w.engine.landReady()
+      await Bun.sleep(300)
       expect(t.merged).toBeFalsy()
     } finally {
       w.settings.set('brief.merge', null)

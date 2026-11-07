@@ -71,8 +71,8 @@ export class Engine extends EngineTidy {
     this.sweeps.push(first, every)
     const watch = () =>
       this.watchPrs()
-        .then(() => this.landReady())
         .then(() => this.watchMains())
+        .then(() => this.landReady())
         .catch(() => undefined)
     const watchFirst = setTimeout(watch, WATCH_FIRST)
     const watchEvery = setInterval(watch, WATCH_EVERY)
