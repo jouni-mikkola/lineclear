@@ -75,8 +75,8 @@ export function codeVersion(dir = join(import.meta.dir, '..', '..')) {
       else if (/\.(ts|json)$/.test(n)) h.update(relative(dir, f)).update(readFileSync(f))
     }
   }
-  for (const d of ['server', 'shared', 'plugins', 'generated']) if (existsSync(join(dir, d))) walk(join(dir, d))
-  for (const f of ['package.json', 'bun.lock', 'plugins.json']) if (existsSync(join(dir, f))) h.update(f).update(readFileSync(join(dir, f)))
+  for (const d of ['server', 'shared']) if (existsSync(join(dir, d))) walk(join(dir, d))
+  for (const f of ['package.json', 'bun.lock']) if (existsSync(join(dir, f))) h.update(f).update(readFileSync(join(dir, f)))
   code = h.digest('hex').slice(0, 16)
   return code
 }

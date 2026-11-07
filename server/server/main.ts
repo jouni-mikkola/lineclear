@@ -25,7 +25,7 @@ if (push && 'devices' in source && 'pushWarnings' in source) {
 }
 // a worker for another machine (machines.ts) serves only its main machine, which pushes alerts itself
 const worker = !!process.env.LINECLEAR_BOX
-const server = startApp({ source, push: worker ? undefined : push, port, updates: worker ? undefined : join(HOME, 'update.json') })
+const server = startApp({ source, push: worker ? undefined : push, port })
 // a worker says which code it runs: the main server keeps it across its own restart while that is the same
 writeJson('server.json', { port: server.port, pid: process.pid, code: worker ? (await import('./live/machines.ts')).codeVersion() : undefined })
 let tunnel: { stop(): void } | undefined

@@ -23,19 +23,16 @@ imports count for the borders but not for cycles, since they are gone when the c
 | `scripts` | `scripts/` | repo tools: the check, the smoke check, measurements | `cli`, `brand`, `gates`, `check-line` |
 | `tests` | `test/` | the bun tests, one file per command | `cli`, `pi`, `kit`, `web`, `brand`, `scripts`, `gates`, `ui-test`, `check-line`, `registry`, `secrets` |
 | `shared` | `server/shared/` | types and pure helpers the server shares | none |
-| `server` | `server/server/` | the server: the live source, agents, chats, the engine and the merge lane | `shared`, `generated`, `check-line`, `registry`, `secrets` |
+| `server` | `server/server/` | the server: the live source, agents, chats, the engine and the merge lane | `shared`, `check-line`, `registry`, `secrets` |
 | `registry` | `src/models.ts` | the models every installed harness lists | none |
 | `secrets` | `server/server/live/secrets.ts` | the vault, and the `secrets` and `totp` words that read it | `cli`, `shared` |
 | `check-line` | `server/server/live/engine/machine.ts`, `src/check-runs.ts`, `src/task-work.ts`, `src/git.ts`, `src/time.ts` | each machine's name and load limit, a branch's GitHub checks read with gh, the log of the work a task does on its machine, and the one git helper and time constants | none |
-| `generated` | `server/generated/` | the plugin registries the build writes | `plugins` |
-| `plugins` | `server/plugins/` | the server's plugins, each a server part | `server`, `shared` |
 | `helper` | `server/helper/` | what runs on a remote machine | `shared` |
-| `server-scripts` | `server/scripts/` | the server's build, update, supervisor and test runner | `server`, `plugins`, `shared`, `server-tests` |
-| `server-tests` | `server/test/` | the server's tests | `server`, `plugins`, `shared`, `server-scripts`, `generated`, `helper`, `check-line`, `registry`, `secrets` |
+| `server-scripts` | `server/scripts/` | the server's test runner and store scripts | `server`, `shared`, `server-tests` |
+| `server-tests` | `server/test/` | the server's tests | `server`, `shared`, `server-scripts`, `helper`, `check-line`, `registry`, `secrets` |
 
 ## Rules of thumb
 
 - Code that two modules share lives in the lower one. `shared` holds what the server's parts both need.
-- `generated` is written by `server/scripts/build-plugins.ts`: it imports every plugin, and only `server` reads it. That is how the server loads plugins that use the server's own parts.
 - Tests may import what they test, never the other way round.
 - An import across a border that is not allowed fails the gate.

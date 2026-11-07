@@ -12,7 +12,7 @@ interface Module {
 
 const ARCHITECTURE = "docs/architecture.md";
 // the server's tsconfig paths
-const ALIASES: Record<string, string> = { "@shared/": "server/shared/", "@plugins/": "server/plugins/" };
+const ALIASES: Record<string, string> = { "@shared/": "server/shared/" };
 const CODE = (s: string) => [...s.matchAll(/`([^`]+)`/g)].map((m) => m[1] ?? "");
 
 /** The rows of the modules table: | `name` | `folder/`, `file.ts` | owns | `a`, `b` or none | */
@@ -72,7 +72,6 @@ function resolveImport(root: string, from: string, spec: string): string | undef
   if (base === undefined) return undefined;
   const isFile = (p: string) => existsSync(join(root, p)) && statSync(join(root, p)).isFile();
   const tries = [base, `${base}.ts`, `${base}.tsx`, `${base}/index.ts`, `${base}/index.tsx`];
-  // a file the build writes (server/generated/) is not on disk in a fresh checkout: keep its path
   return tries.find(isFile) ?? base;
 }
 

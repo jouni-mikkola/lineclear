@@ -38,10 +38,6 @@ Keep your attention on decisions. Lineclear starts, follows and puts away the ta
 
 Each space's chat is in the middle and its tasks on the right, by what they need: `Needs you`, `Ready`, `Merging`, `Working`, `Queued`, `To do` and `Done`. A working task's dot fills like a pie with its % done and its minutes left, and its second line says what it is doing (`Fixing the two failing tests`). The sidebar groups your [spaces](docs/spaces.md) by machine, with Pinned and sections of your own, and marks the ones that wait on you. On a desktop, [split view](docs/chat.md) puts up to three chats or task lists side by side.
 
-### 🧩 Make it yours: everything is a plugin
-
-Places, chats, tasks, the terminal, the browser, voice, alerts: every part of Lineclear is a plugin, and yours sit beside them in `~/.lineclear/plugins/<name>/`. Write one yourself or ask an agent to build it. Change or replace any built-in plugin's server part by giving yours its name (copy it there and edit it), and switch any plugin off in Settings → Plugins. Updates never touch that folder, so you keep every new release without a fork: save a file and Lineclear rebuilds and restarts in seconds, and a plugin that breaks is set aside with its error while the rest runs. [Plugins](docs/plugins.md) has a hello world.
-
 ### ⚡ Stop briefing every agent yourself
 
 Write what needs doing to a space's coordinator: it makes it a task or several, each with a brief and a Settings block that says how it is reviewed and merged. Each agent starts on Claude Code, Codex, pi or another CLI herdr can start, in a worktree of its own, at once or as soon as the machine has room. Want more control? Ask for it "for later", "after SHE-12", or "ask me before merging".
@@ -54,8 +50,8 @@ An agent that asks you something, wants a permission or a plan approved shows un
 
 <table>
 <tr>
-<td align="center" valign="top" width="33%"><h3>1️⃣</h3><b>Install the plugin</b><br /><sub>Run <code>herdr plugin install eliasstravik/herdr-projects</code>. herdr builds it and starts it at every herdr start; it gets its own Bun if you have none.</sub></td>
-<td align="center" valign="top" width="33%"><h3>2️⃣</h3><b>Share it on your tailnet</b><br /><sub>Run the plugin action "Share Lineclear on my tailnet". It serves the app privately with <code>tailscale serve</code>, never public, and prints its link.</sub></td>
+<td align="center" valign="top" width="33%"><h3>1️⃣</h3><b>Install it</b><br /><sub>Run the one-line install from the repository README. It gets its own Bun if you have none.</sub></td>
+<td align="center" valign="top" width="33%"><h3>2️⃣</h3><b>Share it on your tailnet</b><br /><sub>Run <code>tailscale serve</code> on its port. It serves the app privately, never public, and prints its link.</sub></td>
 <td align="center" valign="top" width="33%"><h3>3️⃣</h3><b>Write to a coordinator</b><br /><sub>Open the link on your phone and add it to the home screen, then turn alerts on in Settings. Pick a space and say what needs doing. <code>?</code> on a keyboard shows everything else.</sub></td>
 </tr>
 </table>
@@ -64,7 +60,7 @@ An agent that asks you something, wants a permission or a plan approved shows un
 
 <table align="center">
 <tr>
-<td align="center" valign="top"><sub>For developers who run coding agents in herdr on macOS or Linux</sub><br /><h2>Free</h2><div align="left">&nbsp;&nbsp;&nbsp;✓&nbsp; A coordinator for every space that turns what you write into tasks<br />&nbsp;&nbsp;&nbsp;✓&nbsp; Every task on its own worktree and branch, with its own agent<br />&nbsp;&nbsp;&nbsp;✓&nbsp; A review by fresh eyes before it merges, through a pull request on GitHub<br />&nbsp;&nbsp;&nbsp;✓&nbsp; Cards, alerts and voice calls on your phone, tablet or desktop<br />&nbsp;&nbsp;&nbsp;✓&nbsp; Every machine you saved in herdr, from one app<br />&nbsp;&nbsp;&nbsp;✓&nbsp; Your own plugins and themes, kept through every update<br />&nbsp;&nbsp;&nbsp;✓&nbsp; coordinator timer and split view</div></td>
+<td align="center" valign="top"><sub>For developers who run coding agents in herdr on macOS or Linux</sub><br /><h2>Free</h2><div align="left">&nbsp;&nbsp;&nbsp;✓&nbsp; A coordinator for every space that turns what you write into tasks<br />&nbsp;&nbsp;&nbsp;✓&nbsp; Every task on its own worktree and branch, with its own agent<br />&nbsp;&nbsp;&nbsp;✓&nbsp; A review by fresh eyes before it merges, through a pull request on GitHub<br />&nbsp;&nbsp;&nbsp;✓&nbsp; Cards, alerts and voice calls on your phone, tablet or desktop<br />&nbsp;&nbsp;&nbsp;✓&nbsp; Every machine you saved in herdr, from one app<br />&nbsp;&nbsp;&nbsp;✓&nbsp; coordinator timer and split view</div></td>
 </tr>
 <tr>
 <td align="center"><a href="https://github.com/eliasstravik/herdr-projects/blob/main/docs/get-started.md"><img src="assets/buttons/install-lineclear.svg" alt="Install Lineclear" /></a></td>
@@ -73,11 +69,7 @@ An agent that asks you something, wants a permission or a plan approved shows un
 
 ## Updating
 
-```bash
-herdr plugin update herdr-projects   # its plugin id, from the plugin it replaced
-```
-
-The next herdr start, or the next press of the open key, swaps the running Lineclear for the new version. A linked checkout updates itself: when it moves to a new commit, Lineclear builds a release of it and restarts on it, and every open screen reloads with what you were typing kept. Coming from herdr-projects, the same command takes you there. [Upgrading and updates](docs/upgrading.md) has the details.
+Run the install line again. An update that does not work puts the previous version back.
 
 ## Get your questions answered
 
@@ -87,7 +79,7 @@ You need to be comfortable in a terminal for the install. After that everything 
 
 ### How do I check that Lineclear is running?
 
-The plugin action "Open Lineclear" starts it when it is not running and shows its link. To check every machine, run on the main one:
+`lineclear run` starts it when it is not running. To check every machine, run on the main one:
 
 ```bash
 lineclear doctor
@@ -99,7 +91,7 @@ It checks every machine saved in herdr, puts Lineclear's helper there again, sta
 
 **Codex starts with full access** (`--dangerously-bypass-approvals-and-sandbox`), so a task never waits on a prompt nobody sees. Claude Code and pi start with your own permission settings; Lineclear adds only its hooks, from a settings file of its own, and yours are never touched. A permission prompt shows the task under `Needs you` (`Asks permission`), and startup trust and MCP prompts come as cards. The brief's rules and the review are guidance, not a sandbox. [Tasks](docs/tasks.md) has the details.
 
-### Does the plugin send my work to a hosted service?
+### Does Lineclear send my work to a hosted service?
 
 No. Lineclear runs on your own machine, keeps its files there, talks to your local herdr, and reaches your other machines over herdr's remote and your own SSH. The app is shared only on your tailnet. Your agent CLI still uses its own service as usual, alerts go through your browser's push service, and voice calls go through ElevenLabs if you set them up.
 
@@ -109,7 +101,7 @@ Only the ones it made. Every task works in its own worktree, on its own branch `
 
 ### Where do my tasks live?
 
-In `~/.lineclear/` on the main machine (`LINECLEAR_HOME` to move it): your spaces, tasks, chats, settings and your own plugins. Other machines get only a small helper folder. [Develop](docs/develop.md) and [Plugins](docs/plugins.md) cover the code and how to change Lineclear's plugins for yourself.
+In `~/.lineclear/` on the main machine (`LINECLEAR_HOME` to move it): your spaces, tasks, chats, and settings. Other machines get only a small helper folder. [Develop](docs/develop.md) covers the code.
 
 ### Can I use several machines?
 

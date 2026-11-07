@@ -19,7 +19,7 @@ export function piByDefault(env: NodeJS.ProcessEnv = process.env): void {
   writeAtomic(file, `${JSON.stringify({ machine: {}, spaces: {}, everywhere: Object.fromEntries(PI_ROLES.map((k) => [k, "pi"])) }, null, 2)}\n`);
 }
 
-/** Starts the server in server/ and stays up until it stops. Installs and builds it on first use. */
+/** Starts the server in server/ and stays up until it stops. Installs it on first use. */
 export async function serveMain(args: string[], out: (line: string) => void): Promise<number> {
   let port: string | undefined;
   for (let i = 0; i < args.length; i++) {
@@ -33,7 +33,6 @@ export async function serveMain(args: string[], out: (line: string) => void): Pr
   }
   const step = async (cmd: string[]) => (await Bun.spawn(cmd, { cwd: server, stdin: "ignore", stdout: "inherit", stderr: "inherit" }).exited) === 0;
   if (!existsSync(join(server, "node_modules")) && !(await step(["bun", "install", "--frozen-lockfile"]))) return 1;
-  if (!(await step(["bun", "run", "build"]))) return 1;
   piByDefault();
   const env = { ...process.env, ...(port === undefined ? {} : { LINECLEAR_PORT: port }) };
   const child = Bun.spawn(["bun", "main.ts"], { cwd: join(server, "server"), env, stdin: "ignore", stdout: "inherit", stderr: "inherit" });

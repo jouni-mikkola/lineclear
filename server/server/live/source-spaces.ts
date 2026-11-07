@@ -13,7 +13,6 @@ import * as task from './mfs.ts'
 import { HOST, NAME, placeId } from './places.ts'
 import { SECRET_NAME } from './secrets.ts'
 import { diffFiles, diffPatch, listFiles, pullRequest, readFile } from './worktree.ts'
-import { has } from '../plugins.ts'
 import { minutesOf, chatDir, sharedEverywhere } from './source-helpers.ts'
 import type { LiveSource } from './source.ts'
 import { LiveSourceViews } from './source-views.ts'
@@ -117,7 +116,6 @@ export class LiveSourceSpaces extends LiveSourceViews {
   protected prs = new Map<string, { at: number; v: Promise<unknown> }>()
 
   async worktree(ask: WorktreeAsk): Promise<unknown> {
-    if (!has('worktree')) throw new Error('The worktree plugin is off.')
     const peer = this.peers?.owner(ask.task)
     if (peer) {
       if (!peer.reachable) throw new Error(`Can't reach ${peer.rec.machine} right now.`)
@@ -250,7 +248,6 @@ export class LiveSourceSpaces extends LiveSourceViews {
   }
 
   protected async react(key: string, messageId: string, emoji: string) {
-    if (!has('reactions')) return { ok: false }
     const chat = this.chats.chat(key)
     const m = chat.messages.find((x) => x.id === messageId)
     if (!m || !(m.text || m.file)) return { ok: false }

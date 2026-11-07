@@ -100,9 +100,6 @@ const touched = reached ? new Set([...changed, ...reached]) : undefined;
 
 const allTests = () => Array.from(new Bun.Glob("test/**/*.test.{ts,tsx}").scanSync(".")).map((f) => `./${f}`);
 
-// the release tests run the server's store scripts, which import the registries a fresh checkout has not built yet
-const PLUGINS: Step = { name: "plugins", cmd: ["bun", "scripts/build-plugins.ts"], cwd: "server" };
-const needsPlugins = () => !existsSync("server/generated/server-plugins.ts");
 const SERVER_INSTALL: Step = { name: "server install", cmd: ["bun", "install", "--frozen-lockfile"], cwd: "server" };
 
 // a run of the whole suite records which files each test loads (scripts/load-map.ts) for the next changed run
@@ -125,17 +122,16 @@ function testSteps(): Step[] {
   }
   const runs = split(list, Math.min(TEST_SHARDS, Math.max(1, Math.ceil(list.length / 6))), readTimes());
   // a test waits for its event, never for a time: the limit only stops a hang, so a busy machine never reaches it
-  const built = needsPlugins();
-  // the same release tests run the server's scripts, which import its dependencies: an install under way (a fresh
-  // worktree, a moved lockfile) leaves them half there, so the tests wait for it
+  // the tests import the server's dependencies: an install under way (a fresh worktree, a moved lockfile) leaves
+  // them half there, so the tests wait for it
   const installs = !(onlyChanged && serverInstalled()) && (inServer || !existsSync("server/node_modules"));
-  const needs = [...(built ? [PLUGINS.name] : []), ...(installs ? [SERVER_INSTALL.name] : [])];
+  const needs = installs ? [SERVER_INSTALL.name] : [];
   const tests = runs.map((run, i) => ({
     name: runs.length === 1 ? "tests" : `tests ${i + 1}/${runs.length}`,
     ...(needs.length ? { needs } : {}),
     cmd: ["bun", "test", "--timeout", "120000", "--reporter=junit", `--reporter-outfile=${join(reports, `unit-${i}.xml`)}`, ...run],
   }));
-  return [...(built ? [PLUGINS] : []), ...(installs && !inServer ? [SERVER_INSTALL] : []), ...tests];
+  return [...(installs && !inServer ? [SERVER_INSTALL] : []), ...tests];
 }
 
 // a worker's loop reuses the installed server packages unless the lockfile or package.json is newer than them

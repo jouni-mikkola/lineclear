@@ -103,13 +103,6 @@ API keys, tokens and passwords are the human's secrets: use them by name, never 
 - **Name it plainly**, as its tool expects (`OPENAI_API_KEY`). The human adds, replaces and removes them in Settings →
   Secrets, Everywhere, for a machine or for a space; the most specific one wins.
 
-### Plugins
-
-A plugin you make for the human (a change to Lineclear's own screen just for them) goes in
-`~/.lineclear/plugins/<name>/` on the main machine, never in the repo; one with a built-in plugin's name replaces it.
-Lineclear rebuilds and restarts with it in seconds. How to write one: `docs/plugins.md` (Your own plugins), in Lineclear's
-checkout.
-
 ### Alerts
 
 `lineclear alert "<title>" --body "<why>"` reaches the human's phone: only for what truly can't wait.

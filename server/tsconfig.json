@@ -22,11 +22,7 @@
   "include": [
     "shared",
     "server",
-    "plugins",
     "scripts",
     "test"
   ],
-  "exclude": [
-    "user-plugins"
-  ]
 }

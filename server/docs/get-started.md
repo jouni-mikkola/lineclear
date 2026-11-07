@@ -11,13 +11,11 @@ Needs herdr 0.9 or later, on Linux or macOS. It runs on [Bun](https://bun.sh): w
 checksum-checked Bun into `~/.lineclear/bun/` by itself. Other machines need nothing installed by hand ([Other machines](machines.md)).
 
 ```sh
-herdr plugin install eliasstravik/herdr-projects     # or link a checkout: herdr plugin link /path/to/lineclear
+curl -fsSL https://raw.githubusercontent.com/jouni-mikkola/lineclear/main/install.sh | sh
 ```
 
-Its plugin id is `herdr-projects`, the plugin it replaced ([Upgrading](upgrading.md)), so herdr lists it as `herdr-projects (Lineclear)`
-and its actions are `herdr-projects.<action>`. herdr builds it (`bun install`, `bun run build`) and starts it at every
-herdr start; the action **Open Lineclear** starts it too and shows its link. Then run the plugin action
-**Share Lineclear on my tailnet**: it serves the app privately on your tailnet (`tailscale serve`, never public) and
+`install.sh` is the one install; running it again updates. `lineclear run` starts Lineclear and shows its link. Then serve
+it on your tailnet: `tailscale serve` serves the app privately on your tailnet (never public) and
 prints the link, `https://<machine>.<tailnet>.ts.net/lineclear/`. On an iPhone, open it in Safari and add it to the
 home screen: alerts need that.
 
@@ -52,6 +50,5 @@ app is closed or in the background.
 
 ## Next
 
-- [Upgrading and updates](upgrading.md): coming from herdr-projects, going back, and how Lineclear keeps itself up to date.
 - [Other machines](machines.md): run spaces and tasks on more machines from the same app.
 - [Spaces](spaces.md), [Chats](chat.md), [Tasks](tasks.md) and [Settings](settings.md): how it all works.

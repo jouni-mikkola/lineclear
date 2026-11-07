@@ -22,7 +22,6 @@ import { Vault } from './secrets.ts'
 import { RequestedNewsMailbox } from './requested-news.ts'
 import { Unread } from './unread.ts'
 import { Monitor, meters, procLines, summary, topProcs, type HealthEvent, type Kind } from './health.ts'
-import { has } from '../plugins.ts'
 import { REPLY_AFTER_CARD } from './source-helpers.ts'
 
 export class LiveSourceState extends Emitter<SourceEvents> {
@@ -258,7 +257,7 @@ export class LiveSourceState extends Emitter<SourceEvents> {
   /** this machine's numbers for the screen */
   protected healthView() {
     const s = this.health.last
-    if (!s || !has('health')) return undefined
+    if (!s) return undefined
     const held = this.engine.heldTasks()
     return {
       meters: meters(s, this.settings.machine(), this.health.told()),
@@ -276,7 +275,6 @@ export class LiveSourceState extends Emitter<SourceEvents> {
    * coordinator with the numbers and what uses it most. Only measured and told: what to do is the coordinator's call.
    */
   protected async onHealth(e: HealthEvent) {
-    if (!has('health')) return
     const s = e.sample
     const l = this.settings.machine()
     const load = (x: number | null) => +((x ?? 0) * s.cores).toFixed(1)
@@ -339,7 +337,7 @@ export class LiveSourceState extends Emitter<SourceEvents> {
   }
 
   alert(a: Alert) {
-    if (has('alerts')) this.emit('alert', a)
+    this.emit('alert', a)
   }
 
   protected resumeTaskAgent(key: string) {

@@ -24,7 +24,6 @@ Your data lives in `~/.lineclear` (`LINECLEAR_HOME` to move it).
 server/            the web server and the live source
   live/            herdr link, chats from logs (readers/), tasks (engine/), settings, machines (box, install)
 src/               the screen's kernel, layout and shared pieces
-plugins/<name>/    each base plugin's parts (yours: ~/.lineclear/plugins/<name>/)
 skill/             what every agent is taught (lineclear/), coordinators (lineclear-coordinator/), task agents (lineclear-agent/)
 helper/            what Lineclear puts on another machine: its lineclear command
 bin/lineclear      the command agents use

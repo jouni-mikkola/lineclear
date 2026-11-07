@@ -5,7 +5,6 @@ import { HOME } from '../store.ts'
 import { BOX } from './box.ts'
 import { followCommand } from './commands.ts'
 import { HOME_SPACE, placeId } from './places.ts'
-import { has } from '../plugins.ts'
 import { LiveSourceUpkeep } from './source-upkeep.ts'
 
 export class LiveSource extends LiveSourceUpkeep implements Source {
@@ -39,7 +38,7 @@ export class LiveSource extends LiveSourceUpkeep implements Source {
     // held tasks start once this machine has room: by its load (once measured) and herdr answering
     this.engine.machine = (machine) => {
       if (machine) return this.boxes.get(machine)?.read
-      return has('health') && this.health.last ? { busy: this.health.busy(), herdr: this.agents.reachable } : undefined
+      return this.health.last ? { busy: this.health.busy(), herdr: this.agents.reachable } : undefined
     }
     this.peers?.on('chat', (key) => this.emit('chat', key))
     this.peers?.on('terminal', (key, screen) => this.emit('terminal', key, screen))

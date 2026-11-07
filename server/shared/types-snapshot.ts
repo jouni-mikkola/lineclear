@@ -155,26 +155,10 @@ export interface TermScreen {
   rows?: number
 }
 
-/** how Lineclear's last update of itself went (update.json in its folder, written by the supervisor) */
-export interface UpdateStatus {
-  /** ok: running the newest commit; failed: kept the running version; restarting: about to come back on a new one */
-  state: 'ok' | 'failed' | 'restarting'
-  /** the commit tried last, and its subject line */
-  commit: string
-  subject: string
-  /** the commit the running build was made from */
-  built: string | null
-  /** the release folder (in .releases) the server runs from */
-  release?: string
-  error?: string
-  at: number
-}
-
 export type ServerEvent =
   | { type: 'snapshot'; snapshot: Snapshot }
   | { type: 'chat'; chat: Chat }
   | ({ type: 'terminal'; chat: string } & TermScreen)
   | { type: 'offline'; since: number }
-  | { type: 'update'; update: UpdateStatus | null }
   /** the answer to a screen's ping: its link still works */
   | { type: 'pong' }

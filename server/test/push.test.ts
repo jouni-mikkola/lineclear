@@ -51,7 +51,7 @@ test('partial success, private errors, quiet repeats, skipped devices and recove
     fail = false
     await push.send(alert, new Set([sub('a').endpoint]))
     expect(push.warnings(name)).toHaveLength(1)
-    const rows = new Settings().sections(push.devices, [], null, undefined, [], undefined, push.warnings(name)).flatMap((s) => s.rows)
+    const rows = new Settings().sections(push.devices, [], undefined, [], undefined, push.warnings(name)).flatMap((s) => s.rows)
     expect(rows.find((r) => r.key === 'alerts')?.warn).toContain('1 device could not receive')
     await push.send(alert)
     expect(push.warnings(name)).toEqual([])

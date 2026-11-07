@@ -50,6 +50,5 @@ export type {
   Snapshot,
   Action,
   TermScreen,
-  UpdateStatus,
   ServerEvent,
 } from './types-snapshot.ts'
