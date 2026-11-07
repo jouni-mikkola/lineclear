@@ -4,7 +4,9 @@ import { basename, join, resolve } from "node:path";
 import { serverBin } from "./paths.ts";
 import { currentModelFile } from "./company.ts";
 import { companyOfModel, describeOne, type ModelFile, tierRank } from "./models.ts";
-import { addProject, detectCheck, detectSpace, listProjectNames, readSettings } from "./project.ts";
+import { detectCheck, detectSpace } from "./project-detect.ts";
+import { addProject } from "./project-write.ts";
+import { listProjectNames, readSettings } from "./project.ts";
 
 type Env = Record<string, string | undefined>;
 

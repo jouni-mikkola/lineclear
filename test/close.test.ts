@@ -7,7 +7,7 @@ import { sessionFolder } from "../src/measure.ts";
 import { decisionsPath } from "../pi/config.ts";
 import { realWorld, tick } from "../src/rules.ts";
 import { status } from "../src/status.ts";
-import { changeSettings } from "../src/project.ts";
+import { changeSettings } from "../src/project-change.ts";
 import { readWaits, waitPath, writeWait } from "../src/waits.ts";
 import { demoConfig, idleWorld } from "./demo-world.ts";
 import { tmp } from "./helpers.ts";

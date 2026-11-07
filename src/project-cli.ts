@@ -1,19 +1,6 @@
 import { existsSync, statSync } from "node:fs";
-import {
-  addProject,
-  askBefore,
-  askBeforeKeys,
-  type Ask,
-  fail,
-  listProjectNames,
-  NAME,
-  readSettings,
-  removeProject,
-  roles,
-  setProject,
-  tierNames,
-  tiersOf,
-} from "./project.ts";
+import { addProject, fail, removeProject, setProject } from "./project-write.ts";
+import { askBefore, askBeforeKeys, type Ask, listProjectNames, NAME, readSettings, roles, tierNames, tiersOf } from "./project.ts";
 import { failureTail, maskSecrets, secretNames } from "../server/server/live/secrets.ts";
 
 /** Each project with its commands, its model lists and its secret names, never their values. */
