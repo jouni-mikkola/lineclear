@@ -218,7 +218,7 @@ const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** Runs a failed test again alone, in the folder its step runs in. True when it fails alone too. */
 function failsAlone(f: Failure, cwd: string | undefined): boolean {
-  const name = f.test.split(" > ").map(escapeRegExp).join(" ");
+  const name = `^${f.test.split(" > ").map(escapeRegExp).join(" ")}$`;
   const alone = Bun.spawnSync(["bun", "test", "--timeout", "120000", f.file, "-t", name], {
     cwd,
     stdin: "ignore",
@@ -243,7 +243,8 @@ function quarantined(step: Step, failing: Failure[], output: string): boolean {
   for (const k of verdict.flaky) console.log(`check: flaky, passed alone, quarantined: ${k}`);
   for (const k of verdict.broken) console.error(`check: failed alone too: ${k}`);
   // a step that failed with failures the output does not name as tests (a crash) is not let through
-  return verdict.ok && output.includes("(fail) ");
+  const counted = /^\s*(\d+) fail$/m.exec(output);
+  return verdict.ok && counted !== null && Number(counted[1]) === failing.length;
 }
 
 /** Runs a step and keeps its output, which is printed only when the step fails: the steps run side by side. */
@@ -268,7 +269,7 @@ async function runStep(step: Step): Promise<boolean> {
   const at = performance.now();
   const { code, failing, output } = await run(step);
   const isTests = step.name.startsWith("tests");
-  const ok = code === 0 || ((isTests || step.name === "server tests") && failing.length > 0 && quarantined(step, failing, output));
+  const ok = code === 0 || ((isTests || step.name.startsWith("server tests")) && failing.length > 0 && quarantined(step, failing, output));
   times.push({ step: step.name, seconds: (performance.now() - at) / 1000, ok });
   if (!ok) {
     console.error(
