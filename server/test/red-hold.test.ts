@@ -8,14 +8,14 @@ import { sh, started, world } from './engine-world.ts'
 test('3 merges on a red main: the 2nd and 3rd are held until it is green', async () => {
   const w = world()
   const g = onGitHub()
-  const tasks = []
+  const tasks: Awaited<ReturnType<typeof started>>['t'][] = []
   for (const n of ['one', 'two', 'three']) {
     const { t } = await started(w, g.dir, `hold${n}`)
     writeFileSync(join(t.worktree!, `${n}.txt`), `${n}\n`)
     sh('git add -A && git commit -qm x', t.worktree!)
     tasks.push(t)
   }
-  const p = w.engine.places.space(tasks[0].project)!
+  const p = w.places.space(tasks[0].project)!
   const data = (w.engine as unknown as { data: { red?: Record<string, string> } }).data
   data.red = { [p.path]: 'b'.repeat(40) }
   const merge = (i: number) => w.engine.merge(tasks[i].id, { self: true })
