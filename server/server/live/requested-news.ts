@@ -3,6 +3,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { readAgentRows } from './engine/cold.ts'
 
 export interface RequestedNews {
   id: string
@@ -25,12 +26,8 @@ export class RequestedNewsMailbox {
     const machines = join(this.root, 'workers')
     if (existsSync(machines)) for (const name of readdirSync(machines)) homes.push(join(machines, name))
     for (const home of homes) {
-      try {
-        const records = JSON.parse(readFileSync(join(home, 'agents.json'), 'utf8'))
-        if (records[chat]?.key === chat && !records[chat].finished) return chat
-      } catch {
-        /* no coordinator records here */
-      }
+      const record = readAgentRows<{ key: string; started: number; finished?: boolean }>(home)[chat]
+      if (record && !record.finished) return chat
     }
   }
   post(news: Omit<RequestedNews, 'id'>) {

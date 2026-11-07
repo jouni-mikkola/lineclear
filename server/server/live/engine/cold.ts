@@ -1,10 +1,9 @@
 // Tasks that ended over COLD_AFTER ago leave tasks.json for tasks-cold.jsonl, an append log: a line per change of
-// one of them (the last line of an id wins, `{"gone": id}` drops it). Finished agents' records do the same, from
-// agents.json to agents-cold.jsonl. They stay in memory as before, but a change writes only the ones still at work
-// whole, so each write stays small however many tasks the board has kept.
-import { appendFileSync, closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, writeSync } from 'node:fs'
+// one of them (the last line of an id wins, `{"gone": id}` drops it). Every agent record is a row of such a log
+// (agents-cold.jsonl), so a change to one record writes that record only, however many the board has kept.
+import { appendFileSync, closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, rmSync, writeSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { HOME, readJson, writeJson } from '../../store.ts'
+import { HOME } from '../../store.ts'
 import { durableWrite } from './task-store.ts'
 
 export const COLD_AFTER = 86_400_000
@@ -15,7 +14,7 @@ type Rec = Record<string, unknown>
 
 /** The records of a log, by `idKey`, in the order they first went cold, and how many lines it has. A line that does not
  *  parse is kept in <file>.bad, where `lineclear doctor` finds it; the one before it stands. */
-function readCold(file: string, idKey = 'id'): { recs: Rec[]; lines: number; skipped: string[] } {
+function readCold(file: string, idKey = 'id', repair = true): { recs: Rec[]; lines: number; skipped: string[] } {
   const by = new Map<string, Rec>()
   const skipped: string[] = []
   if (!existsSync(file)) return { recs: [], lines: 0, skipped }
@@ -33,22 +32,16 @@ function readCold(file: string, idKey = 'id'): { recs: Rec[]; lines: number; ski
       skipped.push(line)
     }
   }
-  if (skipped.length) appendFileSync(`${file}.bad`, `${skipped.join('\n')}\n`)
+  if (repair && skipped.length) appendFileSync(`${file}.bad`, `${skipped.join('\n')}\n`)
   // a last line cut short has no end: the next line must not join onto it
-  if (text && !text.endsWith('\n')) appendFileSync(file, '\n')
+  if (repair && text && !text.endsWith('\n')) appendFileSync(file, '\n')
   return { recs: [...by.values()], lines, skipped }
-}
-
-/** a top-level copy: a cold task changes by assignment, so a changed field is a new value here */
-const same = (a: Record<string, unknown>, b: Record<string, unknown>) => {
-  const ka = Object.keys(a)
-  return ka.length === Object.keys(b).length && ka.every((k) => a[k] === b[k])
 }
 
 export class ColdLog<T extends object> {
   private file: string
-  /** each cold record as last written */
-  private written = new Map<string, Record<string, unknown>>()
+  /** each cold record as last written, as its line: a record changed in place still differs from it */
+  private written = new Map<string, string>()
   private lines = 0
   /** lines of the log that did not parse when it was read */
   skipped: string[] = []
@@ -65,17 +58,17 @@ export class ColdLog<T extends object> {
 
   /** The records of the whole file with the cold ones before them; one in both is the whole file's (a stop between
    *  writes). */
-  load(hot: T[]): T[] {
+  load(hot: T[], repair = true): T[] {
     const ids = new Set(hot.map(this.id))
-    const read = readCold(this.file, this.idKey)
+    const read = readCold(this.file, this.idKey, repair)
     const cold = read.recs.filter((t) => !ids.has(t[this.idKey] as string)) as unknown as T[]
-    for (const t of cold) this.written.set(this.id(t), { ...(t as Record<string, unknown>) })
+    for (const t of cold) this.written.set(this.id(t), JSON.stringify(t))
     this.lines = read.lines
     this.skipped = read.skipped
     return [...cold, ...hot]
   }
 
-  /** Appends what changed among the cold records and returns the rest, for the whole file. */
+  /** Appends what changed among the records `isCold` picks and returns the rest, for the whole file. */
   save(tasks: T[], isCold: (t: T) => boolean, out: (t: T) => T = (t) => t): T[] {
     const hot: T[] = []
     const lines: string[] = []
@@ -88,11 +81,10 @@ export class ColdLog<T extends object> {
       const id = this.id(t)
       seen.add(id)
       const was = this.written.get(id)
-      const kept = out(t)
-      const now = kept as Record<string, unknown>
-      if (was && same(was, now)) continue
-      this.written.set(id, { ...now })
-      lines.push(JSON.stringify(kept))
+      const line = JSON.stringify(out(t))
+      if (was === line) continue
+      this.written.set(id, line)
+      lines.push(line)
     }
     // deleted, retired, or at work again: its cold line must not bring it back
     for (const id of this.written.keys()) {
@@ -129,19 +121,45 @@ export function withCold<T extends object, D extends { tasks: T[] }>(cold: ColdL
   return data
 }
 
-type AgentLine = { key: string; started: number; finished?: boolean }
+type AgentLine = { key: string; started: number }
 
-/** agents.json by key, a record finished over COLD_AFTER after it started kept in agents-cold.jsonl */
-export class ColdAgents<T extends AgentLine = AgentLine> {
-  private cold = new ColdLog<T>(COLD_AGENTS, 'key')
+const byKey = <T extends AgentLine>(rows: T[]) => Object.fromEntries(rows.map((r) => [r.key, r]))
 
-  read(): Record<string, T> {
-    return Object.fromEntries(this.cold.load(Object.values(readJson<Record<string, T>>('agents.json', {}))).map((r) => [r.key, r]))
+/** the rows of an older agents.json */
+function olderAgents<T extends AgentLine>(file: string): T[] {
+  try {
+    return Object.values(JSON.parse(readFileSync(file, 'utf8')) as Record<string, T>)
+  } catch {
+    return [] // no older file, or one cut short: the rows stand
+  }
+}
+
+/** the agent records of a folder by key: the rows of agents-cold.jsonl and those of an older agents.json */
+export function readAgentRows<T extends AgentLine>(dir = HOME): Record<string, T> {
+  // a folder that is not this process's own is only read: its log is not repaired here
+  return byKey(new ColdLog<T>(COLD_AGENTS, 'key', dir).load(olderAgents<T>(join(dir, 'agents.json')), false))
+}
+
+/** agent records as rows: a save appends a line for each record that changed and none for the rest */
+export class AgentRows<T extends AgentLine = AgentLine> {
+  private rows: ColdLog<T>
+  private older: string
+  private olderGone = false
+
+  constructor(dir = HOME) {
+    this.rows = new ColdLog<T>(COLD_AGENTS, 'key', dir)
+    this.older = join(dir, 'agents.json')
   }
 
-  /** only a change to a cold record is written, as one line */
-  write(records: Record<string, T>, now = Date.now()) {
-    const hot = this.cold.save(Object.values(records), (r) => !!r.finished && now - r.started >= COLD_AFTER)
-    writeJson('agents.json', Object.fromEntries(hot.map((r) => [r.key, r])))
+  read(): Record<string, T> {
+    return byKey(this.rows.load(olderAgents<T>(this.older)))
+  }
+
+  write(records: Record<string, T>) {
+    this.rows.save(Object.values(records), () => true)
+    // rows from an older agents.json are in the log now; left, it would win over later rows at the next start
+    if (this.olderGone) return
+    rmSync(this.older, { force: true })
+    this.olderGone = true
   }
 }
