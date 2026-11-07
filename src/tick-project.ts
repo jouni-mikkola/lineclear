@@ -6,7 +6,7 @@ import { testOf } from "./doneproof.ts";
 import { ownerStepItem } from "./owner-steps.ts";
 import { stepHeld } from "./parts.ts";
 import { company } from "./company.ts";
-import type { Settings } from "./project.ts";
+import { projectsDir, type Settings } from "./project.ts";
 import { checkRoadmap, closedSteps, doneIds, isFrozen, resultFlag, type StepStatus, type Task } from "./roadmap.ts";
 import { statusesFrom, stepInputs } from "./task-steps.ts";
 import type { Decision, State } from "./rules.ts";
@@ -14,7 +14,7 @@ import { askMachines, type Candidate, mostRoom, type Room, roomLack } from "./sp
 import { routineWorker } from "./routine.ts";
 import { askKey, availability, climbStalls, revertLast, reviewerFor, serviceAccounts } from "./stalls.ts";
 import { THIS_MACHINE } from "./start-failures.ts";
-import { bindStarts, liveSteps, recordStart, lockWhy, reservedLocks, settleLockWaits } from "./starts.ts";
+import { bindStarts, claimStep, liveSteps, recordStart, lockWhy, reservedLocks, settleLockWaits } from "./starts.ts";
 import type { Wait } from "./waits.ts";
 import type { World } from "./world.ts";
 
@@ -304,7 +304,8 @@ function whyStale(s: Starting, step: Step): string | undefined {
     (x) => x.status !== "done" && (x.title.startsWith(`${step.id} `) || (x.id !== undefined && state.taskSteps?.[x.id] === step.id)),
   );
   if (open) return `${open.id ?? open.title} for this step is not done (${open.status}), so it does not start twice`;
-  return undefined;
+  const claimed = claimStep(join(projectsDir(t.env), t.name, "claims"), step.id, world.now());
+  return claimed === undefined ? undefined : `${claimed}, so it does not start twice`;
 }
 
 /** Starts one ready step, or notes why not. Returns whether it started (or would, in a dry run). */

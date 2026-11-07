@@ -596,3 +596,19 @@ test("stepStatuses is called only where its inputs come from stepInputs", () => 
   }
   expect(found).toEqual(["task-steps.ts"]);
 });
+
+test("one agent per step: the same step added twice starts once and is refused once", () => {
+  const t = setup({ steps: [step("A", "none")] });
+  t.doTick();
+  expect(t.adds().length).toBe(1);
+  // the fake board never lists the task, as when a second loop reads its list before the new task shows
+  t.doTick();
+  expect(t.adds().length).toBe(1);
+  expect(t.decisions().some((x) => x.step === "A" && x.reason.includes("claimed for a start"))).toBe(true);
+});
+
+test("one agent per step: a landed step starts no agent", () => {
+  const t = setup({ steps: [step("A", "none")], commits: ["start", "LIN-1: A Title A"] });
+  t.doTick();
+  expect(t.adds()).toEqual([]);
+});

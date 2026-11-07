@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { herdrArgv } from "./herdr.ts";
 import { join } from "node:path";
 import { fileClash, stepHeld, stepNeeds } from "./parts.ts";
@@ -124,6 +124,27 @@ export function lockWhy(step: Step, held: Map<string, string>, reserved: Map<str
   const others = [...reserved].filter(([, owner]) => owner !== step.id).map(([lock]) => lock);
   const lock = stepNeeds(step).find((l) => others.includes(l)) ?? fileClash(step, others);
   return lock === undefined ? undefined : `lock '${lock.replace(/^[=~]/, "")}' is reserved for ${reserved.get(lock)}, skipped for locks ${AGE_TICKS} ticks`;
+}
+
+/** A claim on a step holds this long: the time a started task needs to show in the task list. */
+const CLAIM_MS = 120_000;
+
+/**
+ * Claims the step for one start, atomically through the file system, so two rule loops never start it together.
+ * Returns a note when the step was claimed less than CLAIM_MS ago, else undefined and the claim is made.
+ */
+export function claimStep(dir: string, step: string, now: Date): string | undefined {
+  mkdirSync(dir, { recursive: true });
+  const file = join(dir, `${step.replace(/[^\w.-]/g, "_")}.claim`);
+  try {
+    writeFileSync(file, String(now.getTime()), { flag: "wx" });
+    return undefined;
+  } catch {
+    const ago = now.getTime() - Number(readFileSync(file, "utf8"));
+    if (ago < CLAIM_MS) return `step ${step} was claimed for a start ${Math.round(ago / 1000)} s ago`;
+    writeFileSync(file, String(now.getTime()));
+    return undefined;
+  }
 }
 
 /** After a tick: the steps skipped for locks count one more tick, every other step starts over. */
