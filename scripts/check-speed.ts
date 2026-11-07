@@ -155,10 +155,10 @@ export function writeTimes(times: Times): void {
   writeFileSync(TIMES, JSON.stringify({ ...readTimes(), ...Object.fromEntries(times) }));
 }
 
-/** The files split into `count` runs of about equal time: the last time of a file, or a guess from its size. */
-export function split(files: string[], count: number, last: Baseline): string[][] {
+/** The files split into `count` runs of about equal time: the last time of a file, or a guess from its size. `loads` is the time each run already has. */
+export function split(files: string[], count: number, last: Baseline, loads: number[] = []): string[][] {
   const weight = (f: string) => last[f.replace(/^\.\//, "")] ?? statSync(f).size / 4000;
-  const runs: { files: string[]; weight: number }[] = Array.from({ length: count }, () => ({ files: [], weight: 0 }));
+  const runs: { files: string[]; weight: number }[] = Array.from({ length: count }, (_, i) => ({ files: [], weight: loads[i] ?? 0 }));
   for (const f of [...files].sort((a, b) => weight(b) - weight(a))) {
     const lightest = runs.reduce((a, b) => (b.weight < a.weight ? b : a));
     lightest.files.push(f);

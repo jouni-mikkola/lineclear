@@ -90,11 +90,35 @@ const outsideServer = known === undefined || changed.some((f) => !f.startsWith("
 const TSC_CHANGED = ["bunx", "tsc", "--noEmit", "--incremental", "--tsBuildInfoFile", "node_modules/.cache/tsc-changed.tsbuildinfo"];
 // the most test processes at once: the worker's loop, the lane and the server's tests alike
 const TEST_SHARDS = 4;
+// a GitHub runner has 4 cores: each job runs its share of the test files in this many processes
+const SHARD_PROCESSES = 2;
 // install.sh builds the web pages with vite for real: a run on GitHub, never in a worker's loop
 const BUILDING_TESTS = ["test/install.test.ts"];
 
 // the tests the change reaches: a failure in any other file is not the change's
 // none when the change reaches every test or the whole run is asked for: then no failure is outside it
+// `--shard=i/n` (the GitHub job): this job's share of the steps and test files, balanced by time (below)
+const shardArg = process.argv.find((a) => a.startsWith("--shard="))?.match(/^--shard=(\d+)\/(\d+)$/);
+const shard = shardArg ? { i: Number(shardArg[1]), n: Number(shardArg[2]) } : undefined;
+// seconds on a runner of the steps that stay whole; the server's tests are split by bun itself, so every shard has an equal part
+const WHOLE_STEPS: [string, number][] = [
+  ["types", 9],
+  ["server types", 6],
+  ["gates", 3],
+  ["roadmap", 1],
+];
+const SERVER_TESTS_S = 44;
+const shardLoads = (n: number) => {
+  const loads = Array.from({ length: n }, () => SERVER_TESTS_S / n);
+  const homes = new Map<string, number>();
+  for (const [name, seconds] of WHOLE_STEPS) {
+    const at = loads.indexOf(Math.min(...loads));
+    loads[at] = (loads[at] ?? 0) + seconds;
+    homes.set(name, at);
+  }
+  return { loads, homes };
+};
+
 const reached = known ? testsFor(".", changed) : undefined;
 const touched = reached ? new Set([...changed, ...reached]) : undefined;
 
@@ -123,7 +147,11 @@ function testSteps(): Step[] {
     recording = true;
     Object.assign(env, { LINECLEAR_LOAD_MAP: loadDir, LINECLEAR_LOAD_ROOT: process.cwd() });
   }
-  const runs = split(list, Math.min(TEST_SHARDS, Math.max(1, Math.ceil(list.length / 6))), readTimes());
+  // an install test is far slower than its size says: the committed baseline of slow files weighs it, the last run's times override
+  const weights = { ...readSlowBaseline(), ...readTimes() };
+  const runs = shard
+    ? split(split(list, shard.n, weights, shardLoads(shard.n).loads)[shard.i - 1] ?? [], SHARD_PROCESSES, weights)
+    : split(list, Math.min(TEST_SHARDS, Math.max(1, Math.ceil(list.length / 6))), readTimes());
   // a test waits for its event, never for a time: the limit only stops a hang, so a busy machine never reaches it
   const built = needsPlugins();
   // the same release tests run the server's scripts, which import its dependencies: an install under way (a fresh
@@ -151,7 +179,12 @@ function serverSteps(): Step[] {
   return [
     ...(serverNeeds().length ? [SERVER_INSTALL] : []),
     { name: "server types", cmd: ["bun", "run", full || known === undefined ? "typecheck" : "typecheck:changed"], cwd: "server", needs: serverNeeds() },
-    { name: "server tests", cmd: ["bun", "scripts/test.ts", full || known === undefined ? "--force" : "changed"], cwd: "server", needs: serverNeeds() },
+    {
+      name: "server tests",
+      cmd: ["bun", "scripts/test.ts", full || known === undefined ? "--force" : "changed", ...(shard ? [`--shard=${shard.i}/${shard.n}`] : [])],
+      cwd: "server",
+      needs: serverNeeds(),
+    },
   ];
 }
 
@@ -212,13 +245,12 @@ async function runStep(step: Step): Promise<boolean> {
   return ok;
 }
 
-/** `--shard i/n` (the GitHub job): every n-th step of the plan, with the steps those need (an install, a build). */
+/** `--shard=i/n`: the steps that stay whole go to the job `shardLoads` gave them; every job runs its tests and its part of the server's. */
 function shardOf(all: Step[]): Step[] {
-  const m = process.argv.find((a) => a.startsWith("--shard="))?.match(/^--shard=(\d+)\/(\d+)$/);
-  if (!m) return all;
-  const [i, n] = [Number(m[1]), Number(m[2])];
+  if (!shard) return all;
+  const { homes } = shardLoads(shard.n);
   const byName = new Map(all.map((s) => [s.name, s]));
-  const keep = new Set(all.filter((_, at) => at % n === i - 1).map((s) => s.name));
+  const keep = new Set(all.filter((s) => (homes.has(s.name) ? homes.get(s.name) === shard.i - 1 : true)).map((s) => s.name));
   const grow = (name: string) => {
     for (const need of byName.get(name)?.needs ?? []) {
       if (!keep.has(need)) {
@@ -230,7 +262,7 @@ function shardOf(all: Step[]): Step[] {
   for (const name of [...keep]) grow(name);
   return all.filter((s) => keep.has(s.name));
 }
-const sharded = process.argv.some((a) => a.startsWith("--shard="));
+const sharded = shard !== undefined;
 const plan = shardOf(steps());
 for (const step of plan) outcome.set(step.name, runStep(step));
 // every step runs even after one fails: one run names every failure, so no rerun is needed to find the next one, and
@@ -257,6 +289,14 @@ function speed(): void {
     junitTimes,
   );
   writeTimes(unit);
+  // the log of a GitHub job shows which files cost the most, to cut or speed up
+  console.log(
+    `check: slowest test files\n${[...unit]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([f, sec]) => `  ${sec.toFixed(1)} s  ${f}`)
+      .join("\n")}`,
+  );
   // the unit limit is per test case: a file is judged by its slowest case
   const slowest = read(
     readdirSync(reports).filter((n) => n.startsWith("unit-")),
