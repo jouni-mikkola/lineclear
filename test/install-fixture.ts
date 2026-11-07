@@ -22,7 +22,7 @@ export async function installFixture() {
     [
       "bun",
       "-e",
-      `const fs = require("fs"), f = ${JSON.stringify(join(app, "BROKEN"))};
+      `const fs = require("fs"), f = ${JSON.stringify(join(home, ".lineclear/builds/current/BROKEN"))};
 const broken = () => (fs.existsSync(f) ? fs.readFileSync(f, "utf8").trim() : "");
 const settings = ${JSON.stringify(join(home, ".config/lineclear/projects/p/settings.json"))};
 // a version that pauses a project saves that, as the rules would
@@ -127,5 +127,7 @@ setInterval(() => {}, 1000);`,
     sh(["rm", "-rf", root]);
   });
 
-  return { root, home, repo, stubs, state, git, app, service, env, install, wellButBuild, passes, snapshot, lineclear };
+  const current = join(home, ".lineclear/builds/current");
+
+  return { root, home, repo, stubs, state, git, app, current, service, env, install, wellButBuild, passes, snapshot, lineclear };
 }

@@ -1,5 +1,5 @@
 import { expect, setDefaultTimeout, test } from "bun:test";
-import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadFactor } from "../scripts/check-speed.ts";
 import { extensionFile } from "../src/paths.ts";
@@ -9,7 +9,7 @@ import { installFixture } from "./install-fixture.ts";
 // Each test runs install.sh for real: 30 s covers an idle machine, and the limit grows with the load.
 setDefaultTimeout(30_000 * loadFactor());
 
-const { root, home, repo, stubs, state, service, git, install, wellButBuild, passes, snapshot, lineclear } = await installFixture();
+const { root, home, repo, stubs, state, service, git, current, env, install, wellButBuild, passes, snapshot, lineclear } = await installFixture();
 
 test("install adds Lineclear, the extension and the service, and doctor passes", () => {
   const extDir = join(home, ".pi/agent/extensions");
@@ -21,11 +21,12 @@ test("install adds Lineclear, the extension and the service, and doctor passes",
   for (const f of ["quota-switch.ts", "quota-switch.json", "api-guard.ts"]) expect(existsSync(join(extDir, f))).toBe(false);
   expect(existsSync(join(extDir, "claude-bridge-b.ts"))).toBe(true);
   expect(existsSync(join(state, "lineclear"))).toBe(false); // no herdr-projects 2.0 plugin
-  expect(existsSync(join(home, ".local/share/lineclear/bin/lineclear"))).toBe(true);
+  expect(existsSync(join(current, "bin/lineclear"))).toBe(true);
+  expect(existsSync(join(current, ".git"))).toBe(false); // a build has no checkout
   const ext = join(home, ".pi/agent/extensions/lineclear.ts");
   expect(lstatSync(ext).isSymbolicLink()).toBe(false); // pi resolves a link's imports from the link's folder
-  expect(readFileSync(ext, "utf8")).toBe(extensionFile(join(home, ".local/share/lineclear")));
-  expect(existsSync(join(home, ".local/share/lineclear/ui/web/dist/index.html"))).toBe(true);
+  expect(readFileSync(ext, "utf8")).toBe(extensionFile(current));
+  expect(existsSync(join(current, "ui/web/dist/index.html"))).toBe(true);
   expect(readFileSync(join(home, ".config/systemd/user/lineclear.service"), "utf8")).toContain("lineclear run");
   const unit = readFileSync(join(home, ".config/systemd/user/lineclear.service"), "utf8");
   expect(unit).toMatch(/^Environment="PATH=.+"$/m);
@@ -40,7 +41,6 @@ test("install adds Lineclear, the extension and the service, and doctor passes",
   expect(d.out).toContain("ok     starts at boot");
   expect(d.out).toContain("ok     compile cache on disk");
   wellButBuild(d);
-  expect(d.out).toContain("FAILED stable build");
 }, 180_000); // the first full build of the app and its web pages, then a doctor run
 
 test("where lingering needs root, install prints the one command and doctor names it", () => {
@@ -71,8 +71,9 @@ test("install again updates Lineclear to the newest commit", () => {
   git("commit", "-q", "-m", "second");
   const r = install();
   expect(r.code).toBe(0);
-  expect(existsSync(join(home, ".local/share/lineclear/newer.txt"))).toBe(true);
+  expect(existsSync(join(current, "newer.txt"))).toBe(true);
   expect(readFileSync(join(state, "systemctl.log"), "utf8")).toContain("--user restart lineclear.service");
+  expect(readlinkSync(join(current, "../previous"))).not.toBe(readlinkSync(current)); // the build before it is kept
 });
 
 test("doctor names a problem and its fix, and exits 1", () => {
@@ -145,3 +146,30 @@ test("the README names the install variables and the fork's notice, and the lice
   expect(forkLicense).toContain("MIT License");
   expect(forkLicense).toContain("Elias Stravik");
 });
+
+// Last: it leaves a broken commit in the repository.
+test("an update from the previous release works, and a failed one goes back to it", () => {
+  const release = (version: string) => {
+    const pkg = JSON.parse(readFileSync(join(repo, "package.json"), "utf8"));
+    writeFileSync(join(repo, "package.json"), `${JSON.stringify({ ...pkg, version }, null, 2)}\n`);
+    git("commit", "-q", "-am", `Release ${version}`);
+    git("tag", "-a", `v${version}`, "-m", version);
+  };
+  const installRelease = (version: string) => sh(["sh", "install.sh"], { env: { ...env(), LINECLEAR_REF: `v${version}` } });
+  const builds = join(home, ".lineclear/builds");
+  release("1.0.0");
+  passes(installRelease("1.0.0"));
+  release("1.0.1");
+  passes(installRelease("1.0.1"));
+  expect(readlinkSync(current)).toBe(join(builds, "1.0.1"));
+  expect(readlinkSync(join(builds, "previous"))).toBe(join(builds, "1.0.0"));
+  // 1.0.2 answers no chat message: the update goes back to 1.0.1 in one step
+  writeFileSync(join(repo, "BROKEN"), "chat\n");
+  git("add", "-A");
+  release("1.0.2");
+  const failed = installRelease("1.0.2");
+  expect(failed.code).not.toBe(0);
+  expect(failed.out).toContain("back on 1.0.1");
+  expect(readlinkSync(current)).toBe(join(builds, "1.0.1"));
+  expect(existsSync(join(builds, "previous"))).toBe(false);
+}, 240_000); // three builds

@@ -1,14 +1,13 @@
 import { beforeAll, expect, setDefaultTimeout, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, readlinkSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadFactor } from "../scripts/check-speed.ts";
-import { sh } from "./helpers.ts";
 import { installFixture } from "./install-fixture.ts";
 
 // Each test runs install.sh for real: 30 s covers an idle machine, and the limit grows with the load.
 setDefaultTimeout(30_000 * loadFactor());
 
-const { home, repo, app, git, install, passes } = await installFixture();
+const { home, repo, app, current, git, install, passes } = await installFixture();
 
 // two files, so the rollback tests run beside the install tests and each other in other jobs
 beforeAll(() => passes(install()), 180_000);
@@ -46,10 +45,10 @@ test("an update that wipes the task store is rolled back and the tasks come back
   const tasks = JSON.stringify({ next: {}, tasks: [{ id: "T-1" }, { id: "T-2" }] });
   writeFileSync(join(data, "tasks.json"), tasks);
   writeFileSync(join(data, "tasks-cold.jsonl"), '{"id":"T-0"}\n');
-  const before = sh(["git", "-C", app, "rev-parse", "HEAD"]).out.trim();
+  const before = readlinkSync(current);
   const { r } = installBroken("wipe");
   expect(r.code).not.toBe(0);
-  expect(sh(["git", "-C", app, "rev-parse", "HEAD"]).out.trim()).toBe(before); // the version is back
+  expect(readlinkSync(current)).toBe(before); // the version is back
   expect(readFileSync(join(data, "tasks.json"), "utf8")).toBe(tasks); // and so are the tasks
   expect(readFileSync(join(data, "tasks-cold.jsonl"), "utf8")).toBe('{"id":"T-0"}\n');
   const copies = join(app, "store-copies");
@@ -69,7 +68,7 @@ test("a version that works passes the smoke check and stays", () => {
   const r = install();
   expect(r.code).toBe(0);
   expect(r.out).toContain("the new version works");
-  expect(existsSync(join(app, "good.txt"))).toBe(true);
+  expect(existsSync(join(current, "good.txt"))).toBe(true);
   expect(install().code).toBe(0);
-  expect(existsSync(join(app, "good.txt"))).toBe(true);
+  expect(existsSync(join(current, "good.txt"))).toBe(true);
 }, 240_000);
