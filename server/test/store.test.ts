@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, renameSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { db, HOME, importOnce, openStore, StoreError, tx } from '../server/store.ts'
@@ -11,27 +11,43 @@ test('a store file that is not a database stops with its path', () => {
   expect(() => openStore(file)).toThrow(file)
 })
 
+test('the board refuses to start on a corrupt store and names the file', () => {
+  const home = mkdtempSync(join(tmpdir(), 'store-board-'))
+  const file = join(home, 'store.sqlite')
+  writeFileSync(file, 'this is not a database, it is long enough to look like a broken one'.repeat(100))
+  const run = Bun.spawnSync(['bun', join(import.meta.dir, '..', 'server', 'main.ts')], {
+    env: { ...process.env, LINECLEAR_HOME: home, LINECLEAR_PORT: '0' },
+    timeout: 20_000,
+  })
+  expect(run.exitCode).toBe(1)
+  expect(run.stderr.toString()).toContain(file)
+})
+
 test('a good store opens in WAL mode with a busy timeout', () => {
   const store = openStore(join(mkdtempSync(join(tmpdir(), 'store-ok-')), 'store.sqlite'))
   expect((store.query('PRAGMA journal_mode').get() as { journal_mode: string }).journal_mode).toBe('wal')
   expect((store.query('PRAGMA busy_timeout').get() as { timeout: number }).timeout).toBe(5000)
 })
 
-test('importOnce turns a JSON file into rows and renames it; a failed transaction leaves nothing', () => {
+test('importOnce turns a JSON file into rows and renames it, even after a crash before the rename', () => {
   mkdirSync(HOME, { recursive: true })
-  writeFileSync(join(HOME, 'old.json'), '{"a":1,"b":2}')
-  db.exec('create table if not exists t (k text primary key, v integer)')
-  const imported = importOnce<Record<string, number>>('old.json', (content, store) => {
-    for (const [k, v] of Object.entries(content)) store.query('insert into t values (?, ?)').run(k, v)
-  })
-  expect(imported).toBe(true)
-  expect(existsSync(join(HOME, 'old.json.imported'))).toBe(true)
-  expect(importOnce('old.json', () => {})).toBe(false)
+  const file = join(HOME, 'store-test-old.json')
+  writeFileSync(file, '{"a":1,"b":2}')
+  db.exec('create table if not exists store_test_rows (k text primary key, v integer)')
+  const load = (content: Record<string, number>, store: typeof db) => {
+    for (const [k, v] of Object.entries(content)) store.query('insert into store_test_rows values (?, ?)').run(k, v)
+  }
+  expect(importOnce('store-test-old.json', load)).toBe(true)
+  expect(existsSync(`${file}.imported`)).toBe(true)
+  // the rename never happened: the file is back
+  renameSync(`${file}.imported`, file)
+  expect(importOnce('store-test-old.json', load)).toBe(true)
+  expect((db.query('select count(*) n from store_test_rows').get() as { n: number }).n).toBe(2)
   expect(() =>
     tx((store) => {
-      store.exec("insert into t values ('c', 3)")
+      store.exec("insert into store_test_rows values ('c', 3)")
       throw new Error('no')
     }),
   ).toThrow('no')
-  expect((db.query('select count(*) n from t').get() as { n: number }).n).toBe(2)
+  expect((db.query('select count(*) n from store_test_rows').get() as { n: number }).n).toBe(2)
 })

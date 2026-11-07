@@ -88,8 +88,19 @@ export function tx<T>(fn: (store: Database) => T): T {
 export function importOnce<T>(name: string, load: (content: T, store: Database) => void): boolean {
   const file = join(HOME, name)
   if (!existsSync(file)) return false
-  const content = JSON.parse(readFileSync(file, 'utf8')) as T
-  tx((store) => load(content, store))
+  let content: T
+  try {
+    content = JSON.parse(readFileSync(file, 'utf8')) as T
+  } catch (e) {
+    throw new Error(`lineclear: ${file} cannot be read for import (${e instanceof Error ? e.message : String(e)}). Nothing was changed.`)
+  }
+  // the import is recorded in the same transaction as its rows, so a crash before the rename never imports it twice
+  tx((store) => {
+    store.exec('create table if not exists imports (name text primary key)')
+    if (store.query('select 1 from imports where name = ?').get(name)) return
+    load(content, store)
+    store.query('insert into imports (name) values (?)').run(name)
+  })
   renameSync(file, `${file}.imported`)
   return true
 }
