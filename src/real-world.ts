@@ -10,7 +10,8 @@ import { fitTitle } from "./roadmap.ts";
 import { readRoom, startOn } from "./spread.ts";
 import { agentLastError, realChatCards, realStallCards } from "./stalls.ts";
 import { agentStart, nudgePane } from "./starts.ts";
-import { ownerWrote, taskWorktree, worktreeClean } from "./worktree.ts";
+import { ownerWrote } from "./owner-wrote.ts";
+import { taskWorktree, worktreeClean } from "./worktree.ts";
 import { ownMark, type World } from "./world.ts";
 
 const HEALTH_TIMEOUT_MS = 10 * 60_000;

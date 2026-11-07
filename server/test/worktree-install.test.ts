@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { lstatSync, readFileSync, readlinkSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { fakeHerdr, repo, until, world } from './engine-world.ts'
-import { install, installDirs, storeKey, storePath } from '../server/live/engine/git.ts'
+import { install, installDirs, storeKey, storePath } from '../server/live/engine/install.ts'
 const { Worktrees } = await import('../server/live/engine/worktrees.ts')
 
 /** a folder with a Bun project whose one dependency is a local package (no network) and a lockfile made by bun */

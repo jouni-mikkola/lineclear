@@ -4,7 +4,8 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { cacheDir } from "../src/tmpdirs.ts";
-import { differingFrom, git } from "./gates/tools.ts";
+import { git } from "../src/git.ts";
+import { differingFrom } from "./gates/tools.ts";
 
 export interface LoadMap {
   commit: string;
@@ -54,10 +55,10 @@ export function buildMap(dir: string, tests: string[]): Record<string, string[]>
 
 /** Saves the map of the commit the tree is on; keeps the newest few. */
 export function saveMap(root: string, tests: Record<string, string[]>): void {
-  const head = git(root, ["rev-parse", "HEAD"]);
+  const head = git(root, "rev-parse", "HEAD");
   const dirty = differingFrom(root, "HEAD");
-  if (head.exitCode !== 0 || dirty === undefined) return;
-  const commit = head.stdout.toString().trim();
+  if (!head.ok || dirty === undefined) return;
+  const commit = head.out.trim();
   const dir = mapDir();
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, `${commit}.json`), JSON.stringify({ commit, dirty, tests } satisfies LoadMap));

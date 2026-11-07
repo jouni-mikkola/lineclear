@@ -38,7 +38,7 @@ export class EngineMerge extends EngineLand {
   }
 
   protected async lookAtPrs() {
-    const hubs = new Map<string, G.GitHub | null>()
+    const hubs = new Map<string, GH.GitHub | null>()
     for (const t of this.tasks.filter((t) => t.reported && t.pr && t.worktree && !ended(t) && !t.archived && !t.stopped)) {
       if (['working', 'blocked'].includes(this.agents.status(this.key(t)))) continue
       const p = this.places.space(t.project)
@@ -49,7 +49,7 @@ export class EngineMerge extends EngineLand {
     }
   }
 
-  protected async watchPr(t: TaskRec, g: G.GitHub) {
+  protected async watchPr(t: TaskRec, g: GH.GitHub) {
     const pr = await this.prOf(t, g, t.worktree!)
     // merged on GitHub by hand: it is Done here too, or the tasks queued after it wait for ever
     if (pr?.state === 'MERGED') return void (await this.mergedOnGitHub(t, this.proj(t), `PR #${pr.number} was merged on GitHub`))

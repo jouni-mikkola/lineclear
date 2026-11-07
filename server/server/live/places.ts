@@ -10,7 +10,8 @@ import { nameProblem, slugify } from '../../shared/types.ts'
 import { HOME, readJson, writeJson } from '../store.ts'
 import { Agents } from './agents.ts'
 import { boxHome } from './box.ts'
-import { validateBase, defaultBranch, github, githubRemote, isRepo, topLevel, type GitHub } from './engine/git.ts'
+import { defaultBranch, isRepo, topLevel } from './engine/git.ts'
+import { validateBase, github, githubRemote, type GitHub } from './engine/github.ts'
 
 export interface Space {
   /** the name it was added under: its id and herdr space keep it; the name that shows may change (names.json) */
