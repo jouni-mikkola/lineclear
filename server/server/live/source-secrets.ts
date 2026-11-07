@@ -20,6 +20,23 @@ export class LiveSourceSecrets extends LiveSourceActions {
     return [...(space ? [space] : []), placeId.machine(), 'all']
   }
 
+  /** each name's value, for lineclear secret run and env (names may come comma-separated) */
+  protected secretValues(words: string[], chain: string[]) {
+    const names = words
+      .flatMap((w) => w.split(','))
+      .map((w) => w.trim())
+      .filter(Boolean)
+    if (!names.length) throw new Error('lineclear secret run NAME [NAME …] -- <command>, or lineclear secret env NAME [NAME …] [--file .env]')
+    const bad = names.filter((n) => !SECRET_NAME.test(n))
+    if (bad.length) throw new Error(`Not a secret's name: ${bad.join(', ')} (letters, digits and _, like GITHUB_TOKEN)`)
+    const { found, missing } = this.vault.pick(names, chain)
+    if (missing.length)
+      throw new Error(
+        `No secret ${missing.join(', ')} here. Ask the human for it: lineclear secret ask ${missing[0]} --why "<what it is for>", then end your turn.`,
+      )
+    return Object.fromEntries(Object.entries(found).map(([n, f]) => [n, f.value]))
+  }
+
   /** the level a human's lineclear secret set or rm is for: Everywhere (none), this machine, or one space */
   protected secretLevel(p: Parsed) {
     if (one(p, 'space')) return placeId.space(this.projectFor(p, {}).name)
