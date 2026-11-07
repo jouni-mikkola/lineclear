@@ -30,7 +30,12 @@ export class Clock {
   }
 
   tick(now = Date.now()) {
-    for (const j of this.jobs) if (j.due() <= now) j.run(now)
+    // a job that throws must not stop the timer for the others
+    for (const j of this.jobs) {
+      try {
+        if (j.due() <= now) j.run(now)
+      } catch {}
+    }
     this.arm(now)
   }
 

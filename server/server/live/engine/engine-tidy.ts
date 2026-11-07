@@ -260,6 +260,7 @@ export class EngineTidy extends EngineMerge {
       return
     }
     this.begun(t)
+    this.relook(t)
     // at work: the go reached it
     if (st === 'working' && t.going) t.going = undefined
     // paused, it stopped; at work again on its own after that, it isn't paused any more

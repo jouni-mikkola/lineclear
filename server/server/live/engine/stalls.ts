@@ -3,9 +3,17 @@ import { hidden } from '../agents.ts'
 import { type TaskRec, ended, STALL_QUIET, SILENT_NEED, READY_QUIET } from './engine-helpers.ts'
 import { EngineStatus } from './status.ts'
 
+/** how long after a status report a task is far past its time left */
+const overAfter = (left: number) => (left + Math.max(left, 20)) * 60_000
+
 export class EngineStalls extends EngineStatus {
   /** when each rule last looked at a task because its deadline had passed: its next look is a full period later */
   private looked = new Map<string, number>()
+
+  /** its agent's state changed, so what a rule found at its last look no longer holds: the next look is by the deadlines alone */
+  protected relook(t: TaskRec) {
+    for (const rule of ['ready', 'silent', 'stall']) this.looked.delete(`${t.id}:${rule}`)
+  }
 
   /**
    * The earliest time any task could need a stall check, read from what is already known of it (no status call):
@@ -20,7 +28,10 @@ export class EngineStalls extends EngineStatus {
   /** per rule, when it next needs a look at the task */
   private dues(t: TaskRec) {
     const dues = { ready: Infinity, silent: Infinity, stall: Infinity }
-    if (t.archived || ended(t)) return dues
+    if (t.archived || ended(t)) {
+      this.relook(t)
+      return dues
+    }
     const seen = (rule: keyof typeof dues) => this.looked.get(`${t.id}:${rule}`) ?? 0
     const life = this.lifeOf(t)
     const r = t.report
@@ -29,7 +40,7 @@ export class EngineStalls extends EngineStatus {
     if (t.paused) return dues
     if (t.stalled?.life === undefined || life > t.stalled.life) dues.stall = Math.max(life, seen('stall')) + STALL_QUIET
     if (r?.left !== undefined && r.at !== t.stalled?.over) {
-      const over = r.at + (r.left + Math.max(r.left, 20)) * 60_000 + 1
+      const over = r.at + overAfter(r.left) + 1
       dues.stall = Math.min(dues.stall, seen('stall') ? Math.max(over, seen('stall') + STALL_QUIET) : over)
     }
     return dues
@@ -63,7 +74,7 @@ export class EngineStalls extends EngineStatus {
     // shown life since: its next stall is news again
     if (t.stalled?.life !== undefined && life > t.stalled.life) t.stalled.life = undefined
     const quiet = now - life >= STALL_QUIET && t.stalled?.life === undefined
-    const over = r?.left !== undefined && r.at !== t.stalled?.over && now - r.at > (r.left + Math.max(r.left, 20)) * 60_000
+    const over = r?.left !== undefined && r.at !== t.stalled?.over && now - r.at > overAfter(r.left)
     if (!quiet && !over) return
     t.stalled = { life: quiet ? life : t.stalled?.life, over: r?.at }
     const mins = Math.max(0, Math.round((now - (quiet ? life : r!.at + r!.left! * 60_000)) / 60_000))
