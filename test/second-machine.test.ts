@@ -47,7 +47,10 @@ function setup(o: Opts) {
     JSON.stringify({ desc: "Do the held thing.\n\nSettings: (from lineclear show; where the brief above says otherwise, it wins)\n- Review: on." }),
   );
   writeFileSync(join(fake, "tasks.json"), JSON.stringify(o.localTasks ?? []));
-  script(join(bin, "pi"), `echo "provider model context"; echo "anthropic claude-sonnet-5-5 1M"; echo "anthropic claude-opus-5-5 1M"`);
+  script(
+    join(bin, "pi"),
+    `cat > /dev/null; echo '{"type":"response","command":"get_available_models","success":true,"data":{"models":[{"provider":"anthropic","id":"claude-sonnet-5-5"},{"provider":"anthropic","id":"claude-opus-5-5"}]}}'`,
+  );
 
   // The second machine: a home folder for the clone and the secrets (over SSH) and the files the one server's fake reads.
   const home = join(dir, "farbox-home");
@@ -74,7 +77,7 @@ if (cmd === "task" && sub === "list") {
   fs.appendFileSync(rest.includes("--on") ? "${seen}" : "${fake}/adds.log", (rest.includes("--on") ? "ADD " : "") + line + "\\n");
 } else if (cmd === "task" && sub === "show") process.stdout.write(fs.readFileSync("${fake}/show.json"));
 else if (cmd === "task" && sub === "close") fs.appendFileSync("${fake}/closes.log", [cmd, sub, ...rest].join(" ") + "\\n");
-else if (cmd === "show") console.log("machine.maxTasks       ${o.localMax ?? 0}  (here)");
+else if (cmd === "room") console.log(JSON.stringify({ max: ${o.localMax ?? 0} }));
 `,
   );
   script(join(bin, "lineclear"), `exec bun "${fake}/farbox.js" "$@"`);

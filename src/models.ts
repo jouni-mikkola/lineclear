@@ -37,6 +37,24 @@ function listOne(h: Harness): ModelEntry[] {
   }
 }
 
+/** `provider/id` of every model pi offers, asked over its RPC (one JSON line in, one out), or undefined when it does not answer. */
+export function readOfferedRpc(env: NodeJS.ProcessEnv = process.env): Set<string> | undefined {
+  try {
+    const p = Bun.spawnSync([env.PI_BIN ?? "pi", "--mode", "rpc", "--no-session"], {
+      stdin: Buffer.from(`${JSON.stringify({ id: "models", type: "get_available_models" })}\n`),
+      stderr: "ignore",
+      timeout: 20_000,
+    });
+    for (const line of p.stdout.toString().split("\n")) {
+      const r = JSON.parse(line.trim() || "{}") as { command?: string; success?: boolean; data?: { models?: { provider?: string; id?: string }[] } };
+      if (r.command !== "get_available_models" || !r.success) continue;
+      const models = (r.data?.models ?? []).flatMap((m) => (m.provider && m.id ? [`${m.provider}/${m.id}`] : []));
+      return models.length > 0 ? new Set(models) : undefined;
+    }
+  } catch {}
+  return undefined;
+}
+
 /** Every model the installed harnesses offer. A harness that is missing or fails adds nothing. */
 export function readRegistry(list: Harness[] = harnesses()): ModelEntry[] {
   return list.flatMap(listOne);
