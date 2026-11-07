@@ -18,18 +18,19 @@ const cut = (width: string, text: string, tone = "") => (
   </span>
 );
 
-const stateOf = (r: Row) => (
+// In a table cell the wait sits under the phase; in a phone card it follows on the same line, so the title keeps its two lines.
+const stateOf = (r: Row, stacked = true) => (
   <span className="flex min-w-0 items-center gap-2" title={r.wait ? `${r.phase}: ${r.wait}` : r.phase}>
     <Lamp tone={r.stuck ? "caution" : "clear"} size={8} />
-    <span className="min-w-0">
+    <span className={`min-w-0 ${stacked ? "" : "flex gap-2"}`}>
       <span className="block whitespace-nowrap text-fg">{r.phase}</span>
-      {r.wait && <span className={`block max-w-28 truncate text-xs ${r.stuck ? "text-caution" : "text-fg2"}`}>{r.wait}</span>}
+      {r.wait && <span className={`block max-w-28 truncate text-xs ${stacked ? "" : "self-center"} ${r.stuck ? "text-caution" : "text-fg2"}`}>{r.wait}</span>}
     </span>
   </span>
 );
 
 const columns: Column<Row>[] = [
-  { key: "phase", label: "State", show: stateOf },
+  { key: "phase", label: "State", show: (r) => stateOf(r) },
   {
     key: "step",
     label: "Step",
@@ -123,6 +124,13 @@ function Details({ row, sample, browsers, onChoose }: { row: Row; sample: boolea
         ),
       )}
       {section(
+        "Runs on",
+        <p className="break-words text-fg2" data-runs-on>
+          {row.machine}
+          {row.input !== undefined && ` · ${Math.round(row.input / 1000)}k tokens in`}
+        </p>,
+      )}
+      {section(
         "Cost so far",
         <p className="text-fg2" data-cost>
           {d.cost === undefined ? "not reported" : dollars(d.cost)}
@@ -153,7 +161,7 @@ export function TaskTable({ rows, sample, browsers, onChoose }: { rows: Row[]; s
       group={(r) => r.project}
       cardTitle={(r) => (
         <>
-          <span className="mb-1 block text-xs">{stateOf(r)}</span>
+          <span className="mb-1 block text-xs">{stateOf(r, false)}</span>
           {r.id}: {r.step && !r.title.startsWith(r.step) ? `${r.step} ` : ""}
           {r.title}
         </>

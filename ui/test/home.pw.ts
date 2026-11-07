@@ -105,7 +105,7 @@ test("the table keeps a 200-character Last and 200 rows inside its edge, shows n
     title: `S${i} ${"a long title ".repeat(i === 0 ? 20 : 1)}`,
     state: "work",
     stage: "work",
-    step: `S${i}`,
+    ...(i === 0 ? {} : { step: `S${i}` }),
     last: { text: "x".repeat(200), at: now - 60_000 },
     // the first row knows nothing of its model and time: the cells stay empty
     ...(i === 0 ? {} : { since: now - 5 * 60_000, model: "vendor-b/a-model-with-a-long-name" }),
@@ -134,13 +134,26 @@ test("the table keeps a 200-character Last and 200 rows inside its edge, shows n
       scroll,
       past,
       dash: cells.filter((t) => t === "-" || /(^|\s)-($|\s)/.test(t ?? "")).length,
-      zero: cells.some((t) => /\bMin\b.*\b0\b/.test(t ?? "")),
     };
   });
   expect(fit.scroll.every((s) => s <= 0)).toBe(true);
   expect(fit.past).toBeLessThanOrEqual(0);
   expect(fit.dash).toBe(0);
-  expect(fit.zero).toBe(false);
-  const first = page.locator("[data-table-cards] [data-row-id] button:visible").first();
-  if (await first.count()) await expect(first).toHaveText(/^at work/);
+  const phone = (page.viewportSize()?.width ?? 0) < 640;
+  const row = page.locator(phone ? "[data-table-cards] [data-row-id]:visible" : "tr[data-row-id]:visible");
+  // the first row knows no model or time: nothing stands in for them; the next shows both
+  await expect(row.nth(1)).toContainText("vendor-b/");
+  await expect(row.nth(1)).toContainText("5 min");
+  if (phone) await expect(row.nth(1).locator("button")).toHaveText(/^at work/);
+  // the 200-character Last ends in an ellipsis in its cell
+  if (!phone) {
+    const cut = await row
+      .nth(1)
+      .locator("td")
+      .nth(4)
+      .locator("span")
+      .first()
+      .evaluate((el) => el.scrollWidth > el.clientWidth);
+    expect(cut).toBe(true);
+  }
 });
