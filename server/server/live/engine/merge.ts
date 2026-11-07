@@ -12,6 +12,10 @@ const QUEUE_WAIT_MS = 15 * 60_000
 /** how long a ready task's agent may finish its turn before the board merges without ending it */
 const TURN_END_WAIT_MS = 2 * 60_000
 
+const HELD = 'Held:'
+/** a merge held by a red main is looked at again this soon */
+const HELD_RETRY = 30_000
+
 export class EngineLand extends EngineHandoff {
   /**
    * On its way into main, its agent at rest with nothing left running to wake it, and GitHub's checks through: it is
@@ -59,7 +63,7 @@ export class EngineLand extends EngineHandoff {
   }
 
   private landed(t: TaskRec, r: { ok: boolean; error?: string }) {
-    t.landTriedAt = r.ok ? undefined : Date.now()
+    t.landTriedAt = r.ok ? undefined : r.error?.startsWith(HELD) ? Date.now() - LAND_RETRY + HELD_RETRY : Date.now()
     // only the rebase that failed: main moving on GitHub meanwhile is rebased by the next try
     const clash = /^Conflict with \S+: rebase .* Conflicting files: (.*)\. Sent back to/.exec(r.error ?? '')
     if (clash && !t.landCard) {
@@ -274,23 +278,17 @@ export class EngineLand extends EngineHandoff {
   }
 
   /**
-   * A red main stops the merges: one waits for a green run, so a burst of failures stays one. A fix (its task is made by
-   * main-green, or its title starts with Fix) goes in, as only it can turn main green. False when Lineclear is stopping.
+   * A red main stops the merges, so a burst of failures stays one. A fix (its task is made by main-green, or its title
+   * starts with Fix) goes in, as only it can turn main green. Anything else is refused at once with the reason, never
+   * waited for: a waiting merge would hold the repo's lane and the fix behind it. The board tries again soon (landed).
    */
-  protected async holdWhileRed(t: TaskRec, g: GH.GitHub, cwd: string): Promise<boolean> {
-    if (t.by === 'main-green' || /^fix\b/i.test(t.title)) return true
-    const red = async () => {
-      const runs = await GH.branchRuns(g, cwd, t.base!)
-      return runs?.find((r) => r.state !== 'pending')?.state === 'fail'
-    }
-    while (!this.closing && (await red())) {
-      t.mergeStopped = `Held: ${t.base} is red on GitHub, the merge goes on once a run is green.`
-      await Bun.sleep(this.redWait)
-    }
-    return !this.closing
+  protected async holdWhileRed(t: TaskRec, g: GH.GitHub, cwd: string): Promise<string | undefined> {
+    if (t.by === 'main-green' || /^fix\b/i.test(t.title)) return undefined
+    const last = (await GH.branchRuns(g, cwd, t.base!))?.find((r) => r.state !== 'pending')
+    if (last?.state !== 'fail') return undefined
+    const fix = this.tasks.find((x) => x.by === 'main-green' && !x.merged && !x.archived && x.project === t.project)
+    return `${HELD} ${t.base} is red at ${last.sha.slice(0, 7)}${fix ? `, fix task ${fix.id}` : ''}. Nothing was merged; ${t.id} lands by itself once a run on ${t.base} is green.`
   }
-
-  protected redWait = CHECKS_EVERY
 
   /**
    * Through the pull request, as herdr-projects lands one: the branch pushed as it is, rebased on GitHub's main only
@@ -339,8 +337,8 @@ export class EngineLand extends EngineHandoff {
         `it was in ${t.base} already${pr ? (closed ? `; closed PR #${pr.number}` : `; could not close PR #${pr.number}: close it on GitHub`) : ''}`,
       )
     }
-    if (!(await this.holdWhileRed(t, g, p.path)))
-      return { ok: false, error: `Lineclear is restarting: nothing was merged. Run lineclear merge ${t.id} again in a minute.` }
+    const held = await this.holdWhileRed(t, g, p.path)
+    if (held) return { ok: false, error: held }
     const head = (await G.git(wt, 'rev-parse', 'HEAD')).out
     const pushing = !pr || pr.headRefOid !== head
     if (pushing) {
