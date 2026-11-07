@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { longestChain, planProblems, readinessPrompt, stepFormProblems } from "../src/autoplan.ts";
-import { stepRule, askableKinds } from "../src/inbox.ts";
+import { askableKinds } from "../src/ask-command.ts";
+import { stepRule } from "../src/cards.ts";
 import { askBefore } from "../src/project.ts";
 import { checkRoadmap } from "../src/roadmap.ts";
 

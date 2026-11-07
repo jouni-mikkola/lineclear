@@ -365,7 +365,7 @@ test("a task's two cards in the coordinator chat: the kept merge is an Inbox ite
   const route = () => routeAsks("demo", "Demo", w.tell, new Date(), false, w.env, undefined, close);
   expect(route()).toEqual(["T-3's coordinator card is in the Inbox: Merge T-3?", "T-3's coordinator card was answered by a rule (question)"]);
   const open = readItems(w.env).filter(isOpen);
-  expect(open).toMatchObject([{ kind: "step", task: "T-3", question: "Merge T-3?", choices: ["Merge it", "Not yet"], card: { space: "Demo", id: "ask:m" } }]);
+  expect(open).toMatchObject([{ kind: "choice", task: "T-3", question: "Merge T-3?", choices: ["Merge it", "Not yet"], card: { space: "Demo", id: "ask:m" } }]);
   expect(w.told).toHaveLength(1);
   expect(closed).toHaveLength(1);
   expect(closed[0]).toStartWith("Demo ask:w: ");
@@ -381,7 +381,7 @@ test("a task's two cards in the coordinator chat: the kept merge is an Inbox ite
     "T-3's coordinator card is in the Inbox: Approve T-3's merge?",
     "T-3's coordinator card is in the Inbox: Publish T-3's release to npm?",
   ]);
-  expect(readItems(w.env).map((i) => i.kind)).toEqual(["step", "step", "outward"]);
+  expect(readItems(w.env).map((i) => i.kind)).toEqual(["choice", "choice", "outward"]);
   // a card in a task's own chat is not a coordinator card
   writeFileSync(join(shep, "chatlog", "T-3_Agent.json"), JSON.stringify({ posted: [ask("ask:own", "Merge T-3?")], answers: {} }));
   expect(route()).toEqual([]);
@@ -411,7 +411,15 @@ test("answering the Inbox item answers its card, and closing the item closes it 
   const env = { ...w.env, LINECLEAR_SERVER_BIN: bin };
   const item = (question: string, id: string) =>
     addItem(
-      { kind: "step", task: "T-3", project: "demo", question, choices: ["Merge it", "Not yet"], card: { space: "Demo", id }, since: new Date().toISOString() },
+      {
+        kind: "choice",
+        task: "T-3",
+        project: "demo",
+        question,
+        choices: ["Merge it", "Not yet"],
+        card: { space: "Demo", id },
+        since: new Date().toISOString(),
+      },
       env,
     );
   const first = item("Merge T-3?", "ask:m");

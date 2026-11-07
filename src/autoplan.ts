@@ -1,6 +1,6 @@
 import { askModel } from "./ask-model.ts";
 import { ownerDirection } from "./direction.ts";
-import { askBefore, readSettings } from "./project.ts";
+import { readSettings } from "./project.ts";
 import { checkRoadmap, parseRoadmap, resultOf, stepResultProblems, type Step } from "./roadmap.ts";
 import { stepLocks } from "./parts.ts";
 
@@ -138,10 +138,3 @@ export function readiness(diff: string, project: string | undefined, env = proce
     .at(-1)!;
   return /^GO\b/i.test(last) ? { go: true, why: "" } : { go: false, why: last.replace(/^NO-GO:?\s*/i, "") || "no reason given" };
 }
-
-/** True when this project lets plans apply by themselves. */
-export const plansAreAuto = (project: string | undefined, env = process.env): boolean => {
-  if (!project) return false;
-  const s = readSettings(project, env);
-  return typeof s === "object" && !askBefore(s).plans;
-};

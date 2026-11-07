@@ -1,12 +1,11 @@
-import { isPlanId, mergeTask, planRef, undoApplied } from "./plan-apply.ts";
-import { applyMove } from "./dispatcher.ts";
-import { answerCard, isOpen, type Item, KIND_LABEL, readAllItems, lineclear, saveItem, usage, waitReason } from "./inbox.ts";
-import { readSettings } from "./project.ts";
+import { undoApplied } from "./plan-apply.ts";
+import { answerCard, isOpen, type Item, readAllItems, lineclear, saveItem, waitReason } from "./inbox.ts";
 import { clearWait } from "./waits.ts";
-import { gitText } from "./git.ts";
+
+const USAGE = "usage: lineclear inbox [--all] | lineclear inbox answer <n> <choice> [--note <text>] | lineclear inbox undo <n>";
 
 const describe = (i: Item) =>
-  `${i.n}  ${KIND_LABEL[i.kind]}  ${i.task}${i.project ? ` (${i.project})` : ""}\n   ${i.question}\n` +
+  `${i.n}  ${i.kind}  ${i.task}${i.project ? ` (${i.project})` : ""}\n   ${i.question}\n` +
   (i.diff ? `${i.diff.trimEnd().replace(/^/gm, "   | ")}\n` : "") +
   `   ${i.choices.map((c) => `[${c}]`).join(" ")}` +
   (i.session && isOpen(i) ? `\n   take over the browser: playwright-cli -s=${i.session} show` : "") +
@@ -25,7 +24,7 @@ export function inboxMain(args: string[], out: (l: string) => void, env = proces
   const [rest, noted] = noteAt < 0 ? [tail, undefined] : [tail.slice(0, noteAt), tail.slice(noteAt + 1)];
   const note = noted?.join(" ").trim();
   const isUndo = verb === "undo" && tail.length === 0;
-  if (!/^\d+$/.test(n ?? "") || !(isUndo || (verb === "answer" && rest.length > 0 && note !== ""))) return bail(2, usage("inbox"));
+  if (!/^\d+$/.test(n ?? "") || !(isUndo || (verb === "answer" && rest.length > 0 && note !== ""))) return bail(2, USAGE);
   const item = readAllItems(env).find((i) => i.n === Number(n));
   if (item === undefined) return bail(1, `lineclear inbox: no item ${n}`);
   if (isUndo) {
@@ -37,73 +36,24 @@ export function inboxMain(args: string[], out: (l: string) => void, env = proces
   const text = rest.join(" ");
   const choice = item.choices.find((c) => c === text) ?? item.choices.find((c) => c.toLowerCase() === text.toLowerCase());
   if (choice === undefined) return bail(2, `lineclear inbox: '${text}' is not a choice, use one of: ${item.choices.join(", ")}`);
-  if (note !== undefined && item.kind !== "plan" && item.ownerStep === undefined) return bail(2, "lineclear inbox: --note is only for a plan or an owner step");
-  if (item.move) {
-    if (note !== undefined) return bail(2, "lineclear inbox: --note is only for a plan");
-    const problem = choice === "Approve" ? applyMove(item, env) : undefined;
-    if (problem) return bail(1, `lineclear inbox: ${problem}`);
-    writeAnswer(item, choice, undefined, env);
-    return bail(0, choice === "Approve" ? `${item.move.step} in ${item.project} now comes after ${item.move.after.join(", ")}` : "the move was rejected");
-  }
+  if (note !== undefined && item.ownerStep === undefined) return bail(2, "lineclear inbox: --note is only for an owner step");
   if (item.ownerStep !== undefined && note === undefined) return bail(2, "lineclear inbox: say the result: answer <n> Done --note <text>");
-  const resend = item.kind === "plan" && choice === "Reject" && (item.round ?? 1) < 2;
-  if (resend && note === undefined) return bail(2, "lineclear inbox: say why you reject the plan: answer <n> Reject --note <text>");
-  const failure = deliverAnswer(item, choice, note, resend, env);
+  const failure = deliverAnswer(item, choice, env);
   if (failure) return bail(1, failure);
-  writeAnswer(item, choice, note, env);
+  saveItem({ ...item, answer: choice, ...(note ? { note } : {}), answeredAt: new Date().toISOString() }, env);
   if (waitReason(item.task, env) === `asked: ${item.question}`) clearWait(item.task, env);
-  return bail(0, answeredLine(item, choice, resend));
+  return bail(0, item.task === "-" ? `answered: ${choice}` : `${item.task} was told: ${choice}`);
 }
 
-const writeAnswer = (item: Item, answer: string, note: string | undefined, env: NodeJS.ProcessEnv) =>
-  saveItem({ ...item, answer, ...(note ? { note } : {}), answeredAt: new Date().toISOString() }, env);
-
-/** Carries the answer out: the merge, the close or the word to the task. Returns the line to say when it fails. */
-function deliverAnswer(item: Item, choice: string, note: string | undefined, resend: boolean, env: NodeJS.ProcessEnv): string | undefined {
-  const run = (...a: string[]) => Bun.spawnSync([lineclear(env), ...a], { stdin: "ignore" });
-  const said = (p: { stderr?: Buffer; stdout?: Buffer }) => (p.stderr?.toString() || p.stdout?.toString() || "").trim();
-  let message = `Your answer to "${item.question}": ${choice}. Go on.`;
-  let p: { exitCode: number; stderr?: Buffer; stdout?: Buffer } = { exitCode: 0 };
-  if (item.kind === "plan" && choice === "Approve") {
-    const stale = staleBranch(item, env);
-    if (stale) return stale;
-    if (isPlanId(item.task)) {
-      const repo = item.project ? readSettings(item.project, env) : "no project";
-      const merged = typeof repo === "object" ? mergeTask(item.task, repo.repo, env) : repo;
-      if (typeof merged === "string") return `lineclear inbox: failed: ${merged}`;
-    } else p = run("merge", item.task);
-  } else if (item.kind === "plan" && isPlanId(item.task)) {
-    // the Dispatcher wrote it and has no task to tell or close: it reads the answer from the plan's status
-  } else if (item.kind === "plan") {
-    if (resend) message = `The owner rejected the plan: ${note}. Change docs/ROADMAP.md as the note says, commit, and run \`lineclear plan submit\` once more.`;
-    else p = run("task", "close", item.task);
-  } else if (item.task !== "-") {
-    // An item that belongs to no task (task "-") has nobody to tell.
-    p = run("task", "tell", item.task, message);
-  }
+/** Carries the answer out: the word to the task, and the answer to its chat card. Returns the line to say when it fails. */
+function deliverAnswer(item: Item, choice: string, env: NodeJS.ProcessEnv): string | undefined {
+  // An item that belongs to no task (task "-") has nobody to tell.
+  const p =
+    item.task === "-"
+      ? { exitCode: 0, stderr: undefined, stdout: undefined }
+      : Bun.spawnSync([lineclear(env), "task", "tell", item.task, `Your answer to "${item.question}": ${choice}. Go on.`], { stdin: "ignore" });
   const cardError = p.exitCode === 0 && item.card ? answerCard(item.card, choice, env) : undefined;
   if (cardError) return `lineclear inbox: failed: ${cardError}`;
-  if (p.exitCode !== 0) return `lineclear inbox: failed: ${said(p)}`;
-  if (resend && !isPlanId(item.task)) {
-    p = run("task", "tell", item.task, message);
-    if (p.exitCode !== 0) return `lineclear inbox: task tell failed: ${said(p)}`;
-  }
+  if (p.exitCode !== 0) return `lineclear inbox: failed: ${(p.stderr?.toString() || p.stdout?.toString() || "").trim()}`;
   return undefined;
-}
-
-/** The line that says what the answer did. */
-function answeredLine(item: Item, choice: string, resend: boolean): string {
-  if (item.kind !== "plan") return item.task === "-" ? `answered: ${choice}` : `${item.task} was told: ${choice}`;
-  if (choice === "Approve") return `${item.task} was merged`;
-  if (isPlanId(item.task)) return `${item.task} was rejected, the Dispatcher reads the note in its status`;
-  return resend ? `${item.task} was told to change the plan` : `${item.task} was closed`;
-}
-
-/** Approving a plan merges it only if the branch is still what the owner saw: the line to say when it is not. */
-function staleBranch(item: Item, env: NodeJS.ProcessEnv): string | undefined {
-  const repo = item.project ? readSettings(item.project, env) : undefined;
-  const ref = planRef(item.task);
-  if (!item.head || typeof repo !== "object" || !ref) return undefined;
-  const now = gitText(repo.repo, "for-each-ref", "--format=%(objectname)", ref) ?? "";
-  return now === item.head ? undefined : "lineclear inbox: the branch changed after the plan was sent, ask the Dispatcher to run 'lineclear plan submit' again";
 }

@@ -5,7 +5,7 @@ import { storeMain } from "./store-copies.ts";
 import { dispatcherMain, moveMain } from "./dispatcher.ts";
 import { failedStartsIn, THIS_MACHINE } from "./start-failures.ts";
 import { doctor, herdrVersions, realProbe, testedHerdr } from "./doctor.ts";
-import { askMain } from "./inbox.ts";
+import { askMain } from "./ask-command.ts";
 import { inboxMain } from "./inbox-answer.ts";
 import { status } from "./status.ts";
 import { planMain } from "./plan.ts";

@@ -2,10 +2,10 @@ import { serverBin } from "./paths.ts";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { writeAtomic } from "../pi/atomic.ts";
 import { join } from "node:path";
-import { planProblems, plansAreAuto } from "./autoplan.ts";
+import { planProblems } from "./autoplan.ts";
 import { recordApplied } from "./plan-apply.ts";
 import { ownerDirection } from "./direction.ts";
-import { addItem, isOpen, readItems, type Item } from "./inbox.ts";
+import type { Item } from "./inbox.ts";
 import { readSettings } from "./project.ts";
 import { looseNote, resolveProject, resolveStep } from "./resolve.ts";
 import { projectsMain } from "./requests.ts";
@@ -63,12 +63,10 @@ function checkedMove(rawName: string, rawStep: string, value: string, env: NodeJ
   const changed = withAfter(old, step, after);
   if ("error" in changed) return changed;
   if (changed.text === old) return { error: `${step} already comes after ${after.join(", ")}` };
-  if (readItems(env).some((i) => i.move && i.project === name && i.move.step === step && isOpen(i)))
-    return { error: `a move of ${step} waits for the owner already` };
   return { name, settings, step, after, old, text: changed.text };
 }
 
-/** `lineclear move <project> <step> --after <ids>`: applies a change of one step's `after` once the rule checks pass, or sends it to the Inbox when the project asks before plans. */
+/** `lineclear move <project> <step> --after <ids>`: applies a change of one step's `after` once the rule checks pass. */
 export function moveMain(args: string[], out: (l: string) => void, env = process.env, now: () => Date = () => new Date()): number {
   if (args[0] === "--help" || args[0] === "-h") return (out(USAGE[0]!), 0);
   const [rawName, rawStep, flag, value, ...extra] = args;
@@ -84,35 +82,22 @@ export function moveMain(args: string[], out: (l: string) => void, env = process
       .parsed.steps.find((s) => s.id === step)!
       .after.join(", ") || "none"
   }\n+ after: ${after.join(", ")}`;
-  if (plansAreAuto(name, env)) {
-    // the project does not ask before plans: the rule checks decide, and the owner can undo it
-    const problems = planProblems(old, changed.text);
-    if (problems.length > 0) return fail(`the rule checks refuse this move: ${problems.join("; ")}`);
-    const base = gitAsLineclear(settings.repo, "rev-parse", "HEAD").out.trim();
-    const problem = applyMove({ move: { step, after }, project: name } as Item, env);
-    if (problem) return fail(problem);
-    const commit = gitAsLineclear(settings.repo, "rev-parse", "HEAD").out.trim();
-    const done = recordApplied(
-      { kind: "plan", task: "-", project: name, question, choices: ["Approve", "Reject"], diff, move: { step, after }, since: now().toISOString() },
-      base,
-      commit,
-      now(),
-      env,
-    );
-    out(
-      `inbox ${done.n}: ${step} in ${name} now comes after ${after.join(", ")}. It applied by itself, the owner can undo it.${looseNote([
-        [rawName, name],
-        [rawStep, step],
-      ])}`,
-    );
-    return 0;
-  }
-  const item = addItem(
-    { kind: "plan", task: "-", project: name, question, choices: ["Approve", "Reject"], diff, move: { step, after }, since: now().toISOString() },
+  // the rule checks decide, and the owner can undo it
+  const problems = planProblems(old, changed.text);
+  if (problems.length > 0) return fail(`the rule checks refuse this move: ${problems.join("; ")}`);
+  const base = gitAsLineclear(settings.repo, "rev-parse", "HEAD").out.trim();
+  const problem = applyMove({ move: { step, after }, project: name } as Item, env);
+  if (problem) return fail(problem);
+  const commit = gitAsLineclear(settings.repo, "rev-parse", "HEAD").out.trim();
+  const done = recordApplied(
+    { kind: "choice", task: "-", project: name, question, choices: ["Approve", "Reject"], diff, move: { step, after }, since: now().toISOString() },
+    base,
+    commit,
+    now(),
     env,
   );
   out(
-    `inbox ${item.n}: ${question} Nothing changes until the owner approves.${looseNote([
+    `inbox ${done.n}: ${step} in ${name} now comes after ${after.join(", ")}. It applied by itself, the owner can undo it.${looseNote([
       [rawName, name],
       [rawStep, step],
     ])}`,
@@ -120,15 +105,15 @@ export function moveMain(args: string[], out: (l: string) => void, env = process
   return 0;
 }
 
-/** Applies an approved move: commits the new `after` on the project's main. Returns an error line, or undefined when done. */
-export function applyMove(item: Item, env = process.env): string | undefined {
+/** Applies a move: commits the new `after` on the project's main. Returns an error line, or undefined when done. */
+function applyMove(item: Item, env = process.env): string | undefined {
   if (!item.move || !item.project) return "this item has no move to apply";
   const settings = readSettings(item.project, env);
   if (typeof settings === "string") return settings;
   const repo = settings.repo;
-  if (gitAsLineclear(repo, "rev-parse", "--abbrev-ref", "HEAD").out.trim() !== "main") return `${repo} is not on main, switch it to main and answer again`;
+  if (gitAsLineclear(repo, "rev-parse", "--abbrev-ref", "HEAD").out.trim() !== "main") return `${repo} is not on main, switch it to main and try again`;
   if (gitAsLineclear(repo, "status", "--porcelain", "--", "docs/ROADMAP.md").out.trim() !== "")
-    return "docs/ROADMAP.md has uncommitted changes, commit or undo them and answer again";
+    return "docs/ROADMAP.md has uncommitted changes, commit or undo them and try again";
   const file = join(repo, "docs", "ROADMAP.md");
   const changed = withAfter(readFileSync(file, "utf8"), item.move.step, item.move.after);
   if ("error" in changed) return changed.error;

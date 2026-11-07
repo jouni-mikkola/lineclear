@@ -61,6 +61,7 @@ function setup() {
     LINECLEAR_TASK: "LIN-5",
     LINECLEAR_ROLE: "dispatcher",
     LINECLEAR_STEPCHECK: join(bin, "model"),
+    LINECLEAR_READINESS: "echo GO",
   };
   const says = (text: string) => writeFileSync(answer, text);
   const questions = () =>
@@ -133,40 +134,18 @@ test("submit sends an incomplete step back to the Dispatcher, logs it and adds n
   expect(JSON.stringify(decisionsSince(t.env, 0))).toContain("step B needs");
 });
 
-test("approving a plan merges it", () => {
+test("a plan that passes the checks merges by itself and is recorded as an applied change", () => {
   const t = setup();
   t.edit("B");
   expect(t.plan(["submit"]).code).toBe(0);
-  const [item] = readItems(t.env);
-  expect(item).toMatchObject({ kind: "plan", task: "LIN-5", project: "demo", round: 1, choices: ["Approve", "Reject"] });
-  expect(item!.diff).toContain("+### B Title B");
-  expect(t.inbox([]).text).toContain("+### B Title B");
-  expect(t.inbox(["answer", "1", "Approve"]).code).toBe(0);
   expect(t.calls().at(-1)).toEqual(["merge", "LIN-5"]);
-  expect(readItems(t.env)[0]!.answer).toBe("Approve");
+  const [item] = readItems(t.env);
+  expect(item).toMatchObject({ kind: "choice", task: "LIN-5", project: "demo", auto: true, answer: "Approve" });
+  expect(item!.diff).toContain("+### B Title B");
+  expect(t.inbox([]).text).toBe("The Inbox is empty.");
 });
 
-test("rejecting with a note sends it back once; a second rejection closes the task", () => {
-  const t = setup();
-  t.edit("B");
-  t.plan(["submit"]);
-  expect(t.inbox(["answer", "1", "Reject"]).code).toBe(2); // a note is needed
-  expect(t.inbox(["answer", "1", "Reject", "--note", "split B in two"]).code).toBe(0);
-  const tell = t.calls().at(-1)!;
-  expect(tell.slice(0, 3)).toEqual(["task", "tell", "LIN-5"]);
-  expect(tell[3]).toContain("split B in two");
-  expect(readItems(t.env)[0]).toMatchObject({ answer: "Reject", note: "split B in two" });
-
-  t.edit("C");
-  expect(t.plan(["submit"]).code).toBe(0);
-  expect(readItems(t.env)[1]).toMatchObject({ round: 2 });
-  expect(t.inbox(["answer", "2", "Reject"]).code).toBe(0);
-  expect(t.calls().at(-1)).toEqual(["task", "close", "LIN-5"]);
-  t.edit("D");
-  expect(t.plan(["submit"]).code).toBe(1); // no third try
-});
-
-test("a plan with other files, a second pending plan, or a moved branch is refused", () => {
+test("a plan with other files is refused", () => {
   const t = setup();
   writeFileSync(join(t.work, "other.txt"), "x");
   Bun.spawnSync(["git", "-C", t.work, "add", "-A"]);
@@ -176,12 +155,6 @@ test("a plan with other files, a second pending plan, or a moved branch is refus
   Bun.spawnSync(["git", "-C", t.work, "rm", "-q", "other.txt"]);
   Bun.spawnSync(["git", "-C", t.work, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "undo"]);
   expect(t.plan(["submit"]).code).toBe(0);
-  expect(t.plan(["submit"]).text).toContain("waits for the owner already");
-  t.edit("C"); // a commit after submit
-  const r = t.inbox(["answer", "1", "Approve"]);
-  expect(r.code).toBe(1);
-  expect(r.text).toContain("branch changed");
-  expect(t.calls().some((c) => c[0] === "merge")).toBe(false);
 });
 
 test("submit sends back a new step with no result or a long title, and names each fault", () => {
@@ -208,7 +181,7 @@ test("submit sends back a new step with no result or a long title, and names eac
 
 const commit = (work: string, msg: string) => Bun.spawnSync(["git", "-C", work, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-am", msg]);
 
-test("a go keeps the answer with its model and tokens and sends it with the Inbox item", () => {
+test("a go keeps the answer with its model and tokens on the applied change", () => {
   const t = setup();
   t.edit("B");
   expect(t.plan(["submit"]).code).toBe(0);

@@ -110,7 +110,7 @@ async function until(ok: () => boolean, ms = 30_000) {
 /** Puts a wait, an Inbox item and a decision on disk, as a day of work would. */
 function work(m: Machine) {
   writeWait({ task: "LIN-1", project: "demo", kind: "owner", reason: "asked: Ship it?", since: "2026-11-01T00:00:00Z" }, m.vars);
-  addItem({ kind: "step", task: "LIN-1", project: "demo", question: "Ship it?", choices: ["Yes", "No"], since: "2026-11-01T00:00:00Z" }, m.vars);
+  addItem({ kind: "choice", task: "LIN-1", project: "demo", question: "Ship it?", choices: ["Yes", "No"], since: "2026-11-01T00:00:00Z" }, m.vars);
   mkdirSync(m.config, { recursive: true });
   addDecisions(m.vars, [{ time: new Date().toISOString(), project: "demo", kind: "start", reason: "earlier" }]);
 }

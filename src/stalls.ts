@@ -285,10 +285,10 @@ const RESTART = "You were restarted because nothing changed after a nudge. Carry
 
 /**
  * The stall ladder. The server alone judges which task is quiet or late and posts one "may be stuck" card for it;
- * each new card for a running task is one rung: a nudge, then a restart, then the Inbox. No limit is read here.
+ * each new card for a running task is one rung: a nudge, then a restart, then a note in the decisions. No limit is read here.
  */
 export function climbStalls(a: Args): void {
-  const { settings, world, state, dryRun, note, env } = a;
+  const { settings, world, state, dryRun, note } = a;
   const running = new Set(a.tasks.filter((t) => t.status === "work").map((t) => t.id));
   for (const id of Object.keys(state.ladder)) if (!running.has(id)) delete state.ladder[id];
   for (const card of world.stallCards(settings.space, settings.repo)) {
@@ -309,18 +309,7 @@ export function climbStalls(a: Args): void {
       const err = world.stopTask(id) ?? world.tellTask(id, RESTART, "resume");
       note("stall", err ? `rung 2: could not restart ${id}: ${err}` : `rung 2: restarted ${id}: ${what}`, id);
     } else if (rung === 3) {
-      addItem(
-        {
-          kind: "stuck",
-          task: id,
-          project: a.project,
-          question: `${id} is stuck (${what}) after a nudge and a restart.`,
-          choices: ["Ok"],
-          since: world.now().toISOString(),
-        },
-        env,
-      );
-      note("stall", `rung 3: asked you about ${id} in the Inbox: ${what}`, id);
+      note("stall", `rung 3: ${id} is stuck after a nudge and a restart: ${what}`, id);
     }
   }
 }

@@ -39,17 +39,19 @@ test("50 items added from 5 processes get 50 distinct numbers", async () => {
   expect(numbers).toEqual(Array.from({ length: 50 }, (_, i) => i + 1));
 });
 
-test("a closed plan stays in the list for its tries, and the folders of an older version are imported once", () => {
-  const vars = { LINECLEAR_CONFIG: tmp("contract-inbox-plan") };
-  const plan = addItem({ ...item, kind: "plan" }, vars);
-  closeItem(plan, "the branch changed", new Date(), vars);
-  expect(readItems(vars).map((i) => i.closed)).toEqual(["the branch changed"]);
-  const old = addItem(item, vars);
-  closeItem(old, "old way", new Date(), vars);
-  expect(readItems(vars).map((i) => i.n)).toEqual([plan.n]);
-  expect(readAllItems(vars).map((i) => i.n)).toEqual([plan.n, old.n]);
-  expect(addItem(item, vars).n).toBe(old.n + 1);
+test("an open item of a removed kind closes when read, and an applied one or an owner step is kept as a choice", () => {
+  const vars = { LINECLEAR_CONFIG: tmp("contract-inbox-legacy") };
+  const stuck = addItem({ ...item, kind: "stuck" as never }, vars);
+  const applied = addItem({ ...item, kind: "plan" as never, answer: "Approve", auto: true }, vars);
+  const hand = addItem({ ...item, kind: "step" as never, ownerStep: "A" }, vars);
+  expect(readItems(vars).map((i) => [i.n, i.kind])).toEqual([
+    [applied.n, "choice"],
+    [hand.n, "choice"],
+  ]);
+  expect(readAllItems(vars).find((i) => i.n === stuck.n)?.closed).toBe("the Inbox no longer holds this kind");
+});
 
+test("the folders of an older version are imported once", () => {
   const older = { LINECLEAR_CONFIG: tmp("contract-inbox-old") };
   mkdirSync(join(older.LINECLEAR_CONFIG, "inbox", "closed"), { recursive: true });
   writeFileSync(join(older.LINECLEAR_CONFIG, "inbox", "3.json"), JSON.stringify({ n: 3, ...item }));

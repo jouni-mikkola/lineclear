@@ -2,9 +2,8 @@ import { afterAll, expect, test } from "bun:test";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { plansAreAuto } from "../src/autoplan.ts";
-import { applyPlan, settlePlans, undoApplied } from "../src/plan-apply.ts";
-import { addItem, readItems } from "../src/inbox.ts";
+import { applyPlan, undoApplied } from "../src/plan-apply.ts";
+import { readItems } from "../src/inbox.ts";
 
 // An applied change on a temp git repo: merged by a fake server, then undone with a revert.
 const temps: string[] = [];
@@ -32,7 +31,6 @@ function world(askPlans: boolean) {
   g("checkout", "-q", "-b", "work/7-plan");
   writeFileSync(join(repo, "docs", "ROADMAP.md"), doc(step("A1", "none"), step("B1", "A1"), step("U43", "A1")));
   g("commit", "-qam", "plan: add B1");
-  const head = g("rev-parse", "HEAD");
   g("checkout", "-q", "main");
   const bin = join(dir, "fake-server");
   writeFileSync(bin, `#!/bin/sh\nexec git -C ${repo} -c user.name=t -c user.email=t@t merge --no-ff -q -m "Merge LIN-7" work/7-plan\n`);
@@ -55,14 +53,12 @@ function world(askPlans: boolean) {
   write(askPlans);
   const vars = { ...process.env, LINECLEAR_CONFIG: cfg, LINECLEAR_SERVER_BIN: bin, LINECLEAR_READINESS: "echo GO" } as NodeJS.ProcessEnv;
   const item = {
-    kind: "plan" as const,
+    kind: "choice" as const,
     task: "LIN-7",
     project: "demo",
     question: "q",
     choices: ["Approve", "Reject"],
     diff: "+B1",
-    head,
-    round: 1,
     since: "2026-11-01T00:00:00Z",
   };
   return { repo, vars, item, write };
@@ -72,7 +68,6 @@ const roadmap = (repo: string) => readFileSync(join(repo, "docs", "ROADMAP.md"),
 
 test("a plan applies by itself under the setting, and one undo reverts it", () => {
   const w = world(false);
-  expect(plansAreAuto("demo", w.vars)).toBe(true);
   expect("item" in applyPlan(w.item, w.repo, new Date(), w.vars)).toBe(true);
   expect(roadmap(w.repo)).toContain("B1");
   const applied = readItems(w.vars)[0]!;
@@ -89,14 +84,4 @@ test("an undo refuses when the checkout has uncommitted changes, and loses nothi
   writeFileSync(join(w.repo, "docs", "ROADMAP.md"), "mine\n");
   expect(undoApplied(readItems(w.vars)[0]!, new Date(), w.vars)).toContain("uncommitted");
   expect(roadmap(w.repo)).toBe("mine\n");
-});
-
-test("a waiting plan applies in the tick once its project lets plans apply, and not before", () => {
-  const w = world(true);
-  addItem(w.item, w.vars);
-  expect(settlePlans(new Date(), w.vars)).toEqual([]);
-  w.write(false);
-  expect(settlePlans(new Date(), w.vars)[0]).toContain("applied by itself");
-  expect(readItems(w.vars)[0]).toMatchObject({ auto: true, answer: "Approve" });
-  expect(roadmap(w.repo)).toContain("B1");
 });

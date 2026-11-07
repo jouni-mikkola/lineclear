@@ -371,8 +371,6 @@ rollback() {
   fi
   short=$(basename "$was")
   say "Lineclear: putting $short back."
-  bun "$was/scripts/smoke.ts" post "The update to $(basename "$dest") failed: $1. Putting $short back." >/dev/null 2>&1 ||
-    say "Lineclear: could not post the Inbox item"
   point "$was" "$builds/current"
   rm -f "$builds/previous"
   rm -rf "$dest" # a failed build is made again next time
@@ -385,7 +383,6 @@ rollback() {
   problems=$(printf '%s' "$problems" | sed 's/^; //')
   if [ -n "$problems" ]; then
     say "Lineclear: after putting $short back: $problems. Run 'lineclear doctor'."
-    bun "$was/scripts/smoke.ts" post "After putting $short back: $problems." >/dev/null 2>&1 || true
   else
     say "Lineclear: back on $short"
   fi

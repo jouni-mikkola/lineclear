@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { writeAtomic } from "../pi/atomic.ts";
-import { inboxStamp, isOpen, type Item, KIND_LABEL, newestItem, readItems } from "./inbox.ts";
+import { inboxStamp, isOpen, type Item, newestItem, readItems } from "./inbox.ts";
 import { configDir } from "../pi/config.ts";
 
 export type Alert = { id: string; from: string; title: string; body: string; go: { place: string; focus?: string }; tag: string };
@@ -28,9 +28,9 @@ export async function realPush(): Promise<Pusher> {
 
 const markPath = (env: NodeJS.ProcessEnv) => join(configDir(env), "push-mark");
 
-/** What the phone shows for a new item: "Main is red", or "Inbox 3: step waits for you" over the task and the question. */
+/** What the phone shows for a new item: "Inbox 3: login" over the task and the question. */
 export function alertOf(item: Item): Alert {
-  const title = item.alert ?? `Inbox ${item.n}: ${KIND_LABEL[item.kind]}`;
+  const title = `Inbox ${item.n}: ${item.kind}`;
   const body = item.task === "-" ? item.question : `${item.task}: ${item.question}`;
   return { id: `inbox-${item.n}`, from: "Lineclear", title, body, go: { place: "inbox", focus: `inbox-${item.n}` }, tag: `inbox-${item.n}` };
 }

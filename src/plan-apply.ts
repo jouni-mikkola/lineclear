@@ -1,9 +1,7 @@
-import { planProblems, plansAreAuto, readiness } from "./autoplan.ts";
 import { gitAsLineclear, gitFailure } from "./git.ts";
-import { addItem, closeItem, isOpen, readItems, saveItem, type Item } from "./inbox.ts";
+import { addItem, saveItem, type Item } from "./inbox.ts";
 import { serverBin } from "./paths.ts";
 import { readSettings } from "./project.ts";
-import { clearWait } from "./waits.ts";
 
 const tip = (repo: string) => gitAsLineclear(repo, "rev-parse", "HEAD").out.trim();
 
@@ -20,10 +18,10 @@ export function recordApplied(
 }
 
 /** A plan the Dispatcher wrote itself has an id `PLAN-n` and no task: its branch is `plan/PLAN-n`. */
-export const isPlanId = (task: string) => task.startsWith("PLAN-");
+const isPlanId = (task: string) => task.startsWith("PLAN-");
 
 /** The branch refs of a plan's task: `plan/PLAN-n` for the Dispatcher's own plan, else the task's `work/<n>-*`. */
-export function planRef(task: string): string | undefined {
+function planRef(task: string): string | undefined {
   if (isPlanId(task)) return `refs/heads/plan/${task}`;
   const n = /-(\d+)$/.exec(task)?.[1];
   return n ? `refs/heads/work/${n}-*` : undefined;
@@ -44,7 +42,7 @@ function mergePlanBranch(task: string, repo: string): string | undefined {
 }
 
 /** Merges a plan's task by the server, or a Dispatcher plan's branch by git. Returns the main commits it added, or an error line. */
-export function mergeTask(task: string, repo: string, env = process.env): { base: string; commit: string; commits?: string[] } | string {
+function mergeTask(task: string, repo: string, env = process.env): { base: string; commit: string; commits?: string[] } | string {
   const base = tip(repo);
   const ref = planRef(task);
   const subjects = new Set((ref ? gitAsLineclear(repo, "log", "--format=%s", `main..${ref}`).out.trim().split("\n") : []).filter(Boolean));
@@ -106,75 +104,4 @@ export function undoApplied(item: Item, now: Date, env = process.env): string | 
   }
   saveItem({ ...item, undone: now.toISOString() }, env);
   return undefined;
-}
-
-/**
- * Plans that wait in the Inbox from before their project let them apply by themselves: the same checks, then the same
- * merge. A plan the checks refuse stays where it is, once per commit. Returns a line for each plan looked at.
- */
-export function settlePlans(now: Date, env = process.env, only?: number): string[] {
-  const out: string[] = [];
-  const turn = { asked: false }; // the readiness model can take minutes: one plan a tick, so the rule loop is not held
-  for (const item of readItems(env)) {
-    if (item.kind !== "plan" || item.move || !isOpen(item) || !item.head || !item.diff || !plansAreAuto(item.project, env)) continue;
-    if (only !== undefined && item.n !== only) continue;
-    if (item.tried === item.head && only === undefined) continue;
-    settleOne(item as Item & { head: string; diff: string }, now, env, turn, out);
-  }
-  return out;
-}
-
-/** One waiting plan: the checks, then the merge. Adds the line for it to `out`. */
-function settleOne(item: Item & { head: string; diff: string }, now: Date, env: NodeJS.ProcessEnv, turn: { asked: boolean }, out: string[]): void {
-  const settings = readSettings(item.project as string, env);
-  if (typeof settings === "string") return;
-  const repo = settings.repo;
-  const tried = (why: string) => {
-    saveItem({ ...item, tried: item.head }, env);
-    out.push(`inbox ${item.n}: ${item.task} stays: ${why}`);
-  };
-  const ref = planRef(item.task);
-  const branch = ref && gitAsLineclear(repo, "for-each-ref", "--format=%(objectname)", ref).out.trim();
-  if (branch !== item.head) {
-    closeItem(item, "the branch changed after the plan was sent", now, env);
-    out.push(`inbox ${item.n}: closed, the branch changed after the plan was sent`);
-    return;
-  }
-  const was = gitAsLineclear(repo, "show", "main:docs/ROADMAP.md");
-  const will = gitAsLineclear(repo, "show", `${item.head}:docs/ROADMAP.md`);
-  if (!was.ok || !will.ok) {
-    tried("the roadmap could not be read");
-    return;
-  }
-  const problems = planProblems(was.out, will.out);
-  if (problems.length > 0) {
-    tried(problems.join("; "));
-    return;
-  }
-  if (turn.asked) return;
-  turn.asked = true;
-  const verdict = readiness(item.diff, item.project, env);
-  if (!verdict.go) {
-    tried(`the readiness check said no-go: ${verdict.why}`);
-    return;
-  }
-  const merged = mergeTask(item.task, repo, env);
-  if (typeof merged === "string") {
-    tried(`the merge failed: ${merged}`);
-    return;
-  }
-  saveItem(
-    {
-      ...item,
-      answer: "Approve",
-      answeredAt: now.toISOString(),
-      auto: true,
-      base: merged.base,
-      commit: merged.commit,
-      ...(merged.commits ? { commits: merged.commits } : {}),
-    },
-    env,
-  );
-  clearWait(item.task, env);
-  out.push(`inbox ${item.n}: ${item.task} applied by itself under the rule`);
 }

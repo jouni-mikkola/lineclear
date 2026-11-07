@@ -67,8 +67,8 @@ test("the web chat gets answers to status, plan and move from the Dispatcher", a
     expect(readFileSync(log, "utf8")).not.toContain("task add");
 
     const before = readFileSync(join(repo, "docs", "ROADMAP.md"), "utf8");
-    expect(await ask("move B after A", 6)).toContain("Nothing changes until the owner approves");
-    expect(readItems(env)[0]!.move).toEqual({ step: "B", after: ["A"] });
+    expect(await ask("move B after A", 6)).toContain("the rule checks refuse this move");
+    expect(readItems(env)).toEqual([]);
     expect(readFileSync(join(repo, "docs", "ROADMAP.md"), "utf8")).toBe(before);
   } finally {
     fake.stop();

@@ -3,19 +3,19 @@ import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { writeAtomic } from "../pi/atomic.ts";
 import { readJsonKept } from "./kept-read.ts";
 import { join } from "node:path";
-import { addItem, type InboxKind, stepRule } from "./inbox.ts";
+import { addItem, type InboxKind } from "./inbox.ts";
 import { findSpace, lineclearDir, spaceTasks } from "./measure.ts";
 import { projectsDir, toldPath } from "./project.ts";
 import { loadableTotps, secretNames, storedLogin, totpAdvice, totpAnswers } from "../server/server/live/secrets.ts";
 import { readWaits, waitsForOwner, writeWait } from "./waits.ts";
 import { DECIDE_TEXT, IDLE_NUDGE, mergeNudge, PROMISE_NUDGE, promisesNext } from "../pi/nudge.ts";
-import { type AskKind, askKind, type Card, IDLE_TEXT, isIdle, lineOf, questionIn, replyText } from "./cards.ts";
+import { type AskKind, askKind, type Card, IDLE_TEXT, isIdle, lineOf, questionIn, replyText, stepRule } from "./cards.ts";
 import { HOUR_MS } from "./time.ts";
 
 const title = (c: Card) => c.ask?.questions?.[0]?.title ?? "";
 
 /** Where a kind goes when no rule answers it: this kind of Inbox item. A login without a stored login is the Inbox's. */
-const askRoute: Partial<Record<AskKind, InboxKind>> = { login: "login", permission: "outward", report: "step" };
+const askRoute: Partial<Record<AskKind, InboxKind>> = { login: "login", permission: "outward", report: "choice" };
 
 /** What the owner is asked: a login code or captcha, money beyond the budget, something that leaves the machine. */
 const ownerMatter = (question: string) =>
@@ -186,7 +186,7 @@ function routeCoordinator(project: string, space: { name: string; key: string },
       const choices = card.ask?.choices ?? [];
       addItem(
         {
-          kind: route ?? (ownerMatter(title(card)) || ownerWaits.has(card.task) ? "outward" : "step"),
+          kind: route ?? (ownerMatter(title(card)) || ownerWaits.has(card.task) ? "outward" : "choice"),
           ...(route === "login" ? { session: card.task } : {}),
           task: card.task,
           project,

@@ -1,5 +1,5 @@
 import { addedSteps, type PlanView } from "./requests.ts";
-import { cardExtras, type GoChecks, isOpen, type Item, KIND_LABEL, readItems } from "./inbox.ts";
+import { isOpen, type Item, readItems } from "./inbox.ts";
 import type { WaitingTask } from "./waiting.ts";
 import type { Env } from "./web-guard.ts";
 
@@ -10,9 +10,8 @@ export interface InboxView {
   question: string;
   choices: string[];
   details: string;
-  /** The answer that needs a reason: rejecting a plan the first time. */
+  /** The answer that needs a reason: the result of an owner step. */
   needsNote?: string;
-  stepChecks?: GoChecks;
   /** For a login or a code: the agent's browser session, opened on the Agent browsers view. */
   session?: string;
   /** The task that asked or waits, and its title and the sentence of what it gives once it lands. */
@@ -61,15 +60,14 @@ export interface AppliedChange {
 /** The latest ten changes that applied by themselves in a project, newest first. */
 export function appliedChanges(project: string, env: Env): AppliedChange[] {
   return readItems(env as NodeJS.ProcessEnv)
-    .filter((i) => i.kind === "plan" && i.auto && i.commit && i.project === project)
+    .filter((i) => i.auto && i.commit && i.project === project)
     .reverse()
     .slice(0, 10)
     .map((i) => ({ id: i.n, question: i.question, since: i.answeredAt ?? i.since, steps: addedSteps(i.diff ?? ""), undone: !!i.undone }));
 }
 
 export function inboxView(i: Item, machine?: string, title?: string, result?: string): InboxView {
-  const lines = [`${KIND_LABEL[i.kind].charAt(0).toUpperCase()}${KIND_LABEL[i.kind].slice(1)}.`];
-  if (i.round && i.round > 1) lines.push(`Try ${i.round} of the plan.`);
+  const lines: string[] = [];
   if (i.move) lines.push(`${i.move.step} comes after ${i.move.after.join(", ")}.`);
   if (i.session) lines.push(`Take over its browser: playwright-cli -s=${i.session} show`);
   if (i.diff) lines.push("", i.diff.trimEnd());
@@ -85,7 +83,7 @@ export function inboxView(i: Item, machine?: string, title?: string, result?: st
     question: i.question,
     choices: i.choices,
     details: lines.join("\n"),
-    ...cardExtras(i),
+    ...(i.ownerStep !== undefined ? { needsNote: "Done" } : {}),
     ...(i.kind === "login" && i.session ? { session: i.session } : {}),
   };
 }

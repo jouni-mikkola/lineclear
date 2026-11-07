@@ -62,28 +62,23 @@ function setup(projects = ["demo"], withRepos = true) {
   return { dir, env, repos, calls, run };
 }
 
-test("move sends a change to the Inbox and changes nothing until approved", () => {
+test("move applies by itself, records the change, and one undo reverts it", () => {
   const t = setup();
-  const before = readFileSync(join(t.repos.demo!, "docs", "ROADMAP.md"), "utf8");
   const r = t.run((o) => moveMain(["demo", "B", "--after", "A,C"], o, t.env));
   expect(r.code).toBe(0);
-  expect(readFileSync(join(t.repos.demo!, "docs", "ROADMAP.md"), "utf8")).toBe(before);
-  const [item] = readItems(t.env);
-  expect(item!.move).toEqual({ step: "B", after: ["A", "C"] });
-  expect(item!.diff).toContain("+ after: A, C");
-  expect(t.calls().some((c) => c[0] === "alert")).toBe(false);
-  expect(t.run((o) => moveMain(["demo", "B", "--after", "A"], o, t.env)).text).toContain("waits for the owner already");
-
-  const ok = t.run((o) => inboxMain(["answer", "1", "Approve"], o, t.env));
-  expect(ok.code).toBe(0);
   expect(readFileSync(join(t.repos.demo!, "docs", "ROADMAP.md"), "utf8")).toContain(
     "### B Title B\n- why: because B\n- done when:\n  - first B\n- locks: none\n- after: A, C\n",
   );
   expect(git(t.repos.demo!, "log", "-1", "--format=%s")).toBe("Lineclear: move B after A, C\n");
-  expect(readItems(t.env)[0]!.answer).toBe("Approve");
+  const [item] = readItems(t.env);
+  expect(item).toMatchObject({ kind: "choice", auto: true, answer: "Approve", move: { step: "B", after: ["A", "C"] } });
+  expect(item!.diff).toContain("+ after: A, C");
+  expect(t.calls().some((c) => c[0] === "alert")).toBe(false);
+  expect(t.run((o) => inboxMain(["undo", "1"], o, t.env)).code).toBe(0);
+  expect(readFileSync(join(t.repos.demo!, "docs", "ROADMAP.md"), "utf8")).toContain("- after: none\n");
 });
 
-test("a rejected move changes nothing, and bad moves are refused", () => {
+test("bad moves are refused and change nothing", () => {
   const t = setup();
   expect(t.run((o) => moveMain(["demo", "Z", "--after", "A"], o, t.env)).text).toContain("no step 'Z'");
   expect(t.run((o) => moveMain(["demo", "A", "--after", "C"], o, t.env)).text).toContain("circular");
@@ -92,21 +87,15 @@ test("a rejected move changes nothing, and bad moves are refused", () => {
   expect(t.run((o) => moveMain(["demo"], o, t.env)).code).toBe(2);
   expect(t.run((o) => moveMain(["nope", "A", "--after", "B"], o, t.env)).code).toBe(1);
   expect(readItems(t.env)).toHaveLength(0);
-  expect(t.run((o) => moveMain(["demo", "B", "--after", "A"], o, t.env)).code).toBe(0);
-  const before = git(t.repos.demo!, "rev-parse", "HEAD");
-  expect(t.run((o) => inboxMain(["answer", "1", "Reject"], o, t.env)).code).toBe(0);
-  expect(git(t.repos.demo!, "rev-parse", "HEAD")).toBe(before);
-  expect(readItems(t.env)[0]!.answer).toBe("Reject");
 });
 
-test("an approved move waits when the project is not on main or its roadmap is edited", () => {
+test("a move waits when its roadmap is edited and not committed", () => {
   const t = setup();
-  moveMain(["demo", "B", "--after", "A"], () => {}, t.env);
   writeFileSync(join(t.repos.demo!, "docs", "ROADMAP.md"), `${readFileSync(join(t.repos.demo!, "docs", "ROADMAP.md"), "utf8")}\n`);
-  const r = t.run((o) => inboxMain(["answer", "1", "Approve"], o, t.env));
+  const r = t.run((o) => moveMain(["demo", "B", "--after", "A"], o, t.env));
   expect(r.code).toBe(1);
   expect(r.text).toContain("uncommitted");
-  expect(readItems(t.env)[0]!.answer).toBeUndefined();
+  expect(readItems(t.env)).toHaveLength(0);
 });
 
 test("setup makes a regular-mode space with pi, and plans go to the project's space, so no task event reaches it", () => {
@@ -150,19 +139,17 @@ test("status for many projects stays under 2000 tokens, and names the rest", () 
   expect(t.run((o) => status(o, t.env, "zzz")).code).toBe(1);
 });
 
-test("an approved move is pushed to the remote, and undone when the push fails", () => {
+test("a move is pushed to the remote, and undone when the push fails", () => {
   const t = setup();
   const remote = join(t.dir, "remote.git");
   git(t.dir, "init", "-q", "--bare", "-b", "main", remote);
   git(t.repos.demo!, "remote", "add", "origin", remote);
   git(t.repos.demo!, "push", "-q", "origin", "main");
-  moveMain(["demo", "B", "--after", "A"], () => {}, t.env);
-  expect(t.run((o) => inboxMain(["answer", "1", "Approve"], o, t.env)).code).toBe(0);
+  expect(t.run((o) => moveMain(["demo", "B", "--after", "A"], o, t.env)).code).toBe(0);
   expect(git(remote, "log", "-1", "--format=%s", "main")).toBe("Lineclear: move B after A\n");
-  moveMain(["demo", "C", "--after", "B"], () => {}, t.env);
   git(t.repos.demo!, "remote", "set-url", "origin", join(t.dir, "missing.git"));
   const head = git(t.repos.demo!, "rev-parse", "HEAD");
-  const r = t.run((o) => inboxMain(["answer", "2", "Approve"], o, t.env));
+  const r = t.run((o) => moveMain(["demo", "B", "--after", "A,C"], o, t.env));
   expect(r.code).toBe(1);
   expect(r.text).toContain("push failed");
   expect(git(t.repos.demo!, "rev-parse", "HEAD")).toBe(head);

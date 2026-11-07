@@ -3,7 +3,8 @@ import { expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { routeAsks } from "../src/asks.ts";
-import { askMain, readItems } from "../src/inbox.ts";
+import { askMain } from "../src/ask-command.ts";
+import { readItems } from "../src/inbox.ts";
 import { waitsMain } from "../src/waits.ts";
 import { setup } from "./rules-world.ts";
 

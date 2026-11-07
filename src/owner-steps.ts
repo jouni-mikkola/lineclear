@@ -35,13 +35,12 @@ export function ownerStepItem(a: Ask, step: Step): true {
     .join("\n");
   const item = addItem(
     {
-      kind: "step",
+      kind: "choice",
       task: "-",
       project: a.name,
       ownerStep: step.id,
       question: `${step.id} ${step.title} is yours to do by hand. Mark it done with the result. Its done-when:\n${doneWhen}`,
       choices: ["Done"],
-      alert: `${step.id} waits for you`,
       since: a.world.now().toISOString(),
     },
     a.env,
