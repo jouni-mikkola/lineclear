@@ -1,8 +1,7 @@
 # Plugins
 
-Everything is a plugin: places, coordinators, tasks, chat, reactions, artifacts, terminal, worktree, browser,
-health, alerts, keyboard, autopilot are the base ones, in `plugins/<name>/` and named in [plugins.json](../plugins.json).
-A task's side panel takes its items from plugins too (`taskPanel`: Terminal from terminal; Files, Diff and Pull request
+The base plugins are reactions, artifacts, worktree, browser, health, alerts and autopilot, in `plugins/<name>/` and named
+in [plugins.json](../plugins.json). A task's side panel takes its items from plugins too (Files, Diff and Pull request
 from worktree; Browser from browser). A plugin is a `server.ts`.
 
 ## Your own plugins
