@@ -22,9 +22,9 @@ export interface Finding {
 }
 
 const RULE_FILES = ["AGENTS.md", "CLAUDE.md", "REVIEW.md"];
-const CONTEXT_LINES = 20;
+const CONTEXT_LINES = 8;
 /** The diff and the rules are cut to this many characters each, so a huge change cannot overflow the model. */
-const PART_MAX = 150_000;
+const PART_MAX = 60_000;
 
 /** The repo's own rules, each file under its name. */
 function repoRules(repo: string): string {
@@ -34,7 +34,7 @@ function repoRules(repo: string): string {
     .slice(0, PART_MAX);
 }
 
-/** The change since the branch left its base, with 20 lines of context, committed or not. */
+/** The change since the branch left its base, with 8 lines of context, committed or not. */
 function diffAgainst(repo: string, base: string): string | undefined {
   const ref = [`origin/${base}`, base].find((r) => git(repo, "rev-parse", "--verify", "--quiet", r).ok);
   const from = ref && gitText(repo, "merge-base", ref, "HEAD");
@@ -107,7 +107,8 @@ export function review(i: ReviewInput, env: NodeJS.ProcessEnv = process.env): Re
   if (diff.trim() === "") return { ok: false, error: `${i.task} has no changes against ${i.base}` };
   const model = otherCompany(i.worker, i.reviewer);
   const note = model && i.worker && company(model) === company(i.worker) ? `the reviewer ${model} is from the worker's company` : undefined;
-  const run = askModel(reviewQuestion(i.brief, diff, repoRules(i.repo)), model, env.LINECLEAR_REVIEW, "LINECLEAR_REVIEW_MODEL", env);
+  const question = reviewQuestion(i.brief, diff, repoRules(i.repo));
+  const run = askModel(question, model, env.LINECLEAR_REVIEW, "LINECLEAR_REVIEW_MODEL", env);
   const text = run.stdout.toString().trim();
   if (run.exitCode !== 0 || text === "")
     return { ok: false, error: `the reviewer did not answer: ${run.stderr.toString().trim().split("\n")[0] || "no output"}` };
@@ -117,7 +118,10 @@ export function review(i: ReviewInput, env: NodeJS.ProcessEnv = process.env): Re
   recordWork(i.task, "review", env);
   const path = reviewPath(i.task, env);
   mkdirSync(dirname(path), { recursive: true });
-  writeAtomic(path, `${JSON.stringify({ task: i.task, model, time: new Date().toISOString(), findings }, null, 2)}\n`);
+  writeAtomic(
+    path,
+    `${JSON.stringify({ task: i.task, model, time: new Date().toISOString(), inputTokens: Math.ceil(question.length / 4), findings }, null, 2)}\n`,
+  );
   return { ok: true, findings, model, note };
 }
 
