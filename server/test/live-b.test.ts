@@ -1,4 +1,4 @@
-import { CATALOG, Settings, effortFor, pastTimes, span, readJson, writeJson } from './live-fixture.ts'
+import { Settings, effortFor, pastTimes, span, readJson, writeJson } from './live-fixture.ts'
 import { describe, expect, test } from 'bun:test'
 import { seedModels } from './model-fixture.ts'
 
