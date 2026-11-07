@@ -1,5 +1,5 @@
 import { serverBin } from "./paths.ts";
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DISPATCHER_MODEL, dispatcherDir } from "./dispatcher.ts";
 import { planProblems, plansAreAuto, readiness, stepFormProblems } from "./autoplan.ts";
@@ -12,9 +12,8 @@ import { sendToDispatcher } from "./chat.ts";
 import { planBrief } from "./plan-brief.ts";
 import { checkRoadmap } from "./roadmap.ts";
 import { checkSteps, NOGO_ROUNDS, type StepCheck, type StepCheckInput, type StepVerdict } from "./stepcheck.ts";
-import { decisionsPath } from "../pi/config.ts";
+import { addDecisions } from "./decisions-store.ts";
 import type { Decision } from "./rules.ts";
-import { configDir } from "../pi/config.ts";
 import { clearWait, findProject, findTask, writeWait } from "./waits.ts";
 import { mainBranch, mainRef } from "./main-branch.ts";
 import { git } from "./git.ts";
@@ -152,17 +151,15 @@ function endPlan(
   return 0;
 }
 
-/** Writes one line to decisions.jsonl, where the rule loop logs its choices. */
+/** Writes one line to the decisions table, where the rule loop logs its choices. */
 function logDecision(task: string, project: string | undefined, reason: string, env: NodeJS.ProcessEnv, now: () => Date): void {
-  mkdirSync(configDir(env), { recursive: true });
   const d: Decision = { time: now().toISOString(), project: project ?? "-", step: task, kind: "skip", reason };
-  appendFileSync(decisionsPath(env), `${JSON.stringify(d)}\n`);
+  addDecisions(env, [d]);
 }
 
 function logStall(task: string, project: string | undefined, reason: string, env: NodeJS.ProcessEnv, now: () => Date): void {
-  mkdirSync(configDir(env), { recursive: true });
   const d: Decision = { time: now().toISOString(), project: project ?? "-", step: task, kind: "stall", event: "stall", class: "command-failed", reason };
-  appendFileSync(decisionsPath(env), `${JSON.stringify(d)}\n`);
+  addDecisions(env, [d]);
 }
 
 interface Auto {

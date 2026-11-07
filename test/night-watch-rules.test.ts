@@ -1,6 +1,7 @@
 import assert from "node:assert";
 import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { addDecisions, type StoredDecision } from "../src/decisions-store.ts";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { inNight, nightWatch } from "../src/rules.ts";
@@ -25,8 +26,7 @@ describe("nightWatch", () => {
     return { home, env: { LINECLEAR_HOME: home, LINECLEAR_CONFIG: home } };
   };
   const night = new Date(2026, 0, 1, 23);
-  const log = (env: { LINECLEAR_CONFIG: string }, ds: object[]) =>
-    writeFileSync(join(env.LINECLEAR_CONFIG, "decisions.jsonl"), ds.map((d) => `${JSON.stringify(d)}\n`).join(""));
+  const log = (env: { LINECLEAR_CONFIG: string }, ds: StoredDecision[]) => addDecisions(env, ds);
   const stall = (time: Date, reason = "stall stuck-prompt: waits on a prompt") => ({
     time: time.toISOString(),
     project: "p",

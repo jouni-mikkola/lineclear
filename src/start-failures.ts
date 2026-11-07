@@ -1,5 +1,6 @@
 import type { Decision } from "./rules.ts";
-import { CLASS_INFO, type StallClass, classify, readDecisionsSince } from "./stall-class.ts";
+import { decisionsSince } from "./decisions-store.ts";
+import { CLASS_INFO, type StallClass, classify } from "./stall-class.ts";
 
 /** The name a start meant for the machine that runs the rule loop is recorded and printed under. */
 export const THIS_MACHINE = "this machine";
@@ -43,7 +44,7 @@ export function startsLine(m: MachineStarts): string {
   return `failed starts on ${m.machine} in 24 h: ${m.count}${causes ? ` (${causes})` : ""}`;
 }
 
-/** The failed starts the decisions file holds, for the machines doctor knows. */
-export function failedStartsIn(file: string, machines: string[], now: number): MachineStarts[] {
-  return failedStarts(readDecisionsSince(file, now - DAY_MS), machines, now);
+/** The failed starts the decisions table holds, for the machines doctor knows. */
+export function failedStartsIn(env: NodeJS.ProcessEnv, machines: string[], now: number): MachineStarts[] {
+  return failedStarts(decisionsSince<Decision>(env, now - DAY_MS), machines, now);
 }

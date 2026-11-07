@@ -1,7 +1,6 @@
-import { decisionsPath } from "../pi/config.ts";
 import type { Env, HomeWaiting } from "./home-data.ts";
 import type { Decision } from "./rules.ts";
-import { readDecisionsSince } from "./stall-class.ts";
+import { decisionsSince } from "./decisions-store.ts";
 
 /** The rule loop's reason for a skipped step in plain words: no lock names, and the step that holds a lock by its title. */
 function plainReason(reason: string, titleOf: (step: string) => string | undefined): string {
@@ -26,7 +25,7 @@ export function notStarted(
   now: number,
 ): HomeWaiting["notStarted"] {
   if (!project || !roadmap) return [];
-  const mine = readDecisionsSince(decisionsPath(env as NodeJS.ProcessEnv), now - TICK_WINDOW).filter((d) => d.project === project && d.kind === "skip");
+  const mine = decisionsSince<Decision>(env, now - TICK_WINDOW).filter((d) => d.project === project && d.kind === "skip");
   const titleOf = (id: string) => roadmap.titles.get(id);
   const whole = mine.findLast((d) => !d.step);
   const wholeAt = whole ? Date.parse(whole.time) : 0;

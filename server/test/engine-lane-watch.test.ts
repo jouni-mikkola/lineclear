@@ -1,8 +1,9 @@
 // The merge lane lets go of a head that hangs: no process under it, no progress, or a turn past its limit.
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { afterEach, expect, test } from 'bun:test'
+import { decisionsSince } from '../../src/decisions-store.ts'
 import { repo, sh, started, until, world } from './engine-world.ts'
 
 const configBefore = process.env.LINECLEAR_CONFIG
@@ -48,13 +49,7 @@ const hangs = (w: World, ids: string[]) => {
   }
 }
 
-const decisions = (config: string) =>
-  existsSync(join(config, 'decisions.jsonl'))
-    ? readFileSync(join(config, 'decisions.jsonl'), 'utf8')
-        .split('\n')
-        .filter(Boolean)
-        .map((l) => JSON.parse(l))
-    : []
+const decisions = (config: string) => decisionsSince({ LINECLEAR_CONFIG: config }, 0)
 
 // CI-quarantine: fails on a GitHub runner only, cause not found yet
 test.skipIf(Boolean(process.env.CI))(

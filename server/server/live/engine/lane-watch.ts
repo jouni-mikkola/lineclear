@@ -1,8 +1,6 @@
 // The watch on the head of a repo's merge lane: every step of it (fetch, rebase, check, merge) is read from the
 // processes under it, so a head that waits on nothing is let go instead of holding every merge behind it.
-import { appendFileSync, mkdirSync } from 'node:fs'
-import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { addDecisions } from '../../../../src/decisions-store.ts'
 
 /** a head whose processes show no progress for this long is released */
 const IDLE_MS = 15 * 60_000
@@ -59,11 +57,9 @@ export class HeadWatch {
   }
 }
 
-/** a line of the rule loop's decisions.jsonl */
+/** a row of the decisions table, where the rule loop logs its choices */
 export function decide(step: string, kind: string, reason: string) {
-  const dir = process.env.LINECLEAR_CONFIG || join(homedir(), '.config', 'lineclear')
-  mkdirSync(dir, { recursive: true })
-  appendFileSync(join(dir, 'decisions.jsonl'), `${JSON.stringify({ time: new Date().toISOString(), project: '-', step, kind, reason })}\n`)
+  addDecisions(process.env, [{ time: new Date().toISOString(), project: '-', step, kind, reason }])
 }
 
 /** the newest finished check.yml run on main */

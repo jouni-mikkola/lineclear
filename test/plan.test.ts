@@ -1,4 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
+import { decisionsSince } from "../src/decisions-store.ts";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, existsSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -129,7 +130,7 @@ test("submit sends an incomplete step back to the Dispatcher, logs it and adds n
   expect(r.code).toBe(1);
   expect(r.text).toContain("step B needs a done when with at least one item; known ids in after (unknown: Z9); a files line");
   expect(readItems(t.env)).toHaveLength(0);
-  expect(readFileSync(join(String(t.env.LINECLEAR_CONFIG), "decisions.jsonl"), "utf8")).toContain("step B needs");
+  expect(JSON.stringify(decisionsSince(t.env, 0))).toContain("step B needs");
 });
 
 test("approving a plan merges it", () => {
@@ -281,12 +282,7 @@ test("a step check that cannot run records a command-failed stall for the task",
   writeFileSync(file, JSON.stringify(settings));
   t.edit("B");
   expect(t.plan(["submit"]).code).toBe(1);
-  const last = JSON.parse(
-    readFileSync(join(String(t.env.LINECLEAR_CONFIG), "decisions.jsonl"), "utf8")
-      .trim()
-      .split("\n")
-      .at(-1) ?? "",
-  );
+  const last = decisionsSince(t.env, 0).at(-1);
   expect(last).toMatchObject({ kind: "stall", event: "stall", class: "command-failed", step: "LIN-5" });
 });
 

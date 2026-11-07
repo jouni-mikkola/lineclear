@@ -1,18 +1,14 @@
-// What a task runs (its agent, a review, the step check, the done proof) is written to decisions.jsonl
+// What a task runs (its agent, a review, the step check, the done proof) is written to the decisions table
 // with the machine it ran on.
 // A task stays on the machine it was started on: work found on another one is a fault.
-import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
-import { homedir, hostname } from "node:os";
-import { dirname, join } from "node:path";
+import { hostname } from "node:os";
+import { addDecisionOnce, decisionsSince } from "./decisions-store.ts";
 
 type Env = Record<string, string | undefined>;
 
 /** The machine this runs on: LINECLEAR_MACHINE, else the host name, as a folder name. */
 export const machineOf = (env: Env = process.env) =>
   ((env.LINECLEAR_MACHINE ?? "").split(".")[0] || hostname().split(".")[0] || "machine").replace(/[^A-Za-z0-9._-]+/g, "_");
-
-// the file pi/config.ts's decisionsPath names; the check-line module may not import pi
-const decisionsFile = (env: Env) => join(env.LINECLEAR_CONFIG ?? join(homedir(), ".config", "lineclear"), "decisions.jsonl");
 
 export type Work = "agent" | "review" | "stepcheck" | "doneproof";
 
@@ -28,18 +24,11 @@ export interface WorkLine {
 }
 
 const REPEAT_SPAN_MS = 30 * 60_000;
-const lastWritten = new Map<string, number>();
 
-/** One line of work done for `task` on this machine (or `machine` when the server acts for another). The same line again within half an hour is not written: a tick that starts the same agent over and over is one fact. */
+/** One line of work done for `task` on this machine (or `machine` when the server acts for another). The same line again in the same half hour is not written (a unique key): a tick that starts the same agent over and over is one fact. */
 export function recordWork(task: string, work: Work, env: Env = process.env, machine = machineOf(env), now = Date.now()): void {
-  const file = decisionsFile(env);
-  const key = `${file}\n${task}\n${work}\n${machine}`;
-  const before = lastWritten.get(key);
-  if (before !== undefined && now - before < REPEAT_SPAN_MS) return;
-  lastWritten.set(key, now);
-  mkdirSync(dirname(file), { recursive: true });
-  const line: WorkLine = { time: new Date().toISOString(), project: "-", step: task, kind: "run", work, machine, reason: `${work} ran on ${machine}` };
-  appendFileSync(file, `${JSON.stringify(line)}\n`);
+  const line: WorkLine = { time: new Date(now).toISOString(), project: "-", step: task, kind: "run", work, machine, reason: `${work} ran on ${machine}` };
+  addDecisionOnce(env, line, `${task}|${work}|${machine}|${Math.floor(now / REPEAT_SPAN_MS)}`);
 }
 
 const REVIEW_SPAN_MS = 30 * 60_000;
@@ -49,23 +38,13 @@ export function recordReviewCall(env: Env = process.env, now = Date.now()): void
   const task = /^([\w.-]+)\/Reviewer$/.exec(env.LINECLEAR_CHAT ?? "")?.[1];
   if (!task) return;
   const here = machineOf(env);
-  if (readWork(env).some((w) => w.work === "review" && w.step === task && w.machine === here && now - Date.parse(w.time) < REVIEW_SPAN_MS)) return;
+  if (
+    readWork(env, now - REVIEW_SPAN_MS).some((w) => w.work === "review" && w.step === task && w.machine === here && now - Date.parse(w.time) < REVIEW_SPAN_MS)
+  )
+    return;
   recordWork(task, "review", env);
 }
 
-export function readWork(env: Env = process.env): WorkLine[] {
-  let text = "";
-  try {
-    text = readFileSync(decisionsFile(env), "utf8");
-  } catch {
-    return [];
-  }
-  return text.split("\n").flatMap((l) => {
-    try {
-      const d = JSON.parse(l) as Partial<WorkLine>;
-      return d.kind === "run" && d.work && d.machine ? [d as WorkLine] : [];
-    } catch {
-      return [];
-    }
-  });
+export function readWork(env: Env = process.env, since = 0): WorkLine[] {
+  return decisionsSince<WorkLine>(env, since).filter((d) => d.kind === "run" && d.work && d.machine);
 }

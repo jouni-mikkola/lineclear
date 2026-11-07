@@ -1,7 +1,8 @@
 import { expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { decisionsPath, tick, type Decision, type State } from "../src/rules.ts";
+import { join } from "node:path";
+import { decisionsSince } from "../src/decisions-store.ts";
+import { tick, type Decision, type State } from "../src/rules.ts";
 import { CLASS_INFO, classify, STALL_CLASSES, watchStalls, type Observation } from "../src/stall-class.ts";
 import { stepStatuses, type Step, type Task } from "../src/roadmap.ts";
 import { recordTaskSteps } from "./helpers.ts";
@@ -45,11 +46,7 @@ function setup(list: T[] = [{ id: "LIN-5", title: "A Alpha", status: "work" }], 
     XDG_CACHE_HOME: join(dir, "cache"),
   };
   const { world, clock, log, adds, cards, tasks } = fakeWorld(env, list, ROADMAP, commits);
-  const decisions = (): Decision[] =>
-    readFileSync(decisionsPath(env), "utf8")
-      .trim()
-      .split("\n")
-      .map((l) => JSON.parse(l));
+  const decisions = () => decisionsSince<Decision>(env, 0);
   const jump = (ms: number) => {
     clock.at = new Date(clock.at.getTime() + ms);
     return tick(world, false, env);
@@ -148,22 +145,6 @@ test("a Paused project starts none of its steps, and that is no stall; Running a
   expect(t.adds.map((a) => a[0])).toEqual(["A Alpha"]);
 });
 
-test("old decisions rotate to the archive once a day and are still read back", async () => {
-  const { rotateDecisions, readDecisionsSince } = await import("../src/stall-class.ts");
-  const dir = scratchDir("rotate");
-  const file = join(dir, "decisions.jsonl");
-  const now = new Date("2026-11-01T12:00:00Z");
-  const at = (days: number) => new Date(now.getTime() - days * 86_400_000).toISOString();
-  const lines = [200, 120, 95, 30, 1].map((d, i) => JSON.stringify({ time: at(d), project: "p", step: `T${i}`, kind: "stall", reason: "r" }));
-  writeFileSync(file, `${lines.join("\n")}\n`);
-  expect(rotateDecisions(file, now)).toBe(3);
-  expect(readFileSync(file, "utf8").trim().split("\n")).toHaveLength(2);
-  expect(rotateDecisions(file, now)).toBe(0);
-  expect(readDecisionsSince(file, now.getTime() - 40 * 86_400_000).map((d) => d.step)).toEqual(["T3", "T4"]);
-  expect(readDecisionsSince(file, now.getTime() - 130 * 86_400_000).map((d) => d.step)).toEqual(["T1", "T2", "T3", "T4"]);
-  expect(readDecisionsSince(file, 0).map((d) => d.step)).toEqual(["T0", "T1", "T2", "T3", "T4"]);
-});
-
 test("a step's task holds its locks by the rules' record, never by a title", () => {
   const steps = [{ id: "A", title: "Alpha", phase: "p", after: ["none"], fields: {} }] as unknown as Step[];
   const titled = [{ id: "LIN-9", title: "A and B next", status: "need" }] as Task[];
@@ -174,15 +155,4 @@ test("a step's task holds its locks by the rules' record, never by a title", () 
 test("an unproven step is no stall: the done-when text gets no class", () => {
   const reason = `L13 is merged, unproven: Lineclear's checkStalls posts a "may be stuck" card after 20 min with no sign of life.`;
   expect(classify({ kind: "skip", reason })).toBeUndefined();
-});
-
-test("the loop cuts decisions.jsonl once a day by its own day mark", () => {
-  const t = setup();
-  t.step(0);
-  t.step(MIN);
-  const mark = join(dirname(decisionsPath(t.env)), "decisions-cut-day");
-  expect(readFileSync(mark, "utf8").trim()).toBe("2026-06-01");
-  t.jump(24 * 60 * MIN);
-  expect(readFileSync(mark, "utf8").trim()).toBe("2026-06-02");
-  expect(existsSync(join(dirname(decisionsPath(t.env)), "stalls-daily.jsonl"))).toBe(false);
 });

@@ -2,7 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { readItems } from "../src/inbox.ts";
-import { decisionsPath } from "../pi/config.ts";
+import { decisionsSince } from "../src/decisions-store.ts";
 import { reviewerFor } from "../src/stalls.ts";
 import { tick } from "../src/rules.ts";
 import { availability, parseReset, readAccounts, stallCards } from "../src/stalls.ts";
@@ -59,11 +59,7 @@ function setup(o: Opts = {}) {
   recordTaskSteps(config, Object.fromEntries((o.tasks ?? [{ id: "LIN-5", title: "A Alpha" }]).map((t) => [t.id, t.title.split(" ")[0] as string])));
   const stall = (id: string) => cards.push({ id, task: "LIN-5", at: clock.at.getTime() + cards.length + 1 });
   const lateStall = (id: string) => cards.push({ id, task: "LIN-5", at: clock.at.getTime() + cards.length + 1, late: true });
-  const decisions = () =>
-    readFileSync(decisionsPath(env), "utf8")
-      .trim()
-      .split("\n")
-      .map((l) => JSON.parse(l));
+  const decisions = () => decisionsSince(env, 0);
   return { env, world, log, adds, stall, lateStall, tick: (dry = false) => tick(world, dry, env), decisions, tasks, clock, starts, chat };
 }
 

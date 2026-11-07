@@ -14,6 +14,3 @@ export const readJson = (file: string): any => {
     return undefined;
   }
 };
-
-/** Where the rule loop logs its choices. */
-export const decisionsPath = (env: Record<string, string | undefined> = process.env): string => join(configDir(env), "decisions.jsonl");

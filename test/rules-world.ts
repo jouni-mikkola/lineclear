@@ -4,7 +4,7 @@ import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, wr
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readWaits, waitsMain } from "../src/waits.ts";
-import { decisionsPath } from "../pi/config.ts";
+import { decisionsSince } from "../src/decisions-store.ts";
 import { status as statusLines } from "../src/status.ts";
 import { realWorld, tick } from "../src/rules.ts";
 
@@ -117,13 +117,7 @@ esac`,
           .map((b) => b.split("\x01").slice(0, -1))
       : [];
   };
-  const decisions = () =>
-    existsSync(decisionsPath(env))
-      ? readFileSync(decisionsPath(env), "utf8")
-          .trim()
-          .split("\n")
-          .map((l) => JSON.parse(l))
-      : [];
+  const decisions = () => decisionsSince(env, 0);
   const now = { at: new Date() };
   const real = realWorld(env);
   const piCalls = () => (existsSync(join(fake, "pi.log")) ? readFileSync(join(fake, "pi.log"), "utf8").trim().split("\n") : []);

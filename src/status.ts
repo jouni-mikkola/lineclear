@@ -1,5 +1,4 @@
-import { decisionsPath } from "../pi/config.ts";
-import { readDecisionsSince } from "./stall-class.ts";
+import { decisionsSince } from "./decisions-store.ts";
 import { HOUR_MS } from "./time.ts";
 // `lineclear status`: what stops each project and each task, short enough for a chat or a phone.
 import { IDLE_TEXT } from "./cards.ts";
@@ -42,7 +41,7 @@ function needing(project: string, env: NodeJS.ProcessEnv): string[] {
 function recentReleases(env: NodeJS.ProcessEnv, now: number): { task: string; reason: string }[] {
   const seen = new Set<string>();
   const out: { task: string; reason: string }[] = [];
-  for (const d of readDecisionsSince(decisionsPath(env), now - HOUR_MS).reverse()) {
+  for (const d of decisionsSince(env, now - HOUR_MS).reverse()) {
     const m = d.kind === "stall" ? /^(?:released|restarted) (\S+)'s merge: (.*)$/.exec(d.reason) : null;
     if (!m?.[1] || seen.has(m[1])) continue;
     seen.add(m[1]);
