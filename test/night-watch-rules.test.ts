@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { inNight, nightWatch } from "../src/night-watch.ts";
+import { inNight, nightWatch } from "../src/rules.ts";
 
 describe("inNight", () => {
   test("a window that wraps past midnight", () => {

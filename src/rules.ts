@@ -9,13 +9,15 @@ import { freshDecisions } from "./decision-dedupe.ts";
 import { addItem, answerCard, closeItem, closeSettledUpdates, isOpen, type Item, readItems } from "./inbox.ts";
 import { listProjectNames, projectsDir, readSettings, type Settings } from "./project.ts";
 import type { Task } from "./roadmap.ts";
-import { cutDecisionsDaily, type StallEntry } from "./stall-class.ts";
+import { classify, cutDecisionsDaily, readDecisionsSince, type StallEntry } from "./stall-class.ts";
 import { holdProjectTick, type StartRecord } from "./starts.ts";
 import { tickProject } from "./tick-project.ts";
 import { sweepDiskUse } from "./disk-use.ts";
 import { sweepOldTemp } from "./tmpdirs.ts";
 import { holdWorld } from "./hold.ts";
-import { nightWatch } from "./night-watch.ts";
+import { DISPATCHER } from "./chat.ts";
+import { lineclearServer, postAction, readSnapshot } from "./lineclear-client.ts";
+import { dataDir } from "./paths.ts";
 import { serviceWaits } from "./wait-service.ts";
 import { clearWait, loadLimit, readWaits } from "./waits.ts";
 import { ownMark, realWorld, type World } from "./world.ts";
@@ -271,4 +273,80 @@ export async function runMain(args: string[], out: (l: string) => void, world: W
     sig.once("SIGINT", () => stop("SIGINT"));
     tickNow();
   });
+}
+
+type Env = Record<string, string | undefined>;
+
+/** True when `now` is inside a window like `22-7` (it may wrap past midnight); `off` is never night. */
+export function inNight(now: Date, window: string): boolean {
+  const m = /^(\d{1,2})-(\d{1,2})$/.exec(window);
+  if (!m) return false;
+  const [from, to, h] = [Number(m[1]), Number(m[2]), now.getHours()];
+  return from <= to ? h >= from && h < to : h >= from || h < to;
+}
+
+/** The loop's lines the Dispatcher should hear: a stall, or a skip that waits for the owner. */
+const worthHearing = (d: Decision) => (d.kind === "stall" && d.event === "stall") || (d.kind === "skip" && classify(d) === "owner");
+
+/** When tonight began, in ms: the last whole hour outside the night window, walking back from `now`. */
+function nightStart(now: Date, window: string): number {
+  let t = new Date(now).setMinutes(0, 0, 0);
+  for (let i = 0; i < 24 && inNight(new Date(t - 3_600_000), window); i++) t -= 3_600_000;
+  return t;
+}
+
+/** When the watch last sent, and when it last tried, in ms; 0 for never. */
+const lastTimes = (env: Env): { sent: number; tried: number } => {
+  try {
+    const t = JSON.parse(readFileSync(join(dataDir(env), "night-watch.json"), "utf8"));
+    return { sent: Number(t.sent) || 0, tried: Number(t.tried) || 0 };
+  } catch {
+    return { sent: 0, tried: 0 };
+  }
+};
+
+/** Sends the Dispatcher's chat a text through Lineclear's server; the reason when it cannot. */
+async function sendToDispatcher(text: string, env: Env): Promise<string | undefined> {
+  const base = lineclearServer(env);
+  if (!base) return "the board server is not running";
+  const key = DISPATCHER.find((await readSnapshot(base)) as Parameters<typeof DISPATCHER.find>[0]);
+  if (!key) return DISPATCHER.none;
+  const failed = await postAction(base, { type: "send", chat: key, text, attachments: [] }, 10_000, "the board server is away", "the board server is slow");
+  return failed?.error;
+}
+
+/**
+ * The rule loop's night part: at night, tells the Dispatcher what the rules found (a stall, a skip that waits for the
+ * owner) in running projects, since the last send or the start of the night. A quiet night sends nothing. A send that
+ * fails is tried again after 15 minutes, not every tick. Returns a decision line, or undefined when nothing was due.
+ */
+export async function nightWatch(
+  now: Date,
+  env: Env = process.env,
+  send: (text: string) => Promise<string | undefined> = (t) => sendToDispatcher(t, env),
+): Promise<string | undefined> {
+  const last = lastTimes(env);
+  const at = now.getTime();
+  const window = env.LINECLEAR_NIGHT_WATCH ?? "22-7";
+  if (!inNight(now, window) || at - last.tried < 15 * 60_000) return undefined;
+  const running = listProjectNames(env as NodeJS.ProcessEnv).filter((n) => {
+    const s = readSettings(n, env as NodeJS.ProcessEnv);
+    return typeof s !== "string" && !s.paused;
+  });
+  const since = Math.max(last.sent, nightStart(now, window));
+  const found = readDecisionsSince(decisionsPath(env as NodeJS.ProcessEnv), since).filter(
+    (d) => Date.parse(d.time) > since && running.includes(d.project) && worthHearing(d),
+  );
+  if (found.length === 0) return undefined;
+  const lines = [...new Set(found.map((d) => `- ${d.project}${d.step ? ` ${d.step}` : ""}: ${d.reason}`))];
+  const failed = await send(
+    [
+      "Night watch. The rules found this since the last message:",
+      ...lines,
+      "Fix what the rules allow (tell a task to go on). Ask the owner only for a login, money or something that leaves the machine.",
+    ].join("\n"),
+  );
+  writeAtomic(join(dataDir(env), "night-watch.json"), `${JSON.stringify({ sent: failed ? last.sent : at, tried: at })}\n`);
+  if (failed) return `night watch: the Dispatcher was not reached: ${failed}`;
+  return `night watch: sent the Dispatcher ${found.length} finding${found.length === 1 ? "" : "s"} for ${[...new Set(found.map((d) => d.project))].join(", ")}`;
 }
