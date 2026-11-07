@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import type { Settings } from "./project.ts";
 import type { Decision, State } from "./rules.ts";
 import type { World } from "./world.ts";
@@ -8,10 +10,10 @@ const LOOK_BACK = 10;
 /**
  * Promotes the newest of main's last commits whose `check` is green, with scripts/promote.ts, which refuses a red or
  * pending one. It tries at most once in 30 minutes and never while a merge runs, so main is installed from only when
- * it is quiet. Other machines follow the promoted build through the update path, not through a copy.
+ * it is quiet. Only Lineclear's own repo is promoted: another project has no scripts/promote.ts.
  */
 export function promoteGreen(name: string, settings: Settings, world: World, state: State, dryRun: boolean): Decision[] {
-  if (dryRun || !world.recentMain || !world.promote || settings.paused) return [];
+  if (dryRun || !world.recentMain || !world.promote || settings.paused || !existsSync(join(settings.repo, "scripts", "promote.ts"))) return [];
   const now = world.now().getTime();
   if (state.promote && now - state.promote.at < EVERY_MS) return [];
   const tasks = world.tasks(settings.space);
