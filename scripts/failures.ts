@@ -78,7 +78,12 @@ export function judgeFailures(failures: Failure[], failedAlone: Failure[], quara
   const flaky = failures.filter((f) => !failedAlone.includes(f));
   const quarantined = flaky.filter((f) => quarantine.some((q) => sameTest(q, f)));
   const unlisted = flaky.filter((f) => !quarantined.includes(f));
-  return { broken, quarantined, unlisted, full: quarantine.length > MAX_QUARANTINE || (unlisted.length > 0 && quarantine.length + unlisted.length > MAX_QUARANTINE) };
+  return {
+    broken,
+    quarantined,
+    unlisted,
+    full: quarantine.length > MAX_QUARANTINE || (unlisted.length > 0 && quarantine.length + unlisted.length > MAX_QUARANTINE),
+  };
 }
 
 /** Whether a step with these failures passes: nothing broke alone, and every flake is listed with room to spare. */

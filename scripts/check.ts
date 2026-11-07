@@ -255,7 +255,8 @@ async function runStep(step: Step): Promise<boolean> {
     for (const f of verdict.quarantined) console.log(`check: quarantined, failed then passed alone: ${f.file} > ${f.test}`);
     if (passes(verdict)) ok = true;
     else {
-      for (const f of verdict.unlisted) console.error(`check: flaked, passed alone: ${f.file} > ${f.test}: add it to test/quarantine.json with its fix task's id`);
+      for (const f of verdict.unlisted)
+        console.error(`check: flaked, passed alone: ${f.file} > ${f.test}: add it to test/quarantine.json with its fix task's id`);
       if (verdict.full) console.error("check: test/quarantine.json holds 5 tests at most: fix one before another goes in");
     }
   }
