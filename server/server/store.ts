@@ -3,7 +3,6 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { held } from './live/loop-lag.ts'
 
 /** where the server listens unless LINECLEAR_PORT says otherwise (7420 is the board's web pages) */
 export const DEFAULT_PORT = 7421
@@ -30,10 +29,6 @@ export function readJson<T>(name: string, fallback: T): T {
 const PRIVATE = new Set(['secrets.json', 'vapid.json', 'push.json'])
 
 export function writeJson(name: string, value: unknown) {
-  held(`store write ${name}`, () => writeJsonNow(name, value))
-}
-
-function writeJsonNow(name: string, value: unknown) {
   const f = join(HOME, name)
   mkdirSync(dirname(f), { recursive: true, mode: 0o700 })
   const tmp = `${f}.tmp`

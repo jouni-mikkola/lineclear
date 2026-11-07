@@ -8,12 +8,11 @@ import { HOME_SPACE, placeId } from './places.ts'
 import { carryOn } from './retry.ts'
 import { has } from '../plugins.ts'
 import { LiveSourceUpkeep } from './source-upkeep.ts'
-import { held } from './loop-lag.ts'
 
 export class LiveSource extends LiveSourceUpkeep implements Source {
   constructor() {
     super()
-    this.timers.push(setInterval(() => held('rule requested news', () => void this.drainRequestedNews()), 1000))
+    this.timers.push(setInterval(() => void this.drainRequestedNews(), 1000))
     this.agents.secretScope = (chat) => {
       const space = /^[^/]+\/(Agent|Reviewer)$/.test(chat)
         ? this.engine.task(chat.split('/')[0])?.project
@@ -28,7 +27,7 @@ export class LiveSource extends LiveSourceUpkeep implements Source {
     if (BOX) {
       // the Everywhere defaults: the main machine's, read from its settings as they change
       this.adoptEverywhere()
-      this.timers.push(setInterval(() => held('rule adopt everywhere', () => this.adoptEverywhere()), 3000))
+      this.timers.push(setInterval(() => this.adoptEverywhere(), 3000))
     }
     this.peers?.on('snapshot', () => {
       // another machine's task may be what a queued task here waits for
@@ -114,17 +113,12 @@ export class LiveSource extends LiveSourceUpkeep implements Source {
     // the space the machine's and All machines' coordinators shared is the home space's now; their agents close
     void this.agents.space(HOME_SPACE.label, HOME_SPACE.was).catch(() => undefined)
     // watched chats: read new log lines once a second; schedules once a minute
-    this.timers.push(setInterval(() => held('rule poll chats', () => this.pollChats()), 1000))
+    this.timers.push(setInterval(() => this.pollChats(), 1000))
     // a reply in a turn that goes on (or one only background work follows) changes no status: looked for here
-    this.timers.push(
-      setInterval(
-        () => held('rule fresh status', () => Object.keys(this.agents.records).forEach((k) => this.agents.status(k) !== 'gone' && this.fresh(k))),
-        5000,
-      ),
-    )
-    this.timers.push(setInterval(() => held('rule run schedules', () => this.runSchedules()), 60_000))
+    this.timers.push(setInterval(() => Object.keys(this.agents.records).forEach((k) => this.agents.status(k) !== 'gone' && this.fresh(k)), 5000))
+    this.timers.push(setInterval(() => this.runSchedules(), 60_000))
     this.timers.push(setInterval(() => this.emit('snapshot'), 30_000))
-    if (process.env.NODE_ENV !== 'test') this.timers.push(setInterval(() => held('rule health tick', () => this.healthTick()), 5000))
+    if (process.env.NODE_ENV !== 'test') this.timers.push(setInterval(() => this.healthTick(), 5000))
     if (process.env.NODE_ENV !== 'test') this.timers.push(setInterval(() => void this.revive().catch(() => undefined), 15_000))
   }
 }
