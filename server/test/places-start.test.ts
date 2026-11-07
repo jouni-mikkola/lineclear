@@ -1,7 +1,7 @@
-// Places starts on a fresh store (it writes an empty spaces.json) and on one that has spaces.json (it keeps it).
+// Places starts on a fresh store (no spaces) and on one that has spaces.json (it becomes rows once and stays).
 import { describe, expect, test } from 'bun:test'
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -19,17 +19,17 @@ function start(home: string): Array<{ name: string }> {
 }
 
 describe('Places start', () => {
-  test('a fresh store starts with no spaces and gets spaces.json', () => {
+  test('a fresh store starts with no spaces', () => {
     const home = mkdtempSync(join(tmpdir(), 'places-new-'))
     expect(start(home)).toEqual([])
-    expect(JSON.parse(readFileSync(join(home, 'spaces.json'), 'utf8'))).toEqual([])
   })
 
-  test('a store that has spaces.json starts with its spaces', () => {
+  test('a store that has spaces.json starts with its spaces, as rows from then on', () => {
     const home = mkdtempSync(join(tmpdir(), 'places-old-'))
     const spaces = [{ name: 'web', path: '/x/web', key: 'WEB', base: 'main' }]
     writeFileSync(join(home, 'spaces.json'), JSON.stringify(spaces))
     expect(start(home)).toEqual(spaces)
-    expect(JSON.parse(readFileSync(join(home, 'spaces.json'), 'utf8'))).toEqual(spaces)
+    expect(existsSync(join(home, 'spaces.json'))).toBe(false)
+    expect(start(home)).toEqual(spaces)
   })
 })

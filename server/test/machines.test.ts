@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { helperFiles, helperVersion } from '../server/live/install.ts'
 import type { BoxInfo } from '../server/live/box.ts'
+import { openStore } from '../server/store.ts'
 import { until } from './until.ts'
 
 const root = join(import.meta.dir, '..')
@@ -51,7 +52,12 @@ describe('a machine run from the main one', () => {
         asked.push([verb, key, value].filter(Boolean))
         if (verb === 'set') everywhere[key] = value
         else delete everywhere[key]
-        writeFileSync(join(main, 'settings.json'), JSON.stringify({ everywhere, machine: {}, spaces: {} }))
+        const store = openStore(join(main, 'store.sqlite'))
+        store.exec(
+          'create table if not exists settings (level text not null, key text not null, value text not null, primary key (level, key)); delete from settings',
+        )
+        for (const [k, v] of Object.entries(everywhere)) store.query("insert into settings (level, key, value) values ('all', ?, ?)").run(k, v)
+        store.close()
         return Response.json({ out: 'ok', code: 0 })
       },
     })

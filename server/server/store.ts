@@ -96,6 +96,21 @@ export const db: Database = new Proxy({} as Database, {
   },
 })
 
+/** What `read` finds in the main machine's store, as it is now (a worker for another machine has it in LINECLEAR_SHARED_HOME); none when there is none or it can't be read. */
+export function readMain<T>(read: (store: Database) => T): T | undefined {
+  const dir = process.env.LINECLEAR_SHARED_HOME
+  if (!dir) return undefined
+  let main: Database | undefined
+  try {
+    main = new Database(join(dir, 'store.sqlite'), { readonly: true })
+    return read(main)
+  } catch {
+    return undefined
+  } finally {
+    main?.close()
+  }
+}
+
 /** Runs `fn` in one write transaction: it all happens or none of it does. */
 export function tx<T>(fn: (store: Database) => T): T {
   return db.transaction(() => fn(db)).immediate()

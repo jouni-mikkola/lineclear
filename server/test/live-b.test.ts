@@ -1,5 +1,23 @@
-import { Settings, effortFor, pastTimes, span, readJson, writeJson } from './live-fixture.ts'
+import { Settings, effortFor, pastTimes, span, db, HOME, writeJson } from './live-fixture.ts'
 import { describe, expect, test } from 'bun:test'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
+
+/** the settings table as the three levels hold it */
+function stored() {
+  const rows = db.query('select level, key, value from settings').all() as { level: string; key: string; value: string }[]
+  const out: { everywhere: Record<string, string>; machine: Record<string, string>; spaces: Record<string, Record<string, string>> } = {
+    everywhere: {},
+    machine: {},
+    spaces: {},
+  }
+  for (const r of rows) {
+    if (r.level === 'all') out.everywhere[r.key] = r.value
+    else if (r.level === 'machine') out.machine[r.key] = r.value
+    else (out.spaces[r.level.slice(6)] ??= {})[r.key] = r.value
+  }
+  return out
+}
 
 describe('settings', () => {
   test('only app settings are left, set Everywhere; none belongs to a task', () => {
@@ -136,52 +154,24 @@ describe('settings', () => {
     expect(row('Backup', 'Model').options![1]).toBe('GPT-6.1-Sol')
     for (const k of ['task.agent', 'task.model', 'task.effort']) s.set(k, null)
   })
-  test("an older settings file keeps its app settings; its one CLI becomes the tasks' and the coordinators'", () => {
+  test('a settings.json of the three levels becomes rows once, without the keys and words Lineclear no longer has', () => {
     writeJson('settings.json', {
-      all: {
-        'coordinator.agent': 'pi',
-        'check.command': 'npm test',
-        'autopilot.hours': '9-18',
-        'autopilot.tasksPerDay': '3',
-        'wake.merged': 'now',
-        'heartbeat.every': '45 min',
-      },
-      'task:X-1': { 'merge.by': 'by itself' },
-    })
-    let s = new Settings()
-    expect(s.pick('task.agent')).toEqual({ value: 'pi', from: 'all' })
-    expect(s.pick('coordinator.agent')).toEqual({ value: 'pi', from: 'all' })
-    // coordinator timer's old limits, wake picks and heartbeat interval are dropped
-    s.set('task.agent', null)
-    expect(readJson('settings.json', {})).toEqual({ everywhere: { 'coordinator.agent': 'pi' }, machine: {}, spaces: {} })
-    // the Watcher's settings, from before agents reported their own progress, are dropped
-    writeJson('settings.json', { agent: 'pi', 'watcher.agent': 'Claude Code', 'watcher.effort': 'lowest' })
-    s = new Settings()
-    expect(s.get('task.agent')).toBe('pi')
-    expect(s.get('watcher.effort')).toBe('')
-    expect(s.sections([], []).some((x) => x.rows.some((r) => r.key.startsWith('watcher.')))).toBe(false)
-    s.set('task.agent', null)
-    s.set('coordinator.agent', null)
-  })
-  test('old review and merge words are dropped, not rewritten', () => {
-    writeJson('settings.json', {
-      everywhere: { 'brief.review': '2 rounds', 'brief.waitChecks': 'on', 'brief.merge': 'by itself' },
-      machine: {},
-      spaces: { web: { 'brief.merge': 'after your yes' } },
+      everywhere: { 'coordinator.agent': 'pi', 'brief.review': '2 rounds', 'wake.merged': 'now' },
+      machine: { 'machine.maxTasks': '8' },
+      spaces: { web: { 'brief.merge': 'after your yes', 'task.fallback': 'off' } },
     })
     const s = new Settings()
-    // the old words are no values: the key is dropped and the file is saved without it
-    expect(readJson('settings.json', {})).toEqual({ everywhere: {}, machine: {}, spaces: { web: {} } })
-    expect(s.get('brief.merge')).toBe('on its own')
-    expect(s.ways()).toMatchObject({ merge: 'on its own', waitChecks: false })
-    expect(s.ways('web').merge).toBe('on its own')
-    writeJson('settings.json', {})
+    expect(s.everywhere()).toEqual({ 'coordinator.agent': 'pi' })
+    expect(s.get('machine.maxTasks')).toBe('8')
+    expect(s.get('brief.merge', 'web')).toBe('on its own')
+    expect(s.get('task.fallback', 'web')).toBe('off')
+    expect(existsSync(join(HOME, 'settings.json'))).toBe(false)
+    db.exec('delete from settings')
   })
   test("defaults at three levels: a space's own win over its machine's, which win over Everywhere's", () => {
-    // today's one level becomes All machines; a machine's capacity was each machine's own and stays so
-    writeJson('settings.json', { 'brief.review': 'off', 'machine.maxTasks': '8' })
     const s = new Settings()
-    expect(readJson('settings.json', {})).toEqual({ 'brief.review': 'off', 'machine.maxTasks': '8' })
+    s.set('brief.review', 'off')
+    s.set('machine.maxTasks', '8', 'machine')
     expect(s.pick('brief.review')).toEqual({ value: 'off', from: 'all' })
     expect(s.pick('machine.maxTasks')).toEqual({ value: '8', from: 'machine' })
     expect(s.pick('task.fallback')).toEqual({ value: 'pi', from: 'default' })
@@ -196,7 +186,7 @@ describe('settings', () => {
     // a machine's capacity has no project level; alerts are one for all
     expect(s.set('machine.maxTasks', '2', { space: 'web' }).ok).toBe(false)
     expect(s.set('alerts', 'x', 'machine').ok).toBe(false)
-    expect(readJson<Record<string, unknown>>('settings.json', {})).toEqual({
+    expect(stored()).toEqual({
       everywhere: { 'brief.review': 'off' },
       machine: { 'machine.maxTasks': '8', 'task.fallback': 'off' },
       spaces: { web: { 'task.fallback': 'pi', 'brief.review': 'on' } },
@@ -220,7 +210,7 @@ describe('settings', () => {
     // the other machines take the main one's All machines
     expect(s.adopt({ 'brief.review': 'on', nonsense: 'x' })).toBe(true)
     expect(s.everywhere()).toEqual({ 'brief.review': 'on' })
-    writeJson('settings.json', {})
+    db.exec('delete from settings')
   })
   test("a task's backup agent is pi unless set: any CLI herdr starts, or off", () => {
     const s = new Settings()

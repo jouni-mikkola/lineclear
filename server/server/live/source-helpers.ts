@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Task } from '../../shared/types.ts'
+import { readMain } from '../store.ts'
 import type { Parsed } from './args.ts'
 
 /** how long one line of another space's news may be for the main machine's home space */
@@ -48,15 +49,10 @@ export async function mainCli(args: string[], chat?: string): Promise<{ out: str
   }
 }
 
-/** a worker's Everywhere defaults: the main machine's settings file, as it is now */
+/** a worker's Everywhere defaults: the main machine's settings table, as it is now */
 export function sharedEverywhere(): Record<string, string> | null {
-  const dir = process.env.LINECLEAR_SHARED_HOME
-  if (!dir) return null
-  try {
-    return (JSON.parse(readFileSync(join(dir, 'settings.json'), 'utf8')) as { everywhere?: Record<string, string> }).everywhere ?? null
-  } catch {
-    return null
-  }
+  const rows = readMain((s) => s.query("select key, value from settings where level = 'all'").all() as { key: string; value: string }[])
+  return rows ? Object.fromEntries(rows.map((r) => [r.key, r.value])) : null
 }
 
 /** Preserve all task options when a helper asks for a task on another machine. */

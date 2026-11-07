@@ -9,6 +9,7 @@ import { cpus, homedir, tmpdir } from 'node:os'
 import type { HealthLevel, HealthMeter } from '../../shared/types.ts'
 import type { MachineLimits } from './settings.ts'
 import { BOX } from './box.ts'
+import { db, importOnce, tx } from '../store.ts'
 import { clock } from '../../shared/time.ts'
 
 const SAMPLE_MS = 30_000
@@ -341,6 +342,24 @@ export function healthWords(e: HealthEvent, l: MachineLimits): { words: string; 
   }
   const i = over ? 0 : 1
   return { words: words[e.kind][i], card: card[e.kind][i] }
+}
+
+/** what was told, kept in the health table (one row per kind): an old health.json becomes rows once */
+export const storedWatch = {
+  read(): Partial<Record<Kind, Watch>> {
+    db.exec('create table if not exists health (kind text primary key, data text not null)')
+    importOnce<Partial<Record<Kind, Watch>>>('health.json', (old, store) => {
+      for (const [kind, w] of Object.entries(old)) store.query('insert or replace into health (kind, data) values (?, ?)').run(kind, JSON.stringify(w))
+    })
+    const rows = db.query('select kind, data from health').all() as { kind: Kind; data: string }[]
+    return Object.fromEntries(rows.map((r) => [r.kind, JSON.parse(r.data) as Watch]))
+  },
+  write(all: Partial<Record<Kind, Watch>>) {
+    tx((store) => {
+      store.exec('delete from health')
+      for (const [kind, w] of Object.entries(all)) store.query('insert into health (kind, data) values (?, ?)').run(kind, JSON.stringify(w))
+    })
+  },
 }
 
 /**
