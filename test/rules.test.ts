@@ -177,83 +177,15 @@ test("a broken roadmap starts nothing and shows in status", async () => {
   expect(await status(t)).toContain("roadmap broken, nothing starts");
 });
 
-test("a failing health command starts one fix task; a second failure in a row stops starts", async () => {
-  const t = setup({ steps: [step("A", "none")], health: "echo boom-output; exit 1", max: 5 });
-  const first = t.doTick();
-  expect(first.map((x) => `${x.step ?? "-"}:${x.kind}`)).toEqual(["-:start", "A:start"]);
-  const fix = t.adds()[0]!;
-  expect(fix[2]).toStartWith("Fix health");
-  expect(fix[fix.indexOf("--brief") + 1]).toContain("boom-output");
-
-  // Same head: the command is not run again and no second fix starts.
-  writeFileSync(
-    join(t.fake, "tasks.json"),
-    JSON.stringify([
-      { title: "A Title A", status: "work" },
-      { title: "Fix health x", status: "work" },
-    ]),
-  );
-  expect(t.doTick().filter((x) => x.step === undefined)).toHaveLength(0);
-  expect(t.adds()).toHaveLength(2);
-
-  // Main moves and the command fails again: stopped.
-  t.git("commit", "-q", "--allow-empty", "-m", "merge two");
-  t.git("update-ref", "refs/remotes/origin/main", "HEAD");
-  const second = t.doTick();
-  expect(second.some((x) => x.reason.includes("failed twice in a row"))).toBe(true);
-  expect(second.some((x) => x.kind === "start")).toBe(false);
+test("main marked red by the board stops new starts, and no health command runs", async () => {
+  const t = setup({ steps: [step("A", "none")], max: 5, red: true, settings: { health: "touch ran-health" } });
+  const d = t.doTick();
+  expect(d.some((x) => x.kind === "start")).toBe(false);
+  expect(d.find((x) => x.step === "A")!.reason).toContain("main is red");
+  expect(t.adds()).toHaveLength(0);
   expect(readState("demo", t.env).stopped).toBe(true);
-  expect(await status(t)).toContain("failed twice in a row");
-
-  // A passing result clears it.
-  writeFileSync(
-    join(t.dir, "config", "projects", "demo", "settings.json"),
-    JSON.stringify({
-      ...JSON.parse(readFileSync(join(t.dir, "config", "projects", "demo", "settings.json"), "utf8")),
-      health: "true",
-    }),
-  );
-  t.git("commit", "-q", "--allow-empty", "-m", "merge three");
-  t.git("update-ref", "refs/remotes/origin/main", "HEAD");
-  t.doTick();
-  expect(readState("demo", t.env).stopped).toBe(false);
-});
-
-test("two failed health commands in a row revert the last merge, push the revert, and the Inbox says so", () => {
-  const t = setup({ steps: [step("A", "none")], health: "exit 1", max: 5 });
-  // A bare remote that main is pushed to, as a real project has.
-  const remote = join(t.dir, "remote.git");
-  Bun.spawnSync(["git", "init", "-q", "--bare", "-b", "main", remote]);
-  t.git("remote", "add", "origin", remote);
-  t.git("config", "user.name", "t");
-  t.git("config", "user.email", "t@t");
-  t.git("push", "-q", "origin", "HEAD:main");
-  t.doTick(); // first failure: a fix task starts
-  writeFileSync(join(t.repo, "broken.txt"), "x\n");
-  t.git("add", "-A");
-  t.git("commit", "-q", "-m", "LIN-9: A breaks main");
-  t.git("push", "-q", "origin", "HEAD:main");
-  t.git("update-ref", "refs/remotes/origin/main", "HEAD");
-  const second = t.doTick();
-  expect(second.some((x) => x.reason.includes("failed twice in a row") && x.reason.includes("the merge was reverted"))).toBe(true);
-  const log = Bun.spawnSync(["git", "-C", remote, "log", "--format=%s", "-n", "2", "main"]).stdout.toString().trim().split("\n");
-  expect(log).toEqual(['Revert "LIN-9: A breaks main"', "LIN-9: A breaks main"]);
-  expect(Bun.spawnSync(["git", "-C", remote, "ls-tree", "--name-only", "main"]).stdout.toString()).not.toContain("broken.txt");
-  const [item] = readItems(t.env).filter((i) => i.kind === "stuck");
-  expect(item!.question).toContain("was reverted");
-  expect(item!.question).toContain("LIN-9: A breaks main");
-  expect(item!.alert).toBe("Main is red");
-  expect(t.calls().some((c) => c.startsWith("alert"))).toBe(false);
-});
-
-test("a last commit that is not a task's merge is not reverted, and the Inbox says so", () => {
-  const t = setup({ steps: [], health: "exit 1" });
-  t.doTick();
-  t.git("commit", "-q", "--allow-empty", "-m", "by hand");
-  t.git("update-ref", "refs/remotes/origin/main", "HEAD");
-  const second = t.doTick();
-  expect(second.some((x) => x.reason.includes("not a task's merge"))).toBe(true);
-  expect(readItems(t.env).find((i) => i.kind === "stuck")!.question).toContain("so it was not reverted");
+  expect(existsSync(join(t.repo, "ran-health"))).toBe(false);
+  expect(await status(t)).toContain("main is red");
 });
 
 test("a reviewer from the worker's company, or one pi does not offer, is skipped", () => {
@@ -339,7 +271,7 @@ test("a skip is written when it starts and when it ends, not while only its numb
 });
 
 test("--once --dry-run prints the decisions and changes nothing", async () => {
-  const t = setup({ steps: [step("A", "none")], health: "exit 1" });
+  const t = setup({ steps: [step("A", "none")] });
   const lines: string[] = [];
   // runMain ticks with the process env, so the test's world is put there for the call: nothing reaches the real projects
   const saved = { ...process.env };
@@ -377,19 +309,6 @@ test("the brief lists each done-when line once", () => {
   const brief = add[add.indexOf("--brief") + 1]!;
   expect(brief.split("first A")).toHaveLength(2);
   expect(brief.split("second A")).toHaveLength(2);
-});
-
-test("the health command is not run while the repo folder is behind origin/main", () => {
-  const t = setup({ steps: [], health: "exit 1" });
-  t.git("commit", "-q", "--allow-empty", "-m", "newer");
-  t.git("update-ref", "refs/remotes/origin/main", "HEAD");
-  t.git("reset", "-q", "--hard", "HEAD~1");
-  // a change in the folder keeps it from following main, whatever branch git init named
-  writeFileSync(join(t.repo, "local-change"), "");
-  const d = t.doTick();
-  expect(d).toHaveLength(1);
-  expect(d[0]?.reason).toContain("not at origin/main");
-  expect(t.adds()).toHaveLength(0);
 });
 
 test("the roadmap is read from origin/main, and the folder follows main when it can", () => {

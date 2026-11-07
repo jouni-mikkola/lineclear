@@ -344,23 +344,6 @@ export function serviceAccounts(a: Args): void {
 }
 
 /**
- * The merge lane's last rule: main failed its health command twice in a row, so the last merge is reverted and the
- * Inbox says so. Only a task's merge (a subject `<TASK>: ...`) is reverted, never a commit made by hand. Returns what happened.
- */
-export function revertLast(project: string, settings: Settings, world: World, head: string, subject: string, env = process.env): string {
-  const short = head.slice(0, 7);
-  const merge = /^[A-Za-z][A-Za-z0-9]*-\d+: /.test(subject);
-  const error = merge ? world.revert(settings.repo, head) : undefined;
-  const result = !merge ? "it is not a task's merge, so it was not reverted" : error ? `the revert failed: ${error.split("\n")[0]}` : "the merge was reverted";
-  const question =
-    merge && !error
-      ? `${project}: main failed its health command twice in a row, so the merge that first broke it, ${subject} (${short}), was reverted. New starts are stopped until main is healthy.`
-      : `${project}: main failed its health command twice in a row at ${short} (${subject}), and ${result}. New starts are stopped until main is healthy.`;
-  addItem({ kind: "stuck", task: "-", project, question, choices: ["Ok"], alert: "Main is red", since: world.now().toISOString() }, env);
-  return result;
-}
-
-/**
  * The first reviewer that pi offers, that has room, and that is from another company than the worker. When none is,
  * a different model of the worker's own company: it never blocks a start.
  */

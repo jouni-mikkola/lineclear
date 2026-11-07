@@ -22,7 +22,8 @@ interface Opts {
   commits?: string[];
   tasks?: { id?: string; title: string; status: string; sub?: string; closed?: boolean; closedBy?: "done" | "close"; orphaned?: boolean }[];
   max?: number;
-  health?: string;
+  /** The board has marked the head of main red. */
+  red?: boolean;
   models?: string;
   worker?: string[];
   reviewer?: string[];
@@ -98,7 +99,6 @@ esac`,
       space: o.space ?? "demo",
       check: "bun run check",
       ...o.settings,
-      ...(o.health ? { health: o.health } : {}),
       ...(o.rounds ? { reviewRounds: o.rounds } : {}),
       models: {
         worker: o.worker ?? ["anthropic/claude-sonnet-5-5"],
@@ -107,6 +107,11 @@ esac`,
     }),
   );
   writeFileSync(join(config, "machine.json"), JSON.stringify(o.machine ?? { loadPerCore: 1e6 }));
+  if (o.red) {
+    const head = Bun.spawnSync(["git", "-C", repo, "rev-parse", "HEAD"]).stdout.toString().trim();
+    mkdirSync(env.LINECLEAR_HOME, { recursive: true });
+    writeFileSync(join(env.LINECLEAR_HOME, "tasks.json"), JSON.stringify({ tasks: [], red: { [repo]: head } }));
+  }
   const calls = () => (existsSync(join(fake, "calls.log")) ? readFileSync(join(fake, "calls.log"), "utf8").trim().split("\n") : []);
   const adds = () => {
     const f = join(fake, "adds.log");

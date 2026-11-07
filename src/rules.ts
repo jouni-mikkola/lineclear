@@ -43,12 +43,8 @@ export interface Decision {
   machine?: string;
 }
 
-/** What survives a restart for one project: the last health result and the last decision per step. */
+/** What survives a restart for one project: whether main is red and the last decision per step. */
 export interface State extends StartRecord {
-  healthHead?: string;
-  healthFailures: number;
-  /** the first failing head of a run of failures, and its subject: the merge that broke main, which the revert undoes */
-  firstFailed?: { head: string; subject: string };
   stopped: boolean;
   roadmapErrors: string[];
   last: Record<string, string>;
@@ -79,7 +75,7 @@ export interface State extends StartRecord {
   /** Owner-only steps with the Inbox item that asks the owner; the owner's Done answer ends the step. */
   ownerItems?: Record<string, number>;
 }
-const emptyState = (): State => ({ healthFailures: 0, stopped: false, roadmapErrors: [], last: {}, ladder: {}, models: {}, handed: [], starts: {} });
+const emptyState = (): State => ({ stopped: false, roadmapErrors: [], last: {}, ladder: {}, models: {}, handed: [], starts: {} });
 const statePath = (name: string, env = process.env) => join(projectsDir(env), name, "state.json");
 
 /** The state and the text it came from, so a tick writes the file only when the state changed. A missing file is empty; an unreadable one throws a line that names it. */
