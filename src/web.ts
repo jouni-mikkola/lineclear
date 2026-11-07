@@ -3,7 +3,7 @@ import type { HomeData } from "./home-data.ts";
 import { type ProjectsFeed, projectsFeed, readProjects as readProjectsNow } from "./projects-feed.ts";
 import type { RoadmapRead } from "./roadmap-view.ts";
 import { type Aside, type Kept, keptAside, readAside } from "./read-aside.ts";
-import { type Pusher, watchInbox, watchInboxFolder } from "./notify.ts";
+import { type Pusher, pushOnChange, watchInboxFolder } from "./notify.ts";
 import { dispatcherChat, taskChatLinks } from "./chat.ts";
 import { taskTerminalLinks } from "./task-live.ts";
 import { apiAnswer, liveHub } from "./live.ts";
@@ -93,14 +93,15 @@ export function webHandler(dir: string, env: Env = process.env, push?: Promise<P
   const live = liveHub(api, "/api/home"); // the slow reads start with the server, so the first page finds them done
   // an Inbox item written or closed reaches the open pages in about 3 s at most, not at the next beat of their stream; the api keeps what it read for a second, so the views are read after that
   let changed: ReturnType<typeof setTimeout> | undefined;
+  // each new Inbox item reaches the devices that allowed alerts
+  let tellNew: (() => void) | undefined;
   const unwatchFolder = watchInboxFolder(env, () => {
+    tellNew?.();
     clearTimeout(changed);
     changed = setTimeout(live.refresh, 1100);
   });
-  // each new Inbox item reaches the devices that allowed alerts
-  let unwatch: (() => void) | undefined;
   void push?.then(
-    (p) => (unwatch = watchInbox(p, env as NodeJS.ProcessEnv)),
+    (p) => (tellNew = pushOnChange(p, env as NodeJS.ProcessEnv)),
     (e) => console.error(`lineclear: no push: ${(e as Error).message}`),
   );
   return {
@@ -114,7 +115,7 @@ export function webHandler(dir: string, env: Env = process.env, push?: Promise<P
       return res;
     },
     stop() {
-      unwatch?.();
+      tellNew = undefined;
       unwatchFolder();
       clearTimeout(changed);
       projects?.stop();

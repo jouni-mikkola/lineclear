@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { addItem, closeSettledUpdates, isOpen, readItems } from "../src/inbox.ts";
+import { addItem, closeSettledUpdates, isOpen, readAllItems, readItems } from "../src/inbox.ts";
 import { tmp } from "./helpers.ts";
 
 const git = (cwd: string, ...a: string[]) =>
@@ -46,7 +46,7 @@ test("an update notice closes when the machine runs a newer commit", () => {
   const m = machine();
   m.notice(m.first);
   closeSettledUpdates(new Date(), m.vars);
-  expect(readItems(m.vars)[0]?.closed).toContain("or a newer version");
+  expect(readAllItems(m.vars)[0]?.closed).toContain("or a newer version");
 });
 
 test("a notice stays while the machine is on the version before the update", () => {

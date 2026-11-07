@@ -1,7 +1,7 @@
 import { afterAll, expect, test } from "bun:test";
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { addItem, closeItem } from "../src/inbox.ts";
+import { addItem, closeItem, readItems } from "../src/inbox.ts";
 import { alertOf, notifyNew, type Pusher, realPush } from "../src/notify.ts";
 import { PAGE_TOKEN, webApi } from "../src/web.ts";
 import { tmp } from "./helpers.ts";
@@ -88,6 +88,27 @@ test("each new Inbox item is one push to each device, and old items are not anno
   step(e, "B?");
   expect(await notifyNew(push, e as never)).toBe(2);
   expect(sent).toHaveLength(6);
+});
+
+test("with 1,000 closed items and nothing new, a look reads no item file", async () => {
+  const e = world("quiet");
+  const open = step(e, "Open?");
+  const closed = join(e.LINECLEAR_CONFIG!, "inbox", "closed");
+  mkdirSync(closed, { recursive: true });
+  for (let n = 2; n <= 1001; n++) writeFileSync(join(closed, `${n}.json`), "{ not json");
+  const { push } = await fakePush();
+  expect(await notifyNew(push, e as never)).toBe(0);
+  writeFileSync(join(e.LINECLEAR_CONFIG!, "inbox", `${open.n}.json`), "{ not json"); // read at all, it would be reported
+  const seen: string[] = [];
+  const report = console.error;
+  console.error = (...a: unknown[]) => void seen.push(a.join(" "));
+  try {
+    expect(await notifyNew(push, e as never)).toBe(0);
+    expect(readItems(e as never)).toEqual([]);
+  } finally {
+    console.error = report;
+  }
+  expect(seen).toHaveLength(1); // only readItems looked, and it reports a corrupt file once
 });
 
 test("main turning red is one push with its own title", async () => {

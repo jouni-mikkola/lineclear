@@ -1,6 +1,6 @@
 // The contract of inbox: items as rules, dispatcher, planner, measure and ui add, read and close them.
 import { expect, test } from "bun:test";
-import { addItem, closeItem, isOpen, readItems } from "../../src/inbox.ts";
+import { addItem, closeItem, isOpen, readAllItems, readItems } from "../../src/inbox.ts";
 import { tmp } from "../helpers.ts";
 
 const item = { kind: "outward" as const, task: "T-1", question: "Go?", choices: ["Go", "Not yet"], since: "2026-01-01T00:00:00Z" };
@@ -18,7 +18,8 @@ test("closeItem keeps the item, closed with its reason, and isOpen says no", () 
   const a = addItem(item, vars);
   expect(isOpen(a)).toBe(true);
   closeItem(a, "its task is over", new Date("2026-01-02T00:00:00Z"), vars);
-  const closed = readItems(vars)[0];
+  const closed = readAllItems(vars)[0];
+  expect(readItems(vars)).toEqual([]);
   expect(closed?.closed).toBe("its task is over");
   expect(closed && isOpen(closed)).toBe(false);
   expect(addItem(item, vars).n).toBe(2);

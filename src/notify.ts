@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { writeAtomic } from "../pi/atomic.ts";
-import { isOpen, type Item, KIND_LABEL, readItems } from "./inbox.ts";
+import { isOpen, type Item, itemNumbers, KIND_LABEL, readItems } from "./inbox.ts";
 import { configDir } from "../pi/config.ts";
 
 export type Alert = { id: string; from: string; title: string; body: string; go: { place: string; focus?: string }; tag: string };
@@ -37,35 +37,43 @@ export function alertOf(item: Item): Alert {
 
 /**
  * Sends one push for each open Inbox item newer than the last one told, and remembers the newest. The first look
- * only sets the mark: items from before are not announced. Returns how many were sent.
+ * only sets the mark: items from before are not announced. The file names say whether anything is newer, so when
+ * nothing is, no item is read. Returns how many were sent.
  */
 export async function notifyNew(push: Pusher, env: NodeJS.ProcessEnv = process.env): Promise<number> {
-  const items = readItems(env);
-  const newest = items.reduce((m, i) => Math.max(m, i.n), 0);
+  const newest = Math.max(0, ...itemNumbers(env));
   const mark = existsSync(markPath(env)) ? Number(readFileSync(markPath(env), "utf8")) : Number.NaN;
   if (!Number.isInteger(mark) || newest > mark) writeAtomic(markPath(env), `${newest}\n`);
-  if (!Number.isInteger(mark)) return 0;
+  if (!Number.isInteger(mark) || newest <= mark) return 0;
+  const items = readItems(env);
   const fresh = items.filter((i) => i.n > mark && isOpen(i));
   const count = items.filter(isOpen).length;
   for (const item of fresh) await push.send(alertOf(item), new Set(), { count, tags: [] });
   return fresh.length;
 }
 
-/** Looks for new items every `ms` and pushes them. Returns a function that stops it. */
-export function watchInbox(push: Pusher, env: NodeJS.ProcessEnv = process.env, ms = 2_000): () => void {
+/** Pushes the new items. Returns what to call when the Inbox folder changes: a call while one runs is run once more after it. */
+export function pushOnChange(push: Pusher, env: NodeJS.ProcessEnv = process.env): () => void {
   let busy = false;
-  const tick = () => {
-    if (busy) return;
+  let again = false;
+  const tick = (): void => {
+    if (busy) {
+      again = true;
+      return;
+    }
     busy = true;
     notifyNew(push, env)
       .catch((e) => console.error(`lineclear: a push failed: ${(e as Error).message}`))
       .finally(() => {
         busy = false;
+        if (again) {
+          again = false;
+          tick();
+        }
       });
   };
   tick();
-  const timer = setInterval(tick, ms);
-  return () => clearInterval(timer);
+  return tick;
 }
 
 /**

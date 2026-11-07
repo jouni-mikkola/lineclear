@@ -2,7 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { inboxMain } from "../src/inbox-answer.ts";
-import { addItem, readItems } from "../src/inbox.ts";
+import { addItem, readAllItems } from "../src/inbox.ts";
 import { sessionFolder } from "../src/measure.ts";
 import { decisionsPath } from "../pi/config.ts";
 import { realWorld, tick } from "../src/rules.ts";
@@ -45,7 +45,7 @@ test("an item of a done or gone task closes with its reason and its wait goes", 
   t.ask("LIN-2");
   t.ask("LIN-3"); // archived, so gone from the task list
   t.tick();
-  expect(readItems(t.env).map((i) => [i.task, i.closed])).toEqual([
+  expect(readAllItems(t.env).map((i) => [i.task, i.closed])).toEqual([
     ["LIN-1", "its task is done"],
     ["LIN-2", undefined],
     ["LIN-3", "its task is gone"],
@@ -60,7 +60,7 @@ test("an item asked with no project closes with its done task, and one of anothe
   addItem({ kind: "step", task: "LIN-1", question: "Look at the new UI?", choices: ["Got it"], since: "2026-06-01T09:00:00Z" }, t.env);
   addItem({ kind: "step", task: "OTHER-1", question: "Elsewhere?", choices: ["Yes"], since: "2026-06-01T09:00:00Z" }, t.env);
   t.tick();
-  expect(readItems(t.env).map((i) => [i.task, i.closed])).toEqual([
+  expect(readAllItems(t.env).map((i) => [i.task, i.closed])).toEqual([
     ["LIN-1", "its task is done"],
     ["OTHER-1", undefined],
   ]);
@@ -80,7 +80,7 @@ test("a stuck item and its wait close with a done task", () => {
     t.env,
   );
   t.tick();
-  expect(readItems(t.env)[0]!.closed).toBe("its task is done");
+  expect(readAllItems(t.env)[0]!.closed).toBe("its task is done");
 });
 
 test("an item closes when the owner wrote to its task after it was made", () => {
@@ -88,7 +88,7 @@ test("an item closes when the owner wrote to its task after it was made", () => 
   t.ask("LIN-2");
   t.wrote.add("LIN-2");
   t.tick();
-  expect(readItems(t.env)[0]!.closed).toBe("you wrote to its task after the item was made");
+  expect(readAllItems(t.env)[0]!.closed).toBe("you wrote to its task after the item was made");
   expect(existsSync(waitPath("LIN-2", t.env))).toBe(false);
   expect(readFileSync(decisionsPath(t.env), "utf8")).toContain("closed inbox item 1");
 });

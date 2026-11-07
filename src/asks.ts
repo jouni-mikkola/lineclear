@@ -1,10 +1,10 @@
 import { allowanceReset } from "./zone.ts";
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { writeAtomic } from "../pi/atomic.ts";
-import { readJson } from "../pi/config.ts";
+import { readJsonKept } from "./kept-read.ts";
 import { join } from "node:path";
 import { addItem, type InboxKind, stepRule } from "./inbox.ts";
-import { chatFiles, findSpace, lineclearDir, spaceTasks } from "./measure.ts";
+import { findSpace, lineclearDir, spaceTasks } from "./measure.ts";
 import { projectsDir } from "./project.ts";
 import { loadableTotps, secretNames, storedLogin, totpAdvice, totpAnswers } from "../server/server/live/secrets.ts";
 import { writeWait } from "./waits.ts";
@@ -111,7 +111,24 @@ export function ruleFor(card: Card, project: string, now: Date, env = process.en
   );
 }
 
-const routedPath = (project: string, env = process.env) => join(projectsDir(env), project, "asks-routed.json");
+const toldPath = (project: string, env = process.env) => join(projectsDir(env), project, "asks-told.json");
+
+/**
+ * The chat logs of a space's live tasks (`coordinatorOnly`: just the space's coordinator chat), each parsed again only
+ * when its file changed. A retired task's chat is in archive/chatlog and asks nothing, so it is not read.
+ */
+function liveChats(dir: string, space: { name: string; key: string }, coordinatorOnly = false): any[] {
+  const log = join(dir, "chatlog");
+  if (!existsSync(log)) return [];
+  const own = (f: string) => (!coordinatorOnly && f.startsWith(`${space.key}-`)) || (f.startsWith("p_") && f.endsWith(`_${space.name}.json`));
+  return readdirSync(log)
+    .flatMap((f) => (f.endsWith(".json") && own(f) ? [readJsonKept<any>(join(log, f))] : []))
+    .filter((d) => d !== undefined);
+}
+
+/** The ids of every card the live chats hold: a record of a card that left them has nothing to say any more. */
+const cardIds = (files: any[]): Set<string> =>
+  new Set(postsOf(files).flatMap((p) => [p?.card?.id, p?.id, p?.question?.id].filter((x): x is string => typeof x === "string")));
 
 /** Closes a card of a space's coordinator chat with an answer. Returns an error text, or undefined. */
 export type CardCloser = (space: string, id: string, answer: string) => string | undefined;
@@ -142,7 +159,7 @@ function routeCoordinator(project: string, space: { name: string; key: string },
   const dir = lineclearDir(env);
   const tasks = spaceTasks(dir, space);
   const ids = tasks.map((t) => String(t.id));
-  for (const card of coordinatorCards(chatFiles(dir, space, true), ids)) {
+  for (const card of coordinatorCards(liveChats(dir, space, true), ids)) {
     const task = tasks.find((t) => t.id === card.task);
     if (r.done.has(card.id) || task === undefined) continue;
     const keptByOwner = ownerMatter(title(card)) || (asksToMerge(title(card)) && /^- Merge: ask me first/m.test(String(task.desc ?? "")));
@@ -251,9 +268,10 @@ export function routeAsks(project: string, space: string, tell: Say, now: Date, 
   const dir = lineclearDir(env);
   const s = findSpace(dir, space, "");
   if (s === undefined) return [];
-  const round: Round = { tell, done: new Set(readJson(routedPath(project, env)) ?? []), now, dryRun, out: [] };
+  const saved = new Set(readJsonKept<string[]>(toldPath(project, env)) ?? []);
+  const round: Round = { tell, done: new Set(saved), now, dryRun, out: [] };
   const { done, out } = round;
-  const files = chatFiles(dir, s);
+  const files = liveChats(dir, s);
   const merging = new Set(spaceTasks(dir, s).flatMap((t) => (t.status === "merging" ? [String(t.id)] : [])));
   for (const { card } of closedReports(files)) {
     const id = String(card.id ?? "");
@@ -267,10 +285,14 @@ export function routeAsks(project: string, space: string, tell: Say, now: Date, 
     routeCard(card, at, id, merging.has(card.task), project, idle, env, round);
   }
   if (closeCard) routeCoordinator(project, s, round, closeCard, env);
-  for (const k of done) if (k.startsWith("nudge:") && now.getTime() - Number(k.split("@")[1]) >= HOUR_MS) done.delete(k);
-  if (!dryRun && done.size > 0) {
+  const live = cardIds([...files, ...liveChats(dir, s, true)]);
+  for (const k of done) {
+    const stale = k.startsWith("nudge:") ? now.getTime() - Number(k.split("@")[1]) >= HOUR_MS : !live.has(k.replace(/^told:/, ""));
+    if (stale) done.delete(k);
+  }
+  if (!dryRun && (done.size !== saved.size || [...done].some((k) => !saved.has(k)))) {
     mkdirSync(join(projectsDir(env), project), { recursive: true });
-    writeAtomic(routedPath(project, env), `${JSON.stringify([...done], null, 2)}\n`);
+    writeAtomic(toldPath(project, env), `${JSON.stringify([...done], null, 2)}\n`);
   }
   return out;
 }
