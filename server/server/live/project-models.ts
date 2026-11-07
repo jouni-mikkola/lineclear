@@ -10,6 +10,12 @@ export function projectModel(space: string, role: string): string | undefined {
   return project && typeof project !== 'string' ? project.models[list!][0] : undefined
 }
 
+/** The ordered model lists a space's tasks and reviews really run on; nothing when it has no project. */
+export function projectLists(space: string): { worker: string[]; reviewer: string[] } | undefined {
+  const project = readSettings(space)
+  return typeof project === 'string' ? undefined : project.models
+}
+
 /** Moves a model stored apart from the project to the head of its list. False when the space has no project. */
 export function adoptModel(space: string, role: string, model: string): boolean {
   const list = LIST[role]

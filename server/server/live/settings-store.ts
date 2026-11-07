@@ -301,15 +301,18 @@ export class Settings {
 
   /** every key with its value for a space (none: this machine) and where it comes from, as lineclear show prints
    *  them */
-  lines(space?: string, host = 'this machine') {
+  lines(space?: string, host = 'this machine', lists?: { worker?: string[]; reviewer?: string[] }) {
     const l: Level = space ? { space } : 'machine'
     const name = { space: 'this space', machine: host, all: 'Everywhere', default: 'default' }
     const keys = (told: boolean) =>
       CATALOG.filter((s) => !!(s.told || s.prompt) === told).flatMap((s) =>
         s.rows
-          .filter((r) => r.key !== 'alerts')
+          .filter((r) => r.key !== 'alerts' && r.key !== 'backup.model')
           .map((r) => {
             const p = this.pick(r.key, l)
+            // tasks and reviewers take their models from the space's ordered lists, so the stored model is not shown
+            const list = r.key === 'task.model' ? lists?.worker : r.key === 'reviewer.model' ? lists?.reviewer : undefined
+            if (list) return `${r.key.padEnd(22)} ${list.join(', then ')}  (Settings > Models)`
             return `${r.key.padEnd(22)} ${p.value}  (${name[p.from]})`
           }),
       )
