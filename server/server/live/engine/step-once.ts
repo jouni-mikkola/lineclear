@@ -3,8 +3,8 @@
 // start an agent that reads the brief and the repo for nothing.
 import { git } from './git.ts'
 
-/** The step id a title starts with (a letter prefix and a number, then a space), or undefined for a plain title. */
-export const stepIdOfTitle = (title: string) => /^([A-Za-z]+\d+) /.exec(title)?.[1]?.toUpperCase()
+/** The step id a title starts with (one capital letter and a number, then a space, as in the roadmap), or undefined for a plain title. */
+export const stepIdOfTitle = (title: string) => /^([A-Z]\d+) /.exec(title)?.[1]
 
 /** Commit messages, newest first, as `doneIds` in src/roadmap.ts reads them: this is its server-side twin. */
 interface Commit {
@@ -24,8 +24,8 @@ export function landedIn(commits: Commit[], id: string): boolean {
       continue
     }
     const m = /^[A-Za-z][A-Za-z0-9]*-\d+: (\S+)(?: |$)/.exec(c.subject)
-    if (m && m[1]!.toUpperCase() === id) return true
-    if (c.body.split('\n').some((l) => /^Step: (\S+)\s*$/.exec(l)?.[1]?.toUpperCase() === id)) return true
+    if (m && m[1] === id) return true
+    if (c.body.split('\n').some((l) => /^Step: (\S+)\s*$/.exec(l)?.[1] === id)) return true
   }
   return false
 }

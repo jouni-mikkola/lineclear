@@ -9,6 +9,7 @@ import { landedIn, stepIdOfTitle, whyStepRefused } from '../server/live/engine/s
 test('a step id is read from the start of a title', () => {
   expect(stepIdOfTitle('L461 One agent per step')).toBe('L461')
   expect(stepIdOfTitle('Fix the login')).toBeUndefined()
+  expect(stepIdOfTitle('IPv6 support')).toBeUndefined()
 })
 
 test('a reverted merge does not count as landed', () => {

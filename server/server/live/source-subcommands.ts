@@ -168,7 +168,7 @@ export class LiveSourceSubcommands extends LiveSourceActions {
       const pr = named && this.places.space(named) ? this.places.space(named)! : this.projectFor(p, ctx)
       await validateBase(pr.path, one(p, 'base') ?? pr.base)
       const open = this.engine.tasks.filter((x) => x.project === placeId.space(pr.name) && !x.archived && !ended(x))
-      const refused = whyStepRefused(title, open, stepIdOfTitle(title) && !one(p, 'reopened') ? await commitsOf(pr.path, one(p, 'base') ?? pr.base) : [])
+      const refused = whyStepRefused(title, open, stepIdOfTitle(title) && one(p, 'reopened') !== 'true' ? await commitsOf(pr.path, one(p, 'base') ?? pr.base) : [])
       if (refused) throw new Error(refused)
       const after = p.opts.after ?? []
       const agent = harnessOf(p, this.settings)
