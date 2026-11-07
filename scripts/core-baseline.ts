@@ -12,7 +12,16 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-type Task = { id: string; project: string; created: number; doneAt?: number; worktree: string; startMs?: { worktree: number; install: number; session: number }; briefResent?: unknown; mergeStopped?: unknown };
+type Task = {
+  id: string;
+  project: string;
+  created: number;
+  doneAt?: number;
+  worktree: string;
+  startMs?: { worktree: number; install: number; session: number };
+  briefResent?: unknown;
+  mergeStopped?: unknown;
+};
 type Usage = { input: number; output: number; cacheRead: number; cacheWrite: number };
 type Session = { role: "agent" | "reviewer"; firstToolCallAt?: number; usage: Usage };
 
