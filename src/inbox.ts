@@ -1,5 +1,5 @@
 import { pathsFor, serverBin } from "./paths.ts";
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync } from "node:fs";
 import { createAtomic, writeAtomic } from "../pi/atomic.ts";
 import { join } from "node:path";
 import { askBefore, readSettings } from "./project.ts";
