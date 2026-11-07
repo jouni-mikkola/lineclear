@@ -6,6 +6,7 @@ import { BOX, helperDir } from './box.ts'
 
 const OWN = BOX ? helperDir(BOX.home) : ROOT
 
+// the helper's copy on another machine
 const SKILLS = join(OWN, 'skill')
 const skill = (name: string) => join(SKILLS, name, 'SKILL.md')
 
