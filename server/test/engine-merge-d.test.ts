@@ -373,4 +373,39 @@ describe('on GitHub: news, checks and the default way in', () => {
   })
 })
 
+describe('one red stops the merges', () => {
+  test('3 tasks merge while main is red: the 2nd and 3rd are held until a green run', async () => {
+    const w = world()
+    const g = onGitHub()
+    const run = (headSha: string, conclusion: string, n: number) => ({
+      headSha,
+      status: 'completed',
+      conclusion,
+      url: `https://github.com/acme/app/actions/runs/${n}`,
+      workflowName: 'Check',
+    })
+    const tasks = []
+    for (const n of ['one', 'two', 'three']) {
+      const { t } = await started(w, g.dir, `redhold${n}`)
+      writeFileSync(join(t.worktree!, `${n}.txt`), `${n}\n`)
+      sh(`git add -A && git commit -qm ${n}`, t.worktree!)
+      tasks.push(t)
+    }
+    // the 1st merge is what turns main red
+    expect((await w.engine.merge(tasks[0].id, { self: true })).ok).toBe(true)
+    const red = sh('git rev-parse main', g.bare)
+    g.set({ runs: [run(red, 'failure', 3)] })
+    for (const t of tasks.slice(1)) {
+      const m = await w.engine.merge(t.id, { self: true })
+      expect(m.ok).toBe(false)
+      expect(m.error).toContain('held until a run')
+    }
+    expect(sh('git rev-parse main', g.bare)).toBe(red)
+    // a green run on the newest commit lets them through
+    g.set({ runs: [run(red, 'success', 4)] })
+    expect((await w.engine.merge(tasks[1].id, { self: true })).ok).toBe(true)
+    expect((await w.engine.merge(tasks[2].id, { self: true })).ok).toBe(true)
+  }, 240000)
+})
+
 afterEach(resetMergeSetting)

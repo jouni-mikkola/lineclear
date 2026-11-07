@@ -246,6 +246,18 @@ export class EngineLand extends EngineHandoff {
    * commit, then squash-merged on GitHub only while its head is still that commit, its branch there deleted, and main here brought up to GitHub's (which
    * is what Lineclear's own update watches). Failed checks go back to the agent.
    */
+  /**
+   * One red stops the merges: while the newest decided run on the base failed, a merge waits for a green run, so a burst
+   * of failures stays one. The task that fixes that red is the way out and is not held.
+   */
+  private async heldForRedMain(t: TaskRec, p: Space, g: G.GitHub): Promise<string | undefined> {
+    if (t.title.startsWith(`Fix ${p.base} red`)) return undefined
+    const runs = await GH.branchRuns(g, p.path, p.base)
+    const now = runs?.find((r) => r.state !== 'pending')
+    if (now?.state !== 'fail') return undefined
+    return `${p.base} is red at ${now.sha.slice(0, 7)} (${now.failed.map((x) => x.name).join(', ')}): ${t.id} is held until a run on ${p.base} is green. Nothing was merged.`
+  }
+
   protected async mergeOnGitHub(t: TaskRec, p: Space, g: G.GitHub, self: boolean): Promise<{ ok: boolean; error?: string; note?: string }> {
     const wt = t.worktree!
     const base = `origin/${t.base}`
@@ -267,6 +279,8 @@ export class EngineLand extends EngineHandoff {
     // merged on GitHub already (by hand, or a merge whose answer was lost): it only needs main here and marking
     if (pr?.state === 'MERGED') return this.mergedOnGitHub(t, p, `PR #${pr.number} was merged on GitHub already`)
     if ((await G.aheadCount(wt, t.base!)) === 0) return { ok: false, error: `${t.id} has no changes to merge` }
+    const held = await this.heldForRedMain(t, p, g)
+    if (held) return { ok: false, error: held }
     // GitHub squash-merges a branch behind main as it is: rebasing it would make a new commit, and all its checks run
     // again (again each time main moves meanwhile). Only a real conflict is rebased here; a clash that merges cleanly
     // but breaks is caught by the checks on main.
