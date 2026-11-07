@@ -34,8 +34,12 @@ export function writeJson(name: string, value: unknown) {
   const f = join(HOME, name)
   mkdirSync(dirname(f), { recursive: true, mode: 0o700 })
   const tmp = `${f}.tmp`
-  writeFileSync(tmp, JSON.stringify(value, null, 2), { mode: PRIVATE.has(name) ? 0o600 : 0o644 })
-  renameSync(tmp, f)
+  try {
+    writeFileSync(tmp, JSON.stringify(value, null, 2), { mode: PRIVATE.has(name) ? 0o600 : 0o644 })
+    renameSync(tmp, f)
+  } catch (e) {
+    throw new Error(`Can't write ${f} (${(e as Error).message})`)
+  }
 }
 
 const STORE_FILE = join(HOME, 'store.sqlite')

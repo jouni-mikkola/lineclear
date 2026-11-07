@@ -88,8 +88,8 @@ export class MachinesLinks extends LinkPoll {
       const chats = l.watching.chats.map((k) => l.chats.get(k)).filter((c): c is Chat => !!c)
       try {
         writeJson(join('machines', dirOf(l.rec.machine), 'last.json'), { saved: l.saved, probe: l.probe, chats } satisfies Kept)
-      } catch {
-        /* a full disk: the next start shows it once it answers */
+      } catch (e) {
+        console.error((e as Error).message)
       }
     }
     const t = this.keepTimers.get(l.rec.machine)
@@ -196,8 +196,8 @@ export class MachinesLinks extends LinkPoll {
     l.busy = true
     try {
       await this.look(l)
-    } catch {
-      /* the next restart or the doctor looks again */
+    } catch (e) {
+      console.error(`Can't look at ${l.rec.machine} again: ${(e as Error).message}`)
     } finally {
       l.busy = false
       this.emit('snapshot')
