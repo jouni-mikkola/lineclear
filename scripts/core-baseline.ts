@@ -76,10 +76,19 @@ function start(n: number): void {
 function tokens(n: number): void {
   const tasks = doneTasks(n);
   for (const role of ["agent", "reviewer"] as const) {
-    const per = tasks.map((t) => {
-      const u = sessionsOf(t).filter((s) => s.role === role).map((s) => s.usage);
-      return { fresh: u.reduce((a, x) => a + x.input + x.cacheWrite, 0), cached: u.reduce((a, x) => a + x.cacheRead, 0), out: u.reduce((a, x) => a + x.output, 0), has: u.length > 0 };
-    }).filter((p) => p.has);
+    const per = tasks
+      .map((t) => {
+        const u = sessionsOf(t)
+          .filter((s) => s.role === role)
+          .map((s) => s.usage);
+        return {
+          fresh: u.reduce((a, x) => a + x.input + x.cacheWrite, 0),
+          cached: u.reduce((a, x) => a + x.cacheRead, 0),
+          out: u.reduce((a, x) => a + x.output, 0),
+          has: u.length > 0,
+        };
+      })
+      .filter((p) => p.has);
     const k = (xs: number[]) => xs.map((x) => x / 1000);
     line(`${role} input (new, cache writes), k tokens per task`, k(per.map((p) => p.fresh)), "k", 0);
     line(`${role} input (cache reads), k tokens per task`, k(per.map((p) => p.cached)), "k", 0);
@@ -89,7 +98,10 @@ function tokens(n: number): void {
 
 function stalls(): void {
   const tasks = (JSON.parse(readFileSync(join(BOARD, "tasks.json"), "utf8")) as { tasks: Task[] }).tasks;
-  const chat = readdirSync(join(BOARD, "chatlog")).filter((f) => f.startsWith("p_")).map((f) => readFileSync(join(BOARD, "chatlog", f), "utf8")).join("\n");
+  const chat = readdirSync(join(BOARD, "chatlog"))
+    .filter((f) => f.startsWith("p_"))
+    .map((f) => readFileSync(join(BOARD, "chatlog", f), "utf8"))
+    .join("\n");
   const stalled = (chat.match(/may be stuck|may have stalled/g) ?? []).length;
   for (const [machine, ts] of Object.entries(Object.groupBy(tasks, (t) => t.project.split(":")[1] ?? "?"))) {
     const list = ts ?? [];
@@ -97,12 +109,18 @@ function stalls(): void {
     const last = Math.max(...list.map((t) => t.doneAt ?? t.created));
     const hours = (last - first) / 3.6e6;
     const retried = list.filter((t) => t.briefResent).length;
-    console.log(`${machine}: ${list.length} tasks over ${hours.toFixed(1)} h; stall cards in chat ${stalled} total (${(stalled / hours).toFixed(2)} per h); starts that needed the brief sent again ${retried}`);
+    console.log(
+      `${machine}: ${list.length} tasks over ${hours.toFixed(1)} h; stall cards in chat ${stalled} total (${(stalled / hours).toFixed(2)} per h); starts that needed the brief sent again ${retried}`,
+    );
   }
 }
 
 function gh(n: number): void {
-  const out = spawnSync("gh", ["run", "list", "--workflow", "check.yml", "--branch", "main", "--limit", String(n), "--json", "databaseId,startedAt,updatedAt"], { encoding: "utf8" });
+  const out = spawnSync(
+    "gh",
+    ["run", "list", "--workflow", "check.yml", "--branch", "main", "--limit", String(n), "--json", "databaseId,startedAt,updatedAt"],
+    { encoding: "utf8" },
+  );
   const runs = JSON.parse(out.stdout) as { databaseId: number; startedAt: string; updatedAt: string }[];
   const byJob = new Map<string, number[]>();
   const whole: number[] = [];
