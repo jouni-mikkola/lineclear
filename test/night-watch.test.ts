@@ -58,6 +58,19 @@ describe("nightWatch", () => {
     rmSync(home, { recursive: true, force: true });
   });
 
+  test("a skip that waits for the owner is sent, one that does not is not", async () => {
+    const { home, env } = setup(false);
+    const at = new Date(2026, 0, 2, 1);
+    const skip = (reason: string) => ({ time: at.toISOString(), project: "p", step: "L1", kind: "skip", reason });
+    log(env, [skip("L1 waits for your answer"), skip("slots are full")]);
+    const sent: string[] = [];
+    await nightWatch(new Date(at.getTime() + 1000), env, async (t) => (sent.push(t), undefined));
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toContain("waits for your answer");
+    expect(sent[0]).not.toContain("slots are full");
+    rmSync(home, { recursive: true, force: true });
+  });
+
   test("a failed send is tried again after a while, not at the next tick", async () => {
     const { home, env } = setup(false);
     log(env, [stall(night)]);

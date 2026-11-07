@@ -30,7 +30,7 @@ function worthHearing(d: Decision): boolean {
 }
 
 /** The message: what the rules found, one line each, so the Dispatcher acts on it without a search. */
-export function report(found: Decision[]): string {
+function report(found: Decision[]): string {
   const lines = [...new Set(found.map((d) => `- ${d.project}${d.step ? ` ${d.step}` : ""}: ${d.reason}`))];
   return [
     "Night watch. The rules found this since the last message:",
@@ -42,7 +42,7 @@ export function report(found: Decision[]): string {
 /** When tonight began, in ms: the last whole hour outside the night window, walking back from `now`. */
 function nightStart(now: Date, window: string): number {
   let t = new Date(now).setMinutes(0, 0, 0);
-  while (inNight(new Date(t - 3_600_000), window)) t -= 3_600_000;
+  for (let i = 0; i < 24 && inNight(new Date(t - 3_600_000), window); i++) t -= 3_600_000;
   return t;
 }
 
