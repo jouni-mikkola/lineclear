@@ -46,8 +46,15 @@ const columns: Column<Row>[] = [
     key: "time",
     label: "Time",
     num: true,
-    show: (r) => (r.task.since === undefined ? null : <span className="whitespace-nowrap">{ago(r.task.since)}</span>),
-    sortBy: (r) => r.task.since ?? 0,
+    show: (r) => {
+      const start = r.task.started ?? r.task.since;
+      return start === undefined ? null : (
+        <span className="whitespace-nowrap" title={`Running since ${exact(start)}`}>
+          {ago(start)}
+        </span>
+      );
+    },
+    sortBy: (r) => r.task.started ?? r.task.since ?? 0,
   },
   {
     key: "last",
@@ -122,6 +129,14 @@ function Details({ row, sample, browsers, onChoose }: { row: Row; sample: boolea
         ) : (
           <p className="text-fg3">No findings.</p>
         ),
+      )}
+      {section(
+        "In full",
+        <ul className="space-y-1 break-words text-fg2" data-in-full>
+          <li>{row.wait ? `${row.phase}: ${row.wait}` : row.phase}</li>
+          {row.task.model && <li>{row.task.model}</li>}
+          {row.last && <li>{row.last.text}</li>}
+        </ul>,
       )}
       {section(
         "Runs on",
