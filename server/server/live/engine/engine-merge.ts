@@ -195,7 +195,8 @@ export class EngineMerge extends EngineLand {
     await this.redMain.look(
       { sha: now.sha, conclusion: 'failure' },
       {
-        revert: (sha) => this.revertOnBase(p, sha),
+        // a failure outside the required check gets a fix task only: reverting a commit for it would undo good work
+        revert: async (sha) => now.required === 'fail' && (await this.revertOnBase(p, sha)),
         fixTask: async (sha, reverted) => {
           const failing = now.failed.map((x) => `${x.name} (${x.link})`).join(', ')
           this.add({

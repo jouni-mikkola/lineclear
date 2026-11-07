@@ -278,14 +278,14 @@ export class EngineLand extends EngineHandoff {
   }
 
   /**
-   * A red main stops the merges, so a burst of failures stays one. A fix (its task is made by main-green, or its title
+   * A main red in the required check stops the merges (another workflow's failure files a fix task and holds nothing), so a burst of failures stays one. A fix (its task is made by main-green, or its title
    * starts with Fix) goes in, as only it can turn main green. Anything else is refused at once with the reason, never
    * waited for: a waiting merge would hold the repo's lane and the fix behind it. The board tries again soon (landed).
    */
   protected async holdWhileRed(t: TaskRec, g: GH.GitHub, cwd: string): Promise<string | undefined> {
     if (t.by === 'main-green' || /^fix\b/i.test(t.title)) return undefined
-    const last = (await GH.branchRuns(g, cwd, t.base!))?.find((r) => r.state !== 'pending')
-    if (last?.state !== 'fail') return undefined
+    const last = (await GH.branchRuns(g, cwd, t.base!))?.find((r) => r.required !== 'pending')
+    if (last?.required !== 'fail') return undefined
     const fix = this.tasks.find((x) => x.by === 'main-green' && !x.merged && !x.archived && x.project === t.project)
     return `${HELD} ${t.base} is red at ${last.sha.slice(0, 7)}${fix ? `, fix task ${fix.id}` : ''}. Nothing was merged; ${t.id} lands by itself once a run on ${t.base} is green.`
   }
