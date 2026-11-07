@@ -29,9 +29,6 @@ const snapshotOf = (o: { dispatcher?: boolean; task?: boolean }) => ({
   ...(o.task ? TASK_SNAPSHOT : {}),
 });
 
-/** The screen the fake terminal sends a watcher. */
-const TERMINAL_FRAME = JSON.stringify({ type: "terminal", chat: TASK_KEY, ansi: "\x1b[32m$\x1b[0m ready", cols: 80, rows: 24 });
-
 /** What the fake Dispatcher says: words, or a card with choices. */
 export type Reply = string | { question: { title: string; choices: string[] } };
 
@@ -191,7 +188,6 @@ export function startFakeLineclear(
       },
       message(ws, msg) {
         const m = JSON.parse(String(msg));
-        if (m.type === "watch" && m.term === TASK_KEY) ws.send(TERMINAL_FRAME);
         if (m.type === "watch" && m.chats.includes(DISPATCHER_KEY)) {
           ws.data.watch = true;
           ws.send(JSON.stringify({ type: "chat", chat }));
