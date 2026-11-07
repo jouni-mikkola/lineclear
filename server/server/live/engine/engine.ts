@@ -6,11 +6,15 @@ import type { Settings } from '../settings.ts'
 import { Worktrees, type HerdrSpaces } from './worktrees.ts'
 import { EngineTidy } from './engine-tidy.ts'
 import { move } from './phase.ts'
+import { Clock, every } from './clock.ts'
 import { type TaskRec, ended, RECHECK_FIRST, SWEEP_FIRST, SWEEP_EVERY, WATCH_FIRST, WATCH_EVERY, STALL_EVERY, LATER } from './engine-helpers.ts'
 export type { TaskRec, Harness } from './engine-helpers.ts'
 export { reportOf, ended, MERGE_DEADLINE, STALL_QUIET, SILENT_NEED, checkTitle } from './engine-helpers.ts'
 
 export class Engine extends EngineTidy {
+  /** the one timer: first runs, hourly tidy, PR watch, head watch and the stall deadlines */
+  readonly clock: Clock
+
   constructor(agents: Agents, chats: Chats, places: Places, settings: Settings, h?: HerdrSpaces) {
     super(agents, chats, places, settings)
     this.taskIds = new TaskIds(this.places.spaces, this.data, (name) => placeId.space(name))
@@ -45,9 +49,6 @@ export class Engine extends EngineTidy {
       }
     })
     queueMicrotask(() => this.endLostMerges())
-    const recheck = setTimeout(() => this.resumeQueue(), RECHECK_FIRST)
-    recheck.unref?.()
-    this.sweeps.push(recheck)
     // a repo that gained its GitHub remote after it was added shows it from the start
     queueMicrotask(() =>
       Promise.all(this.places.spaces.map((p) => this.places.recheckGithub(p))).then(
@@ -67,26 +68,26 @@ export class Engine extends EngineTidy {
       this.retireOld()
       this.sweep().catch(() => undefined)
     }
-    const first = setTimeout(tidy, SWEEP_FIRST)
-    const every = setInterval(tidy, SWEEP_EVERY)
-    first.unref?.()
-    every.unref?.()
-    this.sweeps.push(first, every)
     const watch = () =>
       this.watchPrs()
         .then(() => this.watchMains())
         .then(() => this.landReady())
         .catch(() => undefined)
-    const watchFirst = setTimeout(watch, WATCH_FIRST)
-    const watchEvery = setInterval(watch, WATCH_EVERY)
-    watchFirst.unref?.()
-    watchEvery.unref?.()
-    this.sweeps.push(watchFirst, watchEvery)
-    const stalls = setInterval(() => {
-      this.checkStalls()
-      this.watchHeads().catch(() => undefined)
-    }, STALL_EVERY)
-    stalls.unref?.()
-    this.sweeps.push(stalls)
+    this.clock = new Clock(
+      [
+        every(RECHECK_FIRST, undefined, () => this.resumeQueue()),
+        every(SWEEP_FIRST, SWEEP_EVERY, tidy),
+        every(WATCH_FIRST, WATCH_EVERY, watch),
+        every(STALL_EVERY, STALL_EVERY, () => this.watchHeads().catch(() => undefined)),
+        { due: () => this.nextStallDue(), run: (now) => this.checkStalls(now) },
+      ],
+      STALL_EVERY,
+    )
+    this.clock.start()
+  }
+
+  stop() {
+    this.clock.stop()
+    super.stop()
   }
 }

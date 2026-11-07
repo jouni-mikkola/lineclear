@@ -1,32 +1,75 @@
 import { statSync } from '../mfs.ts'
 import { hidden } from '../agents.ts'
-import { type TaskRec, STALL_QUIET, SILENT_NEED, READY_QUIET } from './engine-helpers.ts'
+import { type TaskRec, ended, STALL_QUIET, SILENT_NEED, READY_QUIET } from './engine-helpers.ts'
 import { EngineStatus } from './status.ts'
 
 export class EngineStalls extends EngineStatus {
+  /** when each rule last looked at a task because its deadline had passed: its next look is a full period later */
+  private looked = new Map<string, number>()
+
+  /**
+   * The earliest time any task could need a stall check, read from what is already known of it (no status call):
+   * Infinity when none. Its life only moves later, so a deadline can be early but never late.
+   */
+  nextStallDue() {
+    let next = Infinity
+    for (const t of this.tasks) next = Math.min(next, ...Object.values(this.dues(t)))
+    return next
+  }
+
+  /** per rule, when it next needs a look at the task */
+  private dues(t: TaskRec) {
+    const dues = { ready: Infinity, silent: Infinity, stall: Infinity }
+    if (t.archived || ended(t)) return dues
+    const seen = (rule: keyof typeof dues) => this.looked.get(`${t.id}:${rule}`) ?? 0
+    const life = this.lifeOf(t)
+    const r = t.report
+    if (t.reported && t.reportedAt && t.readyNudged !== t.reportedAt) dues.ready = Math.max(t.reportedAt, life, seen('ready')) + READY_QUIET
+    if (!t.paused && !t.stopped) dues.silent = Math.max(life, t.silentAt ?? 0, seen('silent')) + SILENT_NEED
+    if (t.paused) return dues
+    if (t.stalled?.life === undefined || life > t.stalled.life) dues.stall = Math.max(life, seen('stall')) + STALL_QUIET
+    if (r?.left !== undefined && r.at !== t.stalled?.over) {
+      const over = r.at + (r.left + Math.max(r.left, 20)) * 60_000 + 1
+      dues.stall = Math.min(dues.stall, seen('stall') ? Math.max(over, seen('stall') + STALL_QUIET) : over)
+    }
+    return dues
+  }
+
   /**
    * Working tasks that went quiet (no sign of life for STALL_QUIET) or ran far past the time their agent said was left:
    * news for their coordinator, once per stall. Only time and liveness, which agents can't see of themselves: what to
    * do about it is the coordinator's call.
    */
   checkStalls(now = Date.now()) {
-    for (const t of this.tasks) this.checkReady(t, now)
-    for (const t of this.tasks) this.checkSilentNeed(t, now)
-    for (const t of this.tasks) {
-      if (t.archived || t.paused || this.rawStatus(t) !== 'work' || this.inPhase(t, 'handing')) continue
-      const life = this.lifeOf(t)
-      const r = t.report
-      // shown life since: its next stall is news again
-      if (t.stalled?.life !== undefined && life > t.stalled.life) t.stalled.life = undefined
-      const quiet = now - life >= STALL_QUIET && t.stalled?.life === undefined
-      const over = r?.left !== undefined && r.at !== t.stalled?.over && now - r.at > (r.left + Math.max(r.left, 20)) * 60_000
-      if (!quiet && !over) continue
-      t.stalled = { life: quiet ? life : t.stalled?.life, over: r?.at }
-      const mins = Math.max(0, Math.round((now - (quiet ? life : r!.at + r!.left! * 60_000)) / 60_000))
-      this.emit('card', t, 'work', quiet ? `may be stuck: quiet for ${mins}m` : `may be stuck: ${mins}m past its time left`)
-      this.emit('news', t.project, this.stallLine(t, now, quiet ? life : undefined), 'stalled', { task: t.id, event: 'stalled' })
-      this.save()
+    const rules = {
+      ready: (t: TaskRec) => this.checkReady(t, now),
+      silent: (t: TaskRec) => this.checkSilentNeed(t, now),
+      stall: (t: TaskRec) => this.checkStall(t, now),
     }
+    for (const t of this.tasks) {
+      const dues = this.dues(t)
+      for (const rule of ['ready', 'silent', 'stall'] as const) {
+        if (dues[rule] > now) continue
+        this.looked.set(`${t.id}:${rule}`, now)
+        rules[rule](t)
+      }
+    }
+  }
+
+  private checkStall(t: TaskRec, now: number) {
+    if (t.archived || t.paused || this.rawStatus(t) !== 'work' || this.inPhase(t, 'handing')) return
+    const life = this.lifeOf(t)
+    const r = t.report
+    // shown life since: its next stall is news again
+    if (t.stalled?.life !== undefined && life > t.stalled.life) t.stalled.life = undefined
+    const quiet = now - life >= STALL_QUIET && t.stalled?.life === undefined
+    const over = r?.left !== undefined && r.at !== t.stalled?.over && now - r.at > (r.left + Math.max(r.left, 20)) * 60_000
+    if (!quiet && !over) return
+    t.stalled = { life: quiet ? life : t.stalled?.life, over: r?.at }
+    const mins = Math.max(0, Math.round((now - (quiet ? life : r!.at + r!.left! * 60_000)) / 60_000))
+    this.emit('card', t, 'work', quiet ? `may be stuck: quiet for ${mins}m` : `may be stuck: ${mins}m past its time left`)
+    this.emit('news', t.project, this.stallLine(t, now, quiet ? life : undefined), 'stalled', { task: t.id, event: 'stalled' })
+    this.save()
   }
 
   /**

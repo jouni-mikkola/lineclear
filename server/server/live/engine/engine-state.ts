@@ -62,7 +62,6 @@ export abstract class EngineState extends Emitter<Events> {
   protected closing = false
   /** how long GitHub's checks took lately, per repo, and when that was asked */
   protected took = new Map<string, { ms?: number; at: number }>()
-  protected sweeps: ReturnType<typeof setTimeout>[] = []
   protected wt!: Worktrees
   /** other machines' tasks, for a task queued after one (the main copy only: it is the one that sees them) */
   peerTask?: PeerTask
@@ -172,7 +171,6 @@ export abstract class EngineState extends Emitter<Events> {
   stop() {
     this.taskIds.close()
     for (const x of this.later.values()) clearTimeout(x)
-    for (const x of this.sweeps) clearTimeout(x)
   }
 
   /* ---------- status: from the agent alone (status.ts) ---------- */
