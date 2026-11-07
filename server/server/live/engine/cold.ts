@@ -14,7 +14,7 @@ type Rec = Record<string, unknown>
 
 /** The records of a log, by `idKey`, in the order they first went cold, and how many lines it has. A line that does not
  *  parse is kept in <file>.bad, where `lineclear doctor` finds it; the one before it stands. */
-function readCold(file: string, idKey = 'id'): { recs: Rec[]; lines: number; skipped: string[] } {
+function readCold(file: string, idKey = 'id', repair = true): { recs: Rec[]; lines: number; skipped: string[] } {
   const by = new Map<string, Rec>()
   const skipped: string[] = []
   if (!existsSync(file)) return { recs: [], lines: 0, skipped }
@@ -32,9 +32,9 @@ function readCold(file: string, idKey = 'id'): { recs: Rec[]; lines: number; ski
       skipped.push(line)
     }
   }
-  if (skipped.length) appendFileSync(`${file}.bad`, `${skipped.join('\n')}\n`)
+  if (repair && skipped.length) appendFileSync(`${file}.bad`, `${skipped.join('\n')}\n`)
   // a last line cut short has no end: the next line must not join onto it
-  if (text && !text.endsWith('\n')) appendFileSync(file, '\n')
+  if (repair && text && !text.endsWith('\n')) appendFileSync(file, '\n')
   return { recs: [...by.values()], lines, skipped }
 }
 
@@ -58,9 +58,9 @@ export class ColdLog<T extends object> {
 
   /** The records of the whole file with the cold ones before them; one in both is the whole file's (a stop between
    *  writes). */
-  load(hot: T[]): T[] {
+  load(hot: T[], repair = true): T[] {
     const ids = new Set(hot.map(this.id))
-    const read = readCold(this.file, this.idKey)
+    const read = readCold(this.file, this.idKey, repair)
     const cold = read.recs.filter((t) => !ids.has(t[this.idKey] as string)) as unknown as T[]
     for (const t of cold) this.written.set(this.id(t), JSON.stringify(t))
     this.lines = read.lines
@@ -136,7 +136,8 @@ function olderAgents<T extends AgentLine>(file: string): T[] {
 
 /** the agent records of a folder by key: the rows of agents-cold.jsonl and those of an older agents.json */
 export function readAgentRows<T extends AgentLine>(dir = HOME): Record<string, T> {
-  return byKey(new ColdLog<T>(COLD_AGENTS, 'key', dir).load(olderAgents<T>(join(dir, 'agents.json'))))
+  // a folder that is not this process's own is only read: its log is not repaired here
+  return byKey(new ColdLog<T>(COLD_AGENTS, 'key', dir).load(olderAgents<T>(join(dir, 'agents.json')), false))
 }
 
 /** agent records as rows: a save appends a line for each record that changed and none for the rest */
