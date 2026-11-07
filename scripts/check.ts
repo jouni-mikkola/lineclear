@@ -40,6 +40,7 @@ import {
 import { fastGates } from "./fast-gates.ts";
 import { describeFailure, type Failure, outsideChange, parseFailures } from "./failures.ts";
 import { changedSince } from "./gates/tools.ts";
+import { judge, readQuarantine, runAlone } from "./quarantine.ts";
 
 // Every step but the server's (below) runs with TMPDIR in a folder of this run, on disk. Each test process clears its own
 // folder inside it (tmp-scope.ts), so anything left in it when the steps end was left by a process that did not get
@@ -235,7 +236,16 @@ async function runStep(step: Step): Promise<boolean> {
   const at = performance.now();
   const { code, failing, output } = await run(step);
   const isTests = step.name.startsWith("tests");
-  const ok = code === 0;
+  const isServer = step.name === "server tests";
+  let ok = code === 0;
+  // a failed test is rerun alone: a flake in quarantine does not fail the step, a flake outside it or a failure alone does
+  if (!ok && (isTests || isServer) && failing.length > 0) {
+    const verdict = await judge(failing, (f) => runAlone(f, step.cwd, step.cwd === "server" ? serverEnv : env), readQuarantine(), isServer ? "server/" : "");
+    for (const t of verdict.quarantined) console.log(`check: quarantined flake, passed alone: ${t}`);
+    for (const t of verdict.flaky) console.error(`check: new flake, passed alone: ${t} (add it to test/quarantine.json with its fix task)`);
+    for (const t of verdict.broken) console.error(`check: failed alone too: ${t}`);
+    ok = verdict.ok;
+  }
   times.push({ step: step.name, seconds: (performance.now() - at) / 1000, ok });
   if (!ok) {
     console.error(
