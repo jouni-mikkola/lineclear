@@ -12,7 +12,8 @@ const root = join(import.meta.dir, "..");
 function collect(stream: ReadableStream<Uint8Array>, into: string[]) {
   void (async () => {
     const decoder = new TextDecoder();
-    for await (const chunk of stream) into.push(decoder.decode(chunk, { stream: true }));
+    const reader = stream.getReader();
+    for (let r = await reader.read(); !r.done; r = await reader.read()) into.push(decoder.decode(r.value, { stream: true }));
   })();
 }
 
