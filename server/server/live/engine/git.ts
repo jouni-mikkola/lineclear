@@ -1,9 +1,8 @@
 // git for tasks: what a fresh worktree starts from and gets copied in, whether its work is in main, commits, rebasing
 // on main and merging into it. herdr itself makes and removes task worktrees (worktrees.ts).
-import { createHash } from 'node:crypto'
-import { basename, join } from 'node:path'
+import { join } from 'node:path'
 import { remoteBox, GIT_READ_SHARE_MS, isGitRead, run } from '../box.ts'
-import { boxDir, cpSync, existsSync, readdirSync, readFileSync } from '../mfs.ts'
+import { existsSync } from '../mfs.ts'
 
 export interface Run {
   ok: boolean
@@ -47,84 +46,6 @@ export async function defaultBranch(repo: string) {
   if (r.ok) return r.out.replace(/^origin\//, '')
   for (const b of ['main', 'master']) if ((await git(repo, 'rev-parse', '--verify', '--quiet', `refs/heads/${b}`)).ok) return b
   return (await git(repo, 'branch', '--show-current')).out || 'main'
-}
-
-/** Check a named destination before a task gets a worktree. Never change origin/HEAD. */
-export async function validateBase(repo: string, base: string) {
-  if (!base || base.startsWith('-') || !(await git(repo, 'check-ref-format', `refs/heads/${base}`)).ok)
-    throw new Error('Choose a branch name, like main, develop or feature/login.')
-  const common = await git(repo, 'rev-parse', '--path-format=absolute', '--git-common-dir')
-  if (!common.ok || !(await sh(['test', '-w', common.out], repo)).ok) throw new Error('No permission to write to this repository.')
-  const remote = (await git(repo, 'remote', 'get-url', 'origin')).ok
-  if (remote) {
-    const fetched = await git(repo, 'fetch', '--quiet', 'origin', `+refs/heads/${base}:refs/remotes/origin/${base}`)
-    if (!fetched.ok) throw new Error(`Cannot fetch branch ${base} from origin: ${(fetched.err || fetched.out).split('\n')[0]}`)
-    const g = await github(repo)
-    if (g) {
-      const r = await gh(g, repo, 'repo', 'view', `${g.host}/${g.repo}`, '--json', 'viewerPermission', '--jq', '.viewerPermission')
-      if (!r.ok || !['WRITE', 'MAINTAIN', 'ADMIN'].includes(r.out.trim()))
-        throw new Error(`Cannot confirm permission to merge into ${base} on GitHub. Sign in with repository write access first.`)
-    } else {
-      const r = await git(repo, 'push', '--dry-run', 'origin', `refs/remotes/origin/${base}:refs/heads/${base}`)
-      if (!r.ok) throw new Error(`Cannot confirm permission to push ${base} to origin: ${(r.err || r.out).split('\n')[0]}`)
-    }
-  } else if (!(await branchExists(repo, base))) throw new Error(`No local branch ${base}.`)
-}
-
-/** a GitHub repo as gh reaches it: owner/name, and the host gh is logged in to for it (github.com, github.localhost) */
-export interface GitHub {
-  repo: string
-  host: string
-}
-
-/** host and owner/name of a remote URL in any form git takes: https://host/o/r(.git), ssh://git@host/o/r, git@host:o/r */
-function parseRemote(url: string): GitHub | null {
-  const m = url.trim().match(/^(?:[a-z+]+:\/\/)?(?:[^@/]+@)?([^/:]+)(?::\d+)?[:/]+([^/]+\/[^/]+?)(?:\.git)?\/?$/i)
-  return m && /github/i.test(m[1]) ? { host: m[1].toLowerCase(), repo: m[2] } : null
-}
-
-/**
- * The repo's GitHub remote, read live (a repo may gain one after it was added): origin as written, and as git rewrites
- * it (url.insteadOf), so github.com mapped to github.localhost is found either way. gh talks to the host git really
- * reaches when that is a GitHub one, else to the one written.
- */
-export async function github(repo: string): Promise<GitHub | null> {
-  return (await githubs(repo))[0] ?? null
-}
-
-/** each GitHub repo origin may be: as git rewrites it first, then as written */
-export async function githubs(repo: string): Promise<GitHub[]> {
-  const [written, used] = await Promise.all([git(repo, 'config', '--get', 'remote.origin.url'), git(repo, 'remote', 'get-url', 'origin')])
-  const all = [used.ok ? parseRemote(used.out) : null, written.ok ? parseRemote(written.out) : null].filter((g): g is GitHub => !!g)
-  return all.filter((g, i) => all.findIndex((x) => x.host === g.host && x.repo === g.repo) === i)
-}
-
-export async function githubRemote(repo: string): Promise<string | null> {
-  return (await github(repo))?.repo ?? null
-}
-
-export function slug(title: string, max = 30) {
-  return (
-    title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, max)
-      .replace(/-+$/, '') || 'task'
-  )
-}
-
-/** the commit a task's branch starts from: the remote's base when there is one (fetched first), else the local one.
- *  A commit, not a remote-tracking ref, so no upstream is written into the repo's shared config. */
-export async function startPoint(repo: string, base: string) {
-  await validateBase(repo, base)
-  const from = (await git(repo, 'rev-parse', '--verify', '--quiet', `origin/${base}`)).ok ? `origin/${base}` : base
-  if (!(await branchExists(repo, base)) && from !== base) {
-    const made = await git(repo, 'branch', '--', base, from)
-    if (!made.ok) throw new Error(`Cannot create local branch ${base}: ${made.err}`)
-  }
-  const r = await git(repo, 'rev-parse', '--verify', '--quiet', `${from}^{commit}`)
-  return r.ok ? r.out : from
 }
 
 export async function branchExists(repo: string, branch: string) {
@@ -187,106 +108,6 @@ export async function landed(repo: string, ref: string, base: string, squashes: 
     if (await mergesTo(repo, `${s}^`, ref, s)) return true
   }
   return mergesTo(repo, base, ref, base)
-}
-
-/** git's own pattern match is not needed here: `*` matches anything, and a pattern matches a path or its last part */
-function globMatch(pattern: string, s: string) {
-  const p = pattern.replace(/^\/+|\/+$/g, '')
-  const re = new RegExp(
-    `^${p
-      .split('*')
-      .map((x) => x.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
-      .join('.*')}$`,
-  )
-  return re.test(s)
-}
-
-/** the default install step: `bun install --frozen-lockfile` where a Bun lockfile sits, in the folder and in each folder just under it */
-export function installDirs(wt: string) {
-  const bun = (d: string) => existsSync(join(d, 'package.json')) && (existsSync(join(d, 'bun.lock')) || existsSync(join(d, 'bun.lockb')))
-  const subs = readdirSync(wt)
-    .filter((n) => !n.startsWith('.') && n !== 'node_modules')
-    .map((n) => join(wt, n))
-  return [wt, ...subs].filter(bun)
-}
-
-/** A fresh worktree's install step, before its agent starts: `cmd`, the project's own, in a shell; left out, the default
- *  (installDirs); `off`, none. Bun's download cache is shared by every worktree, so it takes seconds. A failure throws why. */
-export async function install(wt: string, cmd?: string) {
-  const step = cmd?.trim()
-  if (step === 'off') return
-  const jobs: { dir: string; cmd: string[]; text: string }[] = step
-    ? [{ dir: wt, cmd: ['/bin/sh', '-c', step], text: step }]
-    : installDirs(wt).map((dir) => ({ dir, cmd: ['bun', 'install', '--frozen-lockfile'], text: 'bun install --frozen-lockfile' }))
-  for (const j of jobs) {
-    if (!step && (await linkStore(j.dir, wt))) continue
-    const r = await sh(j.cmd, j.dir, { timeoutMs: 300_000 })
-    const why = (r.err || r.out).split('\n').filter(Boolean).slice(-3).join(' ')
-    if (!r.ok) throw new Error(`Install failed (${j.text}${j.dir === wt ? '' : ` in ${basename(j.dir)}/`}): ${why || `exit ${r.code}`}`)
-    if (!step) await keepStore(j.dir, wt)
-  }
-}
-
-/** The store entry of a lock file: its content hash, so a changed lock file makes a new entry. */
-export function storeKey(lock: string | Buffer) {
-  return createHash('sha256').update(lock).digest('hex').slice(0, 16)
-}
-
-/** Where the installed `node_modules` of the Bun project in `dir` (the worktree `wt` or a folder under it) is kept for every
- *  worktree with the same lock file. A worktree's own copy takes 400 MB and many agents multiply it; one linked copy takes none. */
-export function storePath(dir: string, wt: string) {
-  const lock = existsSync(join(dir, 'bun.lock')) ? 'bun.lock' : 'bun.lockb'
-  return join(boxDir(), 'deps', storeKey(readFileSync(join(dir, lock))), dir === wt ? '.' : basename(dir), 'node_modules')
-}
-
-/** `node_modules` of `dir` linked from the store when the store has its lock file's entry. */
-async function linkStore(dir: string, wt: string) {
-  const store = storePath(dir, wt)
-  const r = await sh(['/bin/sh', '-c', `[ -d "$1" ] && rm -rf "$2" && ln -s "$1" "$2"`, 'sh', store, join(dir, 'node_modules')], dir)
-  if (r.ok) await excludeLink(dir)
-  return r.ok
-}
-
-/** A `node_modules/` line in a .gitignore matches folders only, not the link, so git would list the link as new work. */
-async function excludeLink(dir: string) {
-  const script = `f="$(git rev-parse --git-path info/exclude)" && mkdir -p "$(dirname "$f")" && { grep -qx node_modules "$f" 2>/dev/null || echo node_modules >> "$f"; }`
-  await sh(['/bin/sh', '-c', script], dir)
-}
-
-/** A fresh install moves into the store and is linked back, so the next worktree with this lock file links it. A failure here
- *  leaves the worktree's own install in place. */
-async function keepStore(dir: string, wt: string) {
-  const store = storePath(dir, wt)
-  const own = join(dir, 'node_modules')
-  const script = `mkdir -p "$(dirname "$1")" && t="$1.$$" && mv "$2" "$t" && { mv -T "$t" "$1" 2>/dev/null || rm -rf "$t"; } && ln -s "$1" "$2"`
-  const r = await sh(['/bin/sh', '-c', script, 'sh', store, own], dir)
-  if (r.ok) await excludeLink(dir)
-}
-
-/**
- * The repo's setup for a fresh worktree, as herdr-projects does it: ignored files it lacks (.env and the like) are
- * copied in when .worktreeinclude in the repo names them. Nothing else runs.
- */
-export async function copyIncludes(repo: string, wt: string) {
-  if (!existsSync(join(repo, '.worktreeinclude'))) return []
-  const patterns = readFileSync(join(repo, '.worktreeinclude'), 'utf8')
-    .split('\n')
-    .map((l) => l.trim())
-    .filter((l) => l && !l.startsWith('#'))
-  if (!patterns.length) return []
-  const ignored = await git(repo, 'ls-files', '--others', '--ignored', '--exclude-standard', '--directory')
-  const copied: string[] = []
-  for (const entry of ignored.out.split('\n').filter(Boolean)) {
-    const rel = entry.replace(/\/+$/, '')
-    if (!patterns.some((g) => globMatch(g, rel) || globMatch(g, basename(rel)))) continue
-    try {
-      cpSync(join(repo, rel), join(wt, rel))
-      copied.push(rel)
-    } catch {
-      /* one that can't be copied: the rest still are */
-    }
-  }
-  return copied
 }
 
 export async function removeWorktree(repo: string, path: string, force = false) {
@@ -396,12 +217,3 @@ export async function mergeHere(repo: string, branch: string, base: string, mess
     await removeWorktree(repo, tmp, true)
   }
 }
-
-/* ---------- GitHub, through gh ---------- */
-
-/** gh for one repo: its host in GH_HOST (gh can't tell github.localhost from the remote alone), never a prompt */
-export const gh = (g: GitHub, cwd: string, ...args: string[]) =>
-  sh(['gh', ...args], cwd, { timeoutMs: 120_000, env: { GH_HOST: g.host, GH_PROMPT_DISABLED: '1', GH_NO_UPDATE_NOTIFIER: '1', NO_COLOR: '1' } })
-
-/** the repo as gh's --repo takes it, host included */
-export const R = (g: GitHub) => ['--repo', `${g.host}/${g.repo}`]

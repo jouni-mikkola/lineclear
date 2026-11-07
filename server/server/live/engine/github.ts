@@ -1,6 +1,6 @@
 // gh for tasks: login, pull requests, their checks and comments, and the runs of a branch.
 import * as Runs from '../../../../src/check-runs.ts'
-import { gh, git, type GitHub, R } from './git.ts'
+import { branchExists, git, sh } from './git.ts'
 
 /**
  * gh and the repo's host: logged in ("yes"), not logged in there or no gh at all ("no"), or logged in but not answering
@@ -360,3 +360,77 @@ export async function failedLog(g: GitHub, cwd: string, link: string, lines = 15
     .join('\n')
   return tail.length > 1500 ? `…${tail.slice(-1500)}` : tail
 }
+
+/** Check a named destination before a task gets a worktree. Never change origin/HEAD. */
+export async function validateBase(repo: string, base: string) {
+  if (!base || base.startsWith('-') || !(await git(repo, 'check-ref-format', `refs/heads/${base}`)).ok)
+    throw new Error('Choose a branch name, like main, develop or feature/login.')
+  const common = await git(repo, 'rev-parse', '--path-format=absolute', '--git-common-dir')
+  if (!common.ok || !(await sh(['test', '-w', common.out], repo)).ok) throw new Error('No permission to write to this repository.')
+  const remote = (await git(repo, 'remote', 'get-url', 'origin')).ok
+  if (remote) {
+    const fetched = await git(repo, 'fetch', '--quiet', 'origin', `+refs/heads/${base}:refs/remotes/origin/${base}`)
+    if (!fetched.ok) throw new Error(`Cannot fetch branch ${base} from origin: ${(fetched.err || fetched.out).split('\n')[0]}`)
+    const g = await github(repo)
+    if (g) {
+      const r = await gh(g, repo, 'repo', 'view', `${g.host}/${g.repo}`, '--json', 'viewerPermission', '--jq', '.viewerPermission')
+      if (!r.ok || !['WRITE', 'MAINTAIN', 'ADMIN'].includes(r.out.trim()))
+        throw new Error(`Cannot confirm permission to merge into ${base} on GitHub. Sign in with repository write access first.`)
+    } else {
+      const r = await git(repo, 'push', '--dry-run', 'origin', `refs/remotes/origin/${base}:refs/heads/${base}`)
+      if (!r.ok) throw new Error(`Cannot confirm permission to push ${base} to origin: ${(r.err || r.out).split('\n')[0]}`)
+    }
+  } else if (!(await branchExists(repo, base))) throw new Error(`No local branch ${base}.`)
+}
+
+/** a GitHub repo as gh reaches it: owner/name, and the host gh is logged in to for it (github.com, github.localhost) */
+export interface GitHub {
+  repo: string
+  host: string
+}
+
+/** host and owner/name of a remote URL in any form git takes: https://host/o/r(.git), ssh://git@host/o/r, git@host:o/r */
+function parseRemote(url: string): GitHub | null {
+  const m = url.trim().match(/^(?:[a-z+]+:\/\/)?(?:[^@/]+@)?([^/:]+)(?::\d+)?[:/]+([^/]+\/[^/]+?)(?:\.git)?\/?$/i)
+  return m && /github/i.test(m[1]) ? { host: m[1].toLowerCase(), repo: m[2] } : null
+}
+
+/**
+ * The repo's GitHub remote, read live (a repo may gain one after it was added): origin as written, and as git rewrites
+ * it (url.insteadOf), so github.com mapped to github.localhost is found either way. gh talks to the host git really
+ * reaches when that is a GitHub one, else to the one written.
+ */
+export async function github(repo: string): Promise<GitHub | null> {
+  return (await githubs(repo))[0] ?? null
+}
+
+/** each GitHub repo origin may be: as git rewrites it first, then as written */
+export async function githubs(repo: string): Promise<GitHub[]> {
+  const [written, used] = await Promise.all([git(repo, 'config', '--get', 'remote.origin.url'), git(repo, 'remote', 'get-url', 'origin')])
+  const all = [used.ok ? parseRemote(used.out) : null, written.ok ? parseRemote(written.out) : null].filter((g): g is GitHub => !!g)
+  return all.filter((g, i) => all.findIndex((x) => x.host === g.host && x.repo === g.repo) === i)
+}
+
+export async function githubRemote(repo: string): Promise<string | null> {
+  return (await github(repo))?.repo ?? null
+}
+
+/** the commit a task's branch starts from: the remote's base when there is one (fetched first), else the local one.
+ *  A commit, not a remote-tracking ref, so no upstream is written into the repo's shared config. */
+export async function startPoint(repo: string, base: string) {
+  await validateBase(repo, base)
+  const from = (await git(repo, 'rev-parse', '--verify', '--quiet', `origin/${base}`)).ok ? `origin/${base}` : base
+  if (!(await branchExists(repo, base)) && from !== base) {
+    const made = await git(repo, 'branch', '--', base, from)
+    if (!made.ok) throw new Error(`Cannot create local branch ${base}: ${made.err}`)
+  }
+  const r = await git(repo, 'rev-parse', '--verify', '--quiet', `${from}^{commit}`)
+  return r.ok ? r.out : from
+}
+
+/** gh for one repo: its host in GH_HOST (gh can't tell github.localhost from the remote alone), never a prompt */
+const gh = (g: GitHub, cwd: string, ...args: string[]) =>
+  sh(['gh', ...args], cwd, { timeoutMs: 120_000, env: { GH_HOST: g.host, GH_PROMPT_DISABLED: '1', GH_NO_UPDATE_NOTIFIER: '1', NO_COLOR: '1' } })
+
+/** the repo as gh's --repo takes it, host included */
+const R = (g: GitHub) => ['--repo', `${g.host}/${g.repo}`]

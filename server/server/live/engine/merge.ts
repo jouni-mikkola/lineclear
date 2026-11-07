@@ -274,7 +274,7 @@ export class EngineLand extends EngineHandoff {
    * A red main stops the merges: one waits for a green run, so a burst of failures stays one. A fix (its task is made by
    * main-green, or its title starts with Fix) goes in, as only it can turn main green. False when Lineclear is stopping.
    */
-  protected async holdWhileRed(t: TaskRec, g: G.GitHub, cwd: string): Promise<boolean> {
+  protected async holdWhileRed(t: TaskRec, g: GH.GitHub, cwd: string): Promise<boolean> {
     if (t.by === 'main-green' || /^fix\b/i.test(t.title)) return true
     const red = async () => {
       const runs = await GH.branchRuns(g, cwd, t.base!)
@@ -295,7 +295,7 @@ export class EngineLand extends EngineHandoff {
    * commit, then squash-merged on GitHub only while its head is still that commit, its branch there deleted, and main here brought up to GitHub's (which
    * is what Lineclear's own update watches). Failed checks go back to the agent.
    */
-  protected async mergeOnGitHub(t: TaskRec, p: Space, g: G.GitHub, self: boolean): Promise<{ ok: boolean; error?: string; note?: string }> {
+  protected async mergeOnGitHub(t: TaskRec, p: Space, g: GH.GitHub, self: boolean): Promise<{ ok: boolean; error?: string; note?: string }> {
     const wt = t.worktree!
     const base = `origin/${t.base}`
     if (!(await G.git(p.path, 'rev-parse', '--verify', '--quiet', base)).ok)

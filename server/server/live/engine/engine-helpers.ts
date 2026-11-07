@@ -1,6 +1,5 @@
 import { TITLE_MAX, type Report, type Task, type TaskStatus, type UpdateCard } from '../../../shared/types.ts'
 import { HOST } from '../places.ts'
-import * as G from './git.ts'
 import type * as GH from './github.ts'
 import type * as Lane from './lane.ts'
 
@@ -190,7 +189,7 @@ export const HELD = { slots: 'Waiting for a free slot', machine: 'Waiting for th
 export const RECHECK_FIRST = 15_000
 
 /** the branch every task's worktree gets */
-export const branchFor = (t: TaskRec) => `work/${t.n}-${G.slug(t.title)}`
+export const branchFor = (t: TaskRec) => `work/${t.n}-${slug(t.title)}`
 
 /** its herdr space's name */
 export const labelOf = (t: TaskRec) => `${t.id} ${t.title}`
@@ -291,3 +290,15 @@ export const BRIEF_WAIT = 120_000
 
 /** what a task for later (task add --later) is told: its agent reads the brief and waits for a go */
 export const LATER = "Don't start yet: wait for a go."
+
+/** a title as a branch name's last part */
+function slug(title: string, max = 30) {
+  return (
+    title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, max)
+      .replace(/-+$/, '') || 'task'
+  )
+}

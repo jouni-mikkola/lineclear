@@ -1,6 +1,7 @@
 // What the gates share: running a tool of this repo's node_modules in the folder under check, and its tracked files.
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { git } from "../../src/git.ts";
 
 const repoDir = join(import.meta.dir, "..", "..");
 const binDir = join(repoDir, "node_modules", ".bin");
@@ -34,27 +35,23 @@ const SOURCE = /\.(ts|tsx|mts|js|mjs)$/;
 
 /** The files git tracks under `root` that match `pattern` and are on disk (a deletion not yet committed is not). */
 export function trackedFiles(root: string, pattern = SOURCE): string[] {
-  const p = Bun.spawnSync(["git", "-C", root, "ls-files", "-z"]);
-  if (p.exitCode !== 0) throw new Error(`${root} is not a git repository`);
-  return p.stdout
-    .toString()
-    .split("\0")
-    .filter((f) => f && pattern.test(f) && existsSync(join(root, f)));
+  const p = git(root, "ls-files", "-z");
+  if (!p.ok) throw new Error(`${root} is not a git repository`);
+  return p.out.split("\0").filter((f) => f && pattern.test(f) && existsSync(join(root, f)));
 }
 
-export const git = (root: string, args: string[]) => Bun.spawnSync(["git", "-C", root, ...args]);
-const names = (out: Buffer) => out.toString().split("\0").filter(Boolean);
+const names = (out: string) => out.split("\0").filter(Boolean);
 
 /** The files that differ from `commit` now: committed, staged, unstaged or new, deleted ones too. Undefined when git does not know it. */
 export function differingFrom(root: string, commit: string): string[] | undefined {
-  const diff = git(root, ["diff", "-z", "--name-only", "--no-renames", commit]);
-  const added = git(root, ["ls-files", "-z", "--others", "--exclude-standard"]);
-  if (diff.exitCode !== 0 || added.exitCode !== 0) return undefined;
-  return [...new Set([...names(diff.stdout), ...names(added.stdout)])];
+  const diff = git(root, "diff", "-z", "--name-only", "--no-renames", commit);
+  const added = git(root, "ls-files", "-z", "--others", "--exclude-standard");
+  if (!diff.ok || !added.ok) return undefined;
+  return [...new Set([...names(diff.out), ...names(added.out)])];
 }
 
 /** The files changed since the branch left `base`. Undefined when there is no `base` to compare with. */
 export function changedSince(root: string, base: string): string[] | undefined {
-  const fork = git(root, ["merge-base", "HEAD", base]);
-  return fork.exitCode === 0 ? differingFrom(root, fork.stdout.toString().trim()) : undefined;
+  const fork = git(root, "merge-base", "HEAD", base);
+  return fork.ok ? differingFrom(root, fork.out.trim()) : undefined;
 }
