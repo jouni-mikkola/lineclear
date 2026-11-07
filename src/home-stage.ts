@@ -4,7 +4,7 @@ import type { Stage, TaskState } from "./home-data.ts";
 /** A parsed file or event read as it is: its shape is not ours to promise. */
 type Raw = any;
 
-/** The fields of a task record that Home reads. The server writes `stage`, `stageAt`, `step` and `laneReleased` where the event happens. */
+/** The fields of a task record that Home reads. The server is to write `stage`, `stageAt`, `step` and `laneReleased` where the event happens. */
 export interface TaskRecord {
   id: string;
   title?: string;
@@ -15,7 +15,7 @@ export interface TaskRecord {
   closed?: boolean;
   told?: string;
   reported?: boolean;
-  stage?: string;
+  stage?: Stage;
   stageAt?: number;
   step?: string;
   laneReleased?: string;
@@ -59,16 +59,14 @@ export function taskStage(task: Partial<TaskRecord>, state: TaskState, line?: st
   return "work";
 }
 
-// a task of another machine has no record here: the first read that saw it at its stage, as long as this process runs
+// a task with no `stageAt` (another machine's, or an older record): the first read that saw it at its stage, as long as this process runs
 const seen = new Map<string, { stage: Stage; since: number }>();
 
-/** Since when a task is at its stage: the record's `stageAt`, else its creation or merge, else its last update. */
+/** Since when a task is at its stage: the record's `stageAt`, else its creation or merge, else the first read that saw it there (a record without `stageAt` predates the server writing it). */
 export function stageSince(task: Partial<TaskRecord> & { id: string }, stage: Stage, now: number): number {
   if (typeof task.stageAt === "number" && task.stage === stage) return task.stageAt;
   if (stage === "queued" && task.created !== undefined) return task.created;
   if (stage === "done" && (task.doneAt ?? task.updated) !== undefined) return (task.doneAt ?? task.updated) as number;
-  const recorded = task.updated ?? task.created;
-  if (recorded !== undefined) return recorded;
   const was = seen.get(task.id);
   const since = was?.stage === stage ? was.since : now;
   seen.set(task.id, { stage, since });

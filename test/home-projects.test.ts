@@ -31,11 +31,14 @@ describe("where a task is on the line", () => {
   });
 
   test("its time at the stage is the record's, so a restart keeps it", () => {
-    const task = { id: "SINCE-1", created: 5, updated: 150, stage: "work", stageAt: 120 };
+    const task = { id: "SINCE-1", created: 5, updated: 150, stage: "work" as const, stageAt: 120 };
     expect(stageSince({ id: "SINCE-1", created: 5 }, "queued", 100)).toBe(5);
     expect(stageSince(task, "work", 200)).toBe(120);
     expect(stageSince(task, "work", 99_999)).toBe(120);
-    expect(stageSince({ id: "SINCE-1", created: 5, updated: 150 }, "work", 99_999)).toBe(150);
+    // a record without stageAt: the first read that saw it at the stage
+    expect(stageSince({ id: "SINCE-2", created: 5 }, "work", 200)).toBe(200);
+    expect(stageSince({ id: "SINCE-2", created: 5 }, "work", 300)).toBe(200);
+    expect(stageSince({ id: "SINCE-2", created: 5 }, "review", 400)).toBe(400);
   });
 });
 
