@@ -596,3 +596,20 @@ test("stepStatuses is called only where its inputs come from stepInputs", () => 
   }
   expect(found).toEqual(["task-steps.ts"]);
 });
+
+test("the same step added twice gets one start and one refusal", () => {
+  const t = setup({ steps: [step("A", "none")] });
+  expect(t.doTick().filter((x) => x.kind === "start").length).toBe(1);
+  // the task list still lacks the new task: the step must not start again
+  const again = t.doTick();
+  expect(again.some((x) => x.kind === "start")).toBe(false);
+  expect(again.some((x) => x.step === "A" && x.reason.includes("does not start twice"))).toBe(true);
+  expect(t.adds().length).toBe(1);
+});
+
+test("a landed step starts no agent even when it reads ready", () => {
+  const t = setup({ steps: [step("A", "none")] });
+  writeFileSync(join(t.config, "projects", "demo", "state.json"), JSON.stringify({ closedSteps: { A: "LIN-1" } }));
+  expect(t.doTick().some((x) => x.kind === "start")).toBe(false);
+  expect(t.adds()).toEqual([]);
+});
