@@ -6,7 +6,7 @@
 // (machines.ts) reads it there, on the same disk; a value leaves the main machine only when an agent on another machine
 // uses it, over the SSH link to that machine (its lineclear's tunnel), and never lands in a chat, a log or the
 // snapshot: those have names only.
-import { execFileSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs'
 import { hostname } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -225,11 +225,10 @@ function valuesOf(project: string | undefined, env: Env, machine?: string): Reco
 }
 
 const gitCommonDir = (cwd: string): string | undefined => {
+  const r = spawnSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+  if (r.status !== 0) return undefined
   try {
-    const dir = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd, stdio: ['ignore', 'pipe', 'ignore'] })
-      .toString()
-      .trim()
-    return realpathSync(dir)
+    return realpathSync(r.stdout.trim())
   } catch {
     return undefined
   }

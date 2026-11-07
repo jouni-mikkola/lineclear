@@ -3,7 +3,8 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { existsSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { sh, repo, world, until, started, G } from './engine-world.ts'
+import { sh, repo, world, until, started } from './engine-world.ts'
+import * as G from '../server/live/engine/github.ts'
 
 describe('on GitHub: a pull request per task', () => {
   test('its origin is read as written and as git rewrites it: github.com mapped to github.localhost talks to github.localhost', async () => {

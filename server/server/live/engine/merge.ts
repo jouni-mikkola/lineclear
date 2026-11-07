@@ -3,6 +3,7 @@ import { hidden } from '../agents.ts'
 import type { Space } from '../places.ts'
 import * as G from './git.ts'
 import * as GH from './github.ts'
+import * as M from './merge-ops.ts'
 import * as Lane from './lane.ts'
 import { type TaskRec, ended, ANSWER_GRACE, CHECKS_EVERY } from './engine-helpers.ts'
 import { EngineHandoff } from './engine-handoff.ts'
@@ -199,7 +200,7 @@ export class EngineLand extends EngineHandoff {
     const gone = [p.path, wt].find((d) => !existsSync(d))
     if (gone) return { ok: false, error: `Can't merge ${t.id}: the folder ${gone} is gone.` }
     // main here first catches up with the remote's, so the branch is rebased on what main really is
-    const up = await G.catchUp(p.path, t.base)
+    const up = await M.catchUp(p.path, t.base)
     if (!up.ok) return { ok: false, error: `Can't merge ${t.id}: ${up.err}` }
     await G.commitAll(wt, `${t.id}: ${t.title}`)
     // a conflict solved halfway and committed: it never reaches main
@@ -229,10 +230,10 @@ export class EngineLand extends EngineHandoff {
     // moved on since: it only needs marking
     if (await G.landed(wt, 'HEAD', t.base)) note = `it was in ${t.base} already`
     else {
-      const rb = await G.rebase(wt, t.base)
+      const rb = await M.rebase(wt, t.base)
       if (!rb.ok) return this.conflict(t, self, (await Lane.conflictFiles(wt, t.base)) ?? (await Lane.sharedFiles(wt, t.base)))
       const message = `${t.id}: ${t.title}${t.said ? `\n\n${t.said}` : ''}`
-      const m = await G.mergeHere(p.path, t.branch, t.base, message, true)
+      const m = await M.mergeHere(p.path, t.branch, t.base, message, true)
       if (!m.ok) {
         if (/conflict/i.test(`${m.out}${m.err}`)) this.land(t, 'rebase')
         return { ok: false, error: /conflict/i.test(`${m.out}${m.err}`) ? `Conflict with ${t.base}` : `Merge failed: ${(m.err || m.out).split('\n')[0]}` }
@@ -274,7 +275,7 @@ export class EngineLand extends EngineHandoff {
    * A red main stops the merges: one waits for a green run, so a burst of failures stays one. A fix (its task is made by
    * main-green, or its title starts with Fix) goes in, as only it can turn main green. False when Lineclear is stopping.
    */
-  protected async holdWhileRed(t: TaskRec, g: G.GitHub, cwd: string): Promise<boolean> {
+  protected async holdWhileRed(t: TaskRec, g: GH.GitHub, cwd: string): Promise<boolean> {
     if (t.by === 'main-green' || /^fix\b/i.test(t.title)) return true
     const red = async () => {
       const runs = await GH.branchRuns(g, cwd, t.base!)
@@ -295,7 +296,7 @@ export class EngineLand extends EngineHandoff {
    * commit, then squash-merged on GitHub only while its head is still that commit, its branch there deleted, and main here brought up to GitHub's (which
    * is what Lineclear's own update watches). Failed checks go back to the agent.
    */
-  protected async mergeOnGitHub(t: TaskRec, p: Space, g: G.GitHub, self: boolean): Promise<{ ok: boolean; error?: string; note?: string }> {
+  protected async mergeOnGitHub(t: TaskRec, p: Space, g: GH.GitHub, self: boolean): Promise<{ ok: boolean; error?: string; note?: string }> {
     const wt = t.worktree!
     const base = `origin/${t.base}`
     if (!(await G.git(p.path, 'rev-parse', '--verify', '--quiet', base)).ok)
@@ -323,7 +324,7 @@ export class EngineLand extends EngineHandoff {
     // but breaks is caught by the checks on main.
     let rebased = false
     if (!(await G.mergesCleanly(wt, base, 'HEAD'))) {
-      const rb = await G.rebase(wt, base)
+      const rb = await M.rebase(wt, base)
       if (!rb.ok) return this.conflict(t, self, (await Lane.conflictFiles(wt, base)) ?? (await Lane.sharedFiles(wt, base)))
       rebased = true
     }
@@ -413,7 +414,7 @@ export class EngineLand extends EngineHandoff {
 
   /** main here comes up to GitHub's, so the merge is here too (and Lineclear's own update sees it), then it is marked */
   protected async mergedOnGitHub(t: TaskRec, p: Space, note: string) {
-    const up = await G.catchUp(p.path, t.base!)
+    const up = await M.catchUp(p.path, t.base!)
     return this.markMerged(t, up.ok ? note : `${note}; ${t.base} here is not up to date: ${up.err}`)
   }
 

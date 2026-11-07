@@ -21,7 +21,6 @@ export const writeJson = (name: string, value: unknown) => {
   store.writeJson(name, value)
 }
 export const { fakeHerdr } = await import('./fake-herdr.ts')
-export const G = await import('../server/live/engine/git.ts')
 
 // each engine's timers stop with its test: a sweep an earlier test's engine starts 20 s on (sooner than its test ends
 // on a busy machine) would go through the files this test's engine uses

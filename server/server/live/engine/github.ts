@@ -1,6 +1,45 @@
-// gh for tasks: login, pull requests, their checks and comments, and the runs of a branch.
+// GitHub for tasks: the repo's remote, gh, login, pull requests, their checks and comments, and the runs of a branch.
 import * as Runs from '../../../../src/check-runs.ts'
-import { gh, git, type GitHub, R } from './git.ts'
+import { git, sh } from './git.ts'
+
+/** a GitHub repo as gh reaches it: owner/name, and the host gh is logged in to for it (github.com, github.localhost) */
+export interface GitHub {
+  repo: string
+  host: string
+}
+
+/** host and owner/name of a remote URL in any form git takes: https://host/o/r(.git), ssh://git@host/o/r, git@host:o/r */
+function parseRemote(url: string): GitHub | null {
+  const m = url.trim().match(/^(?:[a-z+]+:\/\/)?(?:[^@/]+@)?([^/:]+)(?::\d+)?[:/]+([^/]+\/[^/]+?)(?:\.git)?\/?$/i)
+  return m && /github/i.test(m[1]) ? { host: m[1].toLowerCase(), repo: m[2] } : null
+}
+
+/**
+ * The repo's GitHub remote, read live (a repo may gain one after it was added): origin as written, and as git rewrites
+ * it (url.insteadOf), so github.com mapped to github.localhost is found either way. gh talks to the host git really
+ * reaches when that is a GitHub one, else to the one written.
+ */
+export async function github(repo: string): Promise<GitHub | null> {
+  return (await githubs(repo))[0] ?? null
+}
+
+/** each GitHub repo origin may be: as git rewrites it first, then as written */
+export async function githubs(repo: string): Promise<GitHub[]> {
+  const [written, used] = await Promise.all([git(repo, 'config', '--get', 'remote.origin.url'), git(repo, 'remote', 'get-url', 'origin')])
+  const all = [used.ok ? parseRemote(used.out) : null, written.ok ? parseRemote(written.out) : null].filter((g): g is GitHub => !!g)
+  return all.filter((g, i) => all.findIndex((x) => x.host === g.host && x.repo === g.repo) === i)
+}
+
+export async function githubRemote(repo: string): Promise<string | null> {
+  return (await github(repo))?.repo ?? null
+}
+
+/** gh for one repo: its host in GH_HOST (gh can't tell github.localhost from the remote alone), never a prompt */
+export const gh = (g: GitHub, cwd: string, ...args: string[]) =>
+  sh(['gh', ...args], cwd, { timeoutMs: 120_000, env: { GH_HOST: g.host, GH_PROMPT_DISABLED: '1', GH_NO_UPDATE_NOTIFIER: '1', NO_COLOR: '1' } })
+
+/** the repo as gh's --repo takes it, host included */
+const R = (g: GitHub) => ['--repo', `${g.host}/${g.repo}`]
 
 /**
  * gh and the repo's host: logged in ("yes"), not logged in there or no gh at all ("no"), or logged in but not answering

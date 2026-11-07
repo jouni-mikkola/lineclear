@@ -30,7 +30,7 @@ new disk         425 MB each, 4245 MB for 10
 ```
 
 The disk limit was over, so a new worktree now links `node_modules` from a store keyed by the hash of the lock file
-(`storePath` in `server/server/live/engine/git.ts`). The first worktree of a lock file installs and moves its `node_modules`
+(`storePath` in `server/server/live/engine/install.ts`). The first worktree of a lock file installs and moves its `node_modules`
 into the store. A changed lock file makes a new entry.
 
 After, 10 more worktrees with the same lock files:
