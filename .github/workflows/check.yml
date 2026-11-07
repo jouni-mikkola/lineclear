@@ -1,11 +1,8 @@
 name: check
 
-# Checks are light and run here, never on a machine of the owner's: no browser, no coverage run, 5 minutes a job at most
-# (test/light-checks.test.ts keeps it so). Changed tests while working, the full light check once at merge.
-# A pull request runs only the tests of what it changed (scripts/check.ts --changed, the quick tier the lane uses too).
-# The merge queue runs the full check once, in 4 jobs that each take every 4th step of it (--shard).
-# A push to main runs it too, so the release loop finds a green "check" on the commit it promotes. Require the job "check" in the branch rules: it is green when the
-# jobs of the event passed.
+# Checks are light and run here, never on an owner's machine (test/light-checks.test.ts keeps it so).
+# A pull request runs the tests of what it changed (scripts/check.ts --changed). The merge queue and main run the full
+# check in 4 jobs that each take every 4th step (--shard). Require the job "check" in the branch rules.
 on:
   pull_request:
   merge_group:
@@ -34,7 +31,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      # the check compares the branch with a local main
       - run: git fetch --no-tags origin main:main
         if: github.base_ref == 'main'
       # Tests commit in fresh repos, which need an identity and a default branch the runner lacks
@@ -43,7 +39,6 @@ jobs:
           git config --global user.email ci@localhost
           git config --global init.defaultBranch main
       - uses: oven-sh/setup-bun@v2
-      # The Bun install cache, keyed by both lockfiles
       - uses: actions/cache@v4
         with:
           path: ~/.bun/install/cache
