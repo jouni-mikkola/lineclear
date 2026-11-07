@@ -29,6 +29,15 @@ const PART_MAX = 60_000;
 /** A review has no session file, so its input is counted from the question's size. */
 const CHARS_PER_TOKEN = 4;
 
+/** The input of the rounds already stored for the task, so a second round adds to the first. */
+function earlierRounds(path: string): number {
+  try {
+    return (JSON.parse(readFileSync(path, "utf8")) as { inputTokens?: number }).inputTokens ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
 /** The repo's own rules, each file under its name. */
 function repoRules(repo: string): string {
   return RULE_FILES.filter((f) => existsSync(join(repo, f)))
@@ -127,7 +136,9 @@ export function review(i: ReviewInput, env: NodeJS.ProcessEnv = process.env): Re
   recordWork(i.task, "review", env);
   const path = reviewPath(i.task, env);
   mkdirSync(dirname(path), { recursive: true });
-  writeAtomic(path, `${JSON.stringify({ task: i.task, model, time: new Date().toISOString(), inputTokens: Math.ceil(question.length / CHARS_PER_TOKEN), findings }, null, 2)}\n`);
+  const inputTokens = Math.ceil(question.length / CHARS_PER_TOKEN) + earlierRounds(path);
+  const stored = { task: i.task, model, time: new Date().toISOString(), inputTokens, findings };
+  writeAtomic(path, `${JSON.stringify(stored, null, 2)}\n`);
   return { ok: true, findings, model, note };
 }
 

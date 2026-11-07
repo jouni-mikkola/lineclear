@@ -11,6 +11,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { reviewPath } from "../src/review-call.ts";
 
 type Task = {
   id: string;
@@ -106,9 +107,9 @@ function tokens(n: number): void {
       .map((t) => {
         // a review is one call without a session: its size is stored with its findings
         if (role === "reviewer") {
-          const file = join(BOARD, "reviews", `${t.id}.json`);
+          const file = reviewPath(t.id, { LINECLEAR_HOME: BOARD });
           const tokensIn = existsSync(file) ? (JSON.parse(readFileSync(file, "utf8")) as { inputTokens?: number }).inputTokens : undefined;
-          return { fresh: tokensIn ?? 0, cached: 0, out: 0, has: tokensIn !== undefined };
+          return { fresh: tokensIn ?? 0, cached: Number.NaN, out: Number.NaN, has: tokensIn !== undefined };
         }
         const u = sessionsOf(t)
           .filter((s) => s.role === role)
@@ -123,6 +124,7 @@ function tokens(n: number): void {
       .filter((p) => p.has);
     const k = (xs: number[]) => xs.map((x) => x / 1000);
     line(`${role} input (new, cache writes), k tokens per task`, k(per.map((p) => p.fresh)), "k", 0);
+    if (role === "reviewer") continue; // a review call reports only the size of its input
     line(`${role} input (cache reads), k tokens per task`, k(per.map((p) => p.cached)), "k", 0);
     line(`${role} output, k tokens per task`, k(per.map((p) => p.out)), "k", 0);
   }

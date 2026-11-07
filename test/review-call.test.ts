@@ -43,7 +43,9 @@ test("a review is one tool-less call with the brief, the diff with 8 lines of co
   expect(call).toContain(" line 22\n"); // 8 lines before the change
   expect(call).not.toContain("\n line 21\n");
   const stored = JSON.parse(readFileSync(reviewPath("T-1", env), "utf8"));
-  expect(stored.inputTokens).toBeGreaterThan(0);
+  expect(Math.abs(stored.inputTokens - call.length / 4)).toBeLessThan(40); // the argv adds only flags to the question
+  review({ task: "T-1", repo, base: "main", brief: "BRIEF TEXT", reviewer: "x/y", worker: "z/w" }, env);
+  expect(JSON.parse(readFileSync(reviewPath("T-1", env), "utf8")).inputTokens).toBeGreaterThan(stored.inputTokens);
   expect(stored.findings).toEqual([
     { severity: "major", file: "a.ts", line: 30, why: "the line is wrong" },
     { severity: "trivial", file: "a.ts", line: 31, why: "style" },
