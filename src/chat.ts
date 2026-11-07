@@ -237,7 +237,7 @@ interface ChatTarget {
   none: string;
 }
 
-const DISPATCHER: ChatTarget = {
+export const DISPATCHER: ChatTarget = {
   none: NONE,
   find: (snap) => {
     const places = Array.isArray(snap?.places) ? snap.places : [];
