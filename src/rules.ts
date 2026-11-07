@@ -74,6 +74,8 @@ export interface State extends StartRecord {
   stalls?: Record<string, StallEntry>;
   /** Steps whose task ended with nothing to merge, with that task: kept for good, so archiving the task does not start the step again. */
   closedSteps?: Record<string, string>;
+  /** When each step last got a task (ms): a tick that reads a task list from before it must not start the step again. */
+  startedSteps?: Record<string, number>;
   /** Owner-only steps with the Inbox item that asks the owner; the owner's Done answer ends the step. */
   ownerItems?: Record<string, number>;
 }

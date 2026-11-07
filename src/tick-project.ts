@@ -281,6 +281,9 @@ function addStepTask(s: Starting, step: Step, host: string | undefined, worker: 
   return world.addTaskOn ? world.addTaskOn(host, settings, title, brief, flags, t.name) : `this world cannot start tasks on ${host}`;
 }
 
+/** How long a step's new task may be missing from the board's list before the step can start again. */
+const RECENT_START_MS = 10 * 60_000;
+
 /**
  * Just before a start, reads the tasks here and on every other machine, and main, again: the list of this tick may be
  * minutes old. A step with a task that is not done anywhere, or merged on origin/main, is never started twice. A
@@ -293,6 +296,9 @@ function whyStale(s: Starting, step: Step): string | undefined {
   const main = world.main(settings.repo);
   if (typeof main === "string") return `main cannot be read again: ${main}`;
   if (!step.reopened && doneIds(main.commits, new Set([step.id])).has(step.id)) return "it is merged on origin/main already";
+  if (state.closedSteps?.[step.id] !== undefined) return `it was closed with nothing to merge by ${state.closedSteps[step.id]}`;
+  const startedAt = state.startedSteps?.[step.id];
+  if (startedAt !== undefined && world.now().getTime() - startedAt < RECENT_START_MS) return "a task was started for it a moment ago, so it does not start twice";
   const here = world.tasks(settings.space);
   if (typeof here === "string") return `its tasks cannot be read again: ${here}`;
   const remote: Task[] = [];
@@ -347,6 +353,7 @@ function startStep(s: Starting, step: Step): boolean {
       return false;
     }
     state.models[step.id] = worker;
+    (state.startedSteps ??= {})[step.id] = world.now().getTime();
     if (cheap) (state.cheap ??= []).push(step.id);
     if (host === undefined) recordStart(state, `${step.id} ${step.title}`, step.id);
     const same = company(reviewer) === company(worker) ? " (same company: no other company has room, a different model reviews with a fresh context)" : "";

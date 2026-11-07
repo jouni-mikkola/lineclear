@@ -85,6 +85,22 @@ test("a step whose task appeared since the tick read its list is not started aga
   expect(t.decisions().some((x) => x.step === "A" && x.reason.includes("does not start twice"))).toBe(true);
 });
 
+test("the same step added twice starts once and is refused the second time", () => {
+  const t = setup({ steps: [step("A", "none")] });
+  t.doTick();
+  expect(t.adds().length).toBe(1);
+  t.doTick();
+  expect(t.adds().length).toBe(1);
+  expect(t.decisions().some((x) => x.step === "A" && x.reason.includes("does not start twice"))).toBe(true);
+});
+
+test("a step closed with nothing to merge starts no agent", () => {
+  const t = setup({ steps: [step("A", "none")] });
+  writeFileSync(join(t.config, "projects", "demo", "state.json"), JSON.stringify({ closedSteps: { A: "LIN-1" } }));
+  staleTick(t, {});
+  expect(t.adds()).toEqual([]);
+});
+
 test("a step merged on origin/main since the tick read it is not started", () => {
   const t = setup({ steps: [step("A", "none")] });
   const real = realWorld(t.env);
