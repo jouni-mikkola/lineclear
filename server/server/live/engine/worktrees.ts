@@ -244,7 +244,7 @@ export class Worktrees {
   private async removeFrom(o: { repo: string; wt?: string; label: string }, space: WorkspaceInfo | undefined, left: string[]) {
     if (o.wt && (await exists(o.wt))) {
       if (space?.worktree) await undone(this.h.worktreeRemove(space.workspace_id, true))
-      if ((await exists(o.wt))) {
+      if (await exists(o.wt)) {
         const r = await G.removeWorktree(o.repo, o.wt, true)
         if (!r.ok && (await exists(o.wt))) left.push(`${tilde(o.wt)} (${(r.err || r.out).split('\n')[0] || 'git could not remove it'})`)
       }
