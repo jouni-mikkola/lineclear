@@ -326,7 +326,7 @@ export class AgentsDelivery extends AgentsState {
       true,
       true,
     )
-    setTimeout(() => this.deliver(r.key), 1000)
+    setTimeout(() => this.deliver(r.key), 250)
     setTimeout(() => this.discoverLog(r.key), 3000)
     setTimeout(() => this.discoverLog(r.key), 15000)
     return this.live.get(r.name) ?? null
@@ -459,7 +459,9 @@ export class AgentsDelivery extends AgentsState {
     const hold = holdFrom(e)
     if (hold === 'menu') return
     const n = (this.backoff.get(key)?.n ?? 0) + 1
-    this.backoff.set(key, { n, until: Date.now() + Math.min(this.backoffMs * 2 ** (n - 1), this.backoffMax) })
+    // an agent still starting is asked again soon: a long backoff there is most of a new task's start time
+    const wait = hold === 'start' ? Math.min(this.backoffMs, 500) : Math.min(this.backoffMs * 2 ** (n - 1), this.backoffMax)
+    this.backoff.set(key, { n, until: Date.now() + wait })
     this.giveUpOnBriefs(key)
     // just started, not herdr's named agent yet: tried again on the next refresh, for a while
     if (hold === 'start') {

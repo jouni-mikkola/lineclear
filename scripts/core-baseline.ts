@@ -71,11 +71,14 @@ function sessionsOf(task: Task): Session[] {
 
 function start(n: number): void {
   const secs: number[] = [];
+  let resent = 0;
   for (const t of doneTasks(n)) {
     const first = sessionsOf(t).find((s) => s.role === "agent")?.firstToolCallAt;
     if (first) secs.push((first - t.created) / 1000);
+    if (t.briefResent) resent++;
   }
   line("task add to first tool call", secs, "s");
+  console.log(`tasks whose brief was sent again: ${resent}`);
 }
 
 function tokens(n: number): void {
