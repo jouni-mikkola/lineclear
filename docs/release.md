@@ -1,12 +1,25 @@
 # Release v0.2
 
+## What v0.2 gives you
+
+You add a step, or tell the Dispatcher a goal, and agents build it, review it and merge it without you. Each machine
+runs as many agents as its own free memory and CPU allow, keeps some memory free and takes little for Lineclear itself.
+A step starts once and runs once: no duplicate tasks, no duplicate pull requests, no stalls for you to clear. When a
+task ends, nothing of it is left behind. Every role works within a token budget, and many agents together merge more
+steps an hour than one agent alone, for no more tokens a step. Any repo you add gets the same flow with no setup of its
+own. The web pages show each role at work in one dark theme, on a desk and on a phone: green is clear, amber waits for
+you, red is broken. `lineclear release` and the top of the Roadmap view show how far v0.2 is: each part's steps, each
+check, the steps that run now and each machine's room.
+
+## For planners
+
 What v0.2 is, as numbers anyone can check, the owner's priorities that rank every step, the order the parts land in,
 and the rule that keeps parallel steps off each other's files. The steps are in [ROADMAP.md](ROADMAP.md). A release
 goes out only when every check below holds on one commit of main.
 
-**v0.2 in one sentence.** Lineclear runs 45 or more agents on 3 machines with little memory and CPU of its own, starts
-each step once, never stalls, leaves nothing behind, and a swarm of agents merges more steps per hour than one agent,
-for no more tokens per merged step, on any project.
+**v0.2 in one sentence.** On each machine Lineclear runs as many agents as the machine's own free memory and CPU allow,
+keeps 1 GiB free and its own share small, starts each step once, never stalls, leaves nothing behind, and a swarm of
+agents merges more steps per hour than one agent, for no more tokens per merged step, on any project.
 
 ## The owner's priorities
 
@@ -38,13 +51,17 @@ Each check has an id (R1 to R22) and its rank. A meter that does not exist yet i
 brackets; the meters that exist are modes of `bun scripts/core-baseline.ts`. "Over a week" means the 7 days before the
 release commit, on every machine.
 
+`lineclear release` reads this section. A Today cell that begins with "holds" holds, one that begins with "not
+measured" (or none) is not measured yet, and any other is today's number, which fails. Each `### P<n>` below is a part,
+and a phase of [ROADMAP.md](ROADMAP.md) whose heading ends in `(P<n>)` counts toward it.
+
 ### P1: the core loop works
 
 | Id | Must hold | Measured by | Today |
 | --- | --- | --- | --- |
-| R1 | 45 or more tasks are Working at once across 3 machines for 10 minutes, no machine above its slots, and no machine's free memory under 1 GiB | `core-baseline.ts load` samples the one task list and each machine's free memory once a minute (core) | shown only with fake machines in a test (L460) |
-| R2 | One agent (pi and its model bridge) uses 450 MB RSS or less at the median | `core-baseline.ts resources` reads the RSS of each agent's process tree (core) | about 420 MB |
-| R3 | Lineclear's own processes use 400 MB RSS or less on the main machine and 100 MB on another, and 5 % of one core or less over 10 minutes with 45 agents working | `core-baseline.ts resources` (core) | not measured |
+| R1 | Each machine runs as many tasks at once as its room allows, and its room comes from its own free memory and CPU (`lineclear room`), never from a number set by hand; for 10 minutes with every room full, no machine runs more than its room and none has under 1 GiB of memory free | `core-baseline.ts load` samples the one task list and each machine's room and free memory once a minute; the run we check is the test setup of 3 machines with 45 tasks (core) | not measured; the room is a slot count set in Settings, and the run is shown only with fake machines in a test (L460) |
+| R2 | One agent (pi and its model bridge) uses 450 MB RSS or less at the median, the size a machine's room counts per agent | `core-baseline.ts resources` reads the RSS of each agent's process tree (core) | holds: about 420 MB |
+| R3 | Lineclear's own processes use 400 MB RSS or less on the main machine and 100 MB on another, and 5 % of one core or less, over 10 minutes with the machine's room full | `core-baseline.ts resources`, in the run of R1 (core) | not measured |
 | R4 | Every step id has at most 1 task over a week, and 0 tasks end with "Nothing to merge" in under a minute | `core-baseline.ts twice` groups the task list by step id (core) | 795 tasks for 37 steps in one hour |
 | R5 | Over a week, at most 1 pull request per step, and 0 open pull requests whose task is closed | `core-baseline.ts prs` joins `gh pr list` with the task list (flow) | 59 duplicate pull requests open |
 | R6 | 2 stall lines an hour or fewer, 0 of class `unknown`, 0 owner taps for a stall over a week | `core-baseline.ts stalls` | 15.5 an hour (before L456) |

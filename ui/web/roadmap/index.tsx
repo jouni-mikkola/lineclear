@@ -8,6 +8,7 @@ import type { Load } from "../data.ts";
 import { isOpen, Label, needsYou, StepPic, stateWord } from "./common.tsx";
 import { PhaseLine } from "./line.tsx";
 import { LineOfRoadmap, RunSwitch } from "./summary.tsx";
+import { ReleaseHead } from "./release.tsx";
 import { AppliedStrip, PlanStrip } from "./since.tsx";
 import { ProjectContext, StepDetails, StepPage } from "./step.tsx";
 
@@ -123,6 +124,7 @@ function Filled({ d, plan, planNote }: { d: RoadmapData; plan?: PlanCard; planNo
     <ProjectContext.Provider value={d.project}>
       <div data-roadmap>
         <h1 className="sr-only">Roadmap</h1>
+        {d.release && <ReleaseHead r={d.release} />}
         {d.tasksError && <p className="break-words text-sm text-fg3">The tasks cannot be read, so no step shows its task: {d.tasksError}</p>}
         <RunSwitch key={d.project} project={d.project} paused={d.paused === true} />
         <LineOfRoadmap line={d.line} project={d.project} />

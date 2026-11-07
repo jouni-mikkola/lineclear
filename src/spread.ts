@@ -85,9 +85,9 @@ export function roomLack(r: Room): string | undefined {
 }
 
 /** What a machine row of the main server's snapshot says: its worker's room and the slots the one store counts. */
-interface MachineRow {
+export interface MachineRow {
   machine: string;
-  room?: { load: number; cores: number; freeKb: number };
+  room?: { load: number; cores: number; freeKb: number; totalKb?: number };
   slots?: { working: number; max: number | null };
 }
 
