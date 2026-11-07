@@ -79,9 +79,6 @@ test("a copy is one small file, holds the store at one moment, and leaves out se
   const store = new Database(join(data, "store.sqlite"));
   store.exec("PRAGMA journal_mode=WAL; CREATE TABLE t (v TEXT); INSERT INTO t VALUES ('one')");
   writeFileSync(join(data, "agents-cold.jsonl"), '{"id":"a","note":"x"}\n'.repeat(200_000));
-  const ids = new Database(join(data, "task-ids.sqlite"));
-  ids.exec("CREATE TABLE s (n INTEGER); INSERT INTO s VALUES (7)");
-  ids.close();
   writeFileSync(join(data, "vault.json"), "TOPSECRET");
   writeFileSync(join(data, "vapid.json"), "TOPSECRET");
   writeFileSync(join(data, "push.json"), "TOPSECRET");
@@ -90,7 +87,6 @@ test("a copy is one small file, holds the store at one moment, and leaves out se
   expect(statSync(file).size).toBeLessThan(5_000_000);
   const held = new Database(file).query("SELECT path, body FROM copy_files").all() as { path: string; body: Uint8Array<ArrayBuffer> }[];
   expect(held.map((r) => r.path)).toContain("tasks.json");
-  expect(held.map((r) => r.path)).toContain("task-ids.sqlite");
   expect(held.filter((r) => new TextDecoder().decode(Bun.gunzipSync(r.body)).includes("TOPSECRET"))).toEqual([]);
   store.exec("INSERT INTO t VALUES ('two')");
   restoreCopy(name, env);

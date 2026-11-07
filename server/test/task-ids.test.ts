@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { mkdtempSync } from 'node:fs'
+import { Database } from 'bun:sqlite'
+import { existsSync, mkdtempSync, readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { TaskIds, MAX_TASK_NUMBER, prefixProblem, taskIdsSection } from '../server/live/task-ids.ts'
@@ -120,5 +121,41 @@ describe('task ID reservations', () => {
     expect(page.global).toBeUndefined()
     expect(page.rows.map((r) => r.key)).toEqual(['taskIds.prefix', 'taskIds.next'])
     expect(page.rows.every((r) => r.text && !r.inherits)).toBe(true)
+  })
+
+  test('an older task-ids.sqlite is imported into store.sqlite and removed', () => {
+    const home = dir()
+    const old = new Database(join(home, 'task-ids.sqlite'))
+    old.exec(
+      "PRAGMA journal_mode=WAL; CREATE TABLE prefixes (prefix TEXT PRIMARY KEY, space TEXT NOT NULL); CREATE TABLE sequences (space TEXT PRIMARY KEY, prefix TEXT NOT NULL, last INTEGER NOT NULL); INSERT INTO prefixes VALUES ('WEB', 'p:machine:web'); INSERT INTO sequences VALUES ('p:machine:web', 'WEB', 41)",
+    )
+    old.close()
+    const ids = new TaskIds([space('web', 'WEB')], empty(), id, home)
+    try {
+      expect(ids.allocate(id('web')).id).toBe('WEB-42')
+    } finally {
+      ids.close()
+    }
+    expect(readdirSync(home).filter((f) => f.startsWith('task-ids.sqlite'))).toEqual([])
+    expect(existsSync(join(home, 'store.sqlite'))).toBe(true)
+  })
+
+  test('two processes take 1000 ids each from one store and get 2000 distinct ones', async () => {
+    const home = dir()
+    new TaskIds([space('web', 'WEB')], empty(), id, home).close()
+    const script = join(home, 'take.ts')
+    await Bun.write(
+      script,
+      `import { TaskIds } from ${JSON.stringify(join(import.meta.dir, '../server/live/task-ids.ts'))}
+const ids = new TaskIds([{ name: 'web', key: 'WEB', path: '/repos/web', github: null, base: 'main', added: 1 }], { next: {}, tasks: [] }, () => 'p:machine:web', process.argv[2])
+const out = Array.from({ length: 1000 }, () => ids.allocate('p:machine:web').id)
+ids.close()
+console.log(out.join(' '))`,
+    )
+    const run = () => Bun.spawn(['bun', script, home], { stdout: 'pipe', env: { ...process.env, LINECLEAR_HOME: join(home, 'unused') } })
+    const procs = [run(), run()]
+    const got = (await Promise.all(procs.map((p) => new Response(p.stdout).text()))).flatMap((t) => t.trim().split(' '))
+    expect(got.length).toBe(2000)
+    expect(new Set(got).size).toBe(2000)
   })
 })

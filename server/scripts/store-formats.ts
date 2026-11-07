@@ -8,7 +8,17 @@ import { join } from 'node:path'
 type Values = Record<string, string>
 
 /** The files the server keeps its settings, spaces and tasks in; the database with its journals. */
-const FILES = ['settings.json', 'tasks.json', 'spaces.json', 'task-ids.sqlite', 'task-ids.sqlite-wal', 'task-ids.sqlite-shm']
+const FILES = [
+  'settings.json',
+  'tasks.json',
+  'spaces.json',
+  'store.sqlite',
+  'store.sqlite-wal',
+  'store.sqlite-shm',
+  'task-ids.sqlite',
+  'task-ids.sqlite-wal',
+  'task-ids.sqlite-shm',
+]
 
 const args = process.argv.slice(2).filter((a) => a !== 'read') // `read` is the old verb: a promotion by an older build may still say it
 const dir = args.find((a) => a !== '--older') ?? process.exit(console.error('usage: store-formats.ts <dir> [--older]') ?? 2)
@@ -81,7 +91,7 @@ function chats(): string[] {
 }
 
 const out: string[] = []
-const readers = { 'settings.json': settings, 'tasks.json': tasks, 'spaces.json': spaces, chatlog: chats, 'task-ids.sqlite': taskIds }
+const readers = { 'settings.json': settings, 'tasks.json': tasks, 'spaces.json': spaces, chatlog: chats, 'store.sqlite': taskIds }
 for (const [name, check] of Object.entries(readers)) {
   try {
     if (existsSync(join(home, name))) out.push(...check())
