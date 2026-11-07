@@ -116,7 +116,7 @@ describe('closing from the command', () => {
     })
     const p = await src.places.add(dir, name)
     const t = src.engine.add({ project: p.name, title: 'Answer', by: 'test' })
-    await until(() => !!t.worktree).catch(() => undefined)
+    await until(() => !!t.worktree && t.phase !== 'starting').catch(() => undefined)
     if (!t.worktree) throw new Error(`${t.id} got no worktree: ${t.trouble}`)
     return { t, dir, place: placeId.space(p.name) }
   }
