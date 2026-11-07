@@ -132,6 +132,21 @@ test("at a phone width the bar is a picture and one 48 px row opens the list of 
   await expect(page.locator("[data-phase-list]")).toHaveCount(0);
 });
 
+test("the phase bar is a track with no outline at rest, counts that add up to the summary and gaps from the 8 px scale", async ({ page }) => {
+  await page.goto("/web-shop/roadmap?state=filled");
+  await page.waitForSelector("[data-bar]");
+  const bar = page.locator("[data-line] [data-bar]:visible");
+  expect(await bar.evaluate((el) => [...el.querySelectorAll("*")].map((e) => getComputedStyle(e).outlineStyle))).not.toContain("solid");
+  expect(await bar.evaluate((el) => Number.parseFloat(getComputedStyle(el).columnGap) % 8)).toBe(0);
+  const labels = await page.locator("[data-segment]").evaluateAll((els) => els.map((e) => e.getAttribute("aria-label") ?? ""));
+  const done = labels.reduce((sum, l) => sum + Number(/(\d+) of \d+ done/.exec(l)?.[1]), 0);
+  await expect(page.locator("[data-roadmap-line]")).toHaveText(new RegExp(`^${done} done`));
+  const open = await page.locator("[data-segment][aria-pressed=true]").getAttribute("aria-label");
+  const [, got, all] = /(\d+) of (\d+) done/.exec(open ?? "") ?? [];
+  const named = page.locator("[data-open-phase] span, [data-phase-row] span").filter({ hasText: " of " });
+  await expect(named.first()).toHaveText(`${got} of ${all} done`);
+});
+
 test.describe("live", () => {
   test.skip(({ viewport }) => viewport?.width !== 1440, "the live view is checked once, at 1440 px");
 

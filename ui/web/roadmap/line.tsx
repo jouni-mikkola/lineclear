@@ -30,28 +30,40 @@ function parallelGroups(steps: RoadmapStep[]): RoadmapStep[][] {
   return groups.filter(Boolean);
 }
 
-/** The bar: a segment per phase, as wide as its steps, filled by what is done. */
+function Fill({ share }: { share: number }) {
+  return (
+    <span className="block h-2 w-full overflow-hidden rounded-full bg-line2">
+      <span className="block h-full rounded-full bg-clear" style={{ width: `${share}%` }} />
+    </span>
+  );
+}
+
+/** The bar: a rounded track per phase, as wide as its steps, filled green by what is done; the open phase is the bright one. */
 function Bar({ phases, open, onPick }: { phases: Phase[]; open: string; onPick?: (name: string) => void }) {
   return (
-    <div className="flex h-3 gap-0.5" data-bar aria-hidden={onPick ? undefined : "true"}>
+    <div className="flex gap-2" data-bar aria-hidden={onPick ? undefined : "true"}>
       {phases.map((p) => {
         const share = (doneCount(p) / p.steps.length) * 100;
-        const style = { flexGrow: p.steps.length, flexBasis: 0, background: `linear-gradient(to right, var(--lc-clear) ${share}%, var(--lc-line2) ${share}%)` };
-        const ring = p.name === open ? "outline-2 outline-offset-2 outline-fg" : "";
+        const shade = p.name === open ? "" : "opacity-50";
+        const grow = { flexGrow: p.steps.length, flexBasis: 0 };
         return onPick ? (
           <button
             key={p.name}
             type="button"
-            style={style}
+            style={grow}
             title={p.name}
             aria-label={`${p.name}, ${doneCount(p)} of ${p.steps.length} done`}
             aria-pressed={p.name === open}
             onClick={() => onPick(p.name)}
-            className={`min-w-1 cursor-pointer rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${ring}`}
+            className={`flex min-h-6 min-w-2 cursor-pointer items-center rounded-full hover:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${shade}`}
             data-segment={p.name}
-          />
+          >
+            <Fill share={share} />
+          </button>
         ) : (
-          <span key={p.name} style={style} className={`min-w-1 rounded-sm ${ring}`} />
+          <span key={p.name} style={grow} className={`min-w-2 ${shade}`}>
+            <Fill share={share} />
+          </span>
         );
       })}
     </div>
@@ -156,11 +168,11 @@ export function PhaseLine({ phases, current, project, byId }: { phases: Phase[];
           type="button"
           onClick={() => setList((l) => !l)}
           aria-expanded={list}
-          className="mt-3 flex h-12 w-full items-center gap-3 rounded-lg bg-raised px-4 text-left hover:bg-raised3 focus-visible:outline-2 focus-visible:outline-accent"
+          className="mt-2 flex h-12 w-full items-center gap-3 rounded-lg bg-raised px-4 text-left hover:bg-raised3 focus-visible:outline-2 focus-visible:outline-accent"
           data-phase-row
         >
           <span className="min-w-0 flex-1 break-words text-fg">{shown.name}</span>
-          <span className="shrink-0 text-sm tabular-nums text-fg3">{`${doneCount(shown)}/${shown.steps.length}`}</span>
+          <span className="shrink-0 text-sm tabular-nums text-fg3">{`${doneCount(shown)} of ${shown.steps.length} done`}</span>
           <span className="text-fg3">
             <Chevron open={list} />
           </span>
@@ -186,7 +198,7 @@ export function PhaseLine({ phases, current, project, byId }: { phases: Phase[];
       </div>
       <p className="mt-4 hidden break-words text-fg md:block" data-open-phase>
         {shown.name}
-        <span className="ml-3 text-sm tabular-nums text-fg3">{`${doneCount(shown)}/${shown.steps.length}`}</span>
+        <span className="ml-3 text-sm tabular-nums text-fg3">{`${doneCount(shown)} of ${shown.steps.length} done`}</span>
       </p>
       <Track key={shown.name} phase={shown} project={project} byId={byId} rise={picked} />
     </section>
