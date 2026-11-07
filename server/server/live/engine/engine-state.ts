@@ -1,4 +1,5 @@
 import { answersTo, renameLater, type TaskIds } from '../task-ids.ts'
+import { chooseModel, firstModel } from '../../../../src/models.ts'
 import { trustWorktree } from '../trust.ts'
 import { existsSync } from '../mfs.ts'
 import { agentEnv, onMachine, type BoxInfo } from '../box.ts'
@@ -424,13 +425,14 @@ export abstract class EngineState extends Emitter<Events> {
     // a task from before tasks kept their own CLI starts on Settings'
     const h = t.agent ?? this.settings.harness('task', this.nameOf(t))
     trustWorktree(t.worktree!, as?.kind ?? rec?.kind ?? h.kind, env)
+    const model = !as && !rec ? this.defaultModel(t, h) : undefined
     const spec: Spec = {
       access: 'full',
       key,
       name: rec?.name ?? `shep-${t.id.toLowerCase()}`,
       kind: as?.kind ?? rec?.kind ?? h.kind,
       // only its first start (or a backup's, on its CLI's own model): later, its own chat's pickers are what count
-      ...(as ? { model: as.model ?? 'default', effort: as.effort } : rec ? {} : { model: h.model, effort: h.effort }),
+      ...(as ? { model: as.model ?? 'default', effort: as.effort } : rec ? {} : { model: model ?? h.model, effort: h.effort }),
       // what Settings said when it started on them: a change since is offered as a restart (restart.ts)
       ...(as || !rec ? { set: this.settings.harness('task', this.nameOf(t)) } : {}),
       cwd: t.worktree!,
@@ -447,6 +449,16 @@ export abstract class EngineState extends Emitter<Events> {
     // a start, not a message to a running agent that launch only heals
     if (!rec || restart || this.agents.status(key) === 'gone') recordWork(t.id, 'agent', undefined, t.machine ?? machineOf())
     return restart ? this.agents.restart(spec, restart) : this.agents.ensure(spec)
+  }
+
+  /** a first start with no model set takes the CLI's first listed one, and says so in the task's facts */
+  private defaultModel(t: TaskRec, h: Harness) {
+    if ((h.model && h.model !== 'default') || !chooseModel(h.kind, h.model)) return undefined
+    const model = firstModel(h.kind)
+    if (!model) return undefined
+    t.facts = [t.facts, `No model was set for ${h.kind}: started on ${model}`].filter(Boolean).join(' · ')
+    this.save()
+    return model
   }
 
   /**

@@ -8,7 +8,7 @@ import { failureTail } from "../server/server/live/secrets.ts";
 import { copiesProblem, runByNote } from "./store-copies.ts";
 import { cacheEnvFile, dataDir, extensionFile, INSTALL_URL, type Paths, SERVICE } from "./paths.ts";
 import { diskTrouble, freeBytes } from "./health.ts";
-import { readModelFile } from "./models.ts";
+import { firstModel, readModelFile } from "./models.ts";
 import { checkoutPointers } from "./install-paths.ts";
 import { buildNames, buildProblem, buildsDir, installReleaseCommand, type RunFrom, unitCommand } from "./builds.ts";
 import { publishedAddress, serveCommand } from "./published.ts";
@@ -293,6 +293,12 @@ function checkoutFree(p: Probe, env: Record<string, string | undefined>): Check 
   return { name: "installed paths", problem: found.join("; "), fix: INSTALL_AGAIN };
 }
 
+/** The model a start takes when no default model is set: pi's first listed one. */
+function newTaskModel(): Check {
+  const model = firstModel("pi");
+  return { name: "model", problem: "", fix: "", info: model ? `a new task with no model set starts on ${model}` : "pi lists no model yet" };
+}
+
 /** The service and the command are the release build, or the problem and the install that fixes it. */
 function stableBuild(p: Probe): Check {
   const problem = p.runFrom ? buildProblem(p.runFrom, p.dataDir ?? dataDir()) : "";
@@ -339,6 +345,7 @@ export function doctorChecks(probe: Probe): Check[] {
     oneServer(p),
     compileCache(p),
     stableBuild(p),
+    newTaskModel(),
     lingering(p),
     disk(p),
     ...herdrPinned(p),
