@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { homeData, lastCards, taskState } from "../src/home-data.ts";
-import { type RoadmapLine, roadmapLine, whereTo } from "../src/progress.ts";
+import { homeData } from "../src/home-data.ts";
+import { lastCards, taskState } from "../src/home-stage.ts";
+import { whereTo } from "../src/progress.ts";
+import { type RoadmapLine, roadmapLine } from "../src/roadmap-line.ts";
 import { roadmapMain } from "../src/roadmap-cli.ts";
 import { roadmapData } from "../src/roadmap-view.ts";
 import { tmp } from "./helpers.ts";

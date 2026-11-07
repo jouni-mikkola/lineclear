@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { homeData, stageSince, stepOf, taskStage } from "../src/home-data.ts";
+import { homeData } from "../src/home-data.ts";
+import { stageSince, stepOf, taskStage } from "../src/home-stage.ts";
 import { waitBlocker } from "../src/home-waits.ts";
 import { plainTitle, whereTo } from "../src/progress.ts";
 import { waitGroups } from "../src/waits.ts";

@@ -1,7 +1,7 @@
 import { readJson } from "../pi/config.ts";
 import { dataDir, piDir } from "./paths.ts";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { readTasksKept, type TaskLine } from "./kept-read.ts";
+import { readTasksKept, type TaskLine } from "./tasks-kept.ts";
 import { join } from "node:path";
 import { readSessions } from "./harness-pi.ts";
 import { reviewerRound, sessionUsage, type Usage } from "./session-text.ts";

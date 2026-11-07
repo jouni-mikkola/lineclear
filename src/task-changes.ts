@@ -1,7 +1,7 @@
 // A task's changes for review, read only: its branch's diff against its base, file by file, and its pull request.
 // From git and `gh` in the task's worktree, with no AI.
 import { existsSync } from "node:fs";
-import { readTasksKept } from "./kept-read.ts";
+import { readTasksKept } from "./tasks-kept.ts";
 import { baseOf, taskGit } from "./task-detail.ts";
 
 const MAX_FILES = 80;

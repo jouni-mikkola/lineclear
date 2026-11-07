@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { appendFileSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readTasksKept } from "../src/kept-read.ts";
+import { readTasksKept } from "../src/tasks-kept.ts";
 
 test("Lineclear's tasks are tasks.json with the old ones of its append log; tasks.json wins, a gone line drops one", () => {
   const dir = mkdtempSync(join(tmpdir(), "lc-kept-"));
