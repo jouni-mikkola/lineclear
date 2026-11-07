@@ -3,18 +3,15 @@ import { randomUUID } from 'node:crypto'
 import { herdr, type AgentInfo } from './herdr.ts'
 import { findPiLog } from './readers/find.ts'
 import { chooseModel, firstModel } from '../../../src/models.ts'
-import { putInto, typeIntoPane } from './agent-input.ts'
+import { putInto } from './agent-input.ts'
 import { applySpec, findSpace, launchArgs, launchFiles, paneFor, startIn } from './agent-start.ts'
 import * as task from './mfs.ts'
-import { type AgentRecord, type Spec, holdFrom, hidden, sleep } from './agents-helpers.ts'
+import { type AgentRecord, type Spec, hidden, sleep } from './agents-helpers.ts'
 import { addLog } from './log-list.ts'
 import { BOX } from './box.ts'
 import { AgentsLink } from './agents-link.ts'
 import { isNews } from './agents-sent.ts'
 import { RpcAgent } from './agent-rpc.ts'
-
-/** how soon a hand-over to an agent that is still starting is tried again */
-const STARTING_RETRY_MS = 300
 
 export class AgentsDelivery extends AgentsLink {
   private starting = new Map<string, Promise<AgentInfo | null>>()
@@ -183,12 +180,12 @@ export class AgentsDelivery extends AgentsLink {
 
   /** hand over what waited, oldest first, while the agent can take it */
   async deliver(key: string): Promise<void> {
-    if (this.delivering.has(key) || Date.now() < (this.backoff.get(key)?.until ?? 0)) return
+    if (this.delivering.has(key)) return
     this.delivering.add(key)
     try {
       for (;;) {
         const next = this.outbox.find((o) => o.key === key)
-        if (!next) return void this.unready.delete(key)
+        if (!next) return
         const drop = () => this.dropWhere((o) => o === next)
         if (this.unwanted(next) || (isNews(next.cid) && this.sent.received(next.cid!))) {
           drop()
@@ -200,13 +197,7 @@ export class AgentsDelivery extends AgentsLink {
           continue
         }
         if (this.heldBy(key, next)) return
-        try {
-          await putInto(this, key, next)
-        } catch (e) {
-          if (!(await typeIntoPane(this, key, next, e))) throw e
-        }
-        this.backoff.delete(key)
-        this.unready.delete(key)
+        await putInto(this, key, next)
         this.went(next)
         drop()
         this.emit('sent', next)
@@ -215,33 +206,11 @@ export class AgentsDelivery extends AgentsLink {
         await this.refresh()
       }
     } catch (e) {
-      this.deliveryFailed(key, e)
+      // what a screen sent fails now; the rest is tried on the next status change
+      this.fail(key, `The agent didn't take it: ${(e as Error).message}`)
     } finally {
       this.delivering.delete(key)
     }
-  }
-
-  /** a hand-over failed: backed off, and given up on once it can't be waited for */
-  protected deliveryFailed(key: string, e: unknown) {
-    const hold = holdFrom(e)
-    if (hold === 'menu') return // it goes in once the menu is gone
-    const n = (this.backoff.get(key)?.n ?? 0) + 1
-    // an agent still starting is asked again soon: a long backoff there is most of a new task's start time
-    const wait = hold === 'start' ? Math.min(this.backoffMs, STARTING_RETRY_MS) : Math.min(this.backoffMs * 2 ** (n - 1), this.backoffMax)
-    this.backoff.set(key, { n, until: Date.now() + wait })
-    this.giveUpOnBriefs(key)
-    if (hold === 'start') {
-      const since = this.unready.get(key) ?? Date.now()
-      this.unready.set(key, since)
-      if (Date.now() - since < this.unreadyFor) {
-        setTimeout(() => void (!this.stopped && this.deliver(key)), wait + 10).unref?.()
-        return
-      }
-      this.unready.delete(key)
-    }
-    this.backoff.delete(key)
-    // what a screen sent fails now; the rest is tried on the next status change
-    this.fail(key, `The agent didn't take it: ${(e as Error).message}`)
   }
 
   protected queue(key: string, texts: string[], ahead = false, brief = false) {

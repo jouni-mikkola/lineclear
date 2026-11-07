@@ -30,21 +30,7 @@ export class AgentsState extends Emitter<Events> {
   stopping = new Set<string>()
   /** since when an agent with screen sends waiting for it is gone (fail after strandAfter) */
   private stranded = new Map<string, number>()
-  /** since when herdr lists an agent that just started but won't take input yet (fail after unreadyFor) */
-  unready = new Map<string, number>()
-  /** after a failed hand-over: when the next try may be, and how many failed in a row */
-  backoff = new Map<string, { until: number; n: number }>()
   strandAfter = 30_000
-  unreadyFor = 60_000
-  backoffMs = 2000
-  backoffMax = 60_000
-  /** an agent herdr won't take a prompt for this long gets the text typed into its pane (pi is up in about 2 s but herdr
-   *  names it later: a 10 s value made every first call 10 s late) */
-  paneAfter = 2000
-  /** a message without a screen's id (the brief) still not in after this long is given up on */
-  briefFor = 300_000
-  readyMs = 30_000
-  submitMs = 5000
   startedIn = new Map<string, string>()
   reachable = true
   lastReach = Date.now()
@@ -140,6 +126,7 @@ export class AgentsState extends Emitter<Events> {
         continue
       }
       const since = this.stranded.get(key) ?? now
+      if (!this.stranded.has(key)) setTimeout(() => this.checkStranded(), this.strandAfter + 10).unref()
       this.stranded.set(key, since)
       if (now - since < this.strandAfter) continue
       this.stranded.delete(key)
@@ -201,7 +188,7 @@ export class AgentsState extends Emitter<Events> {
     if (r) this.keepLog(key, r.kind === 'pi' ? findPiLog(r.cwd, r.started - 5000) : undefined)
   }
 
-  /** why this agent takes nothing now, except an agent herdr refused as not ready yet: that one is simply tried again */
+  /** why this agent takes nothing now */
   protected heldBy(key: string, item?: Pick<OutItem, 'idle'>): Hold | undefined {
     const st = this.status(key)
     // stopping for a restart: what you send goes to the agent it starts on
@@ -209,11 +196,6 @@ export class AgentsState extends Emitter<Events> {
     if (st === 'blocked' || this.menuUp?.(key)) return 'menu'
     if (item?.idle && st === 'working') return 'turn'
     return undefined
-  }
-
-  protected giveUpOnBriefs(key: string) {
-    const now = Date.now()
-    if (this.dropWhere((o) => o.key === key && !!o.brief && now - o.at >= this.briefFor)) this.emit('undelivered', key)
   }
 
   protected went(item: OutItem) {

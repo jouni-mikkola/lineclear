@@ -7,11 +7,10 @@ import { join } from 'node:path'
 process.env.LINECLEAR_HOME = mkdtempSync(join(tmpdir(), 'shep-view-'))
 const { Agents } = await import('../server/live/agents.ts')
 
-test('herdrView gives status, session path, pasted and the time heard', () => {
+test('herdrView gives status, session path and the time heard', () => {
   type Kept = {
     records: Record<string, unknown>
     live: Map<string, unknown>
-    paste: { shown: Set<string> }
     heardAt: number
     herdrView(key: string): unknown
   }
@@ -20,7 +19,5 @@ test('herdrView gives status, session path, pasted and the time heard', () => {
   expect(a.herdrView('T1')).toBeUndefined()
   a.live.set('shep-t1', { name: 'shep-t1', agent_status: 'working', agent_session: { kind: 'path', value: '/s/x.jsonl' } })
   a.heardAt = 42
-  expect(a.herdrView('T1')).toEqual({ status: 'working', session: '/s/x.jsonl', pasted: false, at: 42 })
-  a.paste.shown.add('T1')
-  expect(a.herdrView('T1')).toMatchObject({ pasted: true })
+  expect(a.herdrView('T1')).toEqual({ status: 'working', session: '/s/x.jsonl', at: 42 })
 })

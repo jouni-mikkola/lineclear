@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import type { TermScreen } from '../../shared/types.ts'
-import type { AgentInfo, AgentStatus, HerdrError } from './herdr.ts'
+import type { AgentInfo, AgentStatus } from './herdr.ts'
 import { tag } from './chatlines.ts'
 import { boxDir } from './mfs.ts'
 
@@ -69,6 +69,8 @@ export type SendOpts = Pick<OutItem, 'cid' | 'idle' | 'command'> & { ensure?: ()
 
 export interface Sent {
   waiting: boolean
+  /** what an RPC agent did with it: started, queued or handled */
+  disposition?: string
   waitsFor?: Hold
   item: OutItem
 }
@@ -83,7 +85,6 @@ export type Events = {
   logs: [key: string]
   sent: [item: OutItem]
   failed: [key: string]
-  undelivered: [key: string]
   output: [key: string, screen: TermScreen]
 }
 
@@ -94,16 +95,6 @@ export const promptPath = (name: string) => join(boxDir(), 'prompts', `${name}.m
 export function ownOldPane(e: unknown, list: AgentInfo[], name: string, except: string): string | undefined {
   if (!/already used/.test((e as Error)?.message ?? '')) return undefined
   return list.find((a) => a.name === name && a.pane_id !== except)?.pane_id
-}
-
-/** what a refusal from herdr means for what you send: a menu is up, or the agent just started and herdr doesn't count
- *  it as its named agent yet; anything else, it can't go in */
-export function holdFrom(e: unknown): Hold | undefined {
-  const code = (e as HerdrError).code
-  if (code === 'agent_blocked') return 'menu'
-  if (code === 'agent_not_found' || code === 'agent_not_ready' || code === 'agent_not_running') return 'start'
-  if (/not an active named agent/.test((e as Error)?.message ?? '')) return 'start'
-  return undefined
 }
 
 /** wraps text Lineclear sends that is not for the chat in a tag: <lineclear><news task="SHE-9" event="merged">…</news></lineclear> */

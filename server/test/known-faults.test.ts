@@ -1,16 +1,13 @@
-// Faults of the base that lost an agent's brief: herdr lists a just started agent without its name, and a brief pasted
-// into a CLI that is still starting is never submitted.
+// A fault of the base that lost an agent's brief: herdr lists a just started agent without its name.
 import { describe, expect, spyOn, test } from 'bun:test'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { AgentInfo } from '../server/live/herdr.ts'
-import { until } from './until.ts'
 
 // no herdr is reached: every call that is not mocked fails at once
 process.env.HERDR_SOCKET_PATH = join(tmpdir(), 'no-herdr-known-faults.sock')
 const { Agents } = await import('../server/live/agents.ts')
 const { herdr } = await import('../server/live/herdr.ts')
-const { putInto } = await import('../server/live/agent-input.ts')
 
 const key = 'T-1/Agent'
 const listed = (o: Partial<AgentInfo>): AgentInfo => ({ agent: 'pi', agent_status: 'idle', cwd: '/x', pane_id: 'p1', tab_id: 't', workspace_id: 'w', ...o })
@@ -41,102 +38,6 @@ describe('an agent herdr lists without its name', () => {
     } finally {
       list.mockRestore()
       rename.mockRestore()
-      a.stop()
-    }
-  })
-})
-
-describe('a brief pasted while the CLI starts', () => {
-  const put = (a: InstanceType<typeof Agents>, text: string) => putInto(a, key, { id: 'i', key, text, at: Date.now() })
-
-  test('gets its Enter again when the agent just started is still idle after it', async () => {
-    const a = agents()
-    a.submitMs = 10
-    a.live.set('shep-t-1', listed({ name: 'shep-t-1' }))
-    const prompt = spyOn(herdr, 'prompt').mockResolvedValue(undefined as never)
-    const keys = spyOn(herdr, 'paneKeys').mockImplementation((async () => {
-      a.live.set('shep-t-1', listed({ name: 'shep-t-1', agent_status: 'working' }))
-    }) as never)
-    try {
-      await put(a, 'Do the work.')
-      await Bun.sleep(60)
-      expect(keys).toHaveBeenCalledWith('p1', ['enter'])
-    } finally {
-      prompt.mockRestore()
-      keys.mockRestore()
-      a.stop()
-    }
-  })
-
-  test('a pane that swallows the first Enter and holds the brief unsent gets Enter until the agent works', async () => {
-    const a = agents()
-    a.submitMs = 10
-    a.live.set('shep-t-1', listed({ name: 'shep-t-1' }))
-    const prompt = spyOn(herdr, 'prompt').mockResolvedValue(undefined as never)
-    const visible = spyOn(herdr, 'visible').mockResolvedValue('[paste #1 +40 lines]\n❯ ' as never)
-    // the first Enter is swallowed, the second one submits
-    let pressed = 0
-    const keys = spyOn(herdr, 'paneKeys').mockImplementation((async () => {
-      if (++pressed >= 2) a.live.set('shep-t-1', listed({ name: 'shep-t-1', agent_status: 'working' }))
-    }) as never)
-    try {
-      await put(a, 'Do the work.')
-      await until(() => a.status(key) === 'working', 'the agent to be working')
-      expect(a.status(key)).toBe('working')
-      expect(keys).toHaveBeenCalledTimes(2)
-      expect(prompt).toHaveBeenCalledTimes(1)
-    } finally {
-      prompt.mockRestore()
-      visible.mockRestore()
-      keys.mockRestore()
-      a.stop()
-    }
-  })
-
-  test('is left alone when the agent took it and works, or when it started long ago', async () => {
-    const a = agents()
-    a.submitMs = 10
-    const prompt = spyOn(herdr, 'prompt').mockResolvedValue(undefined as never)
-    const keys = spyOn(herdr, 'paneKeys').mockResolvedValue(undefined as never)
-    try {
-      a.live.set('shep-t-1', listed({ name: 'shep-t-1', agent_status: 'working' }))
-      await put(a, 'Do the work.')
-      await Bun.sleep(60)
-      a.live.set('shep-t-1', listed({ name: 'shep-t-1' }))
-      a.records[key].started = Date.now() - 600_000
-      await put(a, 'A later message.')
-      await Bun.sleep(60)
-      expect(keys).not.toHaveBeenCalled()
-    } finally {
-      prompt.mockRestore()
-      keys.mockRestore()
-      a.stop()
-    }
-  })
-
-  test('a slow-starting agent gets the text once, only when ready, and its Enter again if the turn does not start', async () => {
-    const a = agents()
-    a.submitMs = 200
-    a.live.set('shep-t-1', listed({ name: 'shep-t-1', interactive_ready: false }))
-    const prompt = spyOn(herdr, 'prompt').mockImplementation((async () => {
-      // pasted while not ready: lost
-      if (a.info(key)?.interactive_ready === false) throw new Error('pasted too early')
-    }) as never)
-    setTimeout(() => a.live.set('shep-t-1', listed({ name: 'shep-t-1', interactive_ready: true })), 250)
-    // the first Enter is lost while the CLI starts; the agent works only after the second
-    const keys = spyOn(herdr, 'paneKeys').mockImplementation((async () => {
-      a.live.set('shep-t-1', listed({ name: 'shep-t-1', agent_status: 'working' }))
-    }) as never)
-    try {
-      await put(a, 'Do the work.')
-      // a loaded machine delays the timers: wait for the second Enter instead of a fixed time
-      await until(() => keys.mock.calls.length > 0, 'the keys to be sent')
-      expect(prompt).toHaveBeenCalledTimes(1)
-      expect(keys).toHaveBeenCalledTimes(1)
-      expect(a.status(key)).toBe('working')
-    } finally {
-      prompt.mockRestore()
-      keys.mockRestore()
       a.stop()
     }
   })

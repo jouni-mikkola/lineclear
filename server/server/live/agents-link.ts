@@ -1,6 +1,5 @@
 import { herdr, paneEvents, Subscription, type AgentInfo, type AgentStatus, type HerdrEvent } from './herdr.ts'
 import { LinkBackoff } from './recovery.ts'
-import { PasteWatch } from './paste-watch.ts'
 import { AgentTerminals } from './agent-terminals.ts'
 import { listAfter } from './agent-events.ts'
 import { BOX } from './box.ts'
@@ -10,7 +9,6 @@ import type { AgentHerdr, TermScreen } from '../../shared/types.ts'
 /** The link to herdr: the session read on open and when the subscription drops, the events between, and what follows from
  *  the agents herdr lists. What goes into a pane is the delivery's job. */
 export abstract class AgentsLink extends AgentsState {
-  private timer: ReturnType<typeof setInterval> | null = null
   private sub: Subscription
   private refreshing = false
   private readAgain = false
@@ -19,8 +17,6 @@ export abstract class AgentsLink extends AgentsState {
   private retryTimer: ReturnType<typeof setTimeout> | null = null
   /** every agent herdr listed, named or not: events keep it current between reads */
   private listed: AgentInfo[] = []
-  private pasteDue = new Set<string>()
-  private paste = new PasteWatch()
   private heardAt = 0
   private halted = false
   private retryAt = 0
@@ -60,20 +56,13 @@ export abstract class AgentsLink extends AgentsState {
 
   start() {
     this.refresh()
-    // upkeep of what herdr does not push (stranded sends, expiry); the open subscription is herdr's contact
-    this.timer = setInterval(() => {
-      if (this.reachable) this.lastReach = Date.now()
-      this.settle()
-    }, 2000)
   }
 
   stop() {
     this.halted = true
     for (const rpc of this.rpcs.values()) rpc.stop()
-    if (this.timer) clearInterval(this.timer)
     if (this.retryTimer) clearTimeout(this.retryTimer)
     this.terminals.stop()
-    this.paste.stop()
     this.sub.stop()
   }
 
@@ -81,7 +70,7 @@ export abstract class AgentsLink extends AgentsState {
   herdrView(key: string): AgentHerdr | undefined {
     const a = this.info(key)
     const s = a?.agent_session
-    return a && { status: a.agent_status, ...(s?.kind === 'path' ? { session: s.value } : {}), pasted: this.paste.has(key), at: this.heardAt }
+    return a && { status: a.agent_status, ...(s?.kind === 'path' ? { session: s.value } : {}), at: this.heardAt }
   }
 
   screen(key: string): Promise<TermScreen> {
@@ -132,7 +121,7 @@ export abstract class AgentsLink extends AgentsState {
 
   protected take(list: AgentInfo[]) {
     this.listed = list
-    this.heardAt = Date.now()
+    this.heardAt = this.lastReach = Date.now()
     this.live = new Map(list.filter((a) => a.name).map((a) => [a.name!, a]))
     for (const [key, a] of this.rpcs) if (this.records[key]) this.live.set(this.records[key].name, this.rpcInfo(this.records[key], a))
     this.settle()
@@ -161,11 +150,9 @@ export abstract class AgentsLink extends AgentsState {
       const was = this.told.get(key) ?? 'gone'
       this.told.set(key, now)
       if (was === now) continue
-      this.pasteDue.add(key)
       this.changed(key, now, was)
     }
     for (const r of Object.values(this.records)) if (!this.live.has(r.name) || r.finished) this.unroute(r.key)
-    this.lookAtPastes()
     for (const [name, key] of this.trackedNames()) this.learnSession(key, this.live.get(name))
     for (const key of new Set(this.outbox.map((o) => o.key))) if (!this.heldBy(key)) this.deliver(key)
     this.checkStranded()
@@ -181,12 +168,5 @@ export abstract class AgentsLink extends AgentsState {
     this.emit('status', key, status)
     if (status !== 'gone' && status !== 'blocked') this.deliver(key)
     if (status !== 'gone') this.emit('logs', key)
-  }
-
-  private lookAtPastes() {
-    for (const key of this.trackedKeys()) {
-      if (this.halted) return
-      if (this.pasteDue.delete(key) && !this.rpcs.has(key)) void this.paste.look(key, this.records[key]?.started ?? 0, () => this.info(key)?.pane_id)
-    }
   }
 }
