@@ -6,7 +6,9 @@ import { age } from '../../shared/time.ts'
 import { doneNewestFirst, type RestartInfo } from '../../shared/types.ts'
 import { one, summaryOpts, type Parsed } from './args.ts'
 import { checkTitle, type TaskRec } from './engine/engine.ts'
+import { ended } from './engine/engine-helpers.ts'
 import { validateBase } from './engine/git.ts'
+import { commitsOf, stepIdOfTitle, whyStepRefused } from './engine/step-once.ts'
 import { checkResult } from './engine/result.ts'
 import { BOX, machineRef, noTasks, runOn } from './box.ts'
 import { NAME, placeId } from './places.ts'
@@ -114,11 +116,12 @@ export class LiveSourceSubcommands extends LiveSourceActions {
             'reviewer-effort',
             'set',
             'on',
+            'reopened',
           ].includes(f),
       )
       if (odd.length)
         throw new Error(
-          `Task add takes no --${odd[0]}: only --desc, --result, --space, --base, --after, --later, --set, --agent, --model, --effort, --reviewer, --reviewer-model, --reviewer-effort and --on`,
+          `Task add takes no --${odd[0]}: only --desc, --result, --space, --base, --after, --later, --set, --agent, --model, --effort, --reviewer, --reviewer-model, --reviewer-effort, --on and --reopened`,
         )
       // --set key=value: a How tasks work setting for this task, or what --agent, --reviewer and the like set
       const set: Record<string, string> = {}
@@ -164,6 +167,13 @@ export class LiveSourceSubcommands extends LiveSourceActions {
       }
       const pr = named && this.places.space(named) ? this.places.space(named)! : this.projectFor(p, ctx)
       await validateBase(pr.path, one(p, 'base') ?? pr.base)
+      const open = this.engine.tasks.filter((x) => x.project === placeId.space(pr.name) && !x.archived && !ended(x))
+      const refused = whyStepRefused(
+        title,
+        open,
+        stepIdOfTitle(title) && one(p, 'reopened') !== 'true' ? await commitsOf(pr.path, one(p, 'base') ?? pr.base) : [],
+      )
+      if (refused) throw new Error(refused)
       const after = p.opts.after ?? []
       const agent = harnessOf(p, this.settings)
       const reviewer = reviewerOf(p, this.settings)

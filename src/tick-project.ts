@@ -276,6 +276,8 @@ function addStepTask(s: Starting, step: Step, host: string | undefined, worker: 
     "--set",
     `review.rounds=${settings.reviewRounds ?? DEFAULT_ROUNDS}`,
     ...resultFlag(step),
+    // the board refuses a step that already landed; a reopened one is meant to run again
+    ...(step.reopened ? ["--reopened", "true"] : []),
   ];
   if (host === undefined) return world.addTask(settings.space, title, brief, flags);
   return world.addTaskOn ? world.addTaskOn(host, settings, title, brief, flags, t.name) : `this world cannot start tasks on ${host}`;
