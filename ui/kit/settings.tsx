@@ -359,7 +359,7 @@ export function ProjectSettingsCard({
   /** Called at once when an `Ask me before` box is ticked or cleared. */
   onAsk?: (key: AskKey, on: boolean) => void;
   said?: { text: string; failed?: boolean };
-  /** Details start open, as on /design */
+  /** Details start open */
   open?: boolean;
 }) {
   const [check, setCheck] = useState<string | undefined>();

@@ -4,8 +4,8 @@ import { useFadeIn } from "./hooks.ts";
 import { loop } from "./motion.ts";
 
 // The parts every view is drawn from, on the railway parts of rail.tsx: row, card, tile, bar chart, toast, side panel,
-// bottom bar, side rail, parallel tracks, the stale bar and the laid track. The spec is docs/design.md; /design shows
-// each part in each state. A view draws nothing of its own.
+// bottom bar, side rail, parallel tracks, the stale bar and the laid track. The spec is docs/design.md. A view
+// draws nothing of its own.
 
 // The lamp
 

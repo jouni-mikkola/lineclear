@@ -1,7 +1,7 @@
 // Say each thing once (docs/design.md): no view asks the user to run a command, and no headline repeats the Inbox count.
 import { expect, test } from "@playwright/test";
 
-const VIEWS = ["/", "/web-shop/roadmap", "/chat", "/settings", "/design"];
+const VIEWS = ["/", "/web-shop/roadmap", "/chat", "/settings"];
 const STATES = ["filled", "long", "empty", "error", "real"];
 const COMMAND =
   /\blineclear (move|project|doctor|plan|dispatcher|install|migrate|run|slot|check|roadmap|serve|status|retire|secrets|machine|inbox|uninstall)\b/;

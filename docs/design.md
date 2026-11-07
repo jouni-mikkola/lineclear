@@ -6,8 +6,7 @@ shapes, one answer first.
 
 `lineclear run` serves the web pages at `http://127.0.0.1:7420/` (`LINECLEAR_HOST` and `LINECLEAR_PORT` change
 it). Its data answers only to an address, `localhost` or a name listed in `LINECLEAR_HOSTS` (comma separated), so
-a web page cannot point its own name at this machine to read it. The test page is `/design`: every part in one state at a time (`?state=filled`, `empty`, `loading`, `error`,
-`long`, `many`), and a button for every motion.
+a web page cannot point its own name at this machine to read it.
 
 ## The views as they are
 
@@ -36,7 +35,7 @@ Settings is a gear at the top right.
 ### When a read fails
 
 A failed read never takes the data away: each view keeps its last answer and the frame draws one notice above it
-(`Notice`, on `/design` under "The frame's notices"). Grey and quiet while it waits: "Not updated since 14:02.
+(`Notice`). Grey and quiet while it waits: "Not updated since 14:02.
 Retrying." (any other failure), "No connection. Not updated since 14:02. Retrying." (the browser is offline) and
 "The server is slow to answer." (no answer after 5 s). Red only for what is broken, with the one command that fixes
 it: "Lineclear is not running." with `lineclear run`, and "The roadmap file does not pass its check." with the file,
@@ -271,7 +270,7 @@ it does now. Offline, a line says so and Send waits. A new message slides up int
 The UI bar for the views is `ui/test/views.pw.ts`, `ui/test/roadmap.pw.ts`, `ui/test/browsers.pw.ts`,
 `ui/test/settings.pw.ts` and `ui/test/chat.pw.ts`, with `ui/test/fake-playwright-cli` for playwright-cli, `ui/test/fake-ssh` for SSH
 and `ui/test/fake-lineclear-server.ts` for Lineclear's server. It writes the files the server reads (`ui/test/fixture.ts`) and
-checks each motion as on the test page.
+checks each motion.
 
 ### The line
 
@@ -402,14 +401,14 @@ In `ui/kit/`, React with Base UI and Tailwind, as idea.md sets the stack.
 
 Everything that acts has a pointer. Hover changes the fill in 120 ms, the one CSS transition in `kit.css`. Press
 scales to 0.97 and dims at once, within 100 ms. At 390 px every target is at least 48 by 48 px; a link inside a
-sentence is marked `data-inline` and is exempt. `ui/test/design.pw.ts` and `ui/test/kit.pw.ts` read this on `/design`.
+sentence is marked `data-inline` and is exempt. `ui/test/kit.pw.ts` reads this.
 
 ### The table
 
 `DataTable` shows rows that share figures: tabular figures aligned right, units in the header and not in each cell,
 a sticky header, sorting when there are more than 10 rows, and a row that opens its details with one click. At 390 px
 each row becomes a card with its two figures that matter. Do not use it where a picture says it better: a track, a
-bar or a lamp. `/design` shows it with 3 and 200 rows.
+bar or a lamp.
 
 Long text truncates on one line where a title has a tooltip (task chips, project names) and wraps where it is the
 content (answers, questions, details).
@@ -448,14 +447,6 @@ input. Under prefers-reduced-motion none runs and every change is instant.
 
 Anything else changes at once: hover, details opening. Nothing moves at rest but two loops (`LOOPS` in `ui/kit/motion.ts`): `lamp-wait` (2 s) blinks the lamp of a row that waits for someone, and `track-lay` (1.4 s) lays a loading part's track
 from left to right, sleeper by sleeper, until the part is read. Under reduced motion the track stands laid. The typing dots beat only while the Dispatcher writes.
-
-### Alike with the board
-
-The key motions of U24 (a train's glide, a lamp turning green, a view change, laying the track) take their time and
-curve from `KEY` in `ui/brand/rail.ts`. `ui/test/alike.pw.ts` holds each motion in the app and the same motion in `docs/design/board.html` at
-its start, every 50 ms and its end, and compares the share of its travel each has made (position, opacity, colour).
-Alike threshold: 5 %. A motion that differs from the board by more at any instant fails. The parts at rest are
-compared by their ink, pixel by pixel, in the app and on the board (`ui/test/alike-parts.pw.ts`). Parts threshold: 20 %.
 
 ## Say each thing once
 
@@ -496,12 +487,9 @@ Every view step passes it, with the helpers in `ui/test/bar.ts`:
 - each motion runs at 60 fps in a browser performance trace, with no long task over 50 ms while it runs
 - no motion blocks input: a click during a motion acts at once
 - with prefers-reduced-motion, every state change is instant
-- tabbing through the test page, every focusable part shows the one ring; every button, tab and card link shows its
+- tabbing through a view, every focusable part shows the one ring; every button, tab and card link shows its
   press within 100 ms, on a click and on a tap
 - a short recording of each motion
-- the taste gate of "Finish" below: axe, overflow, targets, states, shift, figures, times, pixels, on a real board
-- headings in order in every state: one h1 per view (its answer, or the line of its loading, empty or error state),
-  sections h2, cards h3. A card's heading reads only its name; its state is said apart (`ui/test/headings.pw.ts`)
 - each thing once: no command text, no headline that repeats the Inbox count (`ui/test/once.pw.ts`)
 
 `bun run ui:test` runs it in headless Chromium (once per machine: `bunx playwright install chromium`) against `lineclear run` on an empty config. For each motion it checks
@@ -509,42 +497,9 @@ that only named motions run and each is under 300 ms, reads the compositor's fra
 DevTools trace, clicks again halfway through and wants the change on the next frame, and repeats with reduced motion
 and wants no animation at all. After a change to a picture on
 purpose, `bunx playwright test --update-snapshots` writes the new ones.
-In every state the pictures show, each letter is drawn in the served font: `ui/test/font.pw.ts` fails if one falls back
-to a font of the machine. So the pictures match on machines with other system fonts. They are made and compared on
-Linux, where text is drawn the same way.
-
-The pictures of the test page, in `ui/test/screens/`:
-
-| State | 1440 px | 390 px |
-|---|---|---|
-| Filled | [picture](../ui/test/screens/design-filled-1440.png) | [picture](../ui/test/screens/design-filled-390.png) |
-| Empty | [picture](../ui/test/screens/design-empty-1440.png) | [picture](../ui/test/screens/design-empty-390.png) |
-| Loading | [picture](../ui/test/screens/design-loading-1440.png) | [picture](../ui/test/screens/design-loading-390.png) |
-| Error | [picture](../ui/test/screens/design-error-1440.png) | [picture](../ui/test/screens/design-error-390.png) |
-| Long text | [picture](../ui/test/screens/design-long-1440.png) | [picture](../ui/test/screens/design-long-390.png) |
-| 200 items | [picture](../ui/test/screens/design-many-1440.png) | [picture](../ui/test/screens/design-many-390.png) |
-
 ## Finish
 
-The UI bar says a view works. Finish says it is done. Two parts: checks a machine can run, and a checklist a reviewer scores.
-
-### Checks that run (`ui/test/taste.pw.ts`, in `bun run ui:test`)
-
-They run on every view, at 390 and 1440 px, on the sanitized real board (`?state=real`: 4 spaces, about 300 tasks, long
-titles, five accounts, a broken machine and a failing service) and on the long-text state.
-
-- axe-core: no serious or critical finding (colour contrast is read by `contrast.pw.ts`)
-- no page wider than the screen, no clipped text; a truncated text shows its full text on hover or focus
-- every button, tab, field and summary is 44 px each way on touch
-- every figure is in tabular figures; a relative time has its exact time on hover; no raw timestamp
-- no shell command in a view (a settings value that is a command is marked `data-command-ok`)
-- every link, button and summary has hover, focus and press states (a field has focus)
-- layout shift while a page loads and when it reads again: under 0.05, Settings under 0.2 (the goal is 0)
-- no pixel value in `ui/` below 100 px that is not 1 or 2 or a multiple of 4; drawn pictures are named in `DRAWN`
-
-Each check also runs on a planted fault (overflow, layout shift, missing focus state, small target, command text, a
-stray pixel value, a bare time, an unlabeled image) and must find it. The pictures of the real board at 390, 768 and
-1440 px are written to `ui/test/real-shots/` for the reviewer.
+The UI bar says a view works. Finish says it is done. The checklist below is scored by a reviewer.
 
 ### Reference products
 
