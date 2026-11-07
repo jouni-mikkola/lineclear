@@ -53,7 +53,6 @@ export function fit(p: Parsed, flag: '' | 'reviewer-', kind: string, model?: str
   return Object.fromEntries(Object.entries({ model: pick(m === undefined ? undefined : (found?.id ?? m)), effort: pick(e) }).filter(([, v]) => v !== undefined))
 }
 
-
 /** Preserve all task options when a helper asks for a task on another machine. */
 export function taskAddArgs(rest: string[], p: Parsed, space?: string): string[] {
   return [

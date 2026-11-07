@@ -131,7 +131,10 @@ export class LiveSourceSubcommands extends LiveSourceSettingsCommand {
         null,
         2,
       )
-    const rows = all.map((t) => `${t.id.padEnd(8)} ${t.status.padEnd(5)} ${t.name}${t.pinned ? '  (pinned)' : ''}${statusLine(t) ? `  · ${statusLine(t)}` : ''}  (on ${machine(t)})`)
+    const rows = all.map(
+      (t) =>
+        `${t.id.padEnd(8)} ${t.status.padEnd(5)} ${t.name}${t.pinned ? '  (pinned)' : ''}${statusLine(t) ? `  · ${statusLine(t)}` : ''}  (on ${machine(t)})`,
+    )
     const archived = only ? 0 : this.engine.tasks.filter((t) => t.archived && (!pr || t.project === placeId.space(pr.name))).length
     return (rows.join('\n') || (only ? 'No archived tasks.' : noTasks())) + (archived ? `\n(${archived} archived: lineclear task list --archived)` : '')
   }
@@ -156,7 +159,9 @@ export class LiveSourceSubcommands extends LiveSourceSettingsCommand {
     tell: async (t, rest, _p, ctx) => {
       // a coordinator's go to a task that waits starts it only when this machine has room
       const r = await this.engine.tell(t.id, rest.slice(1).join(' '), { gate: !ctx.chat?.includes('/') })
-      return r.held ? `${t.id} is held: ${this.heldBecause(r.held)}. It shows as Queued and gets your message when there's room, oldest first.` : `Told ${t.id}.`
+      return r.held
+        ? `${t.id} is held: ${this.heldBecause(r.held)}. It shows as Queued and gets your message when there's room, oldest first.`
+        : `Told ${t.id}.`
     },
     queue: (t, _r, p, ctx) => {
       const refs = p.opts.after ?? []

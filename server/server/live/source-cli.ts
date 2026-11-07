@@ -117,7 +117,9 @@ export class LiveSourceCli extends LiveSourceSubcommands {
     if (a1 === 'list' || !a1)
       return this.places
         .shown()
-        .map((x) => (x.space ? `${x.name}  ${x.space.key}  ${x.space.path}${x.space.github ? `  github:${x.space.github}` : ''}` : `${x.name}  (home space)  ${boxHome()}`))
+        .map((x) =>
+          x.space ? `${x.name}  ${x.space.key}  ${x.space.path}${x.space.github ? `  github:${x.space.github}` : ''}` : `${x.name}  (home space)  ${boxHome()}`,
+        )
         .join('\n')
     if (a1 === 'rename') {
       const x = rest[0] ? this.places.find(rest[0]) : undefined
