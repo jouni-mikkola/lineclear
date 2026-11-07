@@ -6,7 +6,6 @@ import { execFileSync } from 'node:child_process'
 import { hostname } from 'node:os'
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
-import { setOrder, type PlaceOrder, type SectionDefs } from '../../shared/order.ts'
 import { nameProblem, slugify } from '../../shared/types.ts'
 import { HOME, readJson, writeJson } from '../store.ts'
 import { Agents } from './agents.ts'
@@ -88,8 +87,6 @@ export class Places {
   /** Historical task prefixes, including deleted tasks; supplied by the owning engine. */
   takenTaskKeys?: () => string[]
   spaces: Space[] = this.loadSpaces()
-  /** the sidebar's order the human dragged, of every machine's places (see shared/order.ts) */
-  order: PlaceOrder = readJson('order.json', {})
   /** the names the human gave machines and spaces in the sidebar, by id, every machine's: only what shows changes,
    *  never a folder, repo, herdr space or task id */
   names: Record<string, string> = readJson('names.json', {})
@@ -128,20 +125,6 @@ export class Places {
     if (emoji) this.emojis[id] = emoji
     else delete this.emojis[id]
     writeJson('emojis.json', this.emojis)
-  }
-
-  setOrder(under: string, ids: string[]) {
-    setOrder(this.order, under, ids)
-    writeJson('order.json', this.order)
-  }
-
-  /** the sections the human made in the sidebar, by id (shared/order.ts): what is in them is kept with the order */
-  sections: SectionDefs = readJson('sections.json', {})
-
-  /** the sections and the order, after a section changed or a space moved */
-  saveSections() {
-    writeJson('sections.json', this.sections)
-    writeJson('order.json', this.order)
   }
 
   save() {

@@ -1,7 +1,5 @@
-import { deleteSection, moveSpace, newSection, PINNED, renameSection, sectionProblem } from '../../shared/order.ts'
 import { asEmoji, NAME_MAX, nameProblem, type Action } from '../../shared/types.ts'
 import { hidden } from './agents.ts'
-import { isCommand } from './commands.ts'
 import { line } from './chatlines.ts'
 import { BOX } from './box.ts'
 import { NAME, placeId } from './places.ts'
@@ -22,8 +20,7 @@ export class LiveSourceActions extends LiveSourceRestarts {
   protected async actLocal(a: Action): Promise<unknown> {
     switch (a.type) {
       case 'send': {
-        // a slash command goes into the CLI as you typed it, for the CLI to run
-        if (isCommand(a.text) && !a.reply) return this.slashCommand(a.chat, a.text.trim(), a.attachments ?? [], a.cid)
+        if (a.text.trim() === '/new' && !a.reply) return this.newSession(a.chat, a.cid)
         const space = this.spaceOf(a.chat, a.space)
         if (space) return this.replyHere(space, a)
         // your words answer the choice cards still open there: they quote them
@@ -175,21 +172,8 @@ export class LiveSourceActions extends LiveSourceRestarts {
           return { ok: false, error: (e as Error).message }
         }
       }
-      case 'read': {
-        if (!a.chats || typeof a.chats !== 'object') return { ok: false, error: 'No chats to mark read.' }
-        if (this.unread.mark(a.chats)) this.emit('snapshot')
-        return { ok: true }
-      }
       case 'rename': {
         const name = typeof a.name === 'string' ? a.name.replace(/\s+/g, ' ').trim() : null
-        if (this.places.sections[a.id] || a.id === PINNED) {
-          const emoji = a.emoji === undefined ? undefined : asEmoji(a.emoji)
-          const bad = emoji === null ? 'One emoji at a time.' : renameSection(this.places.sections, a.id, name ?? '', emoji)
-          if (bad) return { ok: false, error: bad }
-          this.places.saveSections()
-          this.emit('snapshot')
-          return { ok: true }
-        }
         const { places, machines } = this.listed()
         const m = machines.find((x) => x.id === a.id)
         const p = places.find((x) => x.id === a.id)
@@ -210,43 +194,6 @@ export class LiveSourceActions extends LiveSourceRestarts {
         if (bad) return { ok: false, error: bad }
         this.places.rename(a.id, name)
         if (emoji !== undefined) this.places.setEmoji(a.id, emoji)
-        this.emit('snapshot')
-        return { ok: true }
-      }
-      case 'order': {
-        if (typeof a.under !== 'string' || !Array.isArray(a.ids) || !a.ids.every((x) => typeof x === 'string')) return { ok: false, error: 'No order to keep.' }
-        this.places.setOrder(a.under, a.ids)
-        this.emit('snapshot')
-        return { ok: true }
-      }
-      case 'move': {
-        if (typeof a.id !== 'string' || typeof a.to !== 'string') return { ok: false, error: 'Nothing to move.' }
-        const { places, machines } = this.listed()
-        const bad = moveSpace(this.places.order, this.places.sections, places, machines, a.id, a.to, typeof a.before === 'string' ? a.before : undefined)
-        if (bad) return { ok: false, error: bad }
-        this.places.saveSections()
-        this.emit('snapshot')
-        return { ok: true }
-      }
-      case 'section': {
-        if (a.op === 'delete') {
-          if (!this.places.sections[a.id] || a.id === PINNED) return { ok: false, error: a.id === PINNED ? 'Pinned stays.' : 'No such section.' }
-          deleteSection(this.places.sections, this.places.order, a.id)
-        } else {
-          const name = typeof a.name === 'string' ? a.name.replace(/\s+/g, ' ').trim() : ''
-          const emoji = a.emoji === undefined ? '' : asEmoji(a.emoji)
-          const machine = typeof a.machine === 'string' && a.machine ? a.machine : undefined
-          const { machines } = this.listed()
-          if (emoji === null) return { ok: false, error: 'One emoji at a time.' }
-          if (machine && !machines.some((m) => m.machine === machine)) return { ok: false, error: 'No such machine.' }
-          const bad = sectionProblem(this.places.sections, name, machine)
-          if (bad) return { ok: false, error: bad }
-          const id = newSection(this.places.sections, this.places.order, { name, ...(emoji ? { emoji } : {}), ...(machine ? { machine } : {}) }, machines)
-          this.places.saveSections()
-          this.emit('snapshot')
-          return { ok: true, id }
-        }
-        this.places.saveSections()
         this.emit('snapshot')
         return { ok: true }
       }

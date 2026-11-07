@@ -157,39 +157,23 @@ describe('machine health', () => {
   })
 })
 
-describe('unread', () => {
-  test("something new in a chat shows unread until read; a new message alerts as one (only Notify All lets it buzz), a task's card doesn't", async () => {
+describe('new messages', () => {
+  test("a new coordinator message alerts as one; a task's card and a task's chat don't", () => {
     const key = placeId.home()
     const alerts: import('../shared/types.ts').Alert[] = []
     const off = src.on('alert', (a) => void (a.message && alerts.push(a)))
-    const read0 = src.snapshot().read!['*']
-    expect(read0).toBeGreaterThan(0)
     src.chats.post(key, {
       id: 'unread-q',
       question: { id: 'ask:unread', title: 'Clean the disk now?', kind: 'Question', choices: [{ label: 'Yes' }, { label: 'Later' }], to: key },
     })
-    const at = src.snapshot().last![key]
-    expect(at).toBeGreaterThan(read0)
     expect(alerts.map((a) => [a.title, a.body, a.go.place])).toEqual([[src.chatName(key), 'Clean the disk now?', key]])
-    // a card about a task: unread, but its task's own alert tells of it
     src.chats.post(key, { id: 'unread-card', card: { id: 'unread-card', task: 'X-1', status: 'done', text: 'X-1 is merged' } })
-    expect(src.snapshot().last![key]).toBeGreaterThanOrEqual(at)
-    expect(alerts).toHaveLength(1)
-    // a task's chat: never unread, and no new-message alert (its own alerts say what it needs)
     src.chats.post('X-1/Agent', {
       id: 'unread-task',
       question: { id: 'ask:unread-task', title: 'Which port?', kind: 'Question', choices: [{ label: '80' }, { label: '443' }], to: 'X-1' },
     })
-    expect(src.snapshot().last!['X-1/Agent']).toBeUndefined()
     expect(alerts).toHaveLength(1)
     off()
-    // read on one device: every device's snapshot has it
-    await src.act({ type: 'read', chats: { [key]: src.snapshot().last![key] } })
-    expect(src.snapshot().read![key]).toBe(src.snapshot().last![key])
-    // never back, and never the '*' mark
-    await src.act({ type: 'read', chats: { [key]: 1, '*': 1 } })
-    expect(src.snapshot().read![key]).toBe(src.snapshot().last![key])
-    expect(src.snapshot().read!['*']).toBe(read0)
   })
 })
 

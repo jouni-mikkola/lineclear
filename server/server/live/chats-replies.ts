@@ -1,12 +1,10 @@
-import { cardMessage, type Chat, type Job, type Message, type Reaction } from '../../shared/types.ts'
+import { cardMessage, type Chat, type Message, type Reaction } from '../../shared/types.ts'
 import { stripHidden } from './agents.ts'
 import { agentLines, excerpt, findQuoted, parseReply, parseUserLine, userLines } from './chatlines.ts'
 import { findModel } from '../../../src/models.ts'
-import { sameCommand } from './commands.ts'
 import { sessionRuntime } from './runtime.ts'
 import { launchHarness } from './restart.ts'
 import { CLI_NAME } from './settings.ts'
-import { activityOf, lineOf } from './activity.ts'
 import { shownAs, withAnswer, menuId, words, replied, hostFor } from './chats-helpers.ts'
 import { ChatsLogs } from './chats-logs.ts'
 
@@ -151,14 +149,8 @@ export class ChatsReplies extends ChatsLogs {
     for (const p of l.posted) {
       if (p.card) continue
       if (p.who === 'you') {
-        // a command as you typed it: once the log has it (by its id, or by its name: /new is /clear to Claude Code), the
-        // log's line shows, in your words
-        const logged = p.cid
-          ? (msgs.find((m) => m.cid === p.cid) ??
-            msgs.find(
-              (m) => m.who === 'you' && !m.cid && !echoed.has(m) && !!m.text && sameCommand(m.text, p.text ?? '') && Math.abs((m.at ?? 0) - p.at) < 60_000,
-            ))
-          : undefined
+        // once the log has what you sent (by its id), the log's line shows, in your words
+        const logged = p.cid ? msgs.find((m) => m.cid === p.cid) : undefined
         if (logged) {
           echoed.add(logged)
           // at when it went in: Claude Code logs a menu's command once the menu closes
@@ -177,15 +169,6 @@ export class ChatsReplies extends ChatsLogs {
       if (host && !p.text) {
         if (q) host.question = q
       } else msgs.push({ id: p.id, who: 'agent', at: p.at, text: p.text, question: q })
-    }
-    // each turn's steps fold into one line just before its last reply; a turn nobody sees (news it answered with
-    // nothing) shows none
-    const act = activityOf(ev)
-    for (const t of act.turns) {
-      if (!t.steps.length) continue
-      const reply = t.reply ? msgs.find((m) => m.id === t.reply) : undefined
-      if (!reply && !(t.asked && msgs.some((m) => m.id === t.asked))) continue
-      msgs.push({ id: `act:${t.id}`, who: 'agent', at: reply ? (reply.at ?? 0) - 0.5 : t.end, activity: lineOf(t) })
     }
     msgs.sort((a, b) => (a.at ?? 0) - (b.at ?? 0))
     // what waits to go in, and why: the first in line holds the rest
@@ -260,7 +243,6 @@ export class ChatsReplies extends ChatsLogs {
           : r?.logs.at(-1)
     const runtime = sessionRuntime(ev, file, r?.started ?? 0)
     if (runtime?.model) runtime.modelLabel = findModel(kind, runtime.model)?.label
-    const jobs = this.jobs(key, act).map(({ output: _o, ...j }): Job => j)
     return {
       key,
       cli: CLI_NAME[kind] ?? kind,
@@ -276,8 +258,6 @@ export class ChatsReplies extends ChatsLogs {
       working: st === 'working' || undefined,
       background: (st === 'working' && !this.replying(key, ev)) || undefined,
       finished: (r?.finished && st === 'gone') || undefined,
-      live: st === 'working' && act.open ? lineOf(act.open, true) : undefined,
-      jobs: jobs.length ? jobs : undefined,
       controls: this.controls(),
     }
   }

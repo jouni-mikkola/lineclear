@@ -1,91 +1,19 @@
-import type { Place, Machine, Task, Section } from './types-core.ts'
+import type { Place, Machine, Task } from './types-core.ts'
 import type { SettingSection, Chat } from './types-chat.ts'
-
-/** one file of a task's worktree */
-export interface FileText {
-  path: string
-  size: number
-  text?: string
-  binary?: boolean
-  /** only its start is shown */
-  tooBig?: boolean
-}
-
-/** one file a task changed against its base */
-export interface DiffFile {
-  path: string
-  /** a renamed file's old path */
-  from?: string
-  status: 'added' | 'modified' | 'deleted' | 'renamed'
-  /** lines added and taken out */
-  add: number
-  del: number
-  binary?: boolean
-}
-
-/** what a task changed against its base (main): committed or not */
-export interface Diff {
-  base: string
-  files: DiffFile[]
-  add: number
-  del: number
-}
-
-/** one changed file's unified diff */
-export interface Patch {
-  path: string
-  text: string
-  binary?: boolean
-  tooBig?: boolean
-}
-
-export interface PrCheck {
-  name: string
-  state: 'pass' | 'fail' | 'pending' | 'skip'
-  url?: string
-}
-
-/** a task's pull request on GitHub */
-export interface PullRequest {
-  number: number
-  title: string
-  state: 'open' | 'draft' | 'merged' | 'closed'
-  url: string
-  checks: PrCheck[]
-}
-
-/** what the side panel asks of a task's worktree */
-export type WorktreeAsk = { task: string } & (
-  | { what: 'files' }
-  | { what: 'file'; path: string }
-  | { what: 'diff' }
-  | { what: 'patch'; path: string }
-  | { what: 'pr' }
-)
 
 export interface Snapshot {
   name: string
   host: string
-  /** every space, in the sidebar's order: each machine's home space first */
+  /** every space */
   places: Place[]
-  /** the machines, as headings over their spaces, in the sidebar's order */
+  /** the machines, as headings over their spaces */
   machines: Machine[]
   tasks: Task[]
   /** open coordinator questions, by place id (a choice card's id, or "blocked" on the CLI's own menu): counted as waiting on you */
   asks: Record<string, string>
-  /** Unanswered request IDs by original chat, never forwarded copies. Optional for older machines/plugins. */
-  attentionRequests?: Record<string, string[]>
   settings: SettingSection[]
   /** where the human's name in chat lines comes from */
   user: string
-  /** when each chat (by its key) last had something new from its agent or Lineclear (ms): it shows bold until read */
-  last?: Record<string, number>
-  /** how far you have read each chat (ms), the same on every device; '*': since when read marks are kept, so anything
-   *  older counts as read */
-  read?: Record<string, number>
-  /** the sidebar's sections, as Slack's, each with its spaces in the human's order: the top ones first (Pinned, id
-   *  'pinned', among them), then each machine's, its machine in order (shared/order.ts) */
-  sections?: Section[]
 }
 
 export type Action =
@@ -129,23 +57,10 @@ export type Action =
   /** forget a space (lineclear space remove): its folder and code stay on disk, its coordinator closes, and its open
       tasks and chat come back if it is added again; refused while one of its tasks is working */
   | { type: 'space-remove'; place: string }
-  /** the sidebar's order, dragged by the human: the machines (under 'all'), or one machine's spaces
-      (under its id), or a section's (under its id: 'pinned' for Pinned), or the sections at the top ('sections') or in a
-      machine ('sections:<machine id>'). Kept by the machine the screen talks to, never sent on to another */
-  | { type: 'order'; under: string; ids: string[] }
-  /** a space into a section, or back under its machine (to: the machine's id), before another there or last */
-  | { type: 'move'; id: string; to: string; before?: string }
-  /** a section of the sidebar made (at the top, or inside a machine: its key) or deleted (its spaces go back under their
-      machines); renamed with 'rename'. Kept as the order is */
-  | { type: 'section'; op: 'new'; name: string; emoji?: string; machine?: string }
-  | { type: 'section'; op: 'delete'; id: string }
   /** a machine's or space's name as it shows everywhere ('' gives it back its own); kept by the main machine (id,
       not place: never sent on to another), and nothing else changes: its folder, repo, herdr space and task ids stay */
-  /** a machine's or section's emoji too: '' takes it away, none leaves it */
+  /** a machine's emoji too: '' takes it away, none leaves it */
   | { type: 'rename'; id: string; name: string; emoji?: string }
-  /** chats you have read, each up to its Snapshot.last as the screen saw it. Kept by the machine the screen talks to,
-      never sent on to another */
-  | { type: 'read'; chats: Record<string, number> }
 
 /** an agent's terminal as herdr draws it: its recent lines (ANSI), and the pane's size in cells (none from an older
  *  machine) */

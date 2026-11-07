@@ -24,18 +24,6 @@ class Stub extends Emitter<SourceEvents> {
   async attachment(chat: string, path: string) {
     return chat === 'c' && path.startsWith('/inbox/') ? new Blob(['<svg onload="alert(1)"/>']) : null
   }
-  async folders(machine: string, path: string) {
-    if (path.startsWith('/')) throw new Error('Only folders in your home can be added.')
-    return { path, exists: true, dir: true, repo: null, entries: [{ name: 'dev', path: `~/dev`, repo: false }], machine }
-  }
-  async worktree(ask: { task: string; what: string; path?: string }) {
-    if (ask.path?.includes('..')) throw new Error('No such file.')
-    return { asked: ask }
-  }
-  async addSpace(req: unknown) {
-    acted.push(req)
-    return { place: 'p:h:x' }
-  }
 }
 
 const pushed: { alert: Alert; skip: Set<string> }[] = []
@@ -185,39 +173,5 @@ describe('attached files', () => {
   test("only what the source says was attached; another website can't load it", async () => {
     expect((await get('/etc/passwd')).status).toBe(404)
     expect((await get('/inbox/c/x-shot.png', { 'sec-fetch-site': 'cross-site' })).status).toBe(403)
-  })
-})
-
-describe('adding a space', () => {
-  test("folders are listed for the app's own page, never for another website", async () => {
-    const r = await fetch(`${base}/api/folders?machine=mac&path=${encodeURIComponent('~')}`, { headers: { 'sec-fetch-site': 'same-origin' } })
-    expect(await r.json()).toMatchObject({ path: '~', machine: 'mac', entries: [{ name: 'dev' }] })
-    expect((await fetch(`${base}/api/folders?path=~`, { headers: { 'sec-fetch-site': 'cross-site' } })).status).toBe(403)
-    expect((await fetch(`${base}/api/folders?path=~`, { headers: { origin: 'https://evil.example' } })).status).toBe(403)
-  })
-  test('a refused path says why', async () => {
-    const r = await fetch(`${base}/api/folders?machine=h&path=/etc`)
-    expect(r.ok).toBe(false)
-    expect(((await r.json()) as { error: string }).error).toBe('Only folders in your home can be added.')
-  })
-  test('adding needs the app header from a page, and passes on only what it knows', async () => {
-    const host = `127.0.0.1:${server.port}`
-    const body = JSON.stringify({ machine: 'mac', path: '~/dev/x', name: 'x', create: 1, extra: 'no' })
-    expect((await fetch(`${base}/api/spaces`, { method: 'POST', headers: { origin: `http://${host}` }, body })).status).toBe(403)
-    const r = await fetch(`${base}/api/spaces`, { method: 'POST', headers: { origin: `http://${host}`, 'x-lineclear': '1' }, body })
-    expect(await r.json()).toEqual({ place: 'p:h:x' })
-    expect(acted.at(-1)).toEqual({ machine: 'mac', path: '~/dev/x', name: 'x', create: true })
-  })
-})
-
-describe("a task's worktree", () => {
-  test("read by the app's own page, never by another website; it asks only for what the panel knows", async () => {
-    const r = await fetch(`${base}/api/worktree?task=GTM-1&what=file&path=src/a.ts`, { headers: { 'sec-fetch-site': 'same-origin' } })
-    expect(await r.json()).toEqual({ asked: { task: 'GTM-1', what: 'file', path: 'src/a.ts' } })
-    expect((await fetch(`${base}/api/worktree?task=GTM-1&what=files`, { headers: { 'sec-fetch-site': 'cross-site' } })).status).toBe(403)
-    expect((await fetch(`${base}/api/worktree?task=GTM-1&what=files`, { headers: { origin: 'https://evil.example' } })).status).toBe(403)
-    expect((await fetch(`${base}/api/worktree?task=GTM-1&what=rm`)).status).toBe(400)
-    const bad = await fetch(`${base}/api/worktree?task=GTM-1&what=file&path=../x`)
-    expect(((await bad.json()) as { error: string }).error).toBe('No such file.')
   })
 })

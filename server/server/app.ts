@@ -4,7 +4,7 @@ import type { ServerWebSocket } from 'bun'
 import { basename } from 'node:path'
 import { notifies, waiting } from '../shared/alerts.ts'
 import { fileType } from '../shared/files.ts'
-import type { Action, AddSpace, ServerEvent, WorktreeAsk } from '../shared/types.ts'
+import type { Action, ServerEvent } from '../shared/types.ts'
 import type { Source } from './source.ts'
 import type { Push } from './push.ts'
 
@@ -100,36 +100,6 @@ export function startApp({ source, push, port, host = '127.0.0.1', mounted }: Ap
           return json({ chat: source.chat(key) ?? null, status: source.chatStatus?.(key) })
         }
         if (path === '/api/snapshot') return json(source.snapshot())
-        if (path === '/api/folders') {
-          if (!source.folders) return json({ error: 'Adding spaces is not possible here.' }, 404)
-          return json(await source.folders(q.get('machine') ?? '', q.get('path') ?? '~'))
-        }
-        if (path === '/api/spaces' && req.method === 'POST') {
-          if (!source.addSpace) return json({ error: 'Adding spaces is not possible here.' }, 404)
-          const b = (await req.json()) as AddSpace
-          return json(
-            await source.addSpace({
-              machine: String(b.machine ?? ''),
-              path: String(b.path ?? ''),
-              name: b.name === undefined ? undefined : String(b.name),
-              create: !!b.create,
-            }),
-          )
-        }
-        if (path === '/api/worktree') {
-          if (!source.worktree) return json({ error: 'Not possible here.' }, 404)
-          const what = q.get('what')
-          if (what !== 'files' && what !== 'file' && what !== 'diff' && what !== 'patch' && what !== 'pr')
-            return json({ error: 'Ask for files, file, diff, patch or pr.' }, 400)
-          const ask = { task: q.get('task') ?? '', what, path: q.get('path') ?? '' } as WorktreeAsk
-          return json(await source.worktree(ask))
-        }
-        if (path === '/api/activity') {
-          if (!source.activity) return json({ error: 'Not possible here.' }, 404)
-          const what = q.get('what')
-          if (what !== 'turn' && what !== 'output' && what !== 'job') return json({ error: 'Ask for turn, output or job.' }, 400)
-          return json(await source.activity({ chat: q.get('chat') ?? '', what, id: q.get('id') ?? '' }))
-        }
         if (path === '/api/action' && req.method === 'POST') {
           const a = (await req.json()) as Action
           return json((await source.act(a)) ?? {})
@@ -247,17 +217,7 @@ function sameSite(req: Request, path: string): boolean {
   if (writes && origin !== null && req.headers.get('x-lineclear') !== '1') return false
   // fetch metadata: a cross-site request is never let through, Origin or not
   const site = req.headers.get('sec-fetch-site')
-  if (
-    site === 'cross-site' &&
-    (writes ||
-      path === '/api/ws' ||
-      path === '/api/file' ||
-      path === '/api/folders' ||
-      path === '/api/worktree' ||
-      path === '/api/activity' ||
-      path === '/api/chat')
-  )
-    return false
+  if (site === 'cross-site' && (writes || path === '/api/ws' || path === '/api/file' || path === '/api/chat')) return false
   return true
 }
 

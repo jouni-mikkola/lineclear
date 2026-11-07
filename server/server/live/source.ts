@@ -3,7 +3,6 @@ import { join } from 'node:path'
 import type { Source } from '../source.ts'
 import { HOME } from '../store.ts'
 import { BOX } from './box.ts'
-import { followCommand } from './commands.ts'
 import { HOME_SPACE, placeId } from './places.ts'
 import { LiveSourceUpkeep } from './source-upkeep.ts'
 
@@ -64,7 +63,7 @@ export class LiveSource extends LiveSourceUpkeep implements Source {
     })
     this.agents.on('logs', (key) => this.watched.includes(key) && this.emit('chat', key))
     this.agents.on('sent', (item) => {
-      if (item.command) void followCommand(this.agents, this.chats, item, (key) => this.emit('chat', key))
+      if (item.command) this.followNewSession(item.key, item.text, item.cid)
       this.engine.sent(item.key)
       this.emit('chat', item.key)
     })

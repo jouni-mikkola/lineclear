@@ -1,5 +1,4 @@
 import { taskIdsSection } from './task-ids.ts'
-import { coordinatorRequestIds } from '../../shared/attention.ts'
 import { randomUUID } from 'node:crypto'
 import { BODY_MAX, clip, lastReply, openCards, TITLE_MAX } from '../../shared/alerts.ts'
 import type { Action, Alert, CardAsk, Chat, Question, Snapshot, Task } from '../../shared/types.ts'
@@ -65,15 +64,16 @@ export class LiveSourceViews extends LiveSourceState {
     this.engine.stop()
   }
 
-  /* ---------- unread ---------- */
+  /* ---------- new messages ---------- */
 
-  /** a coordinator's chat may have something new: it shows unread, and a new message buzzes where its place's Notify is
+  /** a coordinator's chat may have something new: a new message buzzes where its place's Notify is
    *  All (app.ts asks shared/alerts.ts notifies); a card about a task does not, the task's own alert says it. A task's
    *  chat counts for nothing here: its row shows its status, and its alerts follow no Notify */
   protected fresh(key: string) {
     if (key.includes('/')) return
     const n = this.chats.newest(key)
-    if (!n || !this.unread.saw(key, n.at)) return
+    if (!n?.at || n.at <= (this.newestSeen.get(key) ?? 0)) return
+    this.newestSeen.set(key, n.at)
     this.emit('snapshot')
     // what the first look after a restart finds came before
     if (n.at < this.born || n.card) return
@@ -110,27 +110,6 @@ export class LiveSourceViews extends LiveSourceState {
     return l.snap?.tasks.find((t) => t.id.toUpperCase() === id.toUpperCase() && t.place.startsWith(`p:${l.rec.machine}:`))
   }
 
-  /** Read original chats only: forwarded cards must never multiply requests. */
-  protected attentionRequests(): Record<string, string[]> {
-    const out: Record<string, string[]> = {}
-    for (const p of [placeId.home(), ...this.places.spaces.map((x) => placeId.space(x.name))]) {
-      const log = this.chats.log(p)
-      out[p] = coordinatorRequestIds(
-        log.posted,
-        log.answers,
-        openCards(this.chats.chat(p)).map((m) => m.question.id),
-        this.agents.status(p) === 'blocked',
-      )
-    }
-    for (const t of this.engine.tasks.filter((t) => !t.archived && this.engine.statusOf(t) === 'need')) {
-      const key = `${t.id}/Agent`
-      const ids = openCards(this.chats.chat(key)).map((m) => m.question.id)
-      // Plain questions and permission menus without a card still require one response.
-      out[key] = ids.length ? ids : ['attention']
-    }
-    return out
-  }
-
   /** the Everywhere defaults, for the other machines (they keep a copy) */
   everywhere() {
     return this.settings.everywhere()
@@ -139,14 +118,10 @@ export class LiveSourceViews extends LiveSourceState {
   /* ---------- reading ---------- */
 
   snapshot(): Snapshot {
-    const { places, machines, sections } = this.listed()
+    const { places, machines } = this.listed()
     const peers = this.peers?.list() ?? []
     const asks = this.asks()
-    const attentionRequests = this.attentionRequests()
-    for (const l of peers) {
-      Object.assign(asks, l.snap?.asks ?? {})
-      Object.assign(attentionRequests, l.snap?.attentionRequests ?? {})
-    }
+    for (const l of peers) Object.assign(asks, l.snap?.asks ?? {})
     return this.withSecrets({
       name: 'Lineclear',
       host: HOST,
@@ -157,10 +132,6 @@ export class LiveSourceViews extends LiveSourceState {
         ...peers.flatMap((l) => this.peers!.tasksOf(l)),
       ],
       asks,
-      attentionRequests,
-      last: Object.assign({}, ...peers.map((l) => l.snap?.last ?? {}), this.unread.last),
-      read: this.unread.read,
-      sections,
       settings: this.settings
         .sections(
           this.devices(),

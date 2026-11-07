@@ -67,17 +67,6 @@ export interface Place {
 
 /** A machine, as a heading over its spaces in the sidebar: no chat, nothing to open. How it is doing shows on it and in
  *  its home space. */
-/** a section of the sidebar that only organizes spaces: Pinned (id 'pinned') or one the human made (s:<id>), at the top
- *  (any machine's spaces) or inside a machine (its key: only its spaces) */
-export interface Section {
-  id: string
-  name: string
-  emoji?: string
-  machine?: string
-  /** the spaces in it, in order */
-  spaces: string[]
-}
-
 /** what Lineclear measures on a machine, as one level each: a share of what it has (CPU: its 1-minute load over its
  *  cores, so over 100 means more work than cores) */
 export type HealthLevel = 'ok' | 'busy' | 'over'

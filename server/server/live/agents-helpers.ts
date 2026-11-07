@@ -54,7 +54,7 @@ export interface OutItem {
   brief?: boolean
   /** a CLI command (/model, /compact): goes in only between turns */
   idle?: boolean
-  /** a slash command you typed: Lineclear follows what it does (commands.ts) */
+  /** /new: Lineclear reads the new session's log */
   command?: boolean
 }
 
@@ -76,7 +76,7 @@ export interface SendOpts {
   cid?: string
   /** a CLI command: only between turns */
   idle?: boolean
-  /** a slash command you typed (commands.ts) */
+  /** /new (see OutItem.command) */
   command?: boolean
 }
 

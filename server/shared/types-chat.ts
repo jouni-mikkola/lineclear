@@ -1,77 +1,5 @@
 import type { Question, Reaction, ReplyQuote, UpdateCard, Task } from './types-core.ts'
 
-/** what kind of step a tool call is, for its icon and its row */
-export type StepKind = 'run' | 'read' | 'edit' | 'search' | 'web' | 'agent' | 'other'
-
-/** A turn's steps grouped into rows that read at a glance: "Edited 2 files: app.ts, panel.tsx", "Ran tests: 41 passed" */
-export interface StepRow {
-  /** the same row whether it came with the turn or from its steps */
-  key: string
-  kind: StepKind
-  text: string
-  added?: number
-  removed?: number
-  /** how many of its steps failed */
-  failed?: number
-  /** its steps (Step.id), in order */
-  steps: string[]
-}
-
-/** What a tool call did, in plain words, from its tool and input (the agent's own short description where it gave one) */
-export interface StepWords {
-  /** once over: "Checked the task list", "Read app.ts", "Searched the code for “review”" */
-  title: string
-  /** while it runs: "Checking the task list" */
-  doing: string
-  /** what it is on, to group by: a file's name (read, edit), a search's words; may be empty */
-  target: string
-  /** the raw thing, one tap deeper: the command, a file's path, the pattern, the address */
-  detail?: string
-  /** an edit's lines added and removed */
-  added?: number
-  removed?: number
-  /** a test run: its outcome ("41 passed") reads from its output once over */
-  test?: boolean
-}
-
-/** One tool call of an agent's turn: what it did, on what */
-export interface Step extends StepWords {
-  id: string
-  kind: StepKind
-  /** the tool's own name: Bash, Read, exec_command */
-  tool: string
-  at: number
-  /** when it ended; none while it runs */
-  end?: number
-  failed?: boolean
-  /** a test run's outcome: "41 passed", "2 failed, 39 passed" */
-  result?: string
-  /** it started this background job (Job.id) */
-  job?: string
-  /** its raw output can be read (activityOf, what: 'output') */
-  output?: boolean
-}
-
-/** A turn's steps as the chat shows them: a few rows at a glance; all its steps come when it opens (activityOf, what:
- *  'turn') */
-export interface TurnActivity {
-  /** the turn's id, to ask for its steps */
-  id: string
-  at: number
-  /** when it ended; none while it runs */
-  end?: number
-  /** the rows that say most, at most three, in the order they happened */
-  rows: StepRow[]
-  /** how many rows more it has */
-  more?: number
-  /** how many steps */
-  steps: number
-  /** the step it is on now (a live turn only) */
-  now?: Step
-  /** how many failed */
-  failed?: number
-}
-
 /** a secret an agent asked for by name: the human types or pastes it in a masked box, for one of the levels offered;
  *  only its name ever shows, never its value */
 export interface SecretAsk {
@@ -112,34 +40,10 @@ export interface Message {
   /** Lineclear's update card about a task, drawn as the card; its text ("SHE-4 is done: …") is what a reaction or a
    *  reply quotes */
   card?: UpdateCard
-  /** a turn's tool steps, as a few rows in plain words, just before its last reply */
-  activity?: TurnActivity
   /** a secret the agent asked for (lineclear secret ask): a masked box to give it in */
   secret?: SecretAsk
   at?: number
 }
-
-/** Work an agent started in the background that still runs */
-export interface Job {
-  id: string
-  kind: 'agent' | 'shell' | 'monitor' | 'headless'
-  /** what it is: a subagent's description, a shell's command, a headless CLI's words */
-  title: string
-  at: number
-  /** what it does now: its latest step, or its output's last line */
-  now?: string
-  /** its own steps (a subagent, a headless agent) or its output (a shell) can be read (activityOf, what: 'job') */
-  more?: 'steps' | 'output'
-}
-
-/** what the screen asks of a chat's activity: a turn's steps, a step's raw output, a background job's steps or output */
-export interface ActivityAsk {
-  chat: string
-  what: 'turn' | 'output' | 'job'
-  id: string
-}
-
-export type ActivityAnswer = { steps: Step[]; more?: number } | { output: string; cut?: boolean } | { error: string }
 
 /** Done tasks newest first, at the end; the rest keep their order (a stable sort) */
 export const doneNewestFirst = <T extends Pick<Task, 'status' | 'doneAt'>>(ts: T[]): T[] => [
@@ -196,10 +100,6 @@ export interface Chat {
   failed?: { cid: string; error: string }[]
   /** finished agent: writing resumes it */
   finished?: boolean
-  /** the turn that runs now: how far it got and its step on now, drawn as one quiet line at the end of the chat */
-  live?: TurnActivity
-  /** what it started in the background that still runs: subagents, shells, headless agents */
-  jobs?: Job[]
   cli: string
   /** what this CLI lets the + menu change; only what it supports is listed */
   controls?: ChatControls
@@ -299,48 +199,4 @@ export interface Alert {
   message?: true
   /** about a task (from its agent, or what it needs): it buzzes whatever its place's Notify, which is its coordinator's */
   task?: true
-}
-
-/** A folder on a machine, for adding a space from the sidebar (home only) */
-export interface FolderEntry {
-  name: string
-  /** as the human writes it: ~/dev/lineclear */
-  path: string
-  /** has its own .git */
-  repo: boolean
-  /** a space already */
-  added?: boolean
-}
-
-/** What a typed path is on that machine, and the folders in it */
-export interface Folders {
-  path: string
-  exists: boolean
-  /** a folder (not a file) */
-  dir: boolean
-  /** the repo it is in (its top folder), if any */
-  repo: string | null
-  added?: boolean
-  entries: FolderEntry[]
-  /** more folders than listed */
-  more?: boolean
-  /** at home: repos it likely is, the latest worked in first */
-  likely?: FolderEntry[]
-}
-
-/** Adding a space from the sidebar: an existing repo, or (create) a new one made there first; its name as given */
-export interface AddSpace {
-  machine: string
-  path: string
-  name?: string
-  create?: boolean
-}
-
-/* ---------- a task's worktree, read only, for its side panel ---------- */
-
-/** the files in a task's worktree: tracked ones and new ones git doesn't ignore */
-export interface TreeFiles {
-  files: string[]
-  /** more files than listed */
-  more?: boolean
 }

@@ -1,6 +1,5 @@
 export type {
   Place,
-  Section,
   HealthLevel,
   HealthMeter,
   Machine,
@@ -15,16 +14,8 @@ export type {
 } from './types-core.ts'
 export { NAME_MAX, asEmoji, slugify, nameProblem, TITLE_MAX, STATUS_MAX, SUMMARY_MAX, splitFacts } from './types-core.ts'
 export type {
-  StepKind,
-  StepRow,
-  StepWords,
-  Step,
-  TurnActivity,
   SecretAsk,
   Message,
-  Job,
-  ActivityAsk,
-  ActivityAnswer,
   ChatControls,
   AgentRuntime,
   RestartHint,
@@ -33,20 +24,9 @@ export type {
   RestartInfo,
   SettingSection,
   Alert,
-  FolderEntry,
-  Folders,
-  AddSpace,
-  TreeFiles,
 } from './types-chat.ts'
 export { doneNewestFirst, cardMessage } from './types-chat.ts'
 export type {
-  FileText,
-  DiffFile,
-  Diff,
-  Patch,
-  PrCheck,
-  PullRequest,
-  WorktreeAsk,
   Snapshot,
   Action,
   TermScreen,
