@@ -16,9 +16,9 @@ const USAGE = [
   "       lineclear roadmap locks <repo> --space <name>",
 ];
 
-function readRoadmap(repo: string, out: Out): { text: string; file: string } | undefined {
+function readRoadmap(repo: string, out: Out): { text: string; place: (line: number) => string } | undefined {
   const road = roadmapFolderText(repo);
-  if (!road) out(`${repo}/docs/ROADMAP.md: no such file`);
+  if (!road) out(`${repo}: no docs/ROADMAP.md and no step files in docs/roadmap`);
   return road;
 }
 
@@ -74,7 +74,7 @@ export function roadmapMain(
   // the form (a short title, a result line) is checked by `check`; the views and the rule loop read older files too
   const errors = sub === "check" ? withFormErrors(checked.errors, parsed.steps) : checked.errors;
   if (errors.length > 0) {
-    for (const e of errors) out(`${road.file}:${e.line}: ${e.message}`);
+    for (const e of errors) out(`${road.place(e.line)}: ${e.message}`);
     return 1;
   }
   if (sub === "check") {
@@ -123,7 +123,7 @@ function showMain(args: string[], out: Out): number {
   const road = readRoadmap(repo, out);
   if (!road) return 1;
   const step = checkRoadmap(road.text).parsed.steps.find((s) => s.id.toLowerCase() === id.toLowerCase());
-  if (!step) return fail(out, `no step '${id}' in ${road.file}`);
+  if (!step) return fail(out, `no step '${id}' in the roadmap of ${repo}`);
   out(stepText(road.text, step));
   return 0;
 }

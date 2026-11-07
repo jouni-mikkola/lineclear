@@ -42,15 +42,29 @@ function joinSteps(files: { name: string; text: string }[]): string | undefined 
     .join("\n\n")}\n`;
 }
 
+/** The step file and its own line for a line of the joined text, as `docs/roadmap/L3.md:5`. */
+function placeInSteps(files: { name: string; text: string }[], line: number): string {
+  let start = 1;
+  for (const f of files.filter((x) => x.name.endsWith(".md")).sort((a, b) => byId(a.name, b.name))) {
+    const lines = f.text.trimEnd().split("\n").length;
+    if (line < start + lines + 1) return `docs/roadmap/${f.name}:${Math.max(1, line - start + 1)}`;
+    start += lines + 1;
+  }
+  return `docs/roadmap:${line}`;
+}
+
 /** The roadmap's text in the working folder: `docs/roadmap/<id>.md` joined when the folder exists, else `docs/ROADMAP.md`. */
-export function roadmapFolderText(repo: string): { text: string; file: string } | undefined {
+export function roadmapFolderText(repo: string): { text: string; place: (line: number) => string } | undefined {
   const folder = join(repo, "docs", "roadmap");
   if (existsSync(folder)) {
-    const text = joinSteps(readdirSync(folder).map((name) => ({ name, text: readFileSync(join(folder, name), "utf8") })));
-    if (text !== undefined) return { text, file: folder };
+    const files = readdirSync(folder)
+      .filter((name) => name.endsWith(".md"))
+      .map((name) => ({ name, text: readFileSync(join(folder, name), "utf8") }));
+    const text = joinSteps(files);
+    if (text !== undefined) return { text, place: (line) => placeInSteps(files, line) };
   }
   const file = join(repo, "docs", "ROADMAP.md");
-  return existsSync(file) ? { text: readFileSync(file, "utf8"), file } : undefined;
+  return existsSync(file) ? { text: readFileSync(file, "utf8"), place: (line) => `docs/ROADMAP.md:${line}` } : undefined;
 }
 
 function originText(repo: string, origin: string): string | undefined {
@@ -68,12 +82,12 @@ function originText(repo: string, origin: string): string | undefined {
 function readSource(repo: string): Source | undefined {
   const [origin, main] = mainRefs(repo);
   const fromOrigin = originText(repo, origin);
-  const shown = { ok: fromOrigin !== undefined };
+  const shown = fromOrigin !== undefined;
   const text = fromOrigin ?? roadmapFolderText(repo)?.text;
   if (text === undefined) return undefined;
   const format = "--format=%H%x01%ct%x01%s%x01%b";
   const originLog = git(repo, "log", origin, "-z", format);
-  const log = shown.ok || originLog.ok ? originLog : git(repo, "log", main, "-z", format);
+  const log = shown || originLog.ok ? originLog : git(repo, "log", main, "-z", format);
   const commits = log.ok
     ? log.out
         .split("\0")
