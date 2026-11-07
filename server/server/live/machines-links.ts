@@ -1,4 +1,5 @@
-import { mkdirSync, openSync, rmSync, watch } from 'node:fs'
+import { randomUUID } from 'node:crypto'
+import { mkdirSync, openSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Chat } from '../../shared/types.ts'
 import { HOME, writeJson } from '../store.ts'
@@ -7,7 +8,7 @@ import { MERGE_DEADLINE } from './engine/engine.ts'
 import type { Kept } from './kept.ts'
 import { LinkPoll, workerRecord } from './link-poll.ts'
 import { CONNECTING_FOR, type Link, dirOf, fits, machineHome, sameBox, workerHome } from './machines-helpers.ts'
-import { codeVersion, running, type Worker } from './worker-process.ts'
+import { codeVersion, readAddress, running, type Worker } from './worker-process.ts'
 
 export class MachinesLinks extends LinkPoll {
   constructor(
@@ -37,7 +38,7 @@ export class MachinesLinks extends LinkPoll {
     l.probe = k.probe
     for (const c of k.chats ?? []) l.chats.set(c.key, c)
     const was = workerRecord(k.saved.label)
-    const w = running(was.pid)
+    const w = running(was.pid, was.token)
     if (!w) return
     if (was.port && was.code === codeVersion()) {
       this.own(l, w)
@@ -138,7 +139,8 @@ export class MachinesLinks extends LinkPoll {
           this.keepTimers.delete(label)
           clearTimeout(l.retryTimer)
           l.ws?.close()
-          const worker = l.worker ?? running(workerRecord(label).pid)
+          const rec = workerRecord(label)
+          const worker = l.worker ?? running(rec.pid, rec.token)
           worker?.kill()
           this.links.delete(label)
           rmSync(join(machineHome(label), 'last.json'), { force: true })
@@ -229,7 +231,8 @@ export class MachinesLinks extends LinkPoll {
     if (!this.active(l)) return
     const box = boxInfo(l.saved, p)
     // a worker left from before (another version of the code): one worker per machine
-    const prior = running(workerRecord(l.saved.label).pid)
+    const was = workerRecord(l.saved.label)
+    const prior = running(was.pid, was.token)
     if (prior) {
       prior.kill()
       await prior.exited
@@ -237,7 +240,8 @@ export class MachinesLinks extends LinkPoll {
     if (!this.active(l)) return
     rmSync(join(home, 'server.json'), { force: true })
     l.rec.url = ''
-    const log = openSync(join(home, 'worker.log'), 'a')
+    const logFile = join(home, 'worker.log')
+    const log = openSync(logFile, 'a')
     const w = Bun.spawn([process.execPath, join(import.meta.dir, '..', 'main.ts')], {
       env: {
         ...process.env,
@@ -245,22 +249,18 @@ export class MachinesLinks extends LinkPoll {
         LINECLEAR_HOME: home,
         LINECLEAR_MACHINE: box.label,
         LINECLEAR_PORT: '0',
+        LINECLEAR_TOKEN: randomUUID(),
         LINECLEAR_MAIN_HOME: HOME,
         LINECLEAR_SHARED_HOME: HOME,
       },
-      stdout: log,
+      stdout: 'pipe',
       stderr: log,
     })
     this.own(l, w)
-    // its address, once it serves: server.json appears in its folder
-    const watcher = watch(home, (_, file) => {
-      if (file && file !== 'server.json') return
-      const port = workerRecord(l.saved.label).port
-      if (!port || l.worker !== w) return
-      watcher.close()
+    void readAddress(w.stdout, logFile, (port) => {
+      if (l.worker !== w) return
       l.rec.url = `http://127.0.0.1:${port}`
       void this.poll(l)
     })
-    void w.exited.then(() => watcher.close())
   }
 }

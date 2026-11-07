@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { appendFileSync, existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 
 export interface Worker {
@@ -26,33 +26,54 @@ export function codeVersion(dir = join(import.meta.dir, '..', '..')) {
   return code
 }
 
-/** a process's command line: /proc where there is one (no process is started on the loop for it), else ps */
-function commandOf(pid: number): string {
+/** a worker prints its address when it serves: the port is found in its output, which goes on to its log */
+export async function readAddress(stdout: ReadableStream<Uint8Array>, logFile: string, found: (port: number) => void) {
+  const decoder = new TextDecoder()
+  const reader = stdout.getReader()
+  let line = ''
+  let seen = false
   try {
-    return readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0').join(' ')
+    for (let r = await reader.read(); !r.done; r = await reader.read()) {
+      const text = decoder.decode(r.value, { stream: true })
+      appendFileSync(logFile, text)
+      if (seen) continue
+      line += text
+      const port = line.match(/lineclear on http:\/\/127\.0\.0\.1:(\d+)/)?.[1]
+      if (port) {
+        seen = true
+        found(Number(port))
+      } else line = line.slice(line.lastIndexOf('\n') + 1)
+    }
   } catch {
-    return Bun.spawnSync(['ps', '-o', 'command=', '-p', String(pid)]).stdout.toString()
+    /* the worker is gone */
   }
 }
 
-/** a worker from before this server started, still running: its process, if it is one of Lineclear's */
-export function running(pid: number | undefined): Worker | undefined {
-  if (!pid || pid === process.pid) return undefined
+/** the token a process was started with: a reused pid has none, or another */
+function tokenOf(pid: number): string | undefined {
+  try {
+    const env = readFileSync(`/proc/${pid}/environ`, 'utf8')
+    return env
+      .split('\0')
+      .find((e) => e.startsWith('LINECLEAR_TOKEN='))
+      ?.slice(16)
+  } catch {
+    // no /proc (macOS): ps prints the environment after the command
+    const out = Bun.spawnSync(['ps', 'eww', '-o', 'command=', '-p', String(pid)]).stdout.toString()
+    return out.match(/(?:^|\s)LINECLEAR_TOKEN=(\S+)/)?.[1]
+  }
+}
+
+/** a worker from before this server started, still running: adopted only when it was started with this token */
+export function running(pid: number | undefined, token: string | undefined): Worker | undefined {
+  if (!pid || !token || pid === process.pid) return undefined
   try {
     process.kill(pid, 0)
   } catch {
     return undefined
   }
-  if (!commandOf(pid).includes('server/main.ts')) return undefined
-  const exited = new Promise((done) => {
-    const t = setInterval(() => {
-      try {
-        process.kill(pid, 0)
-      } catch {
-        clearInterval(t)
-        done(undefined)
-      }
-    }, 2000)
-  })
+  if (tokenOf(pid) !== token) return undefined
+  // not our child, so no exit event: a small child process waits for it, and the loop is not touched
+  const exited = Bun.spawn(['sh', '-c', 'while kill -0 "$0" 2>/dev/null; do sleep 1; done', String(pid)], { stdout: 'ignore', stderr: 'ignore' }).exited
   return { pid, kill: (signal = 'SIGTERM') => process.kill(pid, signal), exited }
 }

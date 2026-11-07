@@ -136,13 +136,14 @@ describe('a restart of the main server (an update)', () => {
       join(dir, 'server', 'main.ts'),
       `const s = Bun.serve({ port: 0, fetch: () => Response.json(${JSON.stringify(snap)}) }); console.log(s.port); setTimeout(() => process.exit(0), 120_000)`,
     )
-    const p = spawn(process.execPath, [join(dir, 'server', 'main.ts')])
-    return new Promise<{ pid: number; port: number; alive: () => boolean }>((done) =>
-      p.stdout.once('data', (d) => done({ pid: p.pid!, port: Number(String(d).trim()), alive: () => p.exitCode === null && p.signalCode === null })),
+    const token = `t${Math.random()}`
+    const p = spawn(process.execPath, [join(dir, 'server', 'main.ts')], { env: { ...process.env, LINECLEAR_TOKEN: token } })
+    return new Promise<{ pid: number; port: number; token: string; alive: () => boolean }>((done) =>
+      p.stdout.once('data', (d) => done({ pid: p.pid!, port: Number(String(d).trim()), token, alive: () => p.exitCode === null && p.signalCode === null })),
     )
   }
 
-  async function before(w: { pid: number; port: number }, code: string) {
+  async function before(w: { pid: number; port: number; token: string }, code: string) {
     const { HOME, writeJson } = await import('../server/store.ts')
     const { Machines, codeVersion } = await import('../server/live/machines.ts')
     writeJson('machines/far/last.json', {
@@ -150,7 +151,7 @@ describe('a restart of the main server (an update)', () => {
       snap,
       chats: [{ key: 'p:far:web', cli: 'Claude Code', messages: [{ id: 'm1', who: 'agent', at: 1, text: 'Done.' }] }],
     })
-    writeJson('workers/far/server.json', { port: w.port, pid: w.pid, code: code || codeVersion() })
+    writeJson('workers/far/server.json', { port: w.port, pid: w.pid, token: w.token, code: code || codeVersion() })
     return { HOME, Machines, writeJson }
   }
 
@@ -198,7 +199,7 @@ describe('a restart of the main server (an update)', () => {
       expect(l.reachable).toBe(true)
       // the old worker stops, and a new one serves on another port, as the doctor leaves it
       process.kill(w.pid)
-      writeJson('workers/far/server.json', { port: next.port, pid: next.pid })
+      writeJson('workers/far/server.json', { port: next.port, pid: next.pid, token: next.token })
       await until(() => l.reachable && l.rec.url.endsWith(`:${next.port}`), 'the link to follow the new worker')
       expect(l.rec.url).toBe(`http://127.0.0.1:${next.port}`)
       expect(l.reachable).toBe(true)
