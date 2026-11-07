@@ -17,7 +17,9 @@ then web.
 
 ## v0.2 starts with
 
-These 10 steps have disjoint files and locks and no `after` between them, so all start at once:
+These 10 steps have disjoint files and locks and no `after` between them, so all start at once. L701 waits only
+for L503, which is in review now. L582 keeps its machine half (no `remoteSeen`, no per-machine `tasks.json`); the
+task table is L701's.
 
 | Rank | Step | Priority | Plan |
 | --- | --- | --- | --- |
@@ -27,7 +29,7 @@ These 10 steps have disjoint files and locks and no `after` between them, so all
 | 4 | L702 A task has one phase | 1 | core |
 | 5 | L704 Stalls run on deadlines | 1 | core |
 | 6 | L703 A closed task closes its PR | 1 | core |
-| 7 | L582 One task store | 1 | ROADMAP (one brain across machines) |
+| 7 | L582 One task store (machine half) | 1 | ROADMAP (one brain across machines) |
 | 8 | L600 Questions go to the project chat | 1 | ROADMAP (a question never stalls a task) |
 | 9 | L707 One id series in the store | 2 | core |
 | 10 | L706 A store copy is one file | 2 | core |
