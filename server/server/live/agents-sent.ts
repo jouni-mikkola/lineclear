@@ -1,7 +1,7 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { HOME } from '../store.ts'
-import { durableWrite } from './engine/task-store.ts'
+import { durableWrite } from './engine/durable.ts'
 import type { OutItem } from './agents-helpers.ts'
 
 /** internal news carries a cid of this form and is never a screen's message */

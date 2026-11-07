@@ -1,4 +1,4 @@
-import { withHotLog } from "./hot-log.ts";
+import { readTasksKept } from "./tasks-kept.ts";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -17,32 +17,9 @@ const FRESH_MS = 3 * HOUR_MS;
 const storeCopiesDir = (env: Env = process.env) =>
   env.LINECLEAR_STORE_COPIES ?? join(env.XDG_DATA_HOME || join(env.HOME || homedir(), ".local", "share"), "lineclear", "store-copies");
 
-/** The tasks a data folder holds: the hot ones in tasks.json and one per id in the cold log. */
+/** The tasks a data folder holds. */
 export function taskCount(dir: string): number {
-  let n = 0;
-  try {
-    const hot = withHotLog(dir, JSON.parse(readFileSync(join(dir, "tasks.json"), "utf8")) as { tasks?: { id?: string }[] });
-    n += Array.isArray(hot.tasks) ? hot.tasks.length : 0;
-  } catch {
-    // no file, or one that is not JSON: no hot tasks
-  }
-  try {
-    // an append log: the last line of an id wins and {"gone": id} drops it
-    const ids = new Set<string>();
-    for (const line of readFileSync(join(dir, "tasks-cold.jsonl"), "utf8").split("\n")) {
-      try {
-        const r = JSON.parse(line) as { id?: unknown; gone?: unknown };
-        if (typeof r.gone === "string") ids.delete(r.gone);
-        else if (typeof r.id === "string") ids.add(r.id);
-      } catch {
-        // a blank or torn line
-      }
-    }
-    n += ids.size;
-  } catch {
-    // no cold log
-  }
-  return n;
+  return readTasksKept(dir).tasks.length;
 }
 
 export interface StoreCopy {

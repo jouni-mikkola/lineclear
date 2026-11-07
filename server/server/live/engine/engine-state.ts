@@ -6,9 +6,7 @@ import type { Agents } from '../agents.ts'
 import type { Chats } from '../chats.ts'
 import { HOST, type Places, type Space } from '../places.ts'
 import type { Settings } from '../settings.ts'
-import { Briefs, withoutBrief } from './briefs.ts'
-import { COLD_AFTER, ColdLog, withCold } from './cold.ts'
-import { TaskStore } from './task-store.ts'
+import { TaskRows } from './task-rows.ts'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { join } from 'node:path'
 import { HeadWatch } from './lane-watch.ts'
@@ -26,11 +24,8 @@ export abstract class EngineState extends Emitter<Events> {
     super()
   }
 
-  /** main: by project path, the failing commit on GitHub's main its coordinator was told of, until main is green */
-  private cold = new ColdLog<TaskRec>()
-  private briefs = new Briefs()
-  protected store = new TaskStore<TaskRec>()
-  protected data = this.briefs.loaded(withCold(this.cold, this.store.load()))
+  protected store = new TaskRows<TaskRec>()
+  protected data = this.store.load()
   taskIds!: TaskIds
   protected wrote = new Map<string, number>()
   /** when its agent last reported its progress (lineclear status) */
@@ -107,12 +102,9 @@ export abstract class EngineState extends Emitter<Events> {
     this.save()
   }
 
-  /** the tasks at work, and those ended in the last COLD_AFTER, written whole; older ones only when they change */
+  /** writes the rows of the tasks that changed */
   protected save() {
-    const now = Date.now()
-    this.briefs.write(this.data.tasks)
-    const hot = this.cold.save(this.data.tasks, (t) => ended(t) && now - (t.doneAt ?? t.updated) >= COLD_AFTER, withoutBrief)
-    this.store.save({ ...this.data, tasks: hot.map(withoutBrief) })
+    this.store.save(this.data)
     this.emit('changed')
   }
 

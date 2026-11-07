@@ -305,11 +305,12 @@ api_up() {
 data_dir() { printf '%s' "${LINECLEAR_HOME:-$HOME/.lineclear}"; }
 copies_dir() { printf '%s' "${LINECLEAR_STORE_COPIES:-$app/store-copies}"; }
 
-# store_tasks <data folder>: how many tasks it holds (the hot ones and the cold log's ids).
+# store_tasks <data folder>: how many tasks it holds (the live rows of store.sqlite, or in an older folder the hot ones and the cold log's ids).
 store_tasks() {
   bun -e 'const fs = require("fs"), d = process.argv[process.argv.length - 1]; let n = 0;
 try { n += JSON.parse(fs.readFileSync(d + "/tasks.json", "utf8")).tasks.length; } catch {}
 try { const ids = new Set(); for (const l of fs.readFileSync(d + "/tasks-cold.jsonl", "utf8").split("\n")) { try { const r = JSON.parse(l); if (typeof r.gone === "string") ids.delete(r.gone); else if (typeof r.id === "string") ids.add(r.id); } catch {} } n += ids.size; } catch {}
+try { const { Database } = require("bun:sqlite"); const db = new Database(d + "/store.sqlite", { readonly: true }); n += db.query("select count(*) as n from tasks where retired = 0").get().n; db.close(); } catch {}
 console.log(n);' "$1" 2>/dev/null || echo 0
 }
 
