@@ -143,7 +143,7 @@ export class EngineLand extends EngineHandoff {
   }
 
   protected async mergeNow(t: TaskRec, self: boolean): Promise<{ ok: boolean; error?: string; note?: string }> {
-    const held = this.heldByRedMain(t)
+    const held = this.heldByRedClaim(t)
     if (held) return { ok: false, error: held }
     const r = await this.onMachineOf(t, () => this.mergeOnMachine(t, self))
     // a merge that failed lets the next one try: only a landed merge counts
@@ -158,7 +158,7 @@ export class EngineLand extends EngineHandoff {
    * One red on main stops the merges: the first task to merge while main is red goes through (it may be the fix, as a
    * fix task always does), the rest wait for a green run, so a burst of failures is one failure.
    */
-  private heldByRedMain(t: TaskRec): string | undefined {
+  private heldByRedClaim(t: TaskRec): string | undefined {
     const p = this.proj(t)
     const red = this.data.red?.[p.path]
     if (!red || t.by === 'main-green') return
