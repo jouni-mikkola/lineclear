@@ -1,8 +1,8 @@
 // Flaky tests: a failure that passes when run alone is a flake. A quarantined flake no longer fails the check; a failure alone still does.
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import type { Failure } from "./failures.ts";
 
-export const QUARANTINE_FILE = "test/quarantine.json";
+const QUARANTINE_FILE = "test/quarantine.json";
 export const QUARANTINE_MAX = 5;
 
 /** `test` is `<file>: <name>`, as src/check-runs.ts names a failed test; `task` is the task that fixes it. */
@@ -11,10 +11,12 @@ export interface Quarantined {
   task: string;
 }
 
-export const testKey = (f: Failure, prefix = ""): string => `${prefix}${f.file.replace(/^\.\//, "")}: ${f.test}`;
+const testKey = (f: Failure, prefix = ""): string => `${prefix}${f.file.replace(/^\.\//, "")}: ${f.test}`;
 
 export function readQuarantine(path = QUARANTINE_FILE): Quarantined[] {
-  return existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")) as Quarantined[]) : [];
+  const list = existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")) as Quarantined[]) : [];
+  if (list.length > QUARANTINE_MAX) throw new Error(`${path} holds ${list.length} tests, at most ${QUARANTINE_MAX} may be quarantined`);
+  return list;
 }
 
 /** The list with `test` added; refused when it is full, so a sixth flake gets fixed instead of hidden. */
@@ -23,8 +25,6 @@ export function withQuarantined(list: Quarantined[], test: string, task: string)
   if (list.length >= QUARANTINE_MAX) throw new Error(`quarantine is full (${QUARANTINE_MAX} tests): fix one before quarantining ${test}`);
   return [...list, { test, task }];
 }
-
-export const saveQuarantine = (list: Quarantined[], path = QUARANTINE_FILE): void => writeFileSync(path, `${JSON.stringify(list, null, 2)}\n`);
 
 export interface Verdict {
   /** failed, passed alone, and in quarantine: not held against the check */
@@ -44,9 +44,10 @@ export async function judge(
 ): Promise<Verdict & { ok: boolean }> {
   const verdict: Verdict = { quarantined: [], flaky: [], broken: [] };
   const known = new Set(list.map((q) => q.test));
-  for (const f of failures) {
+  const alone = await Promise.all(failures.map(passesAlone));
+  for (const [i, f] of failures.entries()) {
     const key = testKey(f, prefix);
-    if (!(await passesAlone(f))) verdict.broken.push(key);
+    if (!alone[i]) verdict.broken.push(key);
     else if (known.has(key)) verdict.quarantined.push(key);
     else verdict.flaky.push(key);
   }
