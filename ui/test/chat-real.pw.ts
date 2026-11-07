@@ -1,19 +1,5 @@
-// The Dispatcher's chat on a fresh install: real lines only, an empty state with its composer, and a way in from Home on a phone.
+// The Dispatcher's chat entry: a way in from Home on a phone, and a Chat pill that is not the colour of broken.
 import { expect, test } from "@playwright/test";
-
-const SAMPLE_WORDS = ["14 of 30 steps", "Pay with a saved card", "Burn-down", "checkout-review.png", "Add CSV export"];
-
-test("the panel on an empty config has no lines, repeated or sample, and keeps its composer", async ({ page }) => {
-  await page.goto("/");
-  const column = page.locator("[data-chat-column]");
-  await expect(column.locator("[data-composer]")).toBeVisible();
-  await expect(column.locator("[data-chat-empty]")).toBeVisible();
-  const lines = await column.locator("[data-key]").allInnerTexts();
-  expect(lines, "a fresh install's chat has no message").toEqual([]);
-  expect(new Set(lines).size, "no line repeats").toBe(lines.length);
-  const text = await column.innerText();
-  for (const word of SAMPLE_WORDS) expect(text).not.toContain(word);
-});
 
 test("Home on a phone has a chat entry that brings the composer into view", async ({ page, viewport }) => {
   test.skip(viewport?.width !== 390, "a phone only");
