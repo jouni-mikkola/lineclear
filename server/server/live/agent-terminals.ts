@@ -13,8 +13,9 @@ export class AgentTerminals {
   constructor(
     private info: (key: string) => AgentInfo | undefined,
     output: (key: string, screen: TermScreen) => void,
+    read: (key: string) => Promise<TermScreen>,
   ) {
-    this.clock = new TerminalClock((k) => this.screen(k), output, BOX ? 1500 : 500)
+    this.clock = new TerminalClock(read, output, BOX ? 1500 : 500)
   }
 
   /** its terminal's recent lines and the pane's size, so a screen draws them at its real width; the size is read again

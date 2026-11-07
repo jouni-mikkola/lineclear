@@ -10,6 +10,7 @@ import { until } from './until.ts'
 process.env.HERDR_SOCKET_PATH = join(tmpdir(), 'no-herdr-known-faults.sock')
 const { Agents } = await import('../server/live/agents.ts')
 const { herdr } = await import('../server/live/herdr.ts')
+const { putInto } = await import('../server/live/agent-input.ts')
 
 const key = 'T-1/Agent'
 const listed = (o: Partial<AgentInfo>): AgentInfo => ({ agent: 'pi', agent_status: 'idle', cwd: '/x', pane_id: 'p1', tab_id: 't', workspace_id: 'w', ...o })
@@ -46,8 +47,7 @@ describe('an agent herdr lists without its name', () => {
 })
 
 describe('a brief pasted while the CLI starts', () => {
-  const put = (a: InstanceType<typeof Agents>, text: string) =>
-    (a as unknown as { put: (k: string, i: unknown) => Promise<void> }).put(key, { id: 'i', key, text, at: Date.now() })
+  const put = (a: InstanceType<typeof Agents>, text: string) => putInto(a, key, { id: 'i', key, text, at: Date.now() })
 
   test('gets its Enter again when the agent just started is still idle after it', async () => {
     const a = agents()

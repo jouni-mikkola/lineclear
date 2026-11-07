@@ -3,7 +3,7 @@ import { Emitter } from '../source.ts'
 import { readJson, writeJson } from '../store.ts'
 import { ColdAgents } from './engine/cold.ts'
 import { addLog } from './log-list.ts'
-import type { AgentHerdr } from '../../shared/types.ts'
+import type { AgentHerdr, TermScreen } from '../../shared/types.ts'
 import type { Subscription, AgentInfo, AgentStatus } from './herdr.ts'
 import { findPiLog } from './readers/find.ts'
 import { PasteWatch } from './paste-watch.ts'
@@ -77,6 +77,7 @@ export class AgentsState extends Emitter<Events> {
   protected terminals = new AgentTerminals(
     (k) => this.info(k),
     (k, s) => this.emit('output', k, s),
+    (k) => this.screen(k), // by name, so a subclass or a test can replace screen
   )
   protected told = new Map<string, AgentStatus | 'gone'>()
   /** whether a menu a slash command opened is up, which herdr doesn't see: typed text could pick an option */
@@ -206,7 +207,7 @@ export class AgentsState extends Emitter<Events> {
     }
     this.delivered = [...lately(this.delivered, now), entry].slice(-200)
   }
-  screen(key: string) {
+  screen(key: string): Promise<TermScreen> {
     return this.terminals.screen(key)
   }
 }

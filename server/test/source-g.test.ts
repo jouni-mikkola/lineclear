@@ -4,6 +4,8 @@ import { execSync } from 'node:child_process'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { paneFor } from '../server/live/agent-start.ts'
+import type { AgentRecord } from '../server/live/agents-helpers.ts'
 
 describe("the home space's herdr space", () => {
   test("is home: the one the coordinators shared, still called Coordinators, is renamed in place, never a repo's, and no second one opens", async () => {
@@ -65,8 +67,7 @@ describe('coordinator tab', () => {
     })
     try {
       const rec = { workspace: 'Tabs', tab: 'coordinator', name: 'c', cwd: '/' }
-      const paneFor = (src.agents as unknown as { paneFor(r: unknown): Promise<string> }).paneFor.bind(src.agents)
-      for (let i = 0; i < 3; i++) await paneFor(rec)
+      for (let i = 0; i < 3; i++) await paneFor(rec as AgentRecord)
       expect(tabs.filter((t) => t.label === 'coordinator').map((t) => t.pane_id)).toEqual(['p3'])
       expect(tabs.some((t) => t.label === 'notes')).toBe(true)
     } finally {
