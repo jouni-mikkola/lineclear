@@ -33,7 +33,7 @@ export function shotsList(files: string[]): string {
 export const shotsIn = (list: string): string[] => [...list.matchAll(/^- `([^`]+\.png)`/gm)].map((m) => m[1] ?? "");
 
 /** Pictures that are not of the app: the mark, the illustrations and the brand directions. */
-const NOT_THE_APP = ["docs/brand/", "docs/readme/", "ui/brand/"];
+const NOT_THE_APP = ["docs/brand/", "ui/brand/"];
 /** The brand directions are drawings of what Home could look like: each says so in its alt text. */
 const DIRECTIONS = "docs/brand/home/";
 
