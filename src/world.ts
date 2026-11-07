@@ -1,5 +1,5 @@
 import { statSync } from "node:fs";
-import { loadavg } from "node:os";
+import { hostname, loadavg } from "node:os";
 import { join } from "node:path";
 import { claimWorld } from "./claims.ts";
 import { sessionFolderPath } from "./harness-pi.ts";
@@ -13,6 +13,7 @@ import { serverBin } from "./paths.ts";
 import { readSetup, type Settings } from "./project.ts";
 import { fitTitle, type Task } from "./roadmap.ts";
 import { runAll } from "./run-all.ts";
+import { openLeases } from "./step-leases.ts";
 import { addTasksAt, type NewTask, type Room, readRoom } from "./spread.ts";
 import { agentLastError, type ChatCard, realChatCards, realStallCards, type StallCard } from "./stalls.ts";
 import { agentStart, nudgePane, type StartState } from "./starts.ts";
@@ -57,6 +58,8 @@ export interface World {
   claimedSteps?(repo: string): string[];
   /** Deletes the steps' claims, all at once. */
   releaseSteps?(repo: string, steps: string[]): void;
+  /** Keeps this loop's claims alive; a loop that goes quiet loses them after the lease. */
+  renewClaims?(): void;
   /** What another machine of the project says about its room and its tasks, or why it cannot be reached. */
   room?(host: string, space: string): Room | string;
   /** The machine's one-minute load average. */
@@ -307,6 +310,7 @@ export function realWorld(env = process.env): World {
       run,
       (cmds) => runAll(cmds, env),
       (repo) => refsOf(repo)[0],
+      { store: openLeases(lineclearDir(env)), owner: `${hostname()}:${process.pid}` },
     ),
     ...taskWorld(serverBin(env), io, env),
     stallCards: (space, repo) => io.memo(`stall\0${space}\0${repo}`, () => realStallCards(space, repo, env)),

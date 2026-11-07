@@ -3,6 +3,7 @@
 // through its REST API: creating a ref that exists fails, so only one loop wins, and no git push (no hook, no pack
 // write) is involved.
 import type { Cmd, Ran } from "./run-all.ts";
+import type { StepLeases } from "./step-leases.ts";
 import type { World } from "./world.ts";
 
 const CLAIM_PREFIX = "refs/lineclear/claims/";
@@ -22,9 +23,43 @@ function githubRepo(run: Run, repo: string): string | undefined {
 }
 
 /** The claim operations of the world, on top of ways to run one command and many at once. */
-export function claimWorld(run: Run, runAll: RunAll, originMain: (repo: string) => string): Pick<World, "claimSteps" | "claimedSteps" | "releaseSteps"> {
+export function claimWorld(
+  run: Run,
+  runAll: RunAll,
+  originMain: (repo: string) => string,
+  leases?: { store: StepLeases; owner: string },
+): Pick<World, "claimSteps" | "claimedSteps" | "releaseSteps" | "renewClaims"> {
+  const github = githubClaims(run, runAll, originMain);
+  // The lease is taken first: one insert decides between loops of this machine before GitHub is asked.
+  const leaseKey = (repo: string, step: string) => `${repo}\0${step}`;
   return {
     claimSteps(repo, steps) {
+      if (leases === undefined) return github.claimSteps(repo, steps);
+      const won = steps.map((step) => leases.store.claim(leaseKey(repo, step), leases.owner));
+      const asked = github.claimSteps(
+        repo,
+        steps.filter((_, i) => won[i]),
+      );
+      let next = 0;
+      return steps.map((step, i) => {
+        if (!won[i]) return "held";
+        const answer = asked[next++];
+        if (answer) leases.store.release(leaseKey(repo, step));
+        return answer;
+      });
+    },
+    claimedSteps: github.claimedSteps,
+    releaseSteps(repo, steps) {
+      for (const step of steps) leases?.store.release(leaseKey(repo, step));
+      github.releaseSteps(repo, steps);
+    },
+    renewClaims: () => leases?.store.renew(leases.owner),
+  };
+}
+
+function githubClaims(run: Run, runAll: RunAll, originMain: (repo: string) => string) {
+  return {
+    claimSteps(repo: string, steps: string[]): (string | undefined)[] {
       const gh = githubRepo(run, repo);
       if (gh === undefined || steps.length === 0) return steps.map(() => undefined);
       // The ref must point at a commit GitHub has: origin/main's head.
@@ -37,7 +72,7 @@ export function claimWorld(run: Run, runAll: RunAll, originMain: (repo: string) 
       }));
       return runAll(cmds).map((r) => (r.code === 0 ? undefined : /Reference already exists/i.test(r.out + r.err) ? "held" : firstLine(r)));
     },
-    claimedSteps(repo) {
+    claimedSteps(repo: string): string[] {
       const gh = githubRepo(run, repo);
       if (gh === undefined) return [];
       const r = run(["gh", "api", "--paginate", `repos/${gh}/git/matching-refs/${CLAIM_PREFIX.slice("refs/".length)}`, "--jq", ".[].ref"]);
@@ -48,7 +83,7 @@ export function claimWorld(run: Run, runAll: RunAll, originMain: (repo: string) 
         .filter((ref) => ref.startsWith(CLAIM_PREFIX))
         .map((ref) => ref.slice(CLAIM_PREFIX.length));
     },
-    releaseSteps(repo, steps) {
+    releaseSteps(repo: string, steps: string[]): void {
       const gh = githubRepo(run, repo);
       if (gh === undefined || steps.length === 0) return;
       runAll(
