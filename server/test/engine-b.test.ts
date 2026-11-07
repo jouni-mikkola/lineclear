@@ -281,25 +281,16 @@ describe("a task's CLI, model and effort", () => {
   // CI-quarantine: fails on a GitHub runner only, cause not found yet
   test.skipIf(Boolean(process.env.CI))("Settings' for tasks, unless the coordinator chose others for this one; only on its first start", async () => {
     const w = world()
-    ;(w.settings as any).at('all')['task.model'] = 'opus'
+    ;(w.settings as any).at('all')['task.model'] = 'openai/gpt-5.5'
     const { t, key } = await started(w, repo(), 'harness-engine')
-    // an alias goes in as the model it names now
-    expect(w.started[0]).toMatchObject({ kind: 'claude', model: 'claude-opus-5-5', effort: undefined })
-    expect(t.agent).toEqual({ kind: 'claude', model: 'claude-opus-5-5', effort: undefined })
+    expect(w.started[0]).toMatchObject({ kind: 'pi', model: 'openai/gpt-5.5', effort: undefined })
+    expect(t.agent).toEqual({ kind: 'pi', model: 'openai/gpt-5.5', effort: undefined })
     w.settings.set('task.model', null)
     const p = w.places.byName('harness-engine')!
-    const t2 = w.engine.add({ project: p.name, title: 'On Codex', by: 'test', agent: { kind: 'codex', effort: 'low' } })
+    const t2 = w.engine.add({ project: p.name, title: 'Low effort', by: 'test', agent: { kind: 'pi', effort: 'low' } })
     await until(() => w.started.some((s) => s.key === `${t2.id}/Agent`))
-    expect(w.started.find((s) => s.key === `${t2.id}/Agent`)).toMatchObject({ kind: 'codex', model: undefined, effort: 'low' })
-    expect(w.engine.view(t2).on).toBe('Codex')
-    // another CLI drops Settings' model, which names one of Claude Code's
-    ;(w.settings as any).at('all')['task.model'] = 'claude-opus-5-5'
-    const t3 = w.engine.add({ project: p.name, title: 'Codex too', by: 'test', agent: { kind: 'codex' } })
-    expect(t3.agent).toEqual({ kind: 'codex', model: undefined, effort: undefined })
-    const t4 = w.engine.add({ project: p.name, title: 'Claude', by: 'test', agent: { kind: 'claude', effort: 'max' } })
-    expect(t4.agent).toEqual({ kind: 'claude', model: 'claude-opus-5-5', effort: 'max' })
-    w.settings.set('task.model', null)
-    await until(() => [t3, t4].every((x) => w.started.some((s) => s.key === `${x.id}/Agent`)))
+    expect(w.started.find((s) => s.key === `${t2.id}/Agent`)).toMatchObject({ kind: 'pi', model: undefined, effort: 'low' })
+    expect(w.engine.view(t2).on).toBe('pi')
     // started again later (its chat may have picked another model since): what its record holds counts
     w.agentIs(key, 'gone')
     await w.engine.resume(t.id)

@@ -158,13 +158,13 @@ describe('interactive chat capabilities', () => {
     const { KIND, REVIEWERS } = await import('../server/live/settings.ts')
     const settings = new Settings({ everywhere: {}, machine: {}, spaces: {} })
     const legacy = new Settings({ everywhere: { 'task.agent': 'Antigravity' }, machine: {}, spaces: {} })
-    expect(legacy.get('task.agent')).toBe('Antigravity')
+    expect(legacy.get('task.agent')).toBe('pi')
     for (const key of ['task.agent', 'coordinator.agent', 'task.fallback']) {
       const row = CATALOG.flatMap((s) => s.rows).find((r) => r.key === key)!
       expect(row.options!.filter((v) => v !== 'off').map((v) => KIND[v])).toEqual(CHAT_KINDS)
       const before = settings.get(key)
       for (const value of ['Antigravity', 'Gemini', 'Cursor']) {
-        expect(settings.set(key, value)).toMatchObject({ ok: false, error: expect.stringContaining('no chat log reader') })
+        expect(settings.set(key, value)).toMatchObject({ ok: false, error: expect.stringContaining('not an agent herdr can start') })
         expect(settings.get(key)).toBe(before)
       }
     }
@@ -173,7 +173,7 @@ describe('interactive chat capabilities', () => {
       expect(LOG_FINDERS[kind]).toBeFunction()
     }
     expect(settings.set('task.fallback', 'off').ok).toBe(true)
-    expect(REVIEWERS).toEqual(['Claude Code', 'pi'])
+    expect(REVIEWERS).toEqual(['pi'])
   })
 
   test('unsupported starts and restarts fail before callbacks or agent state changes', async () => {

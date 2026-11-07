@@ -4,8 +4,8 @@ import { describe, expect, test } from 'bun:test'
 describe('settings', () => {
   test('only app settings are left, set Everywhere; none belongs to a task', () => {
     const s = new Settings()
-    expect(s.get('task.agent')).toBe('Claude Code')
-    expect(s.get('coordinator.agent')).toBe('Claude Code')
+    expect(s.get('task.agent')).toBe('pi')
+    expect(s.get('coordinator.agent')).toBe('pi')
     expect(s.get('brief.review')).toBe('on')
     expect(s.get('brief.merge')).toBe('on its own')
     // what the model judges for itself is no setting
@@ -79,28 +79,25 @@ describe('settings', () => {
   })
   test("tasks and coordinators each start on their own CLI, model and effort; default is the CLI's own", () => {
     const s = new Settings()
-    expect(s.harness('task')).toEqual({ kind: 'claude', model: undefined, effort: undefined })
+    expect(s.harness('task')).toEqual({ kind: 'pi', model: undefined, effort: undefined })
     s.set('coordinator.agent', 'pi')
     s.set('coordinator.model', 'openai/gpt-5.5')
     s.set('coordinator.effort', 'high')
     expect(s.harness('coordinator')).toEqual({ kind: 'pi', model: 'openai/gpt-5.5', effort: 'high' })
-    expect(s.harness('task').kind).toBe('claude')
+    expect(s.harness('task').kind).toBe('pi')
     for (const k of ['coordinator.agent', 'coordinator.model', 'coordinator.effort']) s.set(k, null)
   })
-  test("a task's change is reviewed by Claude Code on its own model and effort, unless Settings say another", () => {
+  test("a task's change is reviewed by pi on its own model and effort, unless Settings say another", () => {
     const s = new Settings()
-    expect(s.harness('reviewer')).toEqual({ kind: 'claude', model: undefined, effort: undefined })
+    expect(s.harness('reviewer')).toEqual({ kind: 'pi', model: undefined, effort: undefined })
     s.set('reviewer.effort', 'high')
-    expect(s.harness('reviewer')).toEqual({ kind: 'claude', model: undefined, effort: 'high' })
+    expect(s.harness('reviewer')).toEqual({ kind: 'pi', model: undefined, effort: 'high' })
     expect(s.sections([], [], null).find((x) => x.name === 'How tasks work')!.note).toContain(
-      '- Reviewer: a headless Claude Code or a Claude Code subagent (its default model, high effort). (your setting for every machine)',
+      '- Reviewer: a headless pi or a pi subagent (its default model, high effort). (your setting for every machine)',
     )
     for (const k of ['reviewer.agent', 'reviewer.effort']) s.set(k, null)
   })
   test('each CLI and model takes its own levels: one it lacks goes in as the nearest it has', () => {
-    expect(effortFor('claude', 'lowest')).toBe('low')
-    expect(effortFor('claude', 'Max')).toBe('max')
-    expect(effortFor('claude', 'ultra', 'Opus 5.5')).toBe('max')
     expect(effortFor('pi', 'lowest')).toBe('minimal')
     expect(effortFor('pi', 'default')).toBeUndefined()
     expect(effortFor('gemini', 'high')).toBeUndefined()
@@ -136,7 +133,7 @@ describe('settings', () => {
   test("an older settings file keeps its app settings; its one CLI becomes the tasks' and the coordinators'", () => {
     writeJson('settings.json', {
       all: {
-        'coordinator.agent': 'Codex',
+        'coordinator.agent': 'pi',
         'check.command': 'npm test',
         'autopilot.hours': '9-18',
         'autopilot.tasksPerDay': '3',
@@ -146,11 +143,11 @@ describe('settings', () => {
       'task:X-1': { 'merge.by': 'by itself' },
     })
     let s = new Settings()
-    expect(s.get('task.agent')).toBe('Codex')
-    expect(s.get('coordinator.agent')).toBe('Codex')
+    expect(s.get('task.agent')).toBe('pi')
+    expect(s.get('coordinator.agent')).toBe('pi')
     // coordinator timer's old limits, wake picks and heartbeat interval are dropped
     s.set('task.agent', null)
-    expect(readJson('settings.json', {})).toEqual({ everywhere: { 'coordinator.agent': 'Codex' }, machine: {}, spaces: {} })
+    expect(readJson('settings.json', {})).toEqual({ everywhere: { 'coordinator.agent': 'pi' }, machine: {}, spaces: {} })
     // the Watcher's settings, from before agents reported their own progress, are dropped
     writeJson('settings.json', { agent: 'pi', 'watcher.agent': 'Claude Code', 'watcher.effort': 'lowest' })
     s = new Settings()
@@ -181,14 +178,14 @@ describe('settings', () => {
     expect(readJson('settings.json', {})).toEqual({ 'brief.review': 'off', 'machine.maxTasks': '8' })
     expect(s.pick('brief.review')).toEqual({ value: 'off', from: 'all' })
     expect(s.pick('machine.maxTasks')).toEqual({ value: '8', from: 'machine' })
-    expect(s.pick('task.agent')).toEqual({ value: 'Claude Code', from: 'default' })
-    expect(s.set('task.agent', 'pi', 'machine').ok).toBe(true)
-    expect(s.set('task.agent', 'Claude Code', { space: 'web' }).ok).toBe(true)
+    expect(s.pick('task.fallback')).toEqual({ value: 'pi', from: 'default' })
+    expect(s.set('task.fallback', 'off', 'machine').ok).toBe(true)
+    expect(s.set('task.fallback', 'pi', { space: 'web' }).ok).toBe(true)
     expect(s.set('brief.review', 'on', { space: 'web' }).ok).toBe(true)
-    expect(s.get('task.agent')).toBe('pi')
-    expect(s.get('task.agent', 'web')).toBe('Claude Code')
-    expect(s.get('task.agent', 'api')).toBe('pi')
-    expect(s.harness('task', 'web').kind).toBe('claude')
+    expect(s.get('task.fallback')).toBe('off')
+    expect(s.get('task.fallback', 'web')).toBe('pi')
+    expect(s.get('task.fallback', 'api')).toBe('off')
+    expect(s.harness('backup', 'web').kind).toBe('pi')
     expect(s.ways('web').review).toBe(true)
     expect(s.ways('api').review).toBe(false)
     // a machine's capacity has no project level; alerts are one for all
@@ -196,25 +193,25 @@ describe('settings', () => {
     expect(s.set('alerts', 'x', 'machine').ok).toBe(false)
     expect(readJson<Record<string, unknown>>('settings.json', {})).toEqual({
       everywhere: { 'brief.review': 'off' },
-      machine: { 'machine.maxTasks': '8', 'task.agent': 'pi' },
-      spaces: { web: { 'task.agent': 'Claude Code', 'brief.review': 'on' } },
+      machine: { 'machine.maxTasks': '8', 'task.fallback': 'off' },
+      spaces: { web: { 'task.fallback': 'pi', 'brief.review': 'on' } },
     })
     // the screen's rows say where an inherited value comes from, and what a reset goes back to
     const rows = (level: string, name: string) => s.sections([], [], null, 'vm', ['web']).find((x) => x.level === level && x.name === name)!.rows
-    const agent = (level: string) => rows(level, 'Agents').find((r) => r.key === 'task.agent')!
-    expect(agent('p:vm:web')).toMatchObject({ value: 'Claude Code', inherits: { value: 'pi', from: 'vm' } })
-    expect(agent('m:vm')).toMatchObject({ value: 'pi', inherits: { value: 'Claude Code', from: 'Everywhere' } })
-    expect(agent('all')).toMatchObject({ value: 'Claude Code' })
+    const agent = (level: string) => rows(level, 'Agents').find((r) => r.key === 'task.fallback')!
+    expect(agent('p:vm:web')).toMatchObject({ value: 'pi', inherits: { value: 'off', from: 'vm' } })
+    expect(agent('m:vm')).toMatchObject({ value: 'off', inherits: { value: 'pi', from: 'Everywhere' } })
+    expect(agent('all')).toMatchObject({ value: 'pi' })
     expect(agent('all').from).toBeUndefined()
     // a machine shown by a name of its own: the rows say that name, its levels keep the key
     const named = s.sections([], [], null, 'vm', ['web'], 'VM box').find((x) => x.level === 'p:vm:web' && x.name === 'Agents')!
-    expect(named.rows.find((r) => r.key === 'task.agent')).toMatchObject({ inherits: { value: 'pi', from: 'VM box' } })
+    expect(named.rows.find((r) => r.key === 'task.fallback')).toMatchObject({ inherits: { value: 'off', from: 'VM box' } })
     expect(named.machine).toBe('vm')
     expect(rows('p:vm:web', 'How tasks work').find((r) => r.key === 'brief.merge')).toMatchObject({ value: 'on its own', from: 'Everywhere' })
     expect(s.sections([], [], null, 'vm', ['web']).some((x) => x.level === 'p:vm:web' && x.name === 'Machine')).toBe(false)
     // unset drops a level's own: the one above counts again
-    s.set('task.agent', null, { space: 'web' })
-    expect(s.pick('task.agent', { space: 'web' })).toEqual({ value: 'pi', from: 'machine' })
+    s.set('task.fallback', null, { space: 'web' })
+    expect(s.pick('task.fallback', { space: 'web' })).toEqual({ value: 'off', from: 'machine' })
     // the other machines take the main one's All machines
     expect(s.adopt({ 'brief.review': 'on', nonsense: 'x' })).toBe(true)
     expect(s.everywhere()).toEqual({ 'brief.review': 'on' })
@@ -223,8 +220,7 @@ describe('settings', () => {
   test("a task's backup agent is pi unless set: any CLI herdr starts, or off", () => {
     const s = new Settings()
     expect(s.get('task.fallback')).toBe('pi')
-    expect(s.set('task.fallback', 'Claude Code').ok).toBe(true)
-    expect(s.get('task.fallback')).toBe('Claude Code')
+    expect(s.set('task.fallback', 'Claude Code').ok).toBe(false)
     expect(s.set('task.fallback', 'Off').ok).toBe(true)
     expect(s.get('task.fallback')).toBe('off')
     expect(s.set('task.fallback', 'Nonsense').ok).toBe(false)
@@ -233,7 +229,7 @@ describe('settings', () => {
   test('the Settings screen shows what every new brief ends with, as it is now', () => {
     const s = new Settings()
     const note = () => s.sections([], [], null).find((x) => x.name === 'How tasks work')!.note!
-    expect(note()).toContain('- Reviewer: a headless Claude Code or a Claude Code subagent (its default model and effort).')
+    expect(note()).toContain('- Reviewer: a headless pi or a pi subagent (its default model and effort).')
     // planning, what to fix and what proof to show are the agent's judgment, not settings
     const section = () => s.sections([], [], null).find((x) => x.name === 'How tasks work')!
     expect(section().rows.map((r) => r.key)).toEqual([

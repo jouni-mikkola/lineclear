@@ -8,28 +8,26 @@ process.env.HERDR_SOCKET_PATH = join(process.env.LINECLEAR_HOME, 'no-herdr.sock'
 const { Agents } = await import('../server/live/agents.ts')
 
 describe('private launch prompt delivery', () => {
-  test('Claude and pi append a private prompt file outside the repository, on fresh and resumed starts', () => {
+  test('pi appends a private prompt file outside the repository, on fresh and resumed starts', () => {
     const a = new Agents()
     try {
-      for (const kind of ['claude', 'pi'])
-        for (const resume of [false, true]) {
-          const r = {
-            key: 'PRIVATE-2/Agent',
-            name: `private-test-${kind}`,
-            kind,
-            cwd: '/unused-repo',
-            workspace: 'test',
-            logs: [],
-            started: 0,
-            sessionId: 'old-session',
-            system: 'Synthetic personal rule.',
-          }
-          const args = a.args(r, resume)
-          const flag = kind === 'claude' ? '--append-system-prompt-file' : '--append-system-prompt'
-          const path = args[args.indexOf(flag) + 1]
-          expect(path).not.toStartWith(r.cwd)
-          expect(readFileSync(path, 'utf8')).toBe(r.system)
+      for (const resume of [false, true]) {
+        const r = {
+          key: 'PRIVATE-2/Agent',
+          name: 'private-test-pi',
+          kind: 'pi',
+          cwd: '/unused-repo',
+          workspace: 'test',
+          logs: [],
+          started: 0,
+          sessionId: 'old-session',
+          system: 'Synthetic personal rule.',
         }
+        const args = a.args(r, resume)
+        const path = args[args.indexOf('--append-system-prompt') + 1]
+        expect(path).not.toStartWith(r.cwd)
+        expect(readFileSync(path, 'utf8')).toBe(r.system)
+      }
     } finally {
       a.stop()
     }
