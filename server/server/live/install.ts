@@ -71,8 +71,14 @@ cat "$HOME/.lineclear/helper/version" 2>/dev/null | sed 's/^/helper=/'
 true
 `
 
+/** the machine says who runs its tasks, so its own task list and doctor can tell; the probe's one call carries it */
+const tellRunBy = () => {
+  const me = (process.env.LINECLEAR_MACHINE ?? hostname()).split('.')[0] ?? ''
+  return `mkdir -p "$HOME/.lineclear" && printf '"%s"' ${quote(me)} > "$HOME/.lineclear/${RUN_BY}" 2>/dev/null`
+}
+
 export async function probe(target: string): Promise<Probe> {
-  const r = await onMachine(target, PROBE, { timeoutMs: 30_000 })
+  const r = await onMachine(target, `${tellRunBy()}\n${PROBE}`, { timeoutMs: 30_000 })
   if (r.code !== 0) throw new Error(r.err.split('\n').pop() || `ssh ${target} failed`)
   const kv = Object.fromEntries(
     r.out
@@ -175,16 +181,13 @@ function tarOf(files: [string, string][], version: string) {
 }
 
 /** put the helper there (again): the folder's old files are replaced, its hooks, inbox and prompts stay */
-/** the name this machine gives itself, written on a worker machine so its own task list and doctor can say who runs its tasks */
-const runBy = () => (process.env.LINECLEAR_MACHINE ?? hostname()).split('.')[0] ?? ''
-
 export async function installHelper(target: string, p: Probe) {
   const version = helperVersion()
   const dir = helperDir(p.home)
   const tar = tarOf(helperFiles(), version)
   const r = await onMachine(
     target,
-    `set -e; d=${quote(dir)}; mkdir -p "$d"; rm -rf "$d/skill" "$d/bin"; tar xf - -C "$d"; mkdir -p "$d/hooks" "$d/inbox" "$d/prompts"; printf '"%s"' ${quote(runBy())} > "$HOME/.lineclear/${RUN_BY}"`,
+    `set -e; d=${quote(dir)}; mkdir -p "$d"; rm -rf "$d/skill" "$d/bin"; tar xf - -C "$d"; mkdir -p "$d/hooks" "$d/inbox" "$d/prompts"`,
     {
       stdin: tar,
       timeoutMs: 180_000,

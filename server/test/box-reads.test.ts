@@ -19,6 +19,7 @@ test('45 reads of a file on a box leave the event loop free', () => {
     const rounds: number[] = []
     let ticks = 0
     const timer = setInterval(() => ticks++, 5)
+    const started = performance.now()
     let same = true
     for (let round = 0; round < 8; round++) {
       const began = process.cpuUsage()
@@ -28,16 +29,16 @@ test('45 reads of a file on a box leave the event loop free', () => {
       same &&= (await Promise.all(reads)).every((t) => t === 'hello\\n')
     }
     clearInterval(timer)
-    console.log(JSON.stringify({ stalled: Math.min(...rounds), same, ticks }))
+    console.log(JSON.stringify({ stalled: Math.min(...rounds), same, ticks, beats: (performance.now() - started) / 5 }))
   `
   const r = Bun.spawnSync(['bun', '-e', script], {
     env: { ...process.env, PATH: `${join(dir, 'bin')}:${process.env.PATH}`, LINECLEAR_BOX: JSON.stringify(box), LINECLEAR_MAIN_HOME: dir },
     stderr: 'pipe',
   })
   expect(r.stderr.toString()).toBe('')
-  const got = JSON.parse(r.stdout.toString()) as { stalled: number; same: boolean; ticks: number }
+  const got = JSON.parse(r.stdout.toString()) as { stalled: number; same: boolean; ticks: number; beats: number }
   expect(got.same).toBe(true)
-  // the loop kept running while the box answered
-  expect(got.ticks).toBeGreaterThan(10)
+  // the loop kept beating while the box answered: a call that waits for its child would stop it for the whole wait
+  expect(got.ticks).toBeGreaterThan(got.beats / 5)
   expect(got.stalled).toBeLessThan(50)
 })

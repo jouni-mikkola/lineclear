@@ -88,7 +88,7 @@ describe('one install per lock file', () => {
     await install(b)
     expect(readlinkSync(join(b, 'node_modules'))).toBe(await storePath(a, a))
     expect(existsSync(join(b, 'node_modules/dep/package.json'))).toBe(true)
-    expect(storePath(c, c)).not.toBe(await storePath(a, a))
+    expect(await storePath(c, c)).not.toBe(await storePath(a, a))
     for (const d of [a, b, c]) rmSync(d, { recursive: true, force: true })
   })
 })
