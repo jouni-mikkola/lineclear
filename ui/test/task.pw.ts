@@ -20,8 +20,21 @@ test("one header: the title, the state, the step and the model, with the tabs be
       return r.getBoundingClientRect().left;
     });
   expect(Math.abs(label - title.x)).toBeLessThan(2);
+  expect(Math.abs(first.x - title.x)).toBeLessThan(2);
   expect(first.y).toBeGreaterThan(title.y + title.height);
   await expect(page).toHaveScreenshot("task-header.png", { fullPage: true });
+});
+
+test("a 200-character title wraps inside the column and keeps the tabs on its edge", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/task/WEB-3?state=task&long=1");
+  await page.waitForSelector("[data-thread]");
+  const title = (await page.locator("[data-task-head] h1").boundingBox())!;
+  const first = (await page.locator("[data-task-tabs] button").first().boundingBox())!;
+  expect(Math.abs(first.x - title.x)).toBeLessThan(2);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await expect(page.locator("[data-task-facts]")).toContainText("in review · W3");
+  await expect(page).toHaveScreenshot("task-header-long.png", { fullPage: true });
 });
 
 test("an id nothing has shows not found with a way Home", async ({ page }) => {

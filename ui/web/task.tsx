@@ -34,11 +34,15 @@ const SAMPLE_TASK: Task = {
   model: "vendor-b/model-review",
 };
 
+// `?long=1` on a sample page draws a 200-character title
+const sampleTask = (): Task =>
+  new URLSearchParams(location.search).has("long") ? { ...SAMPLE_TASK, title: "Long title ".repeat(20).trim().slice(0, 200) } : SAMPLE_TASK;
+
 /** The task as the board lists it: undefined while the board loads, null when it does not have it. */
 function useTaskFacts(id: string): Task | null | undefined {
   const sample = sampleState();
   const home = useHome(sample);
-  if (sample) return sample === "loading" ? undefined : id === SAMPLE_TASK.id ? SAMPLE_TASK : null;
+  if (sample) return sample === "loading" ? undefined : id === SAMPLE_TASK.id ? sampleTask() : null;
   if (home.status !== "ok") return undefined;
   return [...home.data.projects.flatMap((p) => p.tasks), ...(home.data.loose ?? [])].find((t) => t.id === id) ?? null;
 }
@@ -70,14 +74,14 @@ export function TaskView({ id }: { id: string }) {
   return (
     <div className="mx-auto w-full max-w-[760px]">
       <TaskHead id={id} task={task ?? undefined}>
-        <nav className="-mx-3 mt-3 flex gap-1" aria-label={`${id} views`} data-task-tabs>
+        <nav className="mt-3 flex gap-5" aria-label={`${id} views`} data-task-tabs>
           {TABS.map(([k, label]) => (
             <button
               key={k}
               type="button"
               aria-current={tab === k ? "page" : undefined}
               onClick={() => pick(k)}
-              className={`min-h-9 rounded-sm px-3 text-sm focus-visible:outline-2 focus-visible:outline-accent ${tab === k ? "bg-raised3 text-fg" : "text-fg3 hover:text-fg"}`}
+              className={`min-h-9 border-b-2 text-sm focus-visible:outline-2 focus-visible:outline-accent ${tab === k ? "border-accent text-fg" : "border-transparent text-fg3 hover:text-fg"}`}
             >
               {label}
             </button>
