@@ -223,6 +223,11 @@ export class EngineLand extends EngineHandoff {
     return this.markMerged(t, note)
   }
 
+  /** why a merge waits while main is red on GitHub (EngineMerge knows main's runs); undefined when it may go on */
+  protected async heldByRedMain(_t: TaskRec, _p: Space): Promise<string | undefined> {
+    return undefined
+  }
+
   /** an error for the caller; anyone but the task's own agent also sends it to the agent */
   protected async sendBackOrTell(t: TaskRec, self: boolean, error: string) {
     if (self && !this.callerLeft.has(t.id)) return { ok: false as const, error }
@@ -258,6 +263,8 @@ export class EngineLand extends EngineHandoff {
         ok: false,
         error: `${t.base} here has ${ahead} commit${ahead === 1 ? '' : 's'} GitHub lacks: push ${t.base} (git push origin ${t.base}) or move them off it, then merge ${t.id} again. Nothing was merged.`,
       }
+    const held = await this.heldByRedMain(t, p)
+    if (held) return { ok: false, error: held }
     const pr = await this.prOf(t, g, wt)
     if (pr && pr.baseRefName !== t.base)
       return {
