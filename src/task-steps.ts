@@ -1,7 +1,6 @@
 import { join, resolve } from "node:path";
 import { readJson } from "../pi/config.ts";
 import { listProjectNames, projectsDir, readSettings } from "./project.ts";
-import { unprovenOf } from "./doneproof.ts";
 import { ownerStepsDone } from "./owner-steps.ts";
 import { doneIds, parseRoadmap, type Step, type StepStatus, stepStatuses, type Task } from "./roadmap.ts";
 import type { State } from "./rules.ts";
@@ -83,7 +82,7 @@ export function stepInputs(
   const { state } = live;
   const merged = mergedSteps(steps, commits, state.closedSteps);
   for (const id of ownerStepsDone(env, state, steps)) merged.add(id);
-  return { merged, tasks: tasks.local, taskSteps: state.taskSteps ?? {}, remote: tasks.remote, unproven: live.unproven ?? unprovenOf(repo, env) };
+  return { merged, tasks: tasks.local, taskSteps: state.taskSteps ?? {}, remote: tasks.remote, unproven: live.unproven ?? new Map() };
 }
 
 /** The states of steps from gathered inputs: the only call of `stepStatuses` outside the roadmap module. */
