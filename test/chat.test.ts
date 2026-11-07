@@ -331,3 +331,49 @@ test("a task's chat is served at its own address, says it has none, and the olde
   expect(closed).toEqual(["A-1"]);
   expect(links("A-2")).toBe(links("A-2"));
 });
+
+test("a down board is tried with growing waits and the chat key is not read again", async () => {
+  const fake = startFakeLineclear();
+  const body = await (await fetch(`${fake.url}/api/snapshot`)).text();
+  fake.stop();
+  let snapshots = 0;
+  const stub = Bun.serve({
+    port: 0,
+    fetch: (r) => {
+      if (!new URL(r.url).pathname.endsWith("/snapshot")) return new Response("no", { status: 500 });
+      snapshots++;
+      return new Response(body, { headers: { "content-type": "application/json" } });
+    },
+  });
+  const { env } = api(`http://127.0.0.1:${stub.port}`);
+  const chat = dispatcherChat(env, 50);
+  try {
+    chat.listen(() => {});
+    await Bun.sleep(1500);
+    // the stub has no WebSocket, so every try after the first opens a socket with the key it knew
+    expect(snapshots).toBe(1);
+  } finally {
+    chat.close();
+    stub.stop(true);
+  }
+});
+
+test("a refused connection and a 500 give different reasons", async () => {
+  const stub = Bun.serve({ port: 0, fetch: () => new Response("boom", { status: 500 }) });
+  const failing = dispatcherChat(api(`http://127.0.0.1:${stub.port}`).env, 50);
+  const refused = startFakeLineclear();
+  const url = refused.url;
+  refused.stop();
+  const gone = dispatcherChat(api(url).env, 50);
+  try {
+    failing.listen(() => {});
+    gone.listen(() => {});
+    await waitFor(() => failing.view().state === "offline" && gone.view().state === "offline", "both to be offline");
+    expect(failing.view().reason).toContain("500");
+    expect(gone.view().reason).toContain("not running");
+  } finally {
+    failing.close();
+    gone.close();
+    stub.stop(true);
+  }
+});
