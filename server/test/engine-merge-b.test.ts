@@ -85,8 +85,8 @@ describe('on GitHub: a pull request per task', () => {
     expect(w.engine.view(t).pr).toEqual(t.pr)
     const pr = g.gh().prs[0]
     expect(pr).toMatchObject({ head: t.branch, base: 'main', title: 'Say hello', isDraft: true })
-    expect(pr.body).toContain('> Add hello.txt. Merge when done.')
-    expect(pr.body).toContain('Generated with [Claude Code]')
+    expect(pr.body).not.toContain('Brief')
+    expect(pr.body).not.toContain('Generated with')
     // gh is told the host git really talks to
     expect(ours(g, t).every((c) => c.host === 'github.localhost')).toBe(true)
     expect(sh(`git rev-parse refs/heads/${t.branch}`, g.bare)).toBe(sh('git rev-parse HEAD', t.worktree!))

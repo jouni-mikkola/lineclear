@@ -2,7 +2,7 @@ import { existsSync } from '../mfs.ts'
 import type { Question } from '../../../shared/types.ts'
 import { hidden } from '../agents.ts'
 import type { Space } from '../places.ts'
-import { handOverLine, restartLine, resumedLine, splitBrief, taskFirst } from '../prompts.ts'
+import { handOverLine, restartLine, resumedLine, taskFirst } from '../prompts.ts'
 import { CLI_NAME, kindOf } from '../settings.ts'
 import { fitHarness, harnessWords, recentChat } from '../restart.ts'
 import * as G from './git.ts'
@@ -10,7 +10,7 @@ import * as GH from './github.ts'
 import { unmerged } from './branch-work.ts'
 import * as Lane from './lane.ts'
 import { fitStatus } from './status-line.ts'
-import { type TaskRec, type Harness, ended, labelOf, CHECKS_EVERY, CHECKS_SHOW, failKey, ghNow, SIGNED, troubleOf } from './engine-helpers.ts'
+import { type TaskRec, type Harness, ended, labelOf, CHECKS_EVERY, CHECKS_SHOW, failKey, ghNow, troubleOf } from './engine-helpers.ts'
 import { EngineLaunch } from './engine-launch.ts'
 
 export class EngineHandoff extends EngineLaunch {
@@ -322,21 +322,9 @@ export class EngineHandoff extends EngineLaunch {
     return null
   }
 
-  /** the pull request's words: the agent's summary, the brief's gist, and the footer its CLI signs with */
+  /** the pull request's words: the agent's summary */
   protected prBody(t: TaskRec) {
-    const kind = this.agents.record(this.key(t))?.kind ?? t.agent?.kind ?? this.settings.harness('task', this.nameOf(t)).kind
-    // the coordinator's words, not the default way of working Lineclear ended the brief with
-    const brief = (splitBrief(t.desc)[0] || t.title).trim()
-    const gist = brief.length > 700 ? `${brief.slice(0, 700).replace(/\s+\S*$/, '')} …` : brief
-    return [
-      t.said || 'Work in progress: the summary comes when the task is done.',
-      ...(t.facts ? [`Facts: ${t.facts}`] : []),
-      `**Brief** (${t.id})\n\n${gist
-        .split('\n')
-        .map((l) => `> ${l}`.trimEnd())
-        .join('\n')}`,
-      SIGNED[kind] ?? `🤖 Generated with ${CLI_NAME[kind] ?? kind}`,
-    ].join('\n\n')
+    return t.said || 'Work in progress: the summary comes when the task is done.'
   }
 
   /** its pull request as GitHub has it now: the one recorded, else the branch's own (one opened by hand) */
@@ -381,7 +369,7 @@ export class EngineHandoff extends EngineLaunch {
 
   /**
    * lineclear pr: push the branch and open its pull request (a draft until the agent reports done), or bring the open
-   * one up to the branch. Its title is the task's, its words the summary and the brief's gist.
+   * one up to the branch. Its title is the task's, its words the summary.
    */
   openPr(id: string): Promise<{ ok: boolean; text: string }> {
     return this.onGitHub(
