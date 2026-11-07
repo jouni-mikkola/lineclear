@@ -280,7 +280,10 @@ export class EngineHandoff extends EngineLaunch {
    */
   protected prBody(t: TaskRec) {
     if (!t.said) return 'Work in progress: the summary comes when the task is done.'
-    const why = splitBrief(t.desc ?? '')[0].replace(LATER, '').trim().split(/\n\s*\n/)[0]
+    const why = splitBrief(t.desc ?? '')[0]
+      .replace(LATER, '')
+      .trim()
+      .split(/\n\s*\n/)[0]
     const proof = (t.facts ?? '')
       .split(' · ')
       .map((f) => f.trim())
