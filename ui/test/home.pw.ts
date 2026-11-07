@@ -172,3 +172,14 @@ test("the table keeps a 200-character Last and 200 rows inside its edge, shows n
   await expect(page.locator("[data-in-full]:visible")).toContainText("x".repeat(200));
   await expect(page.locator("[data-in-full]:visible")).toContainText("vendor-b/a-model-with-a-long-name");
 });
+
+test("W14: on a phone the table head says Sort by and the first row starts above 700 px", async ({ page }) => {
+  if ((page.viewportSize()?.width ?? 0) >= 640) return;
+  await open(page, "many");
+  const bar = page.getByRole("group", { name: "Sort Working tasks" });
+  await expect(bar).toContainText("Sort by");
+  await expect(bar.getByRole("combobox")).toBeVisible();
+  const y = (await page.locator("[data-table-cards] [data-row-id]:visible").first().boundingBox())?.y ?? Number.POSITIVE_INFINITY;
+  expect(y).toBeLessThan(700);
+  await page.screenshot({ path: "ui/test/screens/home-many-sort-390.png" });
+});
