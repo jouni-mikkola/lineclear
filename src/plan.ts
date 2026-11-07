@@ -21,11 +21,8 @@ const USAGE = ['usage: lineclear plan [--url <url>] <project> "<goal>"', "      
 
 const NO_SERVER = "lineclear plan: no Lineclear server is running here; start it with: lineclear serve";
 
-/** True when the server command cannot reach a server: it exits 2 and says so, whatever address it tried. */
-function serverIsDown(env: NodeJS.ProcessEnv): boolean {
-  const p = Bun.spawnSync([serverBin(env), "task", "list", "--json"], { stdin: "ignore", env });
-  return p.exitCode === 2 && p.stderr.toString().startsWith("Cannot reach the lineclear command");
-}
+/** True when the server command cannot reach a server: a ping exits 2, whatever address it tried. */
+const noServer = (env: NodeJS.ProcessEnv): boolean => Bun.spawnSync([serverBin(env), "ping"], { stdin: "ignore", env, timeout: 10_000 }).exitCode === 2;
 
 const lineclear = serverBin;
 /** `lineclear plan <project> "<goal>"` hands the goal to the Dispatcher, which writes the steps. No task starts. `lineclear plan submit` applies its roadmap change once the checks pass. */
@@ -69,7 +66,7 @@ export function planMain(
 
 function submit(out: (l: string) => void, env: NodeJS.ProcessEnv, cwd: string, now: () => Date): number {
   const fail = (m: string) => (out(`lineclear plan submit: ${m}`), 1);
-  if (serverIsDown(env)) return (out(NO_SERVER), 1);
+  if (noServer(env)) return (out(NO_SERVER), 1);
   const task = findTask(cwd, env);
   if (task === undefined) return fail("cannot tell which task this is, run it in the plan's worktree with LINECLEAR_TASK set to its plan id");
   const project = findProject(cwd, env);
@@ -135,7 +132,7 @@ function endPlan(
 ): number {
   const reason = `step ${r.step} stayed unclear after ${NOGO_ROUNDS} rounds: ${r.why}`;
   logDecision(task, project, `planning task ended, ${reason}`, env, now);
-  Bun.spawnSync([lineclear(env), "task", "close", task], { stdin: "ignore" });
+  Bun.spawnSync([lineclear(env), "task", "close", task], { stdin: "ignore", timeout: 30_000 });
   clearWait(task, env);
   out(`report: ${task} ended with no plan. ${reason}`);
   return 0;

@@ -78,6 +78,28 @@ test("a plan applies by itself under the setting, and one undo reverts it", () =
   expect(undoApplied(readItems(w.vars)[0]!, new Date(), w.vars)).toBe("it was undone already");
 });
 
+test("merging a 40 commit plan spawns 3 git processes or fewer", () => {
+  const w = world(false);
+  const g = (...a: string[]) => Bun.spawnSync(["/usr/bin/git", "-C", w.repo, "-c", "user.name=t", "-c", "user.email=t@t", ...a]);
+  g("checkout", "-q", "work/7-plan");
+  for (let i = 0; i < 39; i++) g("commit", "-q", "--allow-empty", "-m", `plan: step ${i}`);
+  g("checkout", "-q", "main");
+  const trace = join(mkdtempSync(join(tmpdir(), "lc-trace-")), "trace");
+  temps.push(join(trace, ".."));
+  // the fake server's own merge is not traced, so only the code under test counts
+  const bin = w.vars.LINECLEAR_SERVER_BIN!;
+  writeFileSync(bin, readFileSync(bin, "utf8").replace("exec git", "unset GIT_TRACE\nexec git"));
+  // Bun does not pass a changed process.env to children, so the merge runs in a process that starts with the trace on
+  const code = `import { applyPlan } from ${JSON.stringify(join(import.meta.dir, "..", "src", "plan-apply.ts"))}; const r = applyPlan(JSON.parse(process.env.ITEM!), process.env.REPO!, new Date()); if ("error" in r) throw new Error(r.error);`;
+  const run = Bun.spawnSync([process.execPath, "-e", code], {
+    env: { ...w.vars, GIT_TRACE: trace, ITEM: JSON.stringify(w.item), REPO: w.repo },
+    stderr: "pipe",
+  });
+  expect(run.stderr.toString()).toBe("");
+  const runs = readFileSync(trace, "utf8").split("\n").filter((l) => l.includes("built-in: git"));
+  expect(runs.length).toBeLessThanOrEqual(3);
+});
+
 test("an undo refuses when the checkout has uncommitted changes, and loses nothing", () => {
   const w = world(false);
   applyPlan(w.item, w.repo, new Date(), w.vars);
