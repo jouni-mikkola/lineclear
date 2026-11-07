@@ -2,7 +2,6 @@
 import { expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { readRelease, saveRelease } from "../../src/release.ts";
 import { secretNames, secrets, storedLoginAdvice } from "../../src/secrets.ts";
 import { tmp } from "../helpers.ts";
 
@@ -47,12 +46,4 @@ test("storedLoginAdvice names a stored login by name only, and gives undefined w
   expect(advice).toContain("SHOP_PASSWORD");
   expect(advice).not.toContain("-value-");
   expect(storedLoginAdvice("Log in to the bank", "alpha", env)).toBeUndefined();
-});
-
-test("readRelease gives {} with no state file and the saved state after saveRelease", () => {
-  const env = fresh();
-  expect(readRelease(env)).toEqual({});
-  const state = { checked: "2026-01-01T00:00:00Z" };
-  saveRelease(state, env);
-  expect(readRelease(env)).toEqual(state);
 });

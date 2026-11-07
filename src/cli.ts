@@ -11,7 +11,6 @@ import { planMain } from "./plan.ts";
 import { planStatus } from "./requests.ts";
 import { resolveProject } from "./resolve.ts";
 import { pathsFor } from "./paths.ts";
-import { releaseMain } from "./release.ts";
 import { fillSetup } from "./fill-setup.ts";
 import { type Ask, setupGate } from "./project.ts";
 import { setupMain } from "./setup.ts";
@@ -58,8 +57,6 @@ export const commands: Record<string, string> = {
   progress: 'A space\'s coordinator saves or reads its progress: progress ["<text>"]',
   checkpoint: "A space's coordinator commits its owned task's work: checkpoint \"<message>\"",
   complete: 'A space\'s coordinator proves its stopping goal and ends its run: complete "<evidence>"',
-  release:
-    "Show the stable and next builds, the last promotion and why next is held (release status); release run tests main and promotes it when green, as the rule loop does every 2 minutes",
   store: "The local copies of the task store (store list, store copy, store restore <name>); the rule loop takes one an hour",
   totp: "Print the current code of a stored login: totp NAME reads NAME_TOTP from this folder's secrets",
   status:
@@ -175,7 +172,6 @@ const COMMANDS: Record<string, (rest: string[], out: Out) => number | Promise<nu
   secrets,
   totp,
   store: storeMain,
-  release: releaseMain,
   status: statusCommand,
   plan: planMain,
   move: moveMain,

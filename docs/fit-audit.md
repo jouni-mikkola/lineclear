@@ -42,7 +42,7 @@ Threshold on disk: `reserveTokens: 850000` on a 1M window, so pi compacts near 1
 - `src/self-fix.ts` (340), `heal.ts` (24), `stalls.ts` (339), `scripts/flaky.ts` (129): the board files tasks about itself and repairs stuck tasks. They hide faults. Tasks 6 and 7 already cover them.
 - `scripts/canary.ts` (266), `smoke.ts` (212), `release-tag.ts`: release safety nets; task 12.
 - `terminal-clock.ts` (50): polling for a herdr gap; keep.
-- Timers/systemd in `uninstall.ts`, `doctor.ts`, `release.ts`, `promote-step.ts`: installer scaffolding.
+- Timers/systemd in `uninstall.ts`, `doctor.ts`, `promote-step.ts`: installer scaffolding.
 
 ## 6. Size against what a board needs
 

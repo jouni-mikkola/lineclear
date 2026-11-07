@@ -11,7 +11,6 @@ import { lineclearDir, worktreeCost } from "./measure.ts";
 import type { Pusher } from "./notify.ts";
 import type { Aside } from "./read-aside.ts";
 import { type AskBefore, changeSettings, listProjectNames, type Role, setupRoles } from "./project.ts";
-import { readRelease } from "./release.ts";
 import { harnesses, readRegistry } from "./models.ts";
 import { planViews } from "./requests.ts";
 import { saveOffered, setupView } from "./setup.ts";
@@ -86,7 +85,6 @@ const homeRoute: Route = async (c, req, url) => {
     if (!c.warmed.has(name)) void c.roadmap(name).ready();
     c.warmed.add(name);
   }
-  const release = readRelease(c.env);
   const planning = planViews(c.env).filter((r) => r.state === "planning").length;
   return json({
     projects: shownProjects(withProject(list), readPrefs(c.env as NodeJS.ProcessEnv)),
@@ -94,7 +92,6 @@ const homeRoute: Route = async (c, req, url) => {
     planning,
     dispatcher: { writing: c.dispatcher().view().writing },
     doctor: doctorProblems(c.env, t).map((p) => `${p.problem}: ${p.fix}`),
-    ...(release.checked ? { release } : {}),
     moves: readMoves(c.env as NodeJS.ProcessEnv, 5),
   } satisfies Partial<HomeData>);
 };

@@ -1,8 +1,8 @@
 #!/bin/sh
 # Installs Lineclear, and updates it when run again:
 #   curl -fsSL https://raw.githubusercontent.com/jouni-mikkola/lineclear/main/install.sh | sh
-# LINECLEAR_REF picks a branch, tag or full commit id (default: this machine's stable build once it has one, else
-# main). LINECLEAR_REPO picks another repository. A release tag (v1.2.3, made by `bun run release`) is built in
+# LINECLEAR_REF picks a branch, tag or full commit id (default: main). LINECLEAR_REPO picks another repository.
+# A release tag (v1.2.3, made by `bun run release`) is built in
 # ~/.lineclear/builds/1.2.3 and run from builds/current, with the build before it as builds/previous.
 # The work is in functions and runs on the last line, so a cut download does nothing.
 set -eu
@@ -477,25 +477,9 @@ update_machines() {
   LINECLEAR_REF="$ref" LINECLEAR_REPO="$repo" "$bindir/lineclear" machine update || say "Some machines did not update. Run 'lineclear doctor' to see which."
 }
 
-# A machine another one installs (lineclear machine) takes that one's stable build and promotes none of its own.
-mark_follows() {
-  [ -n "${LINECLEAR_FOLLOWS:-}" ] || return 0
-  mkdir -p "${LINECLEAR_CONFIG:-$HOME/.config/lineclear}"
-  printf '%s\n' "$LINECLEAR_FOLLOWS" >"${LINECLEAR_CONFIG:-$HOME/.config/lineclear}/release-follows"
-}
-
-# The stable build the last promotion installed (lineclear release), so a run by hand never takes main untested.
-stable_commit() {
-  sed -n '/"stable"/,/}/s/.*"commit": *"\([0-9a-f]\{40\}\)".*/\1/p' "${LINECLEAR_CONFIG:-$HOME/.config/lineclear}/release.json" 2>/dev/null | head -n 1
-  # a machine that follows another runs the stable build that one gave it last
-  [ ! -s "${LINECLEAR_CONFIG:-$HOME/.config/lineclear}/release-follows" ] || [ -s "${LINECLEAR_CONFIG:-$HOME/.config/lineclear}/release.json" ] ||
-    git -C "${XDG_DATA_HOME:-$HOME/.local/share}/lineclear" rev-parse HEAD 2>/dev/null || true
-}
-
 # The install of a release: see install_release. A failed smoke check puts builds/previous back as current.
 main_release() {
   install_tools
-  mark_follows
   armed=0; api_before=noapi
   projects_before=$(mktemp -d)
   active=0
@@ -517,8 +501,7 @@ main_release() {
 
 main() {
   repo=${LINECLEAR_REPO:-https://github.com/jouni-mikkola/lineclear.git}
-  ref=${LINECLEAR_REF:-$(stable_commit)}
-  ref=${ref:-main}
+  ref=${LINECLEAR_REF:-main}
   [ -n "${HOME:-}" ] || die "HOME is not set"
   app=${XDG_DATA_HOME:-$HOME/.local/share}/lineclear
   unit=${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/lineclear.service
@@ -531,7 +514,6 @@ main() {
   if is_release; then main_release; return; fi
 
   install_tools
-  mark_follows
   # The version running now is kept: a failed update puts it back (rollback).
   prev=; armed=0; api_before=noapi
   projects_before=$(mktemp -d)

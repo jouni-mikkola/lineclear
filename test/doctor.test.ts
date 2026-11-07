@@ -156,23 +156,6 @@ test("the tested herdr is the adapter's pin", () => {
   expect(testedHerdr()).toMatch(/^\d+\.\d+\.\d+$/);
 });
 
-test("doctor shows the builds, names a roadmap stable cannot read, and says when another machine promotes", () => {
-  const at = "2026-11-01T12:12:00Z";
-  const release = {
-    stable: { commit: "a".repeat(40), at },
-    next: { commit: "b".repeat(40), at, result: "red" as const },
-    checked: at,
-    held: "next bbbbbbb failed: smoke",
-  };
-  const check = (over: Partial<Probe>) => doctorChecks(probe(over)).find((c) => c.name === "release");
-  expect(check({})?.skip).toBe(true);
-  expect(check({ release })?.problem).toBe("");
-  expect(check({ release })?.info).toContain("held next bbbbbbb failed: smoke");
-  expect(check({ release: { ...release, held: "cannot read main: ROADMAP.md:3" } })?.problem).toBe("cannot read main: ROADMAP.md:3");
-  expect(check({ release: { ...release, held: "cannot read main: no ref" }, ci: true })?.problem).toBe("");
-  expect(check({ release, follows: "desk" })?.info).toBe("follows desk, which promotes for it");
-});
-
 test("the stable build check fails for a checkout or a build that is not a release, and passes for a release", () => {
   const data = mkdtempSync(join(tmpdir(), "lineclear-builds-"));
   const build = (name: string, files: string[]) => {

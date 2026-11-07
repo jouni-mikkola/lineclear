@@ -112,6 +112,3 @@ export function stableRefusal(root: string, args: string[], env: Env = process.e
   if (!used.length) return "";
   return `this checkout's bin/lineclear would use ${used.join(", ")}. The stable lineclear on PATH runs the real system. To try this code, set LINECLEAR_CONFIG, LINECLEAR_HOME and LINECLEAR_PORT to a folder and a port of your own.`;
 }
-
-/** The lock file `<name>.lock` in the config folder: one guard per job that must not run twice at once. */
-export const lockFile = (env: Env, name: string) => join(configDir(env), `${name}.lock`);
