@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { releaseProblems } from "../scripts/release-notes.ts";
+import { releaseProblems } from "../scripts/release-tag.ts";
 
 const root = join(import.meta.dir, "..");
 

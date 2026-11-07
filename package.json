@@ -9,7 +9,7 @@
   "scripts": {
     "web:build": "bunx --bun vite build --config ui/web/vite.config.ts",
     "ui:test": "bun install --frozen-lockfile --silent && bun run web:build && playwright test",
-    "ui:changed": "bun scripts/ui-changed.ts",
+    "ui:changed": "bun scripts/changed.ts ui",
     "types": "tsc --noEmit",
     "test": "bun test ./test",
     "dispatcher:eval": "bun test/dispatcher-eval/run.ts",

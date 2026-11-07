@@ -63,7 +63,7 @@ css, shell, perl and the `bin` scripts): server 17,094, `src/` 14,725, `ui/` 11,
 
 | Module | Core job | Lines | Verdict | Why |
 | --- | --- | ---: | --- | --- |
-| `server/scripts/store-formats.ts` | Install | 159 | keep | store files an update must still read |
+| `server/scripts/store-formats.ts` | Install | 93 | keep | store files an update must still read |
 | `server/scripts/test.ts` | Checks | 215 | keep | the server's test runner |
 | `server/server/app.ts` | Run | 243 | keep | the server's API and live link |
 | `server/server/live/agent*` | Run | 1306 | keep | agents: records, events, start, delivery, state |
@@ -249,8 +249,7 @@ css, shell, perl and the `bin` scripts): server 17,094, `src/` 14,725, `ui/` 11,
 | --- | --- | ---: | --- | --- |
 | `scripts/` | Checks | 1109 | keep | the check and its tools |
 | `scripts/canary.ts` | Install | 9 | keep | the canary |
-| `scripts/formats.ts` | Install | 36 | keep | old store files still read |
 | `scripts/gates/` | Checks | 293 | keep | lint, dead code, borders |
-| `scripts/release*` | Install | 116 | keep | releases |
+| `scripts/release*` | Install | 86 | keep | releases |
 | `playwright*.ts` | Checks | 44 | keep | the UI bar's browser configs |
 | `scripts/smoke.ts` | Install | 210 | keep | the update's smoke check |
