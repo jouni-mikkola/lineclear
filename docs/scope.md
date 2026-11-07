@@ -179,7 +179,6 @@ css, shell, perl and the `bin` scripts; counted by `.ts` and `.tsx` alone it is 
 | `src/published.ts` | Secrets | 22 | keep | the tailnet name the page answers on |
 | `src/read-aside.ts` | View | 34 | keep | slow reads in their own process |
 | `src/reader-ask.ts` | Plan | 3 | keep | the step check's question |
-| `src/real-world.ts` | Rules | 239 | merge | into `world.ts`, its only interface (L497) |
 | `src/requests.ts` | Dispatcher | 182 | keep | a request handed to the planner |
 | `src/resolve.ts` | Dispatcher | 121 | keep | a project by name |
 | `src/roadmap*` | Plan | 721 | keep | the roadmap: parse, check, view |
@@ -216,7 +215,7 @@ css, shell, perl and the `bin` scripts; counted by `.ts` and `.tsx` alone it is 
 | `src/web*` | View | 857 | keep | the web server and its routes |
 | `src/web-guard.ts` | Secrets | 39 | keep | page token and host check |
 | `src/worktree.ts` | Run | 64 | keep | a task's worktree fields |
-| `src/world.ts` | Rules | 75 | keep | what a tick needs from outside |
+| `src/world.ts` | Rules | 248 | keep | what a tick needs from outside, and the real world |
 | `src/zone.ts` | Run | 21 | keep | time zones |
 
 ## The web UI (`ui/`), 12300 lines
