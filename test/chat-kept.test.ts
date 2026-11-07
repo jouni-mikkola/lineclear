@@ -20,8 +20,9 @@ test("the chat logs are read from the chatlog table, live and archived apart, ca
   db.close();
   const live = readChatLogs(dir);
   expect(live.map((c) => c.name)).toEqual(["A-1_Agent"]);
-  expect(live[0].log.posted.map((p) => p.id)).toEqual(["b", "a"]);
-  expect(live[0].log.answers).toEqual({ q: 1 });
-  expect(live[0].log.said).toEqual({ q: { text: "hi" } });
+  const log = live[0]?.log;
+  expect(log?.posted.map((p) => p.id)).toEqual(["b", "a"]);
+  expect(log?.answers).toEqual({ q: 1 });
+  expect(log?.said).toEqual({ q: { text: "hi" } });
   expect(readChatLogs(dir, true).map((c) => c.name)).toEqual(["A-0_Agent"]);
 });
