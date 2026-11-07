@@ -6,9 +6,7 @@ import { dirname, join } from "node:path";
 import { guardGroup, killGroup } from "./process-group.ts";
 import * as Q from "../server/server/live/engine/machine.ts";
 import { storedLoginAdvice } from "./secrets.ts";
-import { listProjectNames, readSettings, type Settings } from "./project.ts";
-import { checkTier } from "./check-tier.ts";
-import type { Tier } from "./check-runs.ts";
+import { listProjectNames, readSettings } from "./project.ts";
 import { day } from "./progress.ts";
 import { gitText } from "./git.ts";
 import { spawnSync } from "node:child_process";
@@ -127,34 +125,17 @@ export function parseUntil(text: string, now: Date): Date | undefined {
   return Number.isNaN(d.getTime()) ? undefined : d;
 }
 
-/** Copies a child's output to this process's own, and hands each piece to `hear` as text. */
-async function tee(from: unknown, to: NodeJS.WriteStream, hear: (text: string) => void) {
-  const text = new TextDecoder();
-  for await (const chunk of from as AsyncIterable<Uint8Array>) {
-    to.write(chunk);
-    hear(text.decode(chunk, { stream: true }));
-  }
-}
-
-/** Runs the command in a process group of its own (the check's), its output on ours (and heard, when asked). */
-async function runChild(command: string, cwd: string, hear: ((text: string) => void) | undefined): Promise<number> {
-  const io = hear ? "pipe" : "inherit";
-  const child = Bun.spawn(["sh", "-c", command], { cwd, stdin: "ignore", stdout: io, stderr: io, detached: true });
+/** Runs the command in a process group of its own (the check's), its output on ours. */
+async function runChild(command: string, cwd: string): Promise<number> {
+  const child = Bun.spawn(["sh", "-c", command], { cwd, stdin: "ignore", stdout: "inherit", stderr: "inherit", detached: true });
   const watcher = guardGroup(child.pid, process.pid);
   try {
-    if (!hear) return await child.exited;
-    const [code] = await Promise.all([child.exited, tee(child.stdout, process.stdout, hear), tee(child.stderr, process.stderr, hear)]);
-    return code;
+    return await child.exited;
   } finally {
     // nothing a check started outlives it
     killGroup(child.pid);
     killGroup(watcher);
   }
-}
-
-/** One `--changed` run, in the check log like every other. */
-function changedRun(command: string, tier: Tier, settings: Settings, env: NodeJS.ProcessEnv, cwd: string, out: (l: string) => void) {
-  return checkTier(["--tier", tier, command], settings, out, env, cwd, (c, _t, hear) => runChild(c, cwd, hear));
 }
 
 /** Runs the server's command for this agent; its words, and whether it passed. */
@@ -183,11 +164,11 @@ function checkOnGitHub(out: (l: string) => void, env: NodeJS.ProcessEnv, cwd: st
 }
 
 /**
- * `lineclear check [--tier inner|merge|heavy] [command]`: an agent's full check goes to GitHub; a tier's commands, or the
- * command given, run here. `lineclear check --changed` is the worker's loop: the project's check told to look only at
+ * `lineclear check [command]`: an agent's full check goes to GitHub; any other folder runs the project's check, or the
+ * command given, here. `lineclear check --changed` is the worker's loop: the project's check told to look only at
  * what the branch changed, since it is short.
  */
-export async function check(out: (l: string) => void, env = process.env, o: { cwd?: string } = {}, args: string[] = []): Promise<number> {
+async function check(out: (l: string) => void, env = process.env, o: { cwd?: string } = {}, args: string[] = []): Promise<number> {
   const cwd = o.cwd ?? process.cwd();
   const name = findProject(cwd, env);
   const settings = name === undefined ? undefined : readSettings(name, env);
@@ -195,31 +176,32 @@ export async function check(out: (l: string) => void, env = process.env, o: { cw
     out("lineclear check: this folder is not in a project, see 'lineclear project list'");
     return 1;
   }
-  if (args.includes("--changed")) {
-    const rest = args.filter((a) => a !== "--changed");
-    if (rest.length > 1) return (out(usage("check")), 2);
-    const command = rest[0];
+  const changed = args.includes("--changed");
+  const rest = args.filter((a) => a !== "--changed");
+  if (rest.length > 1 || rest.some((a) => a.startsWith("--"))) return (out(usage("check")), 2);
+  const command = rest[0];
+  if (changed) {
     // only a check that is Lineclear's own script is known to take the flag; any other project's runs in full
     const script = join(cwd, "scripts/check.ts");
     if (!command && /\bbun run check\b/.test(settings.check) && existsSync(script) && readFileSync(script, "utf8").includes("--changed")) {
-      return changedRun(`${settings.check} --changed`, "inner", settings, env, cwd, out);
+      return runChild(`${settings.check} --changed`, cwd);
     }
     out("lineclear check --changed: this project's check does not take --changed, so the full check runs");
-    return changedRun(command ?? settings.check, "inner", settings, env, cwd, out);
+    return runChild(command ?? settings.check, cwd);
   }
-  // an agent's full check goes to GitHub; a named command or tier runs as asked
+  // an agent's full check goes to GitHub; a named command runs as asked
   if (args.length === 0) {
     const github = checkOnGitHub(out, env, cwd);
     if (github !== undefined) return github;
   }
-  return checkTier(args, settings, out, env, cwd, (command, _tier, hear) => runChild(command, cwd, hear));
+  return runChild(command ?? settings.check, cwd);
 }
 
 function usage(name: string): string {
   return {
     wait: 'usage: lineclear wait <login|checks|browser> "<reason>" | lineclear wait owner --kind <login|money|outward> "<reason>" | lineclear wait until <time> "<reason>" | lineclear wait task <id> "<reason>"',
     resume: "usage: lineclear resume",
-    check: "usage: lineclear check [--changed] [--tier inner|merge|heavy] [command] | lineclear check --release <test> | lineclear check --log",
+    check: "usage: lineclear check [--changed] [command]",
   }[name]!;
 }
 

@@ -1,6 +1,6 @@
 import { isOpen, readItems } from "./inbox.ts";
 import { chatFiles, findSpace, lineclearDir, spaceTasks, taskStart, worktreeCost } from "./measure.ts";
-import { readRuns } from "./check-runs.ts";
+import { prChecks } from "./check-runs.ts";
 import { projectSettings, roadmapData, type RoadmapStep } from "./roadmap-view.ts";
 import { allChecks } from "./step-check-cost.ts";
 import { readWaits, type Wait } from "./waits.ts";
@@ -125,9 +125,7 @@ function historyOf(
     ...(task.pr?.url ? { pr: { number: Number(task.pr.number), url: String(task.pr.url) } } : {}),
     ...(review ? { review: rounds.length ? rounds : [{ findings: review }] } : {}),
     checks: task.branch
-      ? readRuns(repo, 0, env)
-          .filter((r) => r.branch === task.branch)
-          .map((r) => ({ at: r.at, tier: r.tier, ok: r.ok, seconds: r.seconds, failed: r.failed }))
+      ? prChecks(repo, String(task.branch)).map((r) => ({ at: r.at, tier: "merge", ok: r.ok, seconds: r.seconds, failed: r.ok ? [] : [r.name] }))
       : [],
     ...(started !== undefined && readyAt !== undefined && Number.isFinite(readyAt) && started >= readyAt ? { readyToStart: started - readyAt } : {}),
     ...(started !== undefined && task.merged === true && typeof task.doneAt === "number" ? { startToMerge: task.doneAt - started } : {}),

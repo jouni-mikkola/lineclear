@@ -4,7 +4,7 @@
 // ended (or the start, when busier), so a busy machine fails nothing for being busy.
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { loadMeter, recordStepTimes } from "../src/check-runs.ts";
+import { cpus, loadavg } from "node:os";
 
 /** Seconds one test case may take (the owner's budget: every test under 2 s). */
 export const UNIT_LIMIT_S = 2;
@@ -24,19 +24,19 @@ export type Times = Map<string, number>;
 export type Baseline = Record<string, number>;
 
 /** Reads how many times busier than its cores the machine was since the start of the run: 1 when it was not busy. */
-export function loadFactorMeter(read?: () => number[]): () => number {
-  const meter = loadMeter(read);
+export function loadFactorMeter(read: () => number[] = loadavg): () => number {
+  const start = read()[0] ?? 0;
   return () => {
-    const { load, cores } = meter();
-    return Math.max(1, load / cores);
+    const [now = 0, recent = 0] = read();
+    return Math.max(1, Math.max(start, now, recent) / cpus().length);
   };
 }
 
 /** The factor right now, or for a given load and cores: for a test or script that scales its own limits. */
 export function loadFactor(load?: number, cores?: number): number {
   if (load === undefined && cores === undefined) return loadFactorMeter()();
-  const now = loadMeter()();
-  return Math.max(1, (load ?? now.load) / Math.max(1, cores ?? now.cores));
+  const [now = 0, recent = 0] = loadavg();
+  return Math.max(1, (load ?? Math.max(now, recent)) / Math.max(1, cores ?? cpus().length));
 }
 
 /** Seconds per test file from `bun test --reporter=junit`. */
@@ -126,13 +126,6 @@ export interface StepTime {
   step: string;
   seconds: number;
   ok: boolean;
-}
-
-/** The steps and the whole run in the steps log, for the lane's record of what each check spent its time on. */
-export function recordSteps(steps: StepTime[], mode: string, wall: number, factor: number, ok: boolean): void {
-  const commit = Bun.spawnSync(["git", "rev-parse", "HEAD"]).stdout.toString().trim();
-  const base = { at: Date.now(), mode, commit, factor: Math.round(factor * 100) / 100 };
-  recordStepTimes([...steps, { step: "wall", seconds: wall, ok }].map((s) => ({ ...base, ...s })));
 }
 
 /** The steps as a table, slowest first. */

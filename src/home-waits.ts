@@ -1,6 +1,4 @@
 import { decisionsPath, readJson } from "../pi/config.ts";
-import { lanePause, readRuns } from "./check-runs.ts";
-import { DAY } from "./time.ts";
 import { dataDir } from "./paths.ts";
 import { join } from "node:path";
 import { type Blocker, day } from "./progress.ts";
@@ -77,13 +75,9 @@ export function waitingOf(
   project: string | undefined,
   env: Env,
   now: number,
-  base?: string,
-  repo?: string,
 ): HomeWaiting {
   const openIds = new Set(shown.filter((t) => t.state !== "done").map((t) => t.id));
-  const pause = base && repo ? lanePause(readRuns(repo, now - DAY, env), base, now) : undefined;
   return {
-    ...(pause ? { linePaused: `The merge line is paused: ${pause}` } : {}),
     running: shown
       .filter((t) => t.state === "work" && (t.stage === "work" || t.stage === "review"))
       .map((t) => ({ id: t.id, title: t.title, stage: t.stage, since: t.since })),

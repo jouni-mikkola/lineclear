@@ -3,11 +3,10 @@
 // log and pi's session files, with no AI.
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { readRuns, whereRun } from "./check-runs.ts";
+import { prChecks } from "./check-runs.ts";
 import { readTasksKept } from "./kept-read.ts";
 import { dataDir } from "./paths.ts";
-import { DAY } from "./time.ts";
-import { gitWith } from "./git.ts";
+import { gitText, gitWith } from "./git.ts";
 
 /** A task folder's git output, trimmed; empty when git fails or hangs, so Home never waits on it. */
 export const taskGit = (cwd: string, ...args: string[]) => {
@@ -34,20 +33,23 @@ interface TaskRef {
 /** The branch's own base: what a diff and a check of the task are read against. */
 export const baseOf = (t: TaskRef) => (typeof t.base === "string" && t.base ? t.base : "main");
 
-export function taskFacts(t: TaskRef, env: Env = process.env, now = Date.now()): TaskFacts {
+/** GitHub's finished checks on the pull request of the branch checked out in `worktree`. */
+const branchChecks = (worktree: string, now: number) => {
+  const branch = gitText(worktree, "rev-parse", "--abbrev-ref", "HEAD");
+  return branch ? prChecks(worktree, branch, now) : [];
+};
+
+export function taskFacts(t: TaskRef, now = Date.now()): TaskFacts {
   if (typeof t.worktree !== "string" || !existsSync(t.worktree)) return {};
   const out = taskGit(t.worktree, "diff", "--numstat", `${baseOf(t)}...HEAD`);
   const files = out ? out.trim().split("\n").filter(Boolean).length : 0;
-  const where = whereRun(t.worktree);
-  const run = readRuns(where.repo, now - 7 * DAY, env as NodeJS.ProcessEnv)
-    .filter((r) => r.branch === where.branch)
-    .at(-1);
+  const run = branchChecks(t.worktree, now).at(-1);
   return { files, ...(run ? { check: run.ok ? ("pass" as const) : ("fail" as const) } : {}) };
 }
 
 /** What a row shows besides the task itself: its last card, and for a started task its files and check. */
-export function rowFacts(t: TaskRef, last: { text: string; at: number } | undefined, started: boolean, env: Env, now: number) {
-  return { ...(last ? { last } : {}), ...(started ? taskFacts(t, env, now) : {}) };
+export function rowFacts(t: TaskRef, last: { text: string; at: number } | undefined, started: boolean, now: number) {
+  return { ...(last ? { last } : {}), ...(started ? taskFacts(t, now) : {}) };
 }
 
 export interface TaskDetail {
@@ -96,17 +98,12 @@ export function taskDetail(id: string, from: TaskSources, env: Env = process.env
   const review = files.filter((f) => f === `${id}_Reviewer.json`).flatMap((f) => cardTexts(join(chats, f)));
   const worktree = typeof t.worktree === "string" && existsSync(t.worktree) ? t.worktree : undefined;
   const diff = worktree ? taskGit(worktree, "diff", "--stat", `${baseOf(t)}...HEAD`) : "";
-  const where = worktree ? whereRun(worktree) : undefined;
-  const run =
-    where &&
-    readRuns(where.repo, now - 7 * DAY, env as NodeJS.ProcessEnv)
-      .filter((r) => r.branch === where.branch)
-      .at(-1);
+  const run = worktree ? branchChecks(worktree, now).at(-1) : undefined;
   const cost = worktree ? from.costSoFar(worktree) : undefined;
   return {
     log,
     diff,
-    ...(run ? { check: { ok: run.ok, command: run.command, seconds: run.seconds, at: run.at, failed: run.failed } } : {}),
+    ...(run ? { check: { ok: run.ok, command: run.name, seconds: run.seconds, at: run.at, failed: run.ok ? [] : [run.name] } } : {}),
     review,
     ...(cost !== undefined ? { cost } : {}),
   };

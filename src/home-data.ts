@@ -89,8 +89,6 @@ export interface HomeTask {
 
 /** Why work waits in a project, in words: what runs now, what each paused task waits for, why a ready step has not started. */
 export interface HomeWaiting {
-  /** Why the merge line is paused, when it is (a red main or a check that failed for the machine's sake). */
-  linePaused?: string;
   running: { id: string; title: string; stage: Stage; since: number }[];
   paused: WaitGroup[];
   notStarted: { title: string; reason: string }[];
@@ -336,7 +334,7 @@ type Roadmap = ReturnType<typeof roadmapProgress>;
 /** One of this machine's tasks as the home view shows it. */
 function localRow(x: { t: Raw; state: TaskState }, roadmap: Roadmap, line: string | undefined, ctx: SpaceContext): HomeTask {
   const { t, state } = x;
-  const { cards, env, now } = ctx;
+  const { cards, now } = ctx;
   const title = String(t.title ?? t.id);
   const step = stepOf(title);
   const full = step && roadmap?.titles.get(step);
@@ -355,7 +353,7 @@ function localRow(x: { t: Raw; state: TaskState }, roadmap: Roadmap, line: strin
     ...(result ? { result } : {}),
     ...(typeof model === "string" && stage !== "queued" ? { model } : {}),
     since: stageSince(t, stage, now),
-    ...(state !== "done" ? rowFacts(t, cards.get(t.id), stage !== "queued", env, now) : {}),
+    ...(state !== "done" ? rowFacts(t, cards.get(t.id), stage !== "queued", now) : {}),
     ...(stage === "work" && typeof t.report?.progress === "number" ? { progress: Math.max(0, Math.min(1, t.report.progress / 100)) } : {}),
     // Lineclear keeps `stalled` after a stall ends; `life` is set only while the task is still quiet
     ...(typeof t.stalled?.life === "number" && (stage === "work" || stage === "review") ? { stalled: true } : {}),
@@ -423,7 +421,7 @@ function spaceView(s: Raw, ctx: SpaceContext, owner?: { project: string; paused:
     broken,
     ...owner,
     tasks: shown,
-    waiting: waitingOf(shown, own, waits, roadmap, owner?.project, env, now, existsSync(s.path) ? mainRefs(s.path)[1] : undefined, s.path),
+    waiting: waitingOf(shown, own, waits, roadmap, owner?.project, env, now),
   } satisfies HomeProject;
 }
 

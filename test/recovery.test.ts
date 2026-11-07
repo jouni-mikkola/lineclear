@@ -21,7 +21,7 @@ test("no source file writes a state file in place", () => {
   const allowed = new Set(["atomic.ts", "browsers.ts"]);
   // Appends are for the logs only (a cut leaves at most one partial last line, which readers skip).
   const plain = /\b(writeFileSync|writeFile|Bun\.write|createWriteStream|appendFileSync|cpSync)\(/;
-  const logs = new Set(["rules.ts", "full.ts", "plan.ts", "check-runs.ts", "task-work.ts", "api-latency.ts", "stall-class.ts", "stall-ladder.ts"]);
+  const logs = new Set(["rules.ts", "full.ts", "plan.ts", "task-work.ts", "api-latency.ts", "stall-class.ts", "stall-ladder.ts"]);
   const found: string[] = [];
   const src = join(import.meta.dir, "..", "src");
   for (const f of readdirSync(src).filter((f) => f.endsWith(".ts") && !allowed.has(f))) {
