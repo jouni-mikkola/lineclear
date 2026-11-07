@@ -71,6 +71,7 @@ export function world(herdr = fakeHerdr(), o: { boot?: string } = {}) {
       sent.push({ key, text })
       return { waiting: false, item: {} }
     },
+    on: () => () => undefined,
     status: (key: string) => status[key] ?? 'gone',
     aborted: (key: string) => abortedKeys.has(key),
     record: (key: string) => records[key],

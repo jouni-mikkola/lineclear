@@ -4,17 +4,13 @@ import type { Space } from '../places.ts'
 import * as G from './git.ts'
 import * as GH from './github.ts'
 import * as Lane from './lane.ts'
-import { type TaskRec, ended, CHECKS_EVERY, LAND_RETRY } from './engine-helpers.ts'
+import { type TaskRec, ended, LAND_RETRY } from './engine-helpers.ts'
 import { EngineHandoff } from './engine-handoff.ts'
 
-/** how long a merge waits for a merge queue to run its check and merge the pull request */
-const QUEUE_WAIT_MS = 15 * 60_000
 /** how long a ready task's agent may finish its turn before the board merges without ending it */
 const TURN_END_WAIT_MS = 2 * 60_000
 
 const HELD = 'Held:'
-/** a merge held by a red main is looked at again this soon */
-const HELD_RETRY = 30_000
 
 export class EngineLand extends EngineHandoff {
   /**
@@ -54,6 +50,8 @@ export class EngineLand extends EngineHandoff {
     for (const t of waiting) {
       if (t.askFirst || this.settings.ways(this.proj(t).name).merge === 'ask me first') continue
       if (Date.now() - (t.landTriedAt ?? 0) < LAND_RETRY) continue
+      // held by a red main: nothing to try until the watch sees main green
+      if (t.mergeStopped?.startsWith(HELD) && this.redOf(t)) continue
       // not waited for: a merge held by a red main must not hold up the watch that turns main green
       void this.merge(t.id).then(
         (r) => this.landed(t, r),
@@ -63,7 +61,7 @@ export class EngineLand extends EngineHandoff {
   }
 
   private landed(t: TaskRec, r: { ok: boolean; error?: string }) {
-    t.landTriedAt = r.ok ? undefined : r.error?.startsWith(HELD) ? Date.now() - LAND_RETRY + HELD_RETRY : Date.now()
+    t.landTriedAt = r.ok ? undefined : Date.now()
     // only the rebase that failed: main moving on GitHub meanwhile is rebased by the next try
     const clash = /^Conflict with \S+: rebase .* Conflicting files: (.*)\. Sent back to/.exec(r.error ?? '')
     if (clash && !t.landCard) {
@@ -79,12 +77,26 @@ export class EngineLand extends EngineHandoff {
 
   private async endAndMerge(t: TaskRec) {
     const key = this.key(t)
-    for (const end = Date.now() + TURN_END_WAIT_MS; this.agents.status(key) === 'working' && Date.now() < end; ) await Bun.sleep(500)
+    await this.turnEnded(key)
     if (this.agents.status(key) === 'working' || !t.reported || ended(t) || t.landing || this.landings.has(t.id)) return
     // a note not read yet would wait for a process that is gone: leave the agent be, it reads the note and merges
     if (this.chats.unseen(key).length) return
     await this.agents.finish(key).catch(() => undefined)
     await this.merge(t.id)
+  }
+
+  /** resolves when the agent's turn ends (its status changes) or after the wait, whichever is first */
+  private turnEnded(key: string): Promise<void> {
+    if (this.agents.status(key) !== 'working') return Promise.resolve()
+    return new Promise((done) => {
+      const finish = () => {
+        clearTimeout(timer)
+        off()
+        done()
+      }
+      const timer = setTimeout(finish, TURN_END_WAIT_MS)
+      const off = this.agents.on('status', (k) => (k === key || k === '*') && this.agents.status(key) !== 'working' && finish())
+    })
   }
 
   /**
@@ -128,33 +140,28 @@ export class EngineLand extends EngineHandoff {
     return run.finally(() => clearTimeout(late))
   }
 
-  /** a task's merge while it holds its repo's lane: the head, which the lane lets go when it hangs (watchHeads) */
+  /** a task's merge while it holds its repo's lane: the head, which the lane lets go past its limit (releaseHead) */
   protected async head(t: TaskRec, repo: string, self: boolean): Promise<{ ok: boolean; error?: string; note?: string }> {
-    this.headWatch.begin(
-      t.id,
-      [t.worktree, repo].filter((d): d is string => !!d),
-      Lane.turnLimitMs(repo),
-    )
-    const run = ++this.runs
-    this.runOf.set(t.id, run)
+    const ctl = new AbortController()
+    const limit = this.headLimitMs ?? Lane.turnLimitMs(repo)
     const freed = new Promise<{ ok: false; error: string; freed: true }>((free) => this.frees.set(t.id, free))
-    const work = this.inRun.run(run, () =>
+    // over its limit the lane lets it go: its steps end with their process groups and the next head starts
+    const timer = setTimeout(() => void this.releaseHead(t, ctl, limit).catch(() => undefined), limit)
+    const work = G.stepSignal.run(ctl.signal, () =>
       this.onGitHub(
         () => this.mergeNow(t, self),
         (error) => ({ ok: false, error: `Can't merge ${t.id}: ${error}` }),
       ),
     )
-    // a released run is forgotten once it ends
-    const ended = () => this.cut.delete(run)
-    work.then(ended, ended)
+    // a released run ends on its own later, its error is nobody's
+    work.catch(() => undefined)
     try {
       const r = await Promise.race([work, freed])
       if (!('freed' in r)) this.released.delete(t.id)
       return r
     } finally {
-      this.headWatch.end(t.id)
+      clearTimeout(timer)
       this.frees.delete(t.id)
-      if (this.runOf.get(t.id) === run) this.runOf.delete(t.id)
     }
   }
 
@@ -175,7 +182,9 @@ export class EngineLand extends EngineHandoff {
     this.closing = true
     const on = [...this.landings.values()]
     if (!on.length) return false
-    await Promise.race([Promise.allSettled(on), Bun.sleep(this.mergeDeadline)])
+    let timer: ReturnType<typeof setTimeout> | undefined
+    await Promise.race([Promise.allSettled(on), new Promise((r) => (timer = setTimeout(r, this.mergeDeadline)))])
+    clearTimeout(timer)
     return true
   }
 
@@ -278,16 +287,22 @@ export class EngineLand extends EngineHandoff {
   }
 
   /**
-   * A main red in the required check stops the merges (another workflow's failure files a fix task and holds nothing), so a burst of failures stays one. A fix (its task is made by main-green, or its title
-   * starts with Fix) goes in, as only it can turn main green. Anything else is refused at once with the reason, never
-   * waited for: a waiting merge would hold the repo's lane and the fix behind it. The board tries again soon (landed).
+   * A main red in the required check stops the merges (another workflow's failure files a fix task and holds nothing),
+   * so a burst of failures stays one. A fix (its task is made by main-green) goes in, as only it can turn main green.
+   * Anything else is refused at once with the reason, never waited for: a waiting merge would hold the repo's lane and
+   * the fix behind it. The board tries again once the main watch sees main green.
    */
-  protected async holdWhileRed(t: TaskRec, g: GH.GitHub, cwd: string): Promise<string | undefined> {
-    if (t.by === 'main-green' || /^fix\b/i.test(t.title)) return undefined
-    const last = (await GH.branchRuns(g, cwd, t.base!))?.find((r) => r.required !== 'pending')
-    if (last?.required !== 'fail') return undefined
+  protected async holdWhileRed(t: TaskRec): Promise<string | undefined> {
+    if (t.by === 'main-green') return undefined
+    const sha = this.redOf(t)
+    if (!sha) return undefined
     const fix = this.tasks.find((x) => x.by === 'main-green' && !x.merged && !x.archived && x.project === t.project)
-    return `${HELD} ${t.base} is red at ${last.sha.slice(0, 7)}${fix ? `, fix task ${fix.id}` : ''}. Nothing was merged; ${t.id} lands by itself once a run on ${t.base} is green.`
+    return `${HELD} ${t.base} is red at ${sha.slice(0, 7)}${fix ? `, fix task ${fix.id}` : ''}. Nothing was merged; ${t.id} lands by itself once ${t.base} is green.`
+  }
+
+  /** the commit main is red at in the required check, from what the main watch last saw: no call to GitHub */
+  private redOf(t: TaskRec): string | undefined {
+    return this.heldRed.get(this.places.space(t.project)?.path ?? '')
   }
 
   /**
@@ -337,7 +352,7 @@ export class EngineLand extends EngineHandoff {
         `it was in ${t.base} already${pr ? (closed ? `; closed PR #${pr.number}` : `; could not close PR #${pr.number}: close it on GitHub`) : ''}`,
       )
     }
-    const held = await this.holdWhileRed(t, g, p.path)
+    const held = await this.holdWhileRed(t)
     if (held) return { ok: false, error: held }
     const head = (await G.git(wt, 'rev-parse', 'HEAD')).out
     const pushing = !pr || pr.headRefOid !== head
@@ -380,14 +395,14 @@ export class EngineLand extends EngineHandoff {
       return { ok: false, error: `${why} Sent back to ${t.id}'s agent to fix.` }
     }
     const m = await GH.mergePr(g, wt, n, head, `${t.id}: ${t.title} (#${n})`, t.said ?? '')
-    let state = (await GH.viewPr(g, wt, n))?.state
-    // a repo with a merge queue only queues the pull request: GitHub's full check runs there and merges it when green
-    if (state !== 'MERGED' && /merge queue|automatically merged|auto-merge/i.test(`${m.out}\n${m.err}`)) {
-      for (const t0 = Date.now(); state === 'OPEN' && Date.now() - t0 < QUEUE_WAIT_MS; ) {
-        await Bun.sleep(CHECKS_EVERY)
-        state = (await GH.viewPr(g, wt, n))?.state
+    const state = (await GH.viewPr(g, wt, n))?.state
+    // a repo with a merge queue only queues the pull request: GitHub's full check runs there and merges it when green.
+    // The line is not held for that: the board asks again and finds it merged.
+    if (state === 'OPEN' && /merge queue|automatically merged|auto-merge/i.test(`${m.out}\n${m.err}`))
+      return {
+        ok: false,
+        error: `PR #${n} is in GitHub's merge queue: it merges there once its check is green. ${t.id} is marked merged on the next lineclear merge ${t.id}.`,
       }
-    }
     if (state !== 'MERGED') {
       const said = (m.err || m.out || 'it did not say why').split('\n')[0]
       // main moved on GitHub since it was fetched: merging again rebases it if it now conflicts (Merging meanwhile)

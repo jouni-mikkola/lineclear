@@ -7,48 +7,36 @@ import { EngineMerge } from './engine-merge.ts'
 import { move } from './phase.ts'
 import { retireDue } from './retire.ts'
 import * as Lane from './lane.ts'
-import { killWork, workIn } from './machine.ts'
 import { decide } from './lane-watch.ts'
 
 export class EngineTidy extends EngineMerge {
-  /** Lets go of the heads that show no progress or hold their line past its limit: the next head starts, the task is told. */
-  async watchHeads(now = Date.now()) {
-    const look = this.headWatch.look(
-      now,
-      (id) => this.task(id)?.landing?.step,
-      (dirs) => workIn(dirs),
+  /**
+   * A head holds its line past its limit: its steps end (the signal kills their process groups), the next head starts
+   * and the task is told. A second release in a row restarts its agent.
+   */
+  protected override releaseHead = async (t: TaskRec, ctl: AbortController, limitMs: number) => {
+    ctl.abort()
+    const minutes = Math.max(1, Math.round(limitMs / 60_000))
+    const step = t.landing ? Lane.landingLine(t.landing, t.base) : 'Merging'
+    const twice = (this.released.get(t.id) ?? 0) >= 1
+    this.released.set(t.id, (this.released.get(t.id) ?? 0) + 1)
+    const hung = `Your merge hung in "${step}" for ${minutes} min (over the limit), so the merge lane released it and nothing was merged.`
+    decide(
+      t.id,
+      'stall',
+      `${twice ? 'restarted' : 'released'} ${t.id}'s merge: hung in "${step}" for ${minutes} min, over the limit${twice ? ', twice in a row' : ''}`,
     )
-    for (const r of look) {
-      const t = this.task(r.id)
-      const repo = t && this.places.space(t.project)?.path
-      if (!t || !repo) continue
-      const step = t.landing ? Lane.landingLine(t.landing, t.base) : 'Merging'
-      const twice = (this.released.get(t.id) ?? 0) >= 1
-      this.released.set(t.id, (this.released.get(t.id) ?? 0) + 1)
-      const hung = `Your merge hung in "${step}" for ${r.minutes} min (${r.why}), so the merge lane released it and nothing was merged.`
-      decide(
-        t.id,
-        'stall',
-        `${twice ? 'restarted' : 'released'} ${t.id}'s merge: hung in "${step}" for ${r.minutes} min, ${r.why}${twice ? ', twice in a row' : ''}`,
-      )
-      // the work it left running ends, so nothing it still does reaches main or the line; only this task's own folder is
-      // touched: the repo's main checkout is shared
-      const run = this.runOf.get(t.id)
-      if (run !== undefined) this.cut.add(run)
-      this.headWatch.end(t.id)
-      killWork(t.worktree ? [t.worktree] : [])
-      this.land(t)
-      t.mergeStopped = hung.slice(0, 300)
-      this.save()
-      const error = `${hung} Run lineclear merge ${t.id} again.`
-      // the next head starts before anyone is told: a slow message holds nothing
-      this.frees.get(t.id)?.({ ok: false, error: `${error} Sent back to ${t.id}'s agent.`, freed: true })
-      if (twice) {
-        // the stall ladder's restart rung: stop it, then tell it
-        await this.stopTask(t.id).catch((e) => this.troubled(t, e))
-        await this.tell(t.id, `${error} Your agent was restarted because this is the second release in a row.`).catch((e) => this.troubled(t, e))
-      } else await this.sendBack(t, error)
-    }
+    this.land(t)
+    t.mergeStopped = hung.slice(0, 300)
+    this.save()
+    const error = `${hung} Run lineclear merge ${t.id} again.`
+    // the next head starts before anyone is told: a slow message holds nothing
+    this.frees.get(t.id)?.({ ok: false, error: `${error} Sent back to ${t.id}'s agent.`, freed: true })
+    if (twice) {
+      // the stall ladder's restart rung: stop it, then tell it
+      await this.stopTask(t.id).catch((e) => this.troubled(t, e))
+      await this.tell(t.id, `${error} Your agent was restarted because this is the second release in a row.`).catch(() => undefined)
+    } else await this.sendBack(t, error)
   }
 
   /* ---------- you and coordinators ---------- */

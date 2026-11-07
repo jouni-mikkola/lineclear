@@ -78,7 +78,6 @@ export class Engine extends EngineTidy {
         every(RECHECK_FIRST, undefined, () => this.resumeQueue()),
         every(SWEEP_FIRST, SWEEP_EVERY, tidy),
         every(WATCH_FIRST, WATCH_EVERY, watch),
-        every(STALL_EVERY, STALL_EVERY, () => this.watchHeads().catch(() => undefined)),
         { due: () => this.nextStallDue(), run: (now) => this.checkStalls(now) },
       ],
       STALL_EVERY,

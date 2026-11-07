@@ -1,4 +1,4 @@
-import { machineLimits } from "../server/server/live/engine/machine.ts";
+import { machineLimits } from "./machine-limits.ts";
 import { serverBin } from "./paths.ts";
 import { readMachineTasks } from "./task-read.ts";
 import { listProjectNames, projectsDir, readSettings } from "./project.ts";

@@ -185,6 +185,8 @@ export class EngineMerge extends EngineLand {
     const i = runs ? runs.findIndex((r) => r.state !== 'pending') : -1
     if (!g || !runs || i < 0) return
     const now = runs[i]
+    if (now.required === 'fail') this.heldRed.set(p.path, now.sha)
+    else this.heldRed.delete(p.path)
     if (now.state === 'pass') {
       if (red) {
         delete this.data.red![p.path]
