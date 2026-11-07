@@ -26,7 +26,7 @@ export class LiveSourceCli extends LiveSourceSubcommands {
   }
 
   /** the board command's words, one row each; a row gives the words it answers to and what it runs */
-  protected async command(p: Parsed, ctx: Ctx): Promise<string> {
+  protected command(p: Parsed, ctx: Ctx): string | Promise<string> {
     const [word, a1, ...rest] = p.words
     if (!word || word === 'help' || p.flags.has('help')) return HELP
     const rows: Record<string, () => string | Promise<string>> = {
