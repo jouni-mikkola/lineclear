@@ -1,7 +1,8 @@
 import { expect, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { Database } from "bun:sqlite";
+import { mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { copiesProblem, copyStore, listCopies, restoreCopy, storeMain, taskCount } from "../src/store-copies.ts";
+import { copiesProblem, copyStore, copyStoreQuietly, listCopies, restoreCopy, storeMain, taskCount } from "../src/store-copies.ts";
 import { tmp } from "./helpers.ts";
 
 function world() {
@@ -62,7 +63,7 @@ test("lineclear store lists, copies and restores", () => {
   expect(out.join("\n")).toContain("2 tasks");
   expect(storeMain(["restore", "x"], (l) => out.push(l), env)).toBe(1);
   expect(storeMain(["bogus"], (l) => out.push(l), env)).toBe(2);
-  expect(existsSync(join(env.LINECLEAR_STORE_COPIES, readdirSync(env.LINECLEAR_STORE_COPIES)[0] ?? "", "source"))).toBe(true);
+  expect(readdirSync(env.LINECLEAR_STORE_COPIES)).toEqual(["hourly-2026-11-03T00-00-00.sqlite"]);
 });
 
 test("the cold log counts one task per id, and a gone line drops it", () => {
@@ -70,6 +71,52 @@ test("the cold log counts one task per id, and a gone line drops it", () => {
   fill(0);
   writeFileSync(join(data, "tasks-cold.jsonl"), '{"id":"A-1","n":1}\n{"id":"A-1","n":1,"x":2}\n{"id":"A-2"}\n{"gone":"A-2"}\n\n');
   expect(taskCount(data)).toBe(1);
+});
+
+test("a copy is one small file, holds the store at one moment, and leaves out secrets and push keys", () => {
+  const { data, env, fill } = world();
+  fill(1);
+  const store = new Database(join(data, "store.sqlite"));
+  store.exec("PRAGMA journal_mode=WAL; CREATE TABLE t (v TEXT); INSERT INTO t VALUES ('one')");
+  writeFileSync(join(data, "agents-cold.jsonl"), '{"id":"a","note":"x"}\n'.repeat(200_000));
+  const ids = new Database(join(data, "task-ids.sqlite"));
+  ids.exec("CREATE TABLE s (n INTEGER); INSERT INTO s VALUES (7)");
+  ids.close();
+  writeFileSync(join(data, "vault.json"), "TOPSECRET");
+  writeFileSync(join(data, "vapid.json"), "TOPSECRET");
+  writeFileSync(join(data, "push.json"), "TOPSECRET");
+  const name = copyStore("hourly", at(0), env);
+  const file = join(env.LINECLEAR_STORE_COPIES, `${name}.sqlite`);
+  expect(statSync(file).size).toBeLessThan(5_000_000);
+  const held = new Database(file).query("SELECT path, body FROM copy_files").all() as { path: string; body: Uint8Array<ArrayBuffer> }[];
+  expect(held.map((r) => r.path)).toContain("tasks.json");
+  expect(held.map((r) => r.path)).toContain("task-ids.sqlite");
+  expect(held.filter((r) => new TextDecoder().decode(Bun.gunzipSync(r.body)).includes("TOPSECRET"))).toEqual([]);
+  store.exec("INSERT INTO t VALUES ('two')");
+  restoreCopy(name, env);
+  const back = new Database(join(data, "store.sqlite"));
+  expect(back.query("SELECT v FROM t").all()).toEqual([{ v: "one" }]);
+  expect(back.query("SELECT name FROM sqlite_master WHERE name LIKE 'copy_%'").all()).toEqual([]);
+  expect(readFileSync(join(data, "vault.json"), "utf8")).toBe("TOPSECRET");
+});
+
+test("an old folder copy is removed once a file copy exists", () => {
+  const { env, fill } = world();
+  fill(1);
+  mkdirSync(join(env.LINECLEAR_STORE_COPIES, "hourly-2026-01-01T00-00-00"), { recursive: true });
+  copyStore("hourly", at(0), env);
+  expect(readdirSync(env.LINECLEAR_STORE_COPIES)).toEqual(["hourly-2026-11-03T00-00-00.sqlite"]);
+});
+
+test("a failed copy is not swallowed: doctor names it, and a good copy clears it", () => {
+  const { data, env, fill } = world();
+  fill(1);
+  writeFileSync(join(data, "blocker"), "a file where the folder should be");
+  const broken = { ...env, LINECLEAR_STORE_COPIES: join(data, "blocker", "copies") };
+  copyStoreQuietly(broken, at(0));
+  expect(copiesProblem(broken, at(0))).toContain("the last copy of the store failed");
+  copyStoreQuietly(env, at(0));
+  expect(copiesProblem(env, at(0))).toBe("");
 });
 
 test("a copy holds the task briefs tasks.json points at, and restore puts them back", () => {
