@@ -34,7 +34,11 @@ function settings(): string[] {
     ['machine', raw.machine ?? {}, 'machine'],
     ...Object.entries(raw.spaces ?? {}).map(([space, v]): [string, Values, { space: string }] => [`space ${space}`, v, { space }]),
   ]
-  const lost = levels.flatMap(([name, values, level]) => Object.entries(values).filter(([k, v]) => read.pick(k, level).value !== v).map(([k]) => `${name} ${k}`))
+  const lost = levels.flatMap(([name, values, level]) =>
+    Object.entries(values)
+      .filter(([k, v]) => read.pick(k, level).value !== v)
+      .map(([k]) => `${name} ${k}`),
+  )
   return lost.length ? [`settings.json: this build would drop ${lost.join(', ')}`] : []
 }
 
@@ -79,7 +83,13 @@ function chats(): string[] {
 }
 
 const out: string[] = []
-const readers: [string, () => string[]][] = [['settings.json', settings], ['tasks.json', tasks], ['spaces.json', spaces], ['chatlog', chats], ['task-ids.sqlite', taskIds]]
+const readers: [string, () => string[]][] = [
+  ['settings.json', settings],
+  ['tasks.json', tasks],
+  ['spaces.json', spaces],
+  ['chatlog', chats],
+  ['task-ids.sqlite', taskIds],
+]
 for (const [name, check] of readers) {
   try {
     if (existsSync(join(home, name))) out.push(...check())
