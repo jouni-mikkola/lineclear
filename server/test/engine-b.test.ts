@@ -163,9 +163,9 @@ describe('a task is its brief and one agent', () => {
     // a long question is cut at a word to fit one line
     w.chat.reply = 'Should I rename every occurrence of the old setting across all the packages?'
     expect(w.engine.view(t).sub).toBe('Should I rename every occurrence')
-    // words that ask nothing: the standard line, never the message
+    // words that ask nothing: not a need (the stall ladder resumes it), and never the message
     w.chat.reply = 'A very long message that must never show up in the list of tasks or in the news.'
-    expect(w.engine.view(t).sub).toBe('Waits for your reply')
+    expect(w.engine.view(t).sub).toBe('Working')
   })
 
   test('a standard reason: a plan, a choice card, a question, a lost login', async () => {
@@ -189,7 +189,7 @@ describe('a task is its brief and one agent', () => {
     for (const [r, sub] of [
       ['Fixed the bug where users got logged out after a refresh. Okay to merge?', 'Okay to merge?'],
       ['Now an invalid API key returns 401 instead of 500. Please run /login to try it?', 'Please run /login to try it?'],
-      ['Users who are not logged in now see the sign-in page.', 'Waits for your reply'],
+      ['Users who are not logged in now see the sign-in page.', 'Working'],
     ]) {
       w.chat.reply = r
       expect(w.engine.view(t).sub).toBe(sub)
